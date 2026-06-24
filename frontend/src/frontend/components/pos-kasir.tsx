@@ -38,6 +38,8 @@ import {
   createOrderAndPayment,
 } from "@backend/server-actions";
 import { bluetoothPrinter, type ReceiptData } from "@frontend/lib/bluetooth-printer";
+import logoFilkom from "@/assets/logo_filkom.png";
+import logoFM from "@/assets/logo-fm.jpg";
 
 interface CartItem {
   id: string;
@@ -115,6 +117,160 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
   const [dialogSelectedSize, setDialogSelectedSize] = useState<string | null>(null);
   const [dialogSelectedColor, setDialogSelectedColor] = useState<string | null>(null);
 
+  const [currentReceiptData, setCurrentReceiptData] = useState<ReceiptData | null>(null);
+  const [showReceiptDialog, setShowReceiptDialog] = useState(false);
+
+  const printBrowserReceipt = (data: ReceiptData) => {
+    const printWindow = window.open("", "_blank", "width=400,height=600");
+    if (!printWindow) {
+      toast.error("Gagal membuka jendela cetak. Pastikan pop-up diperbolehkan di browser Anda.");
+      return;
+    }
+
+    const itemsHtml = data.items.map(item => `
+      <div style="margin-bottom: 6px;">
+        <div style="font-weight: bold; word-break: break-word;">${item.name}</div>
+        <div style="display: flex; justify-content: space-between; font-size: 9px;">
+          <span>${item.qty} x Rp ${item.price.toLocaleString("id-ID")}</span>
+          <span>Rp ${item.subtotal.toLocaleString("id-ID")}</span>
+        </div>
+      </div>
+    `).join("");
+
+    const discountHtml = data.discount > 0 ? `
+      <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
+        <span>Diskon:</span>
+        <span>-Rp ${data.discount.toLocaleString("id-ID")}</span>
+      </div>
+    ` : "";
+
+    const customerHtml = data.customer_name ? `
+      <div>Pelanggan: ${data.customer_name}</div>
+    ` : "";
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Cetak Struk - FM</title>
+          <style>
+            @page {
+              size: 58mm auto;
+              margin: 0;
+            }
+            body {
+              width: 50mm;
+              margin: 0 auto;
+              padding: 4mm 2mm;
+              font-family: 'Courier New', Courier, monospace;
+              font-size: 10px;
+              color: #000;
+              background: #fff;
+              line-height: 1.3;
+            }
+            .text-center {
+              text-align: center;
+            }
+            .divider {
+              border-top: 1px dashed #000;
+              margin: 6px 0;
+            }
+            .header {
+              margin-bottom: 8px;
+            }
+            .logo {
+              font-size: 16px;
+              font-weight: bold;
+              letter-spacing: 2px;
+            }
+            .info {
+              font-size: 9px;
+              margin-bottom: 8px;
+            }
+            .total-section {
+              font-weight: bold;
+              margin-top: 6px;
+            }
+            .footer {
+              margin-top: 12px;
+              font-size: 9px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header text-center">
+            <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <img src="${logoFilkom}" style="width: 42px; height: auto; filter: grayscale(100%);" />
+              <img src="${logoFM}" style="width: 42px; height: auto; filter: grayscale(100%);" />
+            </div>
+            <div style="font-size: 9px; font-weight: bold;">FILKOM MERCH</div>
+            <div style="font-size: 8px;">Universitas Brawijaya</div>
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div class="info">
+            <div>No: ${data.sale_id}</div>
+            <div>Tgl: ${data.date} ${data.time}</div>
+            <div>Kasir: ${data.cashier_name}</div>
+            ${customerHtml}
+            <div>Bayar: ${data.payment_method}</div>
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div class="items">
+            ${itemsHtml}
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div class="total-section">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
+              <span>Subtotal:</span>
+              <span>Rp ${data.subtotal.toLocaleString("id-ID")}</span>
+            </div>
+            ${discountHtml}
+            <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin-top: 4px; border-top: 1px dashed #000; padding-top: 4px;">
+              <span>TOTAL:</span>
+              <span>Rp ${data.total.toLocaleString("id-ID")}</span>
+            </div>
+          </div>
+          
+          <div class="divider"></div>
+          
+          <div class="footer text-center">
+            <div>Terima kasih telah membeli!</div>
+            <div style="margin-top: 4px; font-style: italic; font-size: 8px;">Wear Your Faculty.</div>
+          </div>
+
+          <script>
+            window.onload = function() {
+              window.print();
+              setTimeout(function() {
+                window.close();
+              }, 500);
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
+  const handleCloseReceiptDialog = () => {
+    setShowReceiptDialog(false);
+    setCurrentReceiptData(null);
+    setCart([]);
+    setCustomerName("");
+    setDiscount(0);
+    setNotes("");
+    setSearchQuery("");
+  };
+
   const loadData = useCallback(async () => {
     try {
       const [productsResult, categoriesResult, settingsResult] = await Promise.all([
@@ -141,12 +297,12 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
     const clientKey = "Mid-client-xBEPEMQRGEXHq99n";
 
-    let script = document.querySelector(`script[src="${snapScriptUrl}"]`);
+    const script = document.querySelector(`script[src="${snapScriptUrl}"]`);
     if (!script) {
-      script = document.createElement("script");
-      script.src = snapScriptUrl;
-      script.setAttribute("data-client-key", clientKey);
-      document.body.appendChild(script);
+      const newScript = document.createElement("script");
+      newScript.src = snapScriptUrl;
+      newScript.setAttribute("data-client-key", clientKey);
+      document.body.appendChild(newScript);
     }
   }, []);
 
@@ -289,26 +445,27 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
         const paymentMethodLabel =
           actualPaymentMethod || (paymentMethod === "cash" ? "Tunai" : "Online Payment");
 
+        const receiptData: ReceiptData = {
+          store_name,
+          sale_id: result.sale_id!,
+          date: new Date().toLocaleDateString("id-ID"),
+          time: new Date().toLocaleTimeString("id-ID"),
+          items: cart.map((item) => ({
+            name: item.product_name,
+            qty: item.quantity,
+            price: item.unit_price,
+            subtotal: item.unit_price * item.quantity,
+          })),
+          subtotal,
+          discount,
+          tax: 0,
+          total,
+          payment_method: paymentMethodLabel,
+          cashier_name: admin_name,
+          customer_name: customerName || undefined,
+        };
+
         if (printerConnected) {
-          const receiptData: ReceiptData = {
-            store_name,
-            sale_id: result.sale_id!,
-            date: new Date().toLocaleDateString("id-ID"),
-            time: new Date().toLocaleTimeString("id-ID"),
-            items: cart.map((item) => ({
-              name: item.product_name,
-              qty: item.quantity,
-              price: item.unit_price,
-              subtotal: item.unit_price * item.quantity,
-            })),
-            subtotal,
-            discount,
-            tax: 0,
-            total,
-            payment_method: paymentMethodLabel,
-            cashier_name: admin_name,
-            customer_name: customerName || undefined,
-          };
           try {
             await bluetoothPrinter.printReceipt(receiptData);
           } catch {
@@ -317,11 +474,8 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
         }
 
         toast.success(`Transaksi berhasil! ${result.sale_id}`);
-        setCart([]);
-        setCustomerName("");
-        setDiscount(0);
-        setNotes("");
-        setSearchQuery("");
+        setCurrentReceiptData(receiptData);
+        setShowReceiptDialog(true);
         await loadData();
       };
 
@@ -803,6 +957,108 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
               >
                 Pilih Varian
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {showReceiptDialog && currentReceiptData && (
+        <Dialog open={showReceiptDialog} onOpenChange={(open) => !open && handleCloseReceiptDialog()}>
+          <DialogContent className="max-w-md bg-white border-2 border-ink">
+            <DialogHeader>
+              <DialogTitle className="display text-lg tracking-wider text-ink uppercase text-center">
+                Transaksi Berhasil!
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 flex flex-col items-center">
+              {/* Receipt Preview */}
+              <div className="bg-white text-black p-4 w-[280px] shadow-sm border border-gray-200 font-mono text-[10px] leading-relaxed select-none">
+                <div className="text-center font-bold mb-2 flex flex-col items-center">
+                  <div className="flex justify-center items-center gap-3 mb-1.5">
+                    <img
+                      src={logoFilkom}
+                      alt="Logo FILKOM"
+                      className="w-11 h-auto grayscale filter brightness-100 contrast-100"
+                    />
+                    <img
+                      src={logoFM}
+                      alt="Logo FM"
+                      className="w-11 h-auto grayscale filter brightness-100 contrast-100"
+                    />
+                  </div>
+                  <div className="text-[10px]">FILKOM MERCH</div>
+                  <div className="text-[9px] font-normal">Universitas Brawijaya</div>
+                </div>
+                
+                <div className="border-t border-dashed border-black my-2"></div>
+                
+                <div className="space-y-0.5 text-[9px]">
+                  <div>No: {currentReceiptData.sale_id}</div>
+                  <div>Tgl: {currentReceiptData.date} {currentReceiptData.time}</div>
+                  <div>Kasir: {currentReceiptData.cashier_name}</div>
+                  {currentReceiptData.customer_name && (
+                    <div>Pelanggan: {currentReceiptData.customer_name}</div>
+                  )}
+                  <div>Bayar: {currentReceiptData.payment_method}</div>
+                </div>
+                
+                <div className="border-t border-dashed border-black my-2"></div>
+                
+                <div className="space-y-1.5">
+                  {currentReceiptData.items.map((item, idx) => (
+                    <div key={idx} className="text-[9px]">
+                      <div className="font-bold">{item.name}</div>
+                      <div className="flex justify-between text-[8px]">
+                        <span>{item.qty} x Rp {item.price.toLocaleString("id-ID")}</span>
+                        <span>Rp {item.subtotal.toLocaleString("id-ID")}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="border-t border-dashed border-black my-2"></div>
+                
+                <div className="space-y-0.5 text-[9px] font-bold">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>Rp {currentReceiptData.subtotal.toLocaleString("id-ID")}</span>
+                  </div>
+                  {currentReceiptData.discount > 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span>Diskon:</span>
+                      <span>-Rp {currentReceiptData.discount.toLocaleString("id-ID")}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-dashed border-black mt-1 pt-1 text-xs">
+                    <span>TOTAL:</span>
+                    <span>Rp {currentReceiptData.total.toLocaleString("id-ID")}</span>
+                  </div>
+                </div>
+                
+                <div className="border-t border-dashed border-black my-2"></div>
+                
+                <div className="text-center text-[9px] space-y-0.5">
+                  <div>Terima kasih telah membeli!</div>
+                  <div className="text-[8px] italic font-normal text-gray-500">Wear Your Faculty.</div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="flex w-full justify-between gap-2 sm:justify-between">
+              <Button
+                variant="outline"
+                onClick={handleCloseReceiptDialog}
+                className="border-2 border-ink text-xs font-bold uppercase tracking-wider flex-1"
+              >
+                Tutup
+              </Button>
+              <Button
+                onClick={() => printBrowserReceipt(currentReceiptData)}
+                className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest flex-1 py-5 px-6 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+              >
+                <Printer className="mr-2 h-4 w-4" /> Cetak Struk
               </Button>
             </DialogFooter>
           </DialogContent>

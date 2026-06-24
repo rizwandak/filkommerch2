@@ -46,6 +46,40 @@ function AdminHomepageEditorPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
+  const handleUploadHeroImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      toast.loading("Mengunggah gambar hero...");
+      const res = await fetch(`${API_BASE_URL}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      toast.dismiss();
+
+      if (data.success && data.url) {
+        setLayout((prev) => ({
+          ...prev,
+          heroImage: data.url,
+        }));
+        toast.success("Gambar hero berhasil diunggah");
+      } else {
+        toast.error(data.error || "Gagal mengunggah gambar hero");
+      }
+    } catch (err) {
+      toast.dismiss();
+      console.error(err);
+      toast.error("Gagal mengunggah gambar hero");
+    }
+  };
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -197,12 +231,39 @@ function AdminHomepageEditorPage() {
               </div>
 
               <div className="space-y-2">
-                <Label>URL Gambar Hero Lookbook (Kosongkan untuk bawaan)</Label>
-                <Input
-                  value={layout.heroImage}
-                  onChange={(e) => setLayout({ ...layout, heroImage: e.target.value })}
-                  placeholder="https://images.unsplash.com/photo-..."
-                />
+                <Label>Gambar Hero Lookbook</Label>
+                {layout.heroImage ? (
+                  <div className="relative border-2 border-dashed border-ink/30 rounded-lg p-4 bg-muted/30 flex flex-col items-center gap-3">
+                    <img
+                      src={layout.heroImage}
+                      alt="Hero Lookbook"
+                      className="max-h-48 rounded object-cover border border-ink/20"
+                    />
+                    <div className="flex gap-2 w-full justify-center">
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => setLayout({ ...layout, heroImage: "" })}
+                        className="text-xs uppercase tracking-wider font-bold animate-fade-in"
+                      >
+                        Hapus Foto
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid w-full items-center gap-1.5">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleUploadHeroImage}
+                      className="cursor-pointer"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Pilih file gambar (PNG, JPG, WEBP). Kosongkan untuk menggunakan tampilan bawaan.
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

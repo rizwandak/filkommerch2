@@ -17,6 +17,11 @@ export interface Product {
   price: number;
   image_url: string | null;
   is_active: boolean;
+  bahan: string | null;
+  asal: string | null;
+  aplikasi: string | null;
+  size_chart_url: string | null;
+  images?: string[];
 }
 
 export interface ProductVariant {
@@ -228,6 +233,7 @@ export interface StoreSettings {
   phone: string | null;
   tax_rate: number;
   qris_static_url: string | null;
+  homepage_layout?: string | null;
 }
 
 export interface CreateProductInput {
@@ -238,6 +244,11 @@ export interface CreateProductInput {
   price: number;
   image_url?: string;
   is_active?: boolean;
+  bahan?: string | null;
+  asal?: string | null;
+  aplikasi?: string | null;
+  size_chart_url?: string | null;
+  images?: string[];
   variants: Array<{ size: string; color?: string | null; stock: number }>;
 }
 
@@ -409,6 +420,67 @@ export const createCategory = createServerFn({ method: "POST" })
     },
   );
 
+// Update category
+export const updateCategory = createServerFn({ method: "POST" })
+  .validator((d: { id: number; name: string }) => d)
+  .handler(
+    async ({
+      data: input,
+    }): Promise<{
+      success: boolean;
+      category?: Category;
+      error?: string;
+    }> => {
+      try {
+        const res = await fetch(`${API_URL}/api/categories/${input.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: input.name }),
+        });
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || `HTTP ${res.status}`);
+        }
+        return res.json();
+      } catch (error) {
+        console.error("Error updating category:", error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to update category",
+        };
+      }
+    },
+  );
+
+// Delete category
+export const deleteCategory = createServerFn({ method: "POST" })
+  .validator((id: number) => id)
+  .handler(
+    async ({
+      data: id,
+    }): Promise<{
+      success: boolean;
+      error?: string;
+    }> => {
+      try {
+        const res = await fetch(`${API_URL}/api/categories/${id}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || `HTTP ${res.status}`);
+        }
+        return res.json();
+      } catch (error) {
+        console.error("Error deleting category:", error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to delete category",
+        };
+      }
+    },
+  );
+
 // Get all products (Admin View)
 export const getAllProductsAdmin = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ products: ProductWithVariants[]; error?: string }> => {
@@ -574,6 +646,7 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
       phone?: string;
       tax_rate?: number;
       qris_static_url?: string;
+      homepage_layout?: string;
     }) => d,
   )
   .handler(async ({ data: input }) => {

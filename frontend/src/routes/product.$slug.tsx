@@ -164,12 +164,11 @@ function ProductDetailPage() {
     );
   }
 
-  // Simulated images array for Shopee gallery look
-  const images = [
-    product.image_url,
-    "https://images.unsplash.com/photo-1578932750294-f5075e85f44a?auto=format&fit=crop&q=80&w=400",
-    "https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&q=80&w=400",
-  ].filter(Boolean) as string[];
+  // Product images gallery
+  const images =
+    product.images && product.images.length > 0
+      ? product.images
+      : ([product.image_url].filter(Boolean) as string[]);
 
   const handleAddToCart = (buyNow = false) => {
     if (!selectedSize && sizes.length > 0) {
@@ -294,9 +293,6 @@ function ProductDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <Link to="/" className="text-xs font-semibold tracking-wider hover:text-brand-orange">
-              SHOP ALL
-            </Link>
             {user ? (
               <div className="relative">
                 <button
@@ -561,27 +557,31 @@ function ProductDetailPage() {
           </div>
         </div>
 
-        {/* Bottom Section: Specifications and Reviews */}
-        <div className="mt-8 grid md:grid-cols-12 gap-8">
-          {/* Specifications Box (7 cols) */}
-          <div className="md:col-span-7 bg-white border-2 border-ink rounded-xl p-6 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+        {/* Bottom Section: Specifications */}
+        <div className="mt-8">
+          {/* Specifications Box (Full Width 12 cols) */}
+          <div className="bg-white border-2 border-ink rounded-xl p-6 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
             <h2 className="text-lg font-bold text-ink uppercase tracking-wider border-b border-border pb-3 mb-4">
               Spesifikasi & Deskripsi
             </h2>
             <div className="space-y-4 text-sm leading-relaxed text-muted-foreground">
               <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-border text-xs">
                 <span className="font-bold text-ink uppercase tracking-wider">Bahan</span>
-                <span className="col-span-2">Premium Cotton Fleece / Heavyweight Cotton 24s</span>
+                <span className="col-span-2">
+                  {product.bahan || "Premium Cotton Fleece / Heavyweight Cotton 24s"}
+                </span>
               </div>
               <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-border text-xs">
                 <span className="font-bold text-ink uppercase tracking-wider">Aplikasi</span>
                 <span className="col-span-2">
-                  Embroidery (Bordir Timbul) / High Quality DTF Screen Print
+                  {product.aplikasi || "Embroidery (Bordir Timbul) / High Quality DTF Screen Print"}
                 </span>
               </div>
               <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-border text-xs">
                 <span className="font-bold text-ink uppercase tracking-wider">Asal</span>
-                <span className="col-span-2">Dibuat oleh BEM FILKOM UB Creative Division</span>
+                <span className="col-span-2">
+                  {product.asal || "Dibuat oleh BEM FILKOM UB Creative Division"}
+                </span>
               </div>
 
               <div className="pt-2">
@@ -596,54 +596,26 @@ function ProductDetailPage() {
 
               <div className="pt-2 border-t border-border mt-4">
                 <p className="font-bold text-ink uppercase text-xs mb-2 tracking-wider">
-                  Ukuran Chart (Lebar Dada x Panjang):
+                  Ukuran Chart:
                 </p>
-                <ul className="list-disc list-inside text-xs space-y-1">
-                  <li>S : 50 cm x 66 cm</li>
-                  <li>M : 53 cm x 69 cm</li>
-                  <li>L : 56 cm x 72 cm</li>
-                  <li>XL : 59 cm x 75 cm</li>
-                  <li>XXL : 62 cm x 78 cm</li>
-                </ul>
+                {product.size_chart_url ? (
+                  <div className="mt-2 max-w-lg border-2 border-ink rounded-lg overflow-hidden bg-cream">
+                    <img
+                      src={product.size_chart_url}
+                      alt="Size Chart"
+                      className="w-full h-auto object-contain max-h-[350px]"
+                    />
+                  </div>
+                ) : (
+                  <ul className="list-disc list-inside text-xs space-y-1">
+                    <li>S : 50 cm x 66 cm</li>
+                    <li>M : 53 cm x 69 cm</li>
+                    <li>L : 56 cm x 72 cm</li>
+                    <li>XL : 59 cm x 75 cm</li>
+                    <li>XXL : 62 cm x 78 cm</li>
+                  </ul>
+                )}
               </div>
-            </div>
-          </div>
-
-          {/* Customer Reviews (5 cols) */}
-          <div className="md:col-span-5 bg-white border-2 border-ink rounded-xl p-6 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
-            <h2 className="text-lg font-bold text-ink uppercase tracking-wider border-b border-border pb-3 mb-4 flex items-center justify-between">
-              Ulasan Pembeli
-              <span className="text-xs bg-yellow-100 text-yellow-800 font-bold px-2.5 py-0.5 rounded">
-                4.9 / 5.0
-              </span>
-            </h2>
-            <div className="space-y-5">
-              {MOCK_REVIEWS.map((review) => (
-                <div
-                  key={review.id}
-                  className="border-b border-border last:border-0 pb-4 last:pb-0"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-xs font-bold text-ink">{review.name}</p>
-                      <p className="text-[9px] text-muted-foreground">
-                        {review.nim} — {review.date}
-                      </p>
-                    </div>
-                    <div className="flex text-yellow-500 gap-0.5">
-                      {Array.from({ length: review.rating }).map((_, i) => (
-                        <Star key={i} className="w-3 h-3 fill-yellow-500 text-yellow-500" />
-                      ))}
-                    </div>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-2 italic">"{review.comment}"</p>
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <span className="text-[9px] bg-cream border border-ink/20 text-ink/70 px-1.5 py-0.5 rounded">
-                      Varian: {review.variant}
-                    </span>
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </div>

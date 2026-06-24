@@ -28,6 +28,8 @@ import {
   updateProduct,
   deleteProduct,
   createCategory,
+  updateCategory,
+  deleteCategory,
   type ProductWithVariants,
   type Category,
 } from "@backend/server-actions";
@@ -45,6 +47,11 @@ interface ProductForm {
   description: string;
   price: string;
   image_url: string;
+  bahan: string;
+  asal: string;
+  aplikasi: string;
+  size_chart_url: string;
+  images: string[];
   variants: Array<{ size: string; color: string; stock: string }>;
 }
 
@@ -55,6 +62,11 @@ const emptyForm = (): ProductForm => ({
   description: "",
   price: "",
   image_url: "",
+  bahan: "",
+  asal: "",
+  aplikasi: "",
+  size_chart_url: "",
+  images: [],
   variants: [{ size: "One Size", color: "", stock: "0" }],
 });
 
@@ -63,11 +75,13 @@ function AdminProductsPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [form, setForm] = useState<ProductForm>(emptyForm());
   const [saving, setSaving] = useState(false);
-  const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
+
+  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
   const loadProducts = async () => {
     const [productsRes, categoriesRes] = await Promise.all([
@@ -96,6 +110,11 @@ function AdminProductsPage() {
       description: product.description || "",
       price: String(product.price),
       image_url: product.image_url || "",
+      bahan: product.bahan || "",
+      asal: product.asal || "",
+      aplikasi: product.aplikasi || "",
+      size_chart_url: product.size_chart_url || "",
+      images: product.images || (product.image_url ? [product.image_url] : []),
       variants: product.variants.map((v) => ({
         size: v.size,
         color: v.color || "",
@@ -103,6 +122,73 @@ function AdminProductsPage() {
       })),
     });
     setDialogOpen(true);
+  };
+
+  const handleUploadImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append("files", files[i]);
+    }
+
+    try {
+      toast.loading("Mengunggah foto...");
+      const res = await fetch(`${API_BASE_URL}/api/upload-multiple`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      toast.dismiss();
+
+      if (data.success && data.urls) {
+        setForm((prev) => ({
+          ...prev,
+          images: [...prev.images, ...data.urls],
+          image_url: prev.image_url || data.urls[0],
+        }));
+        toast.success(`${data.urls.length} foto berhasil diunggah`);
+      } else {
+        toast.error(data.error || "Gagal mengunggah foto");
+      }
+    } catch (err) {
+      toast.dismiss();
+      console.error(err);
+      toast.error("Gagal mengunggah foto");
+    }
+  };
+
+  const handleUploadSizeChart = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      toast.loading("Mengunggah foto size chart...");
+      const res = await fetch(`${API_BASE_URL}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      toast.dismiss();
+
+      if (data.success && data.url) {
+        setForm((prev) => ({
+          ...prev,
+          size_chart_url: data.url,
+        }));
+        toast.success("Foto size chart berhasil diunggah");
+      } else {
+        toast.error(data.error || "Gagal mengunggah size chart");
+      }
+    } catch (err) {
+      toast.dismiss();
+      console.error(err);
+      toast.error("Gagal mengunggah size chart");
+    }
   };
 
   const handleSave = async () => {
@@ -119,6 +205,11 @@ function AdminProductsPage() {
       description: form.description,
       price: parseFloat(form.price),
       image_url: form.image_url || undefined,
+      bahan: form.bahan || undefined,
+      asal: form.asal || undefined,
+      aplikasi: form.aplikasi || undefined,
+      size_chart_url: form.size_chart_url || undefined,
+      images: form.images,
       variants: form.variants.map((v) => ({
         size: v.size,
         color: v.color || null,
@@ -167,9 +258,44 @@ function AdminProductsPage() {
       );
       setForm({ ...form, category_id: String(result.category.id) });
       setNewCategoryName("");
-      setShowNewCategory(false);
     } else {
       toast.error(result.error || "Gagal membuat kategori");
+    }
+  };
+
+  const handleUpdateCategory = async (id: number, newName: string) => {
+    try {
+      const result = await updateCategory({ data: { id, name: newName } });
+      if (result.success && result.category) {
+        toast.success("Kategori berhasil diperbarui");
+        setCategories((prev) =>
+          prev
+            .map((c) => (c.id === id ? result.category! : c))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        );
+      } else {
+        toast.error(result.error || "Gagal memperbarui kategori");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal memperbarui kategori");
+    }
+  };
+
+  const handleDeleteCategory = async (id: number) => {
+    if (!window.confirm("Hapus kategori ini? Produk yang menggunakan kategori ini tidak akan dihapus.")) return;
+    try {
+      const result = await deleteCategory({ data: id });
+      if (result.success) {
+        toast.success("Kategori berhasil dihapus");
+        setCategories((prev) => prev.filter((c) => c.id !== id));
+        if (form.category_id === String(id)) {
+          setForm((prev) => ({ ...prev, category_id: "" }));
+        }
+      } else {
+        toast.error(result.error || "Gagal menghapus kategori");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Gagal menghapus kategori");
     }
   };
 
@@ -320,72 +446,33 @@ function AdminProductsPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Kategori</Label>
-              {showNewCategory ? (
-                <div className="flex gap-2 items-center">
-                  <Input
-                    placeholder="Nama kategori baru..."
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        void handleCreateCategory();
-                      }
-                    }}
-                    autoFocus
-                    className="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    size="icon"
-                    onClick={() => void handleCreateCategory()}
-                    disabled={savingCategory}
-                    className="bg-green-600 hover:bg-green-700 text-white shrink-0 h-9 w-9"
-                  >
-                    <Check className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      setShowNewCategory(false);
-                      setNewCategoryName("");
-                    }}
-                    className="shrink-0 h-9 w-9"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex gap-2">
-                  <Select
-                    value={form.category_id}
-                    onValueChange={(v) => setForm({ ...form, category_id: v })}
-                  >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Pilih kategori" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((c) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setShowNewCategory(true)}
-                    title="Tambah kategori baru"
-                    className="shrink-0 h-9 w-9 border-dashed border-2 hover:border-brand-orange hover:text-brand-orange transition-colors"
-                  >
-                    <FolderPlus className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
+              <div className="flex gap-2">
+                <Select
+                  value={form.category_id}
+                  onValueChange={(v) => setForm({ ...form, category_id: v })}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Pilih kategori" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={String(c.id)}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCategoryDialogOpen(true)}
+                  title="Kelola Kategori"
+                  className="shrink-0 h-9 w-9 border-dashed border-2 hover:border-brand-orange hover:text-brand-orange transition-colors"
+                >
+                  <FolderPlus className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -419,12 +506,122 @@ function AdminProductsPage() {
               />
             </div>
 
+            {/* Multiple Product Images Upload */}
             <div className="space-y-2">
-              <Label>URL Gambar</Label>
-              <Input
-                value={form.image_url}
-                onChange={(e) => setForm({ ...form, image_url: e.target.value })}
-              />
+              <Label className="font-bold text-xs uppercase text-ink">
+                Foto Produk (Unggah Langsung) *
+              </Label>
+              <div className="flex flex-col gap-3">
+                <input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleUploadImages}
+                  className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-2 file:border-ink file:text-xs file:font-semibold file:bg-cream file:text-ink hover:file:bg-cream/80 cursor-pointer"
+                />
+
+                {/* Image Previews */}
+                {form.images.length > 0 && (
+                  <div className="flex flex-wrap gap-2 p-2 border-2 border-dashed border-border rounded-lg bg-cream/10">
+                    {form.images.map((img, idx) => (
+                      <div
+                        key={idx}
+                        className="relative w-16 h-16 rounded overflow-hidden border border-ink/40 group"
+                      >
+                        <img src={img} alt="preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newImages = form.images.filter((_, i) => i !== idx);
+                            setForm({
+                              ...form,
+                              images: newImages,
+                              image_url: newImages.length > 0 ? newImages[0] : "",
+                            });
+                          }}
+                          className="absolute inset-0 bg-red-600/85 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-xs font-bold"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        {idx === 0 && (
+                          <span className="absolute bottom-0 inset-x-0 bg-ink/90 text-white text-[8px] font-extrabold text-center uppercase tracking-wider py-0.5">
+                            Utama
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Specifications fields (bahan, asal, aplikasi) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-y py-3 my-2">
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  Bahan
+                </Label>
+                <Input
+                  placeholder="Cotton Fleece, dll"
+                  value={form.bahan}
+                  onChange={(e) => setForm({ ...form, bahan: e.target.value })}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  Asal
+                </Label>
+                <Input
+                  placeholder="Creative Div, dll"
+                  value={form.asal}
+                  onChange={(e) => setForm({ ...form, asal: e.target.value })}
+                  className="text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] font-bold uppercase text-muted-foreground">
+                  Aplikasi/Detail
+                </Label>
+                <Input
+                  placeholder="Bordir, DTF, dll"
+                  value={form.aplikasi}
+                  onChange={(e) => setForm({ ...form, aplikasi: e.target.value })}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Size Chart Image Upload */}
+            <div className="space-y-2 pb-2">
+              <Label className="font-bold text-xs uppercase text-ink">
+                Foto Size Chart (Unggah Langsung)
+              </Label>
+              <div className="flex flex-col gap-2">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleUploadSizeChart}
+                  className="text-xs file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-2 file:border-ink file:text-xs file:font-semibold file:bg-cream file:text-ink hover:file:bg-cream/80 cursor-pointer"
+                />
+
+                {form.size_chart_url && (
+                  <div className="relative w-32 aspect-[4/3] rounded border border-ink/40 overflow-hidden bg-cream group">
+                    <img
+                      src={form.size_chart_url}
+                      alt="Size Chart Preview"
+                      className="w-full h-full object-contain"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, size_chart_url: "" })}
+                      className="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-xs font-bold"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -517,6 +714,148 @@ function AdminProductsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Kelola Kategori</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {/* Form Tambah Kategori Baru */}
+            <div className="flex gap-2 items-center border-b pb-4">
+              <Input
+                placeholder="Nama kategori baru..."
+                value={newCategoryName}
+                onChange={(e) => setNewCategoryName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleCreateCategory();
+                  }
+                }}
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                onClick={() => void handleCreateCategory()}
+                disabled={savingCategory}
+                className="bg-ink hover:bg-brand-orange text-white"
+              >
+                Tambah
+              </Button>
+            </div>
+
+            {/* Daftar Kategori */}
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase text-muted-foreground">
+                Daftar Kategori Terdaftar
+              </Label>
+              {categories.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Belum ada kategori
+                </p>
+              ) : (
+                <div className="divide-y divide-border border rounded-lg p-2 bg-cream/10 max-h-[40vh] overflow-y-auto">
+                  {categories.map((c) => (
+                    <CategoryListItem
+                      key={c.id}
+                      category={c}
+                      onUpdate={handleUpdateCategory}
+                      onDelete={handleDeleteCategory}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function CategoryListItem({
+  category,
+  onUpdate,
+  onDelete,
+}: {
+  category: Category;
+  onUpdate: (id: number, newName: string) => Promise<void>;
+  onDelete: (id: number) => Promise<void>;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState(category.name);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (!editName.trim()) {
+      toast.error("Nama kategori tidak boleh kosong");
+      return;
+    }
+    setSaving(true);
+    await onUpdate(category.id, editName.trim());
+    setIsEditing(false);
+    setSaving(false);
+  };
+
+  return (
+    <div className="flex items-center justify-between py-2 gap-2 border-b last:border-b-0 animate-fade-in">
+      {isEditing ? (
+        <div className="flex gap-1.5 items-center flex-1">
+          <Input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            className="h-8 py-1 px-2 text-sm"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleSave();
+            }}
+            autoFocus
+          />
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => void handleSave()}
+            disabled={saving}
+            className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50 shrink-0"
+          >
+            <Check className="h-4 w-4" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => {
+              setIsEditing(false);
+              setEditName(category.name);
+            }}
+            disabled={saving}
+            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50 shrink-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <>
+          <span className="text-sm font-medium text-ink flex-1 truncate">{category.name}</span>
+          <div className="flex gap-1 shrink-0">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setIsEditing(true)}
+              className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => void onDelete(category.id)}
+              className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

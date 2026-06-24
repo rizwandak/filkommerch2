@@ -417,6 +417,7 @@ export interface StoreSettings {
   phone: string | null;
   tax_rate: number;
   qris_static_url: string | null;
+  homepage_layout?: string | null;
 }
 
 export interface CreateProductInput {
@@ -738,6 +739,7 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
       phone?: string;
       tax_rate?: number;
       qris_static_url?: string;
+      homepage_layout?: string;
     }) => d,
   )
   .handler(async ({ data: input }) => {
@@ -747,26 +749,28 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
       if (existing) {
         await execute(
           `UPDATE store_settings SET store_name = ?, address = ?, phone = ?,
-           tax_rate = ?, qris_static_url = ? WHERE id = ?`,
+           tax_rate = ?, qris_static_url = ?, homepage_layout = ? WHERE id = ?`,
           [
             input.store_name,
             input.address || null,
             input.phone || null,
             input.tax_rate ?? 0,
             input.qris_static_url || null,
+            input.homepage_layout || null,
             existing.id,
           ],
         );
       } else {
         await execute(
-          `INSERT INTO store_settings (store_name, address, phone, tax_rate, qris_static_url)
-           VALUES (?, ?, ?, ?, ?)`,
+          `INSERT INTO store_settings (store_name, address, phone, tax_rate, qris_static_url, homepage_layout)
+           VALUES (?, ?, ?, ?, ?, ?)`,
           [
             input.store_name,
             input.address || null,
             input.phone || null,
             input.tax_rate ?? 0,
             input.qris_static_url || null,
+            input.homepage_layout || null,
           ],
         );
       }

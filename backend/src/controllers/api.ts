@@ -417,7 +417,14 @@ export const getProductBySlug = async (req: Request, res: Response) => {
       [product.id]
     );
 
-    return res.json({ success: true, product: { ...product, variants } });
+    const images = await query<any>(
+      "SELECT image_url FROM product_images WHERE product_id = ? ORDER BY sort_order ASC",
+      [product.id]
+    );
+
+    const imageUrls = images.length > 0 ? images.map((img: any) => img.image_url) : [product.image_url].filter(Boolean);
+
+    return res.json({ success: true, product: { ...product, variants, images: imageUrls } });
   } catch (error: any) {
     console.error("Error fetching product by slug:", error);
     return res.status(500).json({ success: false, error: "Gagal mengambil data produk" });
@@ -736,6 +743,52 @@ export const createCategory = async (req: Request, res: Response) => {
   }
 };
 
+// Update category
+export const updateCategory = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, error: "Nama kategori wajib diisi" });
+    }
+
+    const slug = name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+
+    const existing = await queryOne<any>("SELECT id FROM categories WHERE slug = ? AND id != ?", [slug, id]);
+    if (existing) {
+      return res.status(400).json({ success: false, error: "Kategori dengan nama serupa sudah ada" });
+    }
+
+    await execute(
+      "UPDATE categories SET name = ?, slug = ? WHERE id = ?",
+      [name.trim(), slug, id]
+    );
+
+    return res.json({ success: true, category: { id: parseInt(id), name: name.trim(), slug } });
+  } catch (error: any) {
+    console.error("Error updating category:", error);
+    return res.status(500).json({ success: false, error: error.message || "Failed to update category" });
+  }
+};
+
+// Delete category (soft delete)
+export const deleteCategory = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    // Soft delete by updating is_active to false
+    await execute(
+      "UPDATE categories SET is_active = FALSE WHERE id = ?",
+      [id]
+    );
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error deleting category:", error);
+    return res.status(500).json({ success: false, error: error.message || "Failed to delete category" });
+  }
+};
+
 // ============ ADMIN MANAGEMENT (PRODUCTS, ORDERS, SETTINGS) ============
 
 // Get all products for admin
@@ -754,7 +807,12 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
           "SELECT * FROM product_variants WHERE product_id = ?",
           [product.id]
         );
-        return { ...product, variants };
+        const images = await query<any>(
+          "SELECT image_url FROM product_images WHERE product_id = ? ORDER BY sort_order ASC",
+          [product.id]
+        );
+        const imageUrls = images.length > 0 ? images.map((img: any) => img.image_url) : [product.image_url].filter(Boolean);
+        return { ...product, variants, images: imageUrls };
       })
     );
 
@@ -769,28 +827,50 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
 export const createProduct = async (req: Request, res: Response) => {
   try {
     const input = req.body;
+    
+    // Set the first image from images array as main image_url if provided
+    const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
+
     const result = await execute(
-      `INSERT INTO products (category_id, name, slug, description, price, image_url, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO products (category_id, name, slug, description, price, image_url, is_active, bahan, asal, aplikasi, size_chart_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.category_id,
         input.name,
         input.slug,
         input.description || null,
         input.price,
-        input.image_url || null,
+        mainImageUrl,
         input.is_active ?? true,
+        input.bahan || null,
+        input.asal || null,
+        input.aplikasi || null,
+        input.size_chart_url || null,
       ]
     );
 
+    const productId = result.insertId;
+
+    // Insert variants
     for (const variant of input.variants) {
       await execute(
         "INSERT INTO product_variants (product_id, size, color, stock) VALUES (?, ?, ?, ?)",
-        [result.insertId, variant.size, variant.color || null, variant.stock]
+        [productId, variant.size, variant.color || null, variant.stock]
       );
     }
 
-    return res.json({ success: true, product_id: result.insertId });
+    // Insert multiple product images
+    if (input.images && Array.isArray(input.images)) {
+      for (let i = 0; i < input.images.length; i++) {
+        await execute(
+          `INSERT INTO product_images (product_id, image_url, sort_order, is_primary, alt_text)
+           VALUES (?, ?, ?, ?, ?)`,
+          [productId, input.images[i], i, i === 0 ? 1 : 0, input.name]
+        );
+      }
+    }
+
+    return res.json({ success: true, product_id: productId });
   } catch (error: any) {
     console.error("Error creating product:", error);
     return res.status(500).json({
@@ -804,17 +884,27 @@ export const createProduct = async (req: Request, res: Response) => {
 export const updateProduct = async (req: Request, res: Response) => {
   try {
     const input = req.body;
+    
+    // Set the first image from images array as main image_url if provided
+    const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
+
     await execute(
-      `UPDATE products SET category_id = ?, name = ?, slug = ?, description = ?,
-       price = ?, image_url = ?, is_active = ? WHERE id = ?`,
+      `UPDATE products 
+       SET category_id = ?, name = ?, slug = ?, description = ?, price = ?, image_url = ?, is_active = ?,
+           bahan = ?, asal = ?, aplikasi = ?, size_chart_url = ? 
+       WHERE id = ?`,
       [
         input.category_id,
         input.name,
         input.slug,
         input.description || null,
         input.price,
-        input.image_url || null,
+        mainImageUrl,
         input.is_active ?? true,
+        input.bahan || null,
+        input.asal || null,
+        input.aplikasi || null,
+        input.size_chart_url || null,
         input.id,
       ]
     );
@@ -837,6 +927,21 @@ export const updateProduct = async (req: Request, res: Response) => {
         await execute(
           "INSERT INTO product_variants (product_id, size, color, stock, is_active) VALUES (?, ?, ?, ?, TRUE)",
           [input.id, variant.size, variant.color || null, variant.stock]
+        );
+      }
+    }
+
+    // Synchronize product images
+    if (input.images && Array.isArray(input.images)) {
+      // Clear old images first
+      await execute("DELETE FROM product_images WHERE product_id = ?", [input.id]);
+      
+      // Insert new images
+      for (let i = 0; i < input.images.length; i++) {
+        await execute(
+          `INSERT INTO product_images (product_id, image_url, sort_order, is_primary, alt_text)
+           VALUES (?, ?, ?, ?, ?)`,
+          [input.id, input.images[i], i, i === 0 ? 1 : 0, input.name]
         );
       }
     }
@@ -1193,8 +1298,9 @@ export const createSale = async (req: Request, res: Response) => {
     const [orderResult] = await connection.execute(
       `INSERT INTO orders (
         order_id, channel, fulfillment_type, fulfillment_status, cashier_id, customer_name,
-        subtotal, discount_amount, tax_amount, gross_amount, payment_status, order_status, notes, transaction_status
-      ) VALUES (?, 'pos', 'walk_in', 'completed', ?, ?, ?, ?, ?, ?, 'paid', 'completed', ?, 'settlement')`,
+        customer_email, customer_phone, subtotal, discount_amount, tax_amount, gross_amount,
+        payment_status, order_status, notes, transaction_status
+      ) VALUES (?, 'pos', 'walk_in', 'completed', ?, ?, 'pos@filkommerch.com', '081234567890', ?, ?, ?, ?, 'paid', 'completed', ?, 'settlement')`,
       [
         saleId,
         input.admin_id || null,

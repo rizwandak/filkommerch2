@@ -27,6 +27,60 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Setup file upload via Multer
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadsDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + "-" + uniqueSuffix + ext);
+  },
+});
+
+const upload = multer({ storage });
+
+// Serve static uploaded files
+app.use("/uploads", express.static(uploadsDir));
+
+// Upload Endpoints
+app.post("/api/upload", upload.single("file"), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: "Tidak ada file yang diunggah" });
+    }
+    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    return res.json({ success: true, url: fileUrl });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.post("/api/upload-multiple", upload.array("files", 10), (req, res) => {
+  try {
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) {
+      return res.status(400).json({ success: false, error: "Tidak ada file yang diunggah" });
+    }
+    const urls = files.map(
+      (file) => `${req.protocol}://${req.get("host")}/uploads/${file.filename}`
+    );
+    return res.json({ success: true, urls });
+  } catch (error: any) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // Logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
@@ -53,6 +107,8 @@ app.get("/api/db-check", apiControllers.checkDatabaseConnection);
 app.get("/api/payment-methods", apiControllers.getPaymentMethods);
 app.get("/api/categories", apiControllers.getCategories);
 app.post("/api/categories", apiControllers.createCategory);
+app.put("/api/categories/:id", apiControllers.updateCategory);
+app.delete("/api/categories/:id", apiControllers.deleteCategory);
 
 // Order / Checkout online API Routes
 app.post("/api/orders", apiControllers.createOrderAndPayment);

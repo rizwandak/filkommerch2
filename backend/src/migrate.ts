@@ -37,6 +37,26 @@ async function run() {
       {
         name: "store_settings.homepage_layout",
         sql: "ALTER TABLE store_settings ADD COLUMN homepage_layout TEXT DEFAULT NULL"
+      },
+      {
+        name: "categories.is_active",
+        sql: "ALTER TABLE categories ADD COLUMN is_active TINYINT(1) DEFAULT 1"
+      },
+      {
+        name: "products.bahan",
+        sql: "ALTER TABLE products ADD COLUMN bahan VARCHAR(255) DEFAULT NULL"
+      },
+      {
+        name: "products.asal",
+        sql: "ALTER TABLE products ADD COLUMN asal VARCHAR(255) DEFAULT NULL"
+      },
+      {
+        name: "products.aplikasi",
+        sql: "ALTER TABLE products ADD COLUMN aplikasi VARCHAR(255) DEFAULT NULL"
+      },
+      {
+        name: "products.size_chart_url",
+        sql: "ALTER TABLE products ADD COLUMN size_chart_url VARCHAR(255) DEFAULT NULL"
       }
     ];
 
