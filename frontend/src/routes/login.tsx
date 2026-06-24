@@ -46,7 +46,7 @@ interface GoogleJwtPayload {
 }
 
 function LoginPage() {
-  const { loginAsAdmin, loginAsGoogle } = useAuth();
+  const { loginAsAdmin, loginAsGoogle, upsertBuyer } = useAuth();
   const [mode, setMode] = useState<"login" | "register" | "admin">("login");
 
   // Form fields
@@ -152,6 +152,14 @@ function LoginPage() {
       name: account.name,
       picture: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(account.name)}`,
     });
+    // Ensure buyer is stored in local registeredBuyers if not already present
+    upsertBuyer({
+      type: "buyer",
+      id: account.id,
+      email: account.email,
+      name: account.name,
+      picture: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(account.name)}`,
+    });
 
     toast.success(`Selamat datang kembali, ${account.name}!`);
     window.location.href = "/";
@@ -192,6 +200,14 @@ function LoginPage() {
         name: decoded.name,
         picture: decoded.picture,
       });
+      // Store Google user as buyer if not already in registeredBuyers
+      upsertBuyer({
+        type: "buyer",
+        id: decoded.sub,
+        email: decoded.email,
+        name: decoded.name,
+        picture: decoded.picture,
+      });
 
       toast.success(`Welcome, ${decoded.name}!`, {
         description: `Masuk sebagai civitas ${organization}`,
@@ -210,7 +226,7 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FCFAF7] text-ink relative flex flex-col items-center justify-center px-4 overflow-hidden">
+    <div className="min-h-screen bg-[#FCFAF7] text-ink relative flex flex-col items-center justify-center px-4 md:px-8 py-8 md:py-12 overflow-hidden">
       {/* Decorative Warm Shapes */}
       <div className="absolute -top-40 -left-40 w-96 h-96 bg-brand-orange/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-brand-blue/10 rounded-full blur-3xl pointer-events-none" />
@@ -244,7 +260,7 @@ function LoginPage() {
         </a>
       </div>
 
-      <Card className="w-full max-w-md border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] bg-white z-10 transition-all duration-300">
+      <Card className="w-full max-w-lg border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] bg-white z-10 transition-all duration-300 py-8">
         <CardHeader className="space-y-1 pb-4">
           <CardTitle className="text-2xl font-bold tracking-tight text-center">
             {mode === "login" && "Welcome Back"}
@@ -258,7 +274,7 @@ function LoginPage() {
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {/* BUYER LOGIN FORM */}
           {mode === "login" && (
             <form onSubmit={handleBuyerLogin} className="space-y-4">
@@ -308,7 +324,7 @@ function LoginPage() {
                 {loading ? "MEMPROSES..." : "MASUK KE AKUN"}
               </Button>
 
-              <div className="relative my-4">
+              <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t-2 border-muted"></div>
                 </div>

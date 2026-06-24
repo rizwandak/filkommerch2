@@ -1,7 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 
 // Check environment variables at runtime
-const API_URL = (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) || import.meta.env.VITE_API_URL || "http://localhost:8080";
+const API_URL =
+  (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:8080";
 
 // ============ INTERFACES ============
 
@@ -19,14 +22,33 @@ export interface Product {
 export interface ProductVariant {
   id: number;
   product_id: number;
+  sku: string | null;
   size: string;
   stock: number;
+  stock_reserved: number;
+  reorder_level: number;
+  barcode: string | null;
+  is_active: boolean;
+  color: string | null;
+  color_hex: string | null;
+  price_override: number | null;
 }
 
 export interface ProductWithVariants extends Product {
   category_name?: string | null;
   category_slug?: string | null;
   variants: ProductVariant[];
+}
+
+export interface DbUser {
+  id: number;
+  name: string;
+  nim: string | null;
+  email: string;
+  phone: string | null;
+  address: string | null;
+  role: "admin" | "cashier" | "customer";
+  created_at?: string;
 }
 
 export interface DatabaseStatus {
@@ -43,13 +65,54 @@ export interface DatabaseStatus {
 export interface Order {
   id: number;
   order_id: string;
+  channel: "online" | "pos";
+  fulfillment_type: "shipping" | "pickup" | "walk_in";
+  fulfillment_status:
+    | "unfulfilled"
+    | "processing"
+    | "ready_for_pickup"
+    | "shipped"
+    | "completed"
+    | "cancelled";
   user_id: number | null;
+  cashier_id: number | null;
   customer_name: string;
   customer_nim: string | null;
   customer_email: string;
   customer_phone: string;
   shipping_address: string | null;
+  subtotal: number;
+  discount_amount: number;
+  service_fee: number;
+  shipping_cost: number;
+  tax_amount: number;
   gross_amount: number;
+  payment_status:
+    | "unpaid"
+    | "pending"
+    | "paid"
+    | "expired"
+    | "failed"
+    | "refunded"
+    | "partial_refund";
+  order_status:
+    | "pending_payment"
+    | "paid"
+    | "processing"
+    | "ready_for_pickup"
+    | "shipped"
+    | "completed"
+    | "cancelled"
+    | "refunded";
+  pickup_code: string | null;
+  pickup_location: string | null;
+  tracking_number: string | null;
+  courier_name: string | null;
+  shipped_at: string | null;
+  completed_at: string | null;
+  cancelled_at: string | null;
+  cancel_reason: string | null;
+  notes: string | null;
   payment_type: string | null;
   transaction_status: string;
   midtrans_transaction_id: string | null;
@@ -61,11 +124,18 @@ export interface Order {
 export interface OrderItem {
   id: number;
   order_id: string;
+  product_id: number | null;
+  variant_id: number | null;
   product_name: string;
   size: string;
+  color: string;
   quantity: number;
-  price: number;
+  unit_price: number;
+  price?: number; // fallback untuk kompatibilitas frontend
+  discount_amount: number;
   subtotal: number;
+  sku_snapshot: string | null;
+  created_at?: string;
 }
 
 export interface TransactionDetails {
@@ -76,6 +146,7 @@ export interface TransactionDetails {
   customerEmail: string;
   customerPhone: string;
   shippingAddress?: string;
+  fulfillmentType?: string;
   items: Array<{
     id: string;
     name: string;
@@ -117,6 +188,7 @@ export interface CreateSaleInput {
   total: number;
   notes?: string;
   customer_name?: string;
+  order_id?: string;
 }
 
 export interface OfflineSale {
@@ -166,7 +238,7 @@ export interface CreateProductInput {
   price: number;
   image_url?: string;
   is_active?: boolean;
-  variants: Array<{ size: string; stock: number }>;
+  variants: Array<{ size: string; color?: string | null; stock: number }>;
 }
 
 export interface UpdateProductInput extends CreateProductInput {
@@ -210,7 +282,7 @@ export const getProducts = createServerFn({ method: "GET" }).handler(
       console.error("Error fetching products:", error);
       return { products: [], error: "Failed to fetch products" };
     }
-  }
+  },
 );
 
 // Check Database Connection
@@ -229,7 +301,7 @@ export const checkDatabaseConnection = createServerFn({ method: "GET" }).handler
         error: error instanceof Error ? error.stack || error.message : String(error),
       };
     }
-  }
+  },
 );
 
 // Create order and payment (Online Checkout)
@@ -274,7 +346,7 @@ export const getOrderById = createServerFn({ method: "GET" })
         console.error("Error fetching order:", error);
         return { success: false, error: "Failed to fetch order" };
       }
-    }
+    },
   );
 
 // Get payment methods
@@ -288,7 +360,7 @@ export const getPaymentMethods = createServerFn({ method: "GET" }).handler(
       console.error("Error fetching payment methods:", error);
       return { success: false, methods: [], error: "Failed to fetch payment methods" };
     }
-  }
+  },
 );
 
 // Get categories
@@ -302,8 +374,40 @@ export const getCategories = createServerFn({ method: "GET" }).handler(
       console.error("Error fetching categories:", error);
       return { categories: [], error: "Failed to fetch categories" };
     }
-  }
+  },
 );
+
+// Create category
+export const createCategory = createServerFn({ method: "POST" })
+  .validator((d: { name: string }) => d)
+  .handler(
+    async ({
+      data: input,
+    }): Promise<{
+      success: boolean;
+      category?: Category;
+      error?: string;
+    }> => {
+      try {
+        const res = await fetch(`${API_URL}/api/categories`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        });
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || `HTTP ${res.status}`);
+        }
+        return res.json();
+      } catch (error) {
+        console.error("Error creating category:", error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : "Failed to create category",
+        };
+      }
+    },
+  );
 
 // Get all products (Admin View)
 export const getAllProductsAdmin = createServerFn({ method: "GET" }).handler(
@@ -316,7 +420,7 @@ export const getAllProductsAdmin = createServerFn({ method: "GET" }).handler(
       console.error("Error fetching admin products:", error);
       return { products: [], error: "Failed to fetch products" };
     }
-  }
+  },
 );
 
 // Create product
@@ -430,7 +534,7 @@ export const getOfflineSales = createServerFn({ method: "GET" }).handler(
       console.error("Error fetching offline sales:", error);
       return { sales: [], error: "Failed to fetch offline sales" };
     }
-  }
+  },
 );
 
 // Get online orders
@@ -444,7 +548,7 @@ export const getOnlineOrders = createServerFn({ method: "GET" }).handler(
       console.error("Error fetching online orders:", error);
       return { orders: [], error: "Failed to fetch orders" };
     }
-  }
+  },
 );
 
 // Get store settings
@@ -458,7 +562,7 @@ export const getStoreSettings = createServerFn({ method: "GET" }).handler(
       console.error("Error fetching store settings:", error);
       return { settings: null, error: "Failed to fetch settings" };
     }
-  }
+  },
 );
 
 // Update store settings
@@ -470,7 +574,7 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
       phone?: string;
       tax_rate?: number;
       qris_static_url?: string;
-    }) => d
+    }) => d,
   )
   .handler(async ({ data: input }) => {
     try {
@@ -536,3 +640,256 @@ export const getInventory = createServerFn({ method: "GET" }).handler(async () =
     return { success: false, inventory: [], error: "Failed to fetch inventory" };
   }
 });
+
+// ============ AUTHENTICATION ACTIONS ============
+
+// Register buyer
+export const authRegister = createServerFn({ method: "POST" })
+  .validator((d: any) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error registering:", error);
+      return { success: false, error: error.message || "Failed to register" };
+    }
+  });
+
+// Login user
+export const authLogin = createServerFn({ method: "POST" })
+  .validator((d: any) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error logging in:", error);
+      return { success: false, error: error.message || "Failed to login" };
+    }
+  });
+
+// Login Google user
+export const authGoogleLogin = createServerFn({ method: "POST" })
+  .validator((d: { email: string; name: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/auth/google`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error logging in with Google:", error);
+      return { success: false, error: error.message || "Failed Google login" };
+    }
+  });
+
+// ============ PRODUCT DETAILS ACTIONS ============
+
+// Get product by slug
+export const getProductBySlug = createServerFn({ method: "GET" })
+  .validator((slug: string) => slug)
+  .handler(
+    async ({
+      data: slug,
+    }): Promise<{ success: boolean; product?: ProductWithVariants; error?: string }> => {
+      try {
+        const res = await fetch(`${API_URL}/api/products/${slug}`);
+        if (!res.ok) throw new Error("Failed to fetch product detail");
+        return res.json();
+      } catch (error: any) {
+        console.error("Error fetching product detail:", error);
+        return { success: false, error: error.message || "Failed to fetch product" };
+      }
+    },
+  );
+
+// ============ ADMIN USER CRUD ACTIONS ============
+
+// Get all users admin
+export const getUsersAdmin = createServerFn({ method: "GET" }).handler(
+  async (): Promise<{ success: boolean; users: DbUser[]; error?: string }> => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users`);
+      if (!res.ok) throw new Error("Failed to fetch users");
+      return res.json();
+    } catch (error: any) {
+      console.error("Error fetching users:", error);
+      return { success: false, users: [], error: error.message || "Failed to fetch users" };
+    }
+  },
+);
+
+// Create user admin
+export const createUserAdmin = createServerFn({ method: "POST" })
+  .validator((d: any) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      return { success: false, error: error.message || "Failed to create user" };
+    }
+  });
+
+// Update user admin
+export const updateUserAdmin = createServerFn({ method: "POST" })
+  .validator((d: any) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error updating user:", error);
+      return { success: false, error: error.message || "Failed to update user" };
+    }
+  });
+
+// Delete user admin
+export const deleteUserAdmin = createServerFn({ method: "POST" })
+  .validator((id: number) => id)
+  .handler(async ({ data: id }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error deleting user:", error);
+      return { success: false, error: error.message || "Failed to delete user" };
+    }
+  });
+
+// ============ ADMIN ORDER & TRANSATION ACTIONS ============
+
+// Update order status
+export const updateOrderStatus = createServerFn({ method: "POST" })
+  .validator((d: { id: string; status: string; shipping_address?: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/orders/${input.id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: input.status, shipping_address: input.shipping_address }),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error updating order status:", error);
+      return { success: false, error: error.message || "Failed to update order status" };
+    }
+  });
+
+// Delete order
+export const deleteOrder = createServerFn({ method: "POST" })
+  .validator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/admin/orders/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error deleting order:", error);
+      return { success: false, error: error.message || "Failed to delete order" };
+    }
+  });
+
+// Get offline sale details by ID
+export const getOfflineSaleById = createServerFn({ method: "GET" })
+  .validator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/sales/${id}`);
+      if (!res.ok) throw new Error("Failed to fetch sale details");
+      return res.json();
+    } catch (error: any) {
+      console.error("Error fetching offline sale details:", error);
+      return { success: false, error: error.message || "Failed to fetch sale" };
+    }
+  });
+
+// Delete offline sale
+export const deleteOfflineSale = createServerFn({ method: "POST" })
+  .validator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    try {
+      const res = await fetch(`${API_URL}/api/sales/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error deleting sale:", error);
+      return { success: false, error: error.message || "Failed to delete sale" };
+    }
+  });
+
+// Get user orders
+export const getUserOrders = createServerFn({ method: "GET" })
+  .validator((userId: number) => userId)
+  .handler(
+    async ({ data: userId }): Promise<{ success: boolean; orders: any[]; error?: string }> => {
+      try {
+        const res = await fetch(`${API_URL}/api/orders/user/${userId}`);
+        if (!res.ok) throw new Error("Failed to fetch user orders");
+        return res.json();
+      } catch (error) {
+        console.error("Error fetching user orders:", error);
+        return { success: false, orders: [], error: "Failed to fetch orders" };
+      }
+    },
+  );

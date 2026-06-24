@@ -51,6 +51,7 @@ function CheckoutPage() {
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerNim, setCustomerNim] = useState("");
   const [shippingAddress, setShippingAddress] = useState("");
+  const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "shipping">("pickup");
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState<number>(1);
   const [qrUrl, setQrUrl] = useState<string | null>(null);
@@ -133,6 +134,10 @@ function CheckoutPage() {
         toast.error("Please enter a valid email");
         return false;
       }
+      if (fulfillmentType === "shipping" && !shippingAddress.trim()) {
+        toast.error("Alamat pengiriman wajib diisi untuk metode Diantar!");
+        return false;
+      }
     }
     if (currentStep === 1 && cartItems.length === 0) {
       toast.error("Your cart is empty");
@@ -165,7 +170,9 @@ function CheckoutPage() {
         customerNim: customerNim.trim() || undefined,
         customerEmail,
         customerPhone,
-        shippingAddress: shippingAddress.trim() || undefined,
+        shippingAddress:
+          fulfillmentType === "pickup" ? "Ambil di FILKOM Merch (gratis)" : shippingAddress.trim(),
+        fulfillmentType,
         items: cartItems,
         userId: buyerUserId,
       };
@@ -198,7 +205,7 @@ function CheckoutPage() {
           onClose: () => {
             toast.warning("Anda menutup popup pembayaran sebelum menyelesaikan transaksi.");
             void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
-          }
+          },
         });
       } else {
         // Fallback to QRIS screen if Snap fails to load
@@ -309,11 +316,13 @@ function CheckoutPage() {
                 phone={customerPhone}
                 nim={customerNim}
                 address={shippingAddress}
+                fulfillmentType={fulfillmentType}
                 onNameChange={setCustomerName}
                 onEmailChange={setCustomerEmail}
                 onPhoneChange={setCustomerPhone}
                 onNimChange={setCustomerNim}
                 onAddressChange={setShippingAddress}
+                onFulfillmentTypeChange={setFulfillmentType}
               />
             )}
             {currentStep === 3 && (
@@ -324,7 +333,10 @@ function CheckoutPage() {
                   nim: customerNim,
                   email: customerEmail,
                   phone: customerPhone,
-                  address: shippingAddress,
+                  address:
+                    fulfillmentType === "pickup"
+                      ? "Ambil di FILKOM Merch (gratis)"
+                      : shippingAddress,
                 }}
               />
             )}
@@ -333,7 +345,7 @@ function CheckoutPage() {
             )}
 
             {/* Navigation Buttons */}
-            <div className="mt-8 flex gap-4">
+            <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4">
               {currentStep > 1 && currentStep < 4 && (
                 <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)}>
                   Back
@@ -351,7 +363,11 @@ function CheckoutPage() {
                 </Button>
               )}
               {currentStep === 3 && (
-                <Button onClick={handlePayment} disabled={isProcessing} className="flex-1 bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider">
+                <Button
+                  onClick={handlePayment}
+                  disabled={isProcessing}
+                  className="flex-1 bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider text-xs sm:text-sm"
+                >
                   {isProcessing ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -391,19 +407,46 @@ function CheckoutPage() {
                   </div>
                 ))}
 
-                <div className="border-t border-border pt-4">
-                  <div className="flex justify-between font-semibold">
-                    <span>Total</span>
-                    <span className="text-lg text-primary">
-                      Rp {totalAmount.toLocaleString("id-ID")}
+                <div className="border-t border-border pt-4 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Metode Pengiriman:</span>
+                    <span className="font-semibold text-ink">
+                      {fulfillmentType === "pickup" ? "Ambil di FILKOM Merch" : "Diantar (Kurir)"}
                     </span>
+                  </div>
+                  {fulfillmentType === "shipping" ? (
+                    <div className="flex justify-between text-[11px] text-brand-orange bg-brand-orange/5 p-2.5 rounded border border-brand-orange/20">
+                      <span>Ongkir:</span>
+                      <span className="font-bold text-right">Info Jarak via WhatsApp</span>
+                    </div>
+                  ) : (
+                    <div className="flex justify-between text-[11px] text-emerald-700 bg-emerald-50 p-2.5 rounded border border-emerald-200">
+                      <span>Ongkir:</span>
+                      <span className="font-bold">GRATIS</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-semibold pt-2 border-t border-dashed">
+                    <span>Total</span>
+                    <div className="text-right font-bold">
+                      <span className="text-lg text-primary block">
+                        Rp {totalAmount.toLocaleString("id-ID")}
+                      </span>
+                      {fulfillmentType === "shipping" && (
+                        <span className="text-[10px] text-muted-foreground block font-normal italic">
+                          (Belum termasuk ongkir)
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 {currentStep === 3 && (
                   <div className="rounded-lg bg-blue-50 p-3 text-xs text-blue-900 border border-blue-200">
                     <p className="font-bold">ℹ️ Midtrans Secure Payment</p>
-                    <p className="mt-1">Klik "Bayar Sekarang" untuk memilih metode pembayaran (Virtual Account, QRIS, Kartu Kredit, dll.)</p>
+                    <p className="mt-1">
+                      Klik "Bayar Sekarang" untuk memilih metode pembayaran (Virtual Account, QRIS,
+                      Kartu Kredit, dll.)
+                    </p>
                   </div>
                 )}
 
@@ -440,7 +483,7 @@ function CartReviewStep({ items, onQuantityChange, onRemoveItem }: CartReviewSte
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex items-center justify-between rounded-lg border border-border p-4"
+              className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border border-border p-3 sm:p-4 gap-3"
             >
               <div className="flex-1">
                 <h3 className="font-medium text-foreground">{item.name}</h3>
@@ -449,7 +492,7 @@ function CartReviewStep({ items, onQuantityChange, onRemoveItem }: CartReviewSte
                   Rp {item.price.toLocaleString("id-ID")}
                 </p>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
                 <div className="flex items-center gap-2">
                   <Button
                     variant="outline"
@@ -485,11 +528,13 @@ interface CustomerDetailsStepProps {
   email: string;
   phone: string;
   address: string;
+  fulfillmentType: "pickup" | "shipping";
   onNameChange: (value: string) => void;
   onNimChange: (value: string) => void;
   onEmailChange: (value: string) => void;
   onPhoneChange: (value: string) => void;
   onAddressChange: (value: string) => void;
+  onFulfillmentTypeChange: (value: "pickup" | "shipping") => void;
 }
 
 function CustomerDetailsStep({
@@ -498,70 +543,133 @@ function CustomerDetailsStep({
   email,
   phone,
   address,
+  fulfillmentType,
   onNameChange,
   onNimChange,
   onEmailChange,
   onPhoneChange,
   onAddressChange,
+  onFulfillmentTypeChange,
 }: CustomerDetailsStepProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Customer Details</CardTitle>
-        <CardDescription>Enter your information for delivery and payment</CardDescription>
+    <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+      <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
+        <CardTitle className="display text-sm tracking-wider uppercase text-ink">
+          Informasi Pelanggan
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Lengkapi informasi untuk pengambilan dan pembayaran
+        </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 pt-6 text-ink">
         <div className="space-y-2">
-          <Label htmlFor="name">Full Name *</Label>
+          <Label htmlFor="name" className="font-bold text-xs uppercase">
+            Nama Lengkap *
+          </Label>
           <Input
             id="name"
-            placeholder="John Doe"
+            placeholder="Nama Lengkap"
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
+            className="border-2 border-ink bg-white"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="email">Email *</Label>
+          <Label htmlFor="email" className="font-bold text-xs uppercase">
+            Email *
+          </Label>
           <Input
             id="email"
             type="email"
             placeholder="john@example.com"
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
+            className="border-2 border-ink bg-white"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="nim">NIM</Label>
+          <Label htmlFor="nim" className="font-bold text-xs uppercase">
+            NIM
+          </Label>
           <Input
             id="nim"
-            placeholder="23515040000000"
+            placeholder="NIM Mahasiswa (opsional)"
             value={nim}
             onChange={(e) => onNimChange(e.target.value)}
+            className="border-2 border-ink bg-white"
           />
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number *</Label>
+          <Label htmlFor="phone" className="font-bold text-xs uppercase">
+            Nomor WhatsApp *
+          </Label>
           <Input
             id="phone"
             type="tel"
-            placeholder="+62 812 3456 7890"
+            placeholder="Contoh: 08123456789"
             value={phone}
             onChange={(e) => onPhoneChange(e.target.value)}
+            className="border-2 border-ink bg-white"
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="address">Shipping Address</Label>
-          <Input
-            id="address"
-            placeholder="Alamat pengiriman"
-            value={address}
-            onChange={(e) => onAddressChange(e.target.value)}
-          />
+        {/* Pilihan Metode Pengambilan / Pengiriman */}
+        <div className="space-y-3">
+          <Label className="font-bold text-xs uppercase">Metode Pengambilan / Pengiriman *</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => onFulfillmentTypeChange("pickup")}
+              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${
+                fulfillmentType === "pickup"
+                  ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                  : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
+              }`}
+            >
+              <span className="font-extrabold text-sm text-ink">Ambil di FILKOM Merch</span>
+              <span className="text-[10px] text-emerald-700 font-bold uppercase mt-1">GRATIS</span>
+              <span className="text-[10px] text-muted-foreground mt-1 leading-snug">
+                Ambil langsung di toko fisik FILKOM Merch UB.
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onFulfillmentTypeChange("shipping")}
+              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${
+                fulfillmentType === "shipping"
+                  ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                  : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
+              }`}
+            >
+              <span className="font-extrabold text-sm text-ink">Diantar (Kurir)</span>
+              <span className="text-[10px] text-brand-orange font-bold uppercase mt-1">
+                Ada Ongkir (Jarak)
+              </span>
+              <span className="text-[10px] text-muted-foreground mt-1 leading-snug">
+                Kirim ke alamat Anda, info tarif ongkos kirim akan dikomunikasikan via WhatsApp.
+              </span>
+            </button>
+          </div>
         </div>
+
+        {fulfillmentType === "shipping" && (
+          <div className="space-y-2 animate-fade-in">
+            <Label htmlFor="address" className="font-bold text-xs uppercase text-brand-orange">
+              Alamat Pengiriman Lengkap *
+            </Label>
+            <Input
+              id="address"
+              placeholder="Tulis alamat pengiriman secara detail..."
+              value={address}
+              onChange={(e) => onAddressChange(e.target.value)}
+              className="border-2 border-ink bg-white"
+            />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

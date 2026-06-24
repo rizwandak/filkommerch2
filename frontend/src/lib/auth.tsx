@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { authLogin, authGoogleLogin, authRegister } from "@backend/server-actions";
 
 export type AdminRole = "admin" | "cashier";
 
@@ -24,7 +25,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   loginAsAdmin: (username: string, password: string) => Promise<void>;
-  loginAsGoogle: (userInfo: Omit<BuyerUser, "type">) => void;
+  loginAsGoogle: (userInfo: Omit<BuyerUser, "type">) => void | Promise<void>;
   logout: () => void;
 }
 
@@ -48,38 +49,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const loginAsAdmin = async (username: string, password: string) => {
-    let role: AdminRole = "admin";
-    let email = "admin@filkommerch.ub";
-
-    if (username === "adminfm" && password === "Filkommerch123_wkwk") {
-      role = "admin";
-    } else if (username === "kasirfm" && password === "Kasir123_wkwk") {
-      role = "cashier";
-      email = "kasir@filkommerch.ub";
-    } else {
-      throw new Error("Invalid username or password");
+    const result = await authLogin({ data: { username, password } });
+    if (!result || !result.success || !result.user) {
+      throw new Error(result?.error || "Gagal login. Periksa username dan password Anda.");
     }
 
-    const adminUser: AdminUser = {
-      type: "admin",
-      role,
-      username,
-      email,
-      id: role === "admin" ? 1 : 2,
-    };
-
-    setUser(adminUser);
-    localStorage.setItem("user", JSON.stringify(adminUser));
+    setUser(result.user);
+    localStorage.setItem("user", JSON.stringify(result.user));
   };
 
-  const loginAsGoogle = (userInfo: Omit<BuyerUser, "type">) => {
-    const buyerUser: BuyerUser = {
-      type: "buyer",
-      ...userInfo,
-    };
+  const loginAsGoogle = async (userInfo: Omit<BuyerUser, "type">) => {
+    const result = await authGoogleLogin({ data: { email: userInfo.email, name: userInfo.name } });
+    if (!result || !result.success || !result.user) {
+      // Fallback
+      const fallbackUser: BuyerUser = {
+        type: "buyer",
+        ...userInfo,
+      };
+      setUser(fallbackUser);
+      localStorage.setItem("user", JSON.stringify(fallbackUser));
+      return;
+    }
 
-    setUser(buyerUser);
-    localStorage.setItem("user", JSON.stringify(buyerUser));
+    setUser(result.user);
+    localStorage.setItem("user", JSON.stringify(result.user));
   };
 
   const logout = () => {
@@ -88,8 +81,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem("cart");
   };
 
+  /**
+   * Insert a buyer into the local `registeredBuyers` store only if it does not exist.
+   */
+  const upsertBuyer = (buyer: BuyerUser) => {
+    try {
+      const saved = localStorage.getItem("registeredBuyers");
+      const buyers: BuyerUser[] = saved ? JSON.parse(saved) : [];
+      const exists = buyers.some((b) => b.id === buyer.id);
+      if (!exists) {
+        const updated = [...buyers, buyer];
+        localStorage.setItem("registeredBuyers", JSON.stringify(updated));
+      }
+    } catch (e) {
+      console.error("Failed to upsert buyer", e);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, loginAsAdmin, loginAsGoogle, logout }}>
+    <AuthContext.Provider
+      value={{ user, loading, loginAsAdmin, loginAsGoogle, logout, upsertBuyer }}
+    >
       {children}
     </AuthContext.Provider>
   );

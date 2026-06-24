@@ -7,6 +7,8 @@ import {
   LogOut,
   Store,
   MonitorSmartphone,
+  Users,
+  Sliders,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, type AdminRole } from "@/lib/auth";
@@ -24,6 +26,8 @@ const adminNavItems: NavItem[] = [
   { label: "Dashboard", to: "/admin/dashboard", icon: LayoutDashboard, roles: ["admin"] },
   { label: "Produk", to: "/admin/products", icon: Package, roles: ["admin"] },
   { label: "Transaksi", to: "/admin/transactions", icon: Receipt, roles: ["admin"] },
+  { label: "Pengguna", to: "/admin/users", icon: Users, roles: ["admin"] },
+  { label: "Tata Letak", to: "/admin/homepage", icon: Sliders, roles: ["admin"] },
   { label: "Pengaturan Toko", to: "/admin/settings", icon: Settings, roles: ["admin"] },
 ];
 

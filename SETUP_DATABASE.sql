@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS product_variants (
     id INT AUTO_INCREMENT PRIMARY KEY,
     product_id INT NOT NULL,
     size VARCHAR(10) NOT NULL, -- S, M, L, XL, XXL, All Size
+    color VARCHAR(50) DEFAULT NULL,
     stock INT NOT NULL DEFAULT 0,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
 );
@@ -100,6 +101,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     -- Snapshot data barang (Jaga-jaga kalau nama/harga barang berubah di masa depan)
     product_name VARCHAR(150) NOT NULL,
     size VARCHAR(10) NOT NULL,
+    color VARCHAR(50) DEFAULT NULL,
     quantity INT NOT NULL,
     price INT NOT NULL,
     subtotal INT NOT NULL,
@@ -135,6 +137,7 @@ CREATE TABLE IF NOT EXISTS offline_sale_items (
   product_name VARCHAR(255) NOT NULL,
   variant_id INT DEFAULT NULL,
   size VARCHAR(50),
+  color VARCHAR(50) DEFAULT NULL,
   quantity INT NOT NULL,
   unit_price INT NOT NULL,
   discount INT DEFAULT 0,
@@ -150,6 +153,7 @@ CREATE TABLE IF NOT EXISTS store_settings (
   phone VARCHAR(20),
   tax_rate DECIMAL(5, 2) DEFAULT 0,
   qris_static_url VARCHAR(255),
+  homepage_layout TEXT DEFAULT NULL,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, FolderPlus, X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
@@ -27,6 +27,7 @@ import {
   createProduct,
   updateProduct,
   deleteProduct,
+  createCategory,
   type ProductWithVariants,
   type Category,
 } from "@backend/server-actions";
@@ -44,7 +45,7 @@ interface ProductForm {
   description: string;
   price: string;
   image_url: string;
-  variants: Array<{ size: string; stock: string }>;
+  variants: Array<{ size: string; color: string; stock: string }>;
 }
 
 const emptyForm = (): ProductForm => ({
@@ -54,7 +55,7 @@ const emptyForm = (): ProductForm => ({
   description: "",
   price: "",
   image_url: "",
-  variants: [{ size: "One Size", stock: "0" }],
+  variants: [{ size: "One Size", color: "", stock: "0" }],
 });
 
 function AdminProductsPage() {
@@ -64,6 +65,9 @@ function AdminProductsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<ProductForm>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [savingCategory, setSavingCategory] = useState(false);
 
   const loadProducts = async () => {
     const [productsRes, categoriesRes] = await Promise.all([
@@ -94,6 +98,7 @@ function AdminProductsPage() {
       image_url: product.image_url || "",
       variants: product.variants.map((v) => ({
         size: v.size,
+        color: v.color || "",
         stock: String(v.stock),
       })),
     });
@@ -116,6 +121,7 @@ function AdminProductsPage() {
       image_url: form.image_url || undefined,
       variants: form.variants.map((v) => ({
         size: v.size,
+        color: v.color || null,
         stock: parseInt(v.stock) || 0,
       })),
     };
@@ -143,6 +149,27 @@ function AdminProductsPage() {
       await loadProducts();
     } else {
       toast.error(result.error || "Gagal menghapus produk");
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      toast.error("Nama kategori tidak boleh kosong");
+      return;
+    }
+    setSavingCategory(true);
+    const result = await createCategory({ data: { name: newCategoryName.trim() } });
+    setSavingCategory(false);
+    if (result.success && result.category) {
+      toast.success(`Kategori "${result.category.name}" berhasil ditambahkan`);
+      setCategories((prev) =>
+        [...prev, result.category!].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setForm({ ...form, category_id: String(result.category.id) });
+      setNewCategoryName("");
+      setShowNewCategory(false);
+    } else {
+      toast.error(result.error || "Gagal membuat kategori");
     }
   };
 
@@ -210,16 +237,29 @@ function AdminProductsPage() {
                           <img
                             src={product.image_url}
                             alt={product.name}
-                            className="h-10 w-10 rounded object-cover border border-border"
+                            className="h-10 w-10 rounded object-cover border border-border shrink-0"
                           />
                         ) : (
-                          <div className="h-10 w-10 rounded bg-cream border border-border" />
+                          <div className="h-10 w-10 rounded bg-cream border border-border shrink-0" />
                         )}
                         <div>
                           <p className="font-semibold text-ink uppercase text-xs tracking-wide">
                             {product.name}
                           </p>
                           <p className="text-[10px] text-muted-foreground">{product.slug}</p>
+                          {product.variants && product.variants.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1 max-w-md">
+                              {product.variants.map((v, idx) => (
+                                <span
+                                  key={idx}
+                                  className="text-[9px] bg-cream border border-border px-1.5 py-0.5 rounded text-muted-foreground font-medium"
+                                >
+                                  {v.size}
+                                  {v.color ? ` (${v.color})` : ""}: {v.stock}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -280,21 +320,72 @@ function AdminProductsPage() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Kategori</Label>
-              <Select
-                value={form.category_id}
-                onValueChange={(v) => setForm({ ...form, category_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Pilih kategori" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={String(c.id)}>
-                      {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {showNewCategory ? (
+                <div className="flex gap-2 items-center">
+                  <Input
+                    placeholder="Nama kategori baru..."
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void handleCreateCategory();
+                      }
+                    }}
+                    autoFocus
+                    className="flex-1"
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    onClick={() => void handleCreateCategory()}
+                    disabled={savingCategory}
+                    className="bg-green-600 hover:bg-green-700 text-white shrink-0 h-9 w-9"
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setShowNewCategory(false);
+                      setNewCategoryName("");
+                    }}
+                    className="shrink-0 h-9 w-9"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <Select
+                    value={form.category_id}
+                    onValueChange={(v) => setForm({ ...form, category_id: v })}
+                  >
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Pilih kategori" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowNewCategory(true)}
+                    title="Tambah kategori baru"
+                    className="shrink-0 h-9 w-9 border-dashed border-2 hover:border-brand-orange hover:text-brand-orange transition-colors"
+                  >
+                    <FolderPlus className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -344,44 +435,75 @@ function AdminProductsPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Varian & Stok</Label>
-              {form.variants.map((v, i) => (
-                <div key={i} className="flex gap-2">
-                  <Input
-                    placeholder="Ukuran"
-                    value={v.size}
-                    onChange={(e) => {
-                      const variants = [...form.variants];
-                      variants[i] = { ...variants[i], size: e.target.value };
-                      setForm({ ...form, variants });
-                    }}
-                  />
-                  <Input
-                    type="number"
-                    placeholder="Stok"
-                    value={v.stock}
-                    onChange={(e) => {
-                      const variants = [...form.variants];
-                      variants[i] = { ...variants[i], stock: e.target.value };
-                      setForm({ ...form, variants });
-                    }}
-                  />
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  setForm({
-                    ...form,
-                    variants: [...form.variants, { size: "", stock: "0" }],
-                  })
-                }
-              >
-                + Varian
-              </Button>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center border-b pb-1">
+                <Label className="text-sm font-semibold">Varian & Stok</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      variants: [...form.variants, { size: "", color: "", stock: "0" }],
+                    })
+                  }
+                  className="h-8 text-xs font-bold"
+                >
+                  + Varian Baru
+                </Button>
+              </div>
+              <div className="space-y-2">
+                {form.variants.map((v, i) => (
+                  <div key={i} className="flex gap-2 items-center">
+                    <Input
+                      placeholder="Ukuran (S, M, L, dll)"
+                      value={v.size}
+                      onChange={(e) => {
+                        const variants = [...form.variants];
+                        variants[i] = { ...variants[i], size: e.target.value };
+                        setForm({ ...form, variants });
+                      }}
+                      className="flex-1"
+                    />
+                    <Input
+                      placeholder="Warna (Opsional)"
+                      value={v.color}
+                      onChange={(e) => {
+                        const variants = [...form.variants];
+                        variants[i] = { ...variants[i], color: e.target.value };
+                        setForm({ ...form, variants });
+                      }}
+                      className="flex-1"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Stok"
+                      value={v.stock}
+                      onChange={(e) => {
+                        const variants = [...form.variants];
+                        variants[i] = { ...variants[i], stock: e.target.value };
+                        setForm({ ...form, variants });
+                      }}
+                      className="w-24"
+                    />
+                    {form.variants.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:bg-red-50 hover:text-destructive shrink-0"
+                        onClick={() => {
+                          const variants = form.variants.filter((_, idx) => idx !== i);
+                          setForm({ ...form, variants });
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
