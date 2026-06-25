@@ -1,10 +1,62 @@
+
+
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 
 // Check environment variables at runtime
 const API_URL =
   (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
   import.meta.env.VITE_API_URL ||
   "http://localhost:8080";
+
+// Helper to get auth headers from incoming request cookies
+const getAuthHeaders = () => {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  
+  try {
+    const request = getRequest();
+    if (request) {
+      const cookieHeader = request.headers.get("cookie") || "";
+      const cookies = cookieHeader.split(";").reduce((acc: Record<string, string>, cookie: string) => {
+        const parts = cookie.split("=");
+        const key = parts[0]?.trim();
+        const value = parts.slice(1).join("=").trim();
+        if (key) acc[key] = decodeURIComponent(value);
+        return acc;
+      }, {} as Record<string, string>);
+      
+      if (cookies.user_role) {
+        headers["x-user-role"] = cookies.user_role;
+      }
+      if (cookies.user_id) {
+        headers["x-user-id"] = cookies.user_id;
+      }
+      if (cookies.user_name) {
+        headers["x-user-name"] = cookies.user_name;
+      }
+    }
+  } catch (e) {
+    console.warn("Could not retrieve web request context:", e);
+  }
+  
+
+
+  return headers;
+};
+
+// Wrapper around fetch to automatically include auth headers when executed on server
+const serverFetch = async (url: string, init?: RequestInit) => {
+  const authHeaders = getAuthHeaders();
+  return fetch(url, {
+    ...init,
+    headers: {
+      ...authHeaders,
+      ...init?.headers,
+    },
+  });
+};
 
 // ============ INTERFACES ============
 
@@ -15,6 +67,18 @@ export interface Product {
   slug: string;
   description: string | null;
   price: number;
+  original_price: number | null;
+  filkom_price: number | null;
+  promo_price: number | null;
+  sale_type: string | null;
+  product_type: string | null;
+  low_stock_threshold: number;
+  is_best_seller: boolean;
+  is_limited: boolean;
+  preorder_start_at: string | null;
+  preorder_end_at: string | null;
+  preorder_moq: number | null;
+  production_eta_days: number | null;
   image_url: string | null;
   is_active: boolean;
   bahan: string | null;
@@ -37,6 +101,7 @@ export interface ProductVariant {
   color: string | null;
   color_hex: string | null;
   price_override: number | null;
+  filkom_price: number | null;
 }
 
 export interface ProductWithVariants extends Product {
@@ -236,12 +301,26 @@ export interface StoreSettings {
   homepage_layout?: string | null;
 }
 
+
+
 export interface CreateProductInput {
   category_id: number;
   name: string;
   slug: string;
   description?: string;
   price: number;
+  original_price?: number | null;
+  filkom_price?: number | null;
+  promo_price?: number | null;
+  sale_type?: string | null;
+  product_type?: string | null;
+  low_stock_threshold?: number;
+  is_best_seller?: boolean;
+  is_limited?: boolean;
+  preorder_start_at?: string | null;
+  preorder_end_at?: string | null;
+  preorder_moq?: number | null;
+  production_eta_days?: number | null;
   image_url?: string;
   is_active?: boolean;
   bahan?: string | null;
@@ -249,7 +328,7 @@ export interface CreateProductInput {
   aplikasi?: string | null;
   size_chart_url?: string | null;
   images?: string[];
-  variants: Array<{ size: string; color?: string | null; stock: number }>;
+  variants: Array<{ size: string; color?: string | null; stock: number; filkom_price?: number | null }>;
 }
 
 export interface UpdateProductInput extends CreateProductInput {
@@ -286,7 +365,7 @@ export interface InventoryItem {
 export const getProducts = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ products: ProductWithVariants[]; error?: string }> => {
     try {
-      const res = await fetch(`${API_URL}/api/products`);
+      const res = await serverFetch(`${API_URL}/api/products`);
       if (!res.ok) throw new Error("Gagal mengambil produk");
       return res.json();
     } catch (error) {
@@ -300,7 +379,7 @@ export const getProducts = createServerFn({ method: "GET" }).handler(
 export const checkDatabaseConnection = createServerFn({ method: "GET" }).handler(
   async (): Promise<DatabaseStatus> => {
     try {
-      const res = await fetch(`${API_URL}/api/db-check`);
+      const res = await serverFetch(`${API_URL}/api/db-check`);
       if (!res.ok) throw new Error("Gagal memeriksa koneksi database");
       return res.json();
     } catch (error) {
@@ -320,7 +399,7 @@ export const createOrderAndPayment = createServerFn({ method: "POST" })
   .validator((d: TransactionDetails) => d)
   .handler(async ({ data: details }) => {
     try {
-      const res = await fetch(`${API_URL}/api/orders`, {
+      const res = await serverFetch(`${API_URL}/api/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -350,7 +429,7 @@ export const getOrderById = createServerFn({ method: "GET" })
       data: orderId,
     }): Promise<{ success: boolean; order?: Order; items?: OrderItem[]; error?: string }> => {
       try {
-        const res = await fetch(`${API_URL}/api/orders/${orderId}`);
+        const res = await serverFetch(`${API_URL}/api/orders/${orderId}`);
         if (!res.ok) throw new Error("Failed to fetch order");
         return res.json();
       } catch (error) {
@@ -364,7 +443,7 @@ export const getOrderById = createServerFn({ method: "GET" })
 export const getPaymentMethods = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ success: boolean; methods: PaymentMethod[]; error?: string }> => {
     try {
-      const res = await fetch(`${API_URL}/api/payment-methods`);
+      const res = await serverFetch(`${API_URL}/api/payment-methods`);
       if (!res.ok) throw new Error("Failed to fetch payment methods");
       return res.json();
     } catch (error) {
@@ -378,7 +457,7 @@ export const getPaymentMethods = createServerFn({ method: "GET" }).handler(
 export const getCategories = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ categories: Category[]; error?: string }> => {
     try {
-      const res = await fetch(`${API_URL}/api/categories`);
+      const res = await serverFetch(`${API_URL}/api/categories`);
       if (!res.ok) throw new Error("Failed to fetch categories");
       return res.json();
     } catch (error) {
@@ -400,7 +479,7 @@ export const createCategory = createServerFn({ method: "POST" })
       error?: string;
     }> => {
       try {
-        const res = await fetch(`${API_URL}/api/categories`, {
+        const res = await serverFetch(`${API_URL}/api/categories`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(input),
@@ -432,7 +511,7 @@ export const updateCategory = createServerFn({ method: "POST" })
       error?: string;
     }> => {
       try {
-        const res = await fetch(`${API_URL}/api/categories/${input.id}`, {
+        const res = await serverFetch(`${API_URL}/api/categories/${input.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name: input.name }),
@@ -463,7 +542,7 @@ export const deleteCategory = createServerFn({ method: "POST" })
       error?: string;
     }> => {
       try {
-        const res = await fetch(`${API_URL}/api/categories/${id}`, {
+        const res = await serverFetch(`${API_URL}/api/categories/${id}`, {
           method: "DELETE",
         });
         if (!res.ok) {
@@ -485,7 +564,7 @@ export const deleteCategory = createServerFn({ method: "POST" })
 export const getAllProductsAdmin = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ products: ProductWithVariants[]; error?: string }> => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/products`);
+      const res = await serverFetch(`${API_URL}/api/admin/products`);
       if (!res.ok) throw new Error("Failed to fetch admin products");
       return res.json();
     } catch (error) {
@@ -500,7 +579,7 @@ export const createProduct = createServerFn({ method: "POST" })
   .validator((d: CreateProductInput) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/products`, {
+      const res = await serverFetch(`${API_URL}/api/admin/products`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -526,7 +605,7 @@ export const updateProduct = createServerFn({ method: "POST" })
   .validator((d: UpdateProductInput) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/products`, {
+      const res = await serverFetch(`${API_URL}/api/admin/products`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -552,7 +631,7 @@ export const deleteProduct = createServerFn({ method: "POST" })
   .validator((id: number) => id)
   .handler(async ({ data: id }) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/products/${id}`, {
+      const res = await serverFetch(`${API_URL}/api/admin/products/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -574,7 +653,7 @@ export const createSale = createServerFn({ method: "POST" })
   .validator((d: CreateSaleInput) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await fetch(`${API_URL}/api/sales`, {
+      const res = await serverFetch(`${API_URL}/api/sales`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -599,7 +678,7 @@ export const createSale = createServerFn({ method: "POST" })
 export const getOfflineSales = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ sales: OfflineSale[]; error?: string }> => {
     try {
-      const res = await fetch(`${API_URL}/api/sales`);
+      const res = await serverFetch(`${API_URL}/api/sales`);
       if (!res.ok) throw new Error("Failed to fetch offline sales");
       return res.json();
     } catch (error) {
@@ -613,7 +692,7 @@ export const getOfflineSales = createServerFn({ method: "GET" }).handler(
 export const getOnlineOrders = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ orders: Order[]; error?: string }> => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/orders`);
+      const res = await serverFetch(`${API_URL}/api/admin/orders`);
       if (!res.ok) throw new Error("Failed to fetch online orders");
       return res.json();
     } catch (error) {
@@ -627,7 +706,7 @@ export const getOnlineOrders = createServerFn({ method: "GET" }).handler(
 export const getStoreSettings = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ settings: StoreSettings | null; error?: string }> => {
     try {
-      const res = await fetch(`${API_URL}/api/settings`);
+      const res = await serverFetch(`${API_URL}/api/settings`);
       if (!res.ok) throw new Error("Failed to fetch store settings");
       return res.json();
     } catch (error) {
@@ -651,7 +730,7 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
   )
   .handler(async ({ data: input }) => {
     try {
-      const res = await fetch(`${API_URL}/api/settings`, {
+      const res = await serverFetch(`${API_URL}/api/settings`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -677,7 +756,7 @@ export const getDailySalesSummary = createServerFn({ method: "GET" })
   .validator((date: string) => date)
   .handler(async ({ data: date }) => {
     try {
-      const res = await fetch(`${API_URL}/api/analytics/daily?date=${encodeURIComponent(date)}`);
+      const res = await serverFetch(`${API_URL}/api/analytics/daily?date=${encodeURIComponent(date)}`);
       if (!res.ok) throw new Error("Failed to fetch daily summary");
       return res.json();
     } catch (error) {
@@ -693,7 +772,7 @@ export const getTopProducts = createServerFn({ method: "GET" })
     try {
       const limit = data?.limit ?? 10;
       const days = data?.days ?? 30;
-      const res = await fetch(`${API_URL}/api/analytics/top-products?limit=${limit}&days=${days}`);
+      const res = await serverFetch(`${API_URL}/api/analytics/top-products?limit=${limit}&days=${days}`);
       if (!res.ok) throw new Error("Failed to fetch top products");
       return res.json();
     } catch (error) {
@@ -705,7 +784,7 @@ export const getTopProducts = createServerFn({ method: "GET" })
 // Get inventory status
 export const getInventory = createServerFn({ method: "GET" }).handler(async () => {
   try {
-    const res = await fetch(`${API_URL}/api/analytics/inventory`);
+    const res = await serverFetch(`${API_URL}/api/analytics/inventory`);
     if (!res.ok) throw new Error("Failed to fetch inventory");
     return res.json();
   } catch (error) {
@@ -721,7 +800,7 @@ export const authRegister = createServerFn({ method: "POST" })
   .validator((d: any) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await fetch(`${API_URL}/api/auth/register`, {
+      const res = await serverFetch(`${API_URL}/api/auth/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -742,7 +821,7 @@ export const authLogin = createServerFn({ method: "POST" })
   .validator((d: any) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await fetch(`${API_URL}/api/auth/login`, {
+      const res = await serverFetch(`${API_URL}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -763,7 +842,7 @@ export const authGoogleLogin = createServerFn({ method: "POST" })
   .validator((d: { email: string; name: string }) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await fetch(`${API_URL}/api/auth/google`, {
+      const res = await serverFetch(`${API_URL}/api/auth/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -789,7 +868,7 @@ export const getProductBySlug = createServerFn({ method: "GET" })
       data: slug,
     }): Promise<{ success: boolean; product?: ProductWithVariants; error?: string }> => {
       try {
-        const res = await fetch(`${API_URL}/api/products/${slug}`);
+        const res = await serverFetch(`${API_URL}/api/products/${slug}`);
         if (!res.ok) throw new Error("Failed to fetch product detail");
         return res.json();
       } catch (error: any) {
@@ -805,7 +884,7 @@ export const getProductBySlug = createServerFn({ method: "GET" })
 export const getUsersAdmin = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ success: boolean; users: DbUser[]; error?: string }> => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/users`);
+      const res = await serverFetch(`${API_URL}/api/admin/users`);
       if (!res.ok) throw new Error("Failed to fetch users");
       return res.json();
     } catch (error: any) {
@@ -820,7 +899,7 @@ export const createUserAdmin = createServerFn({ method: "POST" })
   .validator((d: any) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/users`, {
+      const res = await serverFetch(`${API_URL}/api/admin/users`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -841,7 +920,7 @@ export const updateUserAdmin = createServerFn({ method: "POST" })
   .validator((d: any) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/users`, {
+      const res = await serverFetch(`${API_URL}/api/admin/users`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
@@ -862,7 +941,7 @@ export const deleteUserAdmin = createServerFn({ method: "POST" })
   .validator((id: number) => id)
   .handler(async ({ data: id }) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/users/${id}`, {
+      const res = await serverFetch(`${API_URL}/api/admin/users/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -883,7 +962,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
   .validator((d: { id: string; status: string; shipping_address?: string }) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/orders/${input.id}/status`, {
+      const res = await serverFetch(`${API_URL}/api/admin/orders/${input.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: input.status, shipping_address: input.shipping_address }),
@@ -904,7 +983,7 @@ export const deleteOrder = createServerFn({ method: "POST" })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/orders/${id}`, {
+      const res = await serverFetch(`${API_URL}/api/admin/orders/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -923,7 +1002,7 @@ export const getOfflineSaleById = createServerFn({ method: "GET" })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
     try {
-      const res = await fetch(`${API_URL}/api/sales/${id}`);
+      const res = await serverFetch(`${API_URL}/api/sales/${id}`);
       if (!res.ok) throw new Error("Failed to fetch sale details");
       return res.json();
     } catch (error: any) {
@@ -937,7 +1016,7 @@ export const deleteOfflineSale = createServerFn({ method: "POST" })
   .validator((id: string) => id)
   .handler(async ({ data: id }) => {
     try {
-      const res = await fetch(`${API_URL}/api/sales/${id}`, {
+      const res = await serverFetch(`${API_URL}/api/sales/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -950,14 +1029,13 @@ export const deleteOfflineSale = createServerFn({ method: "POST" })
       return { success: false, error: error.message || "Failed to delete sale" };
     }
   });
-
 // Get user orders
 export const getUserOrders = createServerFn({ method: "GET" })
   .validator((userId: number) => userId)
   .handler(
     async ({ data: userId }): Promise<{ success: boolean; orders: any[]; error?: string }> => {
       try {
-        const res = await fetch(`${API_URL}/api/orders/user/${userId}`);
+        const res = await serverFetch(`${API_URL}/api/orders/user/${userId}`);
         if (!res.ok) throw new Error("Failed to fetch user orders");
         return res.json();
       } catch (error) {
@@ -966,3 +1044,32 @@ export const getUserOrders = createServerFn({ method: "GET" })
       }
     },
   );
+
+export interface ActivityLog {
+  id: number;
+  user_id: number | null;
+  actor_name_snapshot: string | null;
+  actor_role: string | null;
+  action: string;
+  entity_type: string | null;
+  entity_id: string | null;
+  description: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  metadata?: any;
+  created_at: string;
+}
+
+// Get activity logs (Admin only)
+export const getActivityLogs = createServerFn({ method: "GET" }).handler(
+  async (): Promise<{ logs: ActivityLog[]; error?: string }> => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/admin/activity-logs`);
+      if (!res.ok) throw new Error("Failed to fetch activity logs");
+      return res.json();
+    } catch (error) {
+      console.error("Error fetching activity logs:", error);
+      return { logs: [], error: "Failed to fetch activity logs" };
+    }
+  }
+);

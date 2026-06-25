@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as ProductsRouteImport } from './routes/products'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as OrderConfirmationRouteImport } from './routes/order-confirmation'
 import { Route as LoginRouteImport } from './routes/login'
@@ -28,7 +29,13 @@ import { Route as AdminProductsRouteImport } from './routes/admin/products'
 import { Route as AdminKasirRouteImport } from './routes/admin/kasir'
 import { Route as AdminHomepageRouteImport } from './routes/admin/homepage'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
+import { Route as AdminActivityLogsRouteImport } from './routes/admin/activity-logs'
 
+const ProductsRoute = ProductsRouteImport.update({
+  id: '/products',
+  path: '/products',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrdersRoute = OrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
@@ -124,6 +131,11 @@ const AdminDashboardRoute = AdminDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminActivityLogsRoute = AdminActivityLogsRouteImport.update({
+  id: '/activity-logs',
+  path: '/activity-logs',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -134,6 +146,8 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/orders': typeof OrdersRoute
+  '/products': typeof ProductsRoute
+  '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/kasir': typeof AdminKasirRoute
@@ -153,6 +167,8 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/orders': typeof OrdersRoute
+  '/products': typeof ProductsRoute
+  '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/kasir': typeof AdminKasirRoute
@@ -175,6 +191,8 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/orders': typeof OrdersRoute
+  '/products': typeof ProductsRoute
+  '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/kasir': typeof AdminKasirRoute
@@ -198,6 +216,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/order-confirmation'
     | '/orders'
+    | '/products'
+    | '/admin/activity-logs'
     | '/admin/dashboard'
     | '/admin/homepage'
     | '/admin/kasir'
@@ -217,6 +237,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/order-confirmation'
     | '/orders'
+    | '/products'
+    | '/admin/activity-logs'
     | '/admin/dashboard'
     | '/admin/homepage'
     | '/admin/kasir'
@@ -238,6 +260,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/order-confirmation'
     | '/orders'
+    | '/products'
+    | '/admin/activity-logs'
     | '/admin/dashboard'
     | '/admin/homepage'
     | '/admin/kasir'
@@ -260,12 +284,20 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   OrderConfirmationRoute: typeof OrderConfirmationRoute
   OrdersRoute: typeof OrdersRoute
+  ProductsRoute: typeof ProductsRoute
   ApiDbTestRoute: typeof ApiDbTestRoute
   ProductSlugRoute: typeof ProductSlugRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/products': {
+      id: '/products'
+      path: '/products'
+      fullPath: '/products'
+      preLoaderRoute: typeof ProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/orders': {
       id: '/orders'
       path: '/orders'
@@ -399,10 +431,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDashboardRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/activity-logs': {
+      id: '/admin/activity-logs'
+      path: '/activity-logs'
+      fullPath: '/admin/activity-logs'
+      preLoaderRoute: typeof AdminActivityLogsRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
   }
 }
 
 interface AdminRouteRouteChildren {
+  AdminActivityLogsRoute: typeof AdminActivityLogsRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminHomepageRoute: typeof AdminHomepageRoute
   AdminKasirRoute: typeof AdminKasirRoute
@@ -414,6 +454,7 @@ interface AdminRouteRouteChildren {
 }
 
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
+  AdminActivityLogsRoute: AdminActivityLogsRoute,
   AdminDashboardRoute: AdminDashboardRoute,
   AdminHomepageRoute: AdminHomepageRoute,
   AdminKasirRoute: AdminKasirRoute,
@@ -449,6 +490,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   OrderConfirmationRoute: OrderConfirmationRoute,
   OrdersRoute: OrdersRoute,
+  ProductsRoute: ProductsRoute,
   ApiDbTestRoute: ApiDbTestRoute,
   ProductSlugRoute: ProductSlugRoute,
 }

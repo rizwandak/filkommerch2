@@ -5,6 +5,84 @@ import { snap } from "../config/midtrans";
 import bcrypt from "bcryptjs";
 
 
+// ============ GENERAL HELPERS & DYNAMIC PRICING ============
+
+/**
+ * Checks if a given email belongs to the UB (Universitas Brawijaya) domain.
+ * Configured via UB_DOMAINS env variable.
+ */
+export const isUbEmail = (email?: string | null): boolean => {
+  if (!email) return false;
+  const domains = (process.env.UB_DOMAINS || "student.ub.ac.id,ub.ac.id")
+    .split(",")
+    .map(d => d.trim().toLowerCase());
+  const emailDomain = email.split("@")[1]?.toLowerCase();
+  return domains.includes(emailDomain);
+};
+
+/**
+ * Determines the correct dynamic price for a product/variant based on user context.
+ * Priority: promo_price -> filkom_price (if UB email) -> fallback price (variant override or base product price).
+ */
+export const determinePrice = (variant: any, isUbEmail: boolean): number => {
+  // 1. Promo price (product-level promo price takes priority)
+  if (variant.product_promo_price !== undefined && variant.product_promo_price !== null && Number(variant.product_promo_price) > 0) {
+    return Number(variant.product_promo_price);
+  }
+  
+  // 2. UB Email / Civitas UB price
+  if (isUbEmail) {
+    if (variant.filkom_price !== undefined && variant.filkom_price !== null && Number(variant.filkom_price) > 0) {
+      return Number(variant.filkom_price);
+    }
+    if (variant.product_filkom_price !== undefined && variant.product_filkom_price !== null && Number(variant.product_filkom_price) > 0) {
+      return Number(variant.product_filkom_price);
+    }
+  }
+  
+  // 3. Fallback to public price (variant override or product price)
+  if (variant.price_override !== undefined && variant.price_override !== null && Number(variant.price_override) > 0) {
+    return Number(variant.price_override);
+  }
+  return Number(variant.product_price);
+};
+
+/**
+ * Helper to write a log entry to activity_logs table.
+ */
+export const logActivity = async (
+  userId: number | null,
+  actorName: string | null,
+  actorRole: string | null,
+  action: string,
+  entityType: string | null,
+  entityId: string | number | null,
+  description: string,
+  ipAddress?: string | null,
+  userAgent?: string | null
+) => {
+  try {
+    await execute(
+      `INSERT INTO activity_logs (user_id, actor_name_snapshot, actor_role, action, entity_type, entity_id, description, ip_address, user_agent)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        userId,
+        actorName,
+        actorRole,
+        action,
+        entityType,
+        entityId ? String(entityId) : null,
+        description,
+        ipAddress || null,
+        userAgent || null
+      ]
+    );
+  } catch (error) {
+    console.error("Failed to log activity:", error);
+  }
+};
+
+
 // ============ STOCK MANAGEMENT HELPERS ============
 
 /**
@@ -291,10 +369,16 @@ export const getAllUsersAdmin = async (req: Request, res: Response) => {
   }
 };
 
+
+
 // Create user
 export const createUser = async (req: Request, res: Response) => {
   try {
     const { name, email, password, nim, phone, address, role } = req.body;
+    const actorId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const actorName = req.header("x-user-name") || null;
+    const actorRole = req.header("x-user-role") || null;
+
     if (!name || !email || !password || !role) {
       return res.status(400).json({ success: false, error: "Nama, email, password, dan peran wajib diisi" });
     }
@@ -311,6 +395,16 @@ export const createUser = async (req: Request, res: Response) => {
       [name, email, hash, nim || null, phone || null, address || null, role]
     );
 
+    await logActivity(
+      actorId,
+      actorName,
+      actorRole,
+      "create_user",
+      "user",
+      result.insertId,
+      `Pengguna "${name}" (${role}) dibuat oleh ${actorName || 'Sistem'}`
+    );
+
     return res.json({ success: true, user_id: result.insertId });
   } catch (error: any) {
     console.error("Error creating user:", error);
@@ -322,6 +416,10 @@ export const createUser = async (req: Request, res: Response) => {
 export const updateUser = async (req: Request, res: Response) => {
   try {
     const { id, name, email, password, nim, phone, address, role } = req.body;
+    const actorId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const actorName = req.header("x-user-name") || null;
+    const actorRole = req.header("x-user-role") || null;
+
     if (!id || !name || !email || !role) {
       return res.status(400).json({ success: false, error: "ID, nama, email, dan peran wajib diisi" });
     }
@@ -344,6 +442,16 @@ export const updateUser = async (req: Request, res: Response) => {
       );
     }
 
+    await logActivity(
+      actorId,
+      actorName,
+      actorRole,
+      "update_user",
+      "user",
+      id,
+      `Pengguna "${name}" (${role}) diperbarui oleh ${actorName || 'Sistem'}`
+    );
+
     return res.json({ success: true });
   } catch (error: any) {
     console.error("Error updating user:", error);
@@ -355,10 +463,25 @@ export const updateUser = async (req: Request, res: Response) => {
 export const deleteUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const actorId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const actorName = req.header("x-user-name") || null;
+    const actorRole = req.header("x-user-role") || null;
+
     if (Number(id) === 1) {
       return res.status(400).json({ success: false, error: "Admin utama tidak dapat dihapus" });
     }
     await execute("DELETE FROM users WHERE id = ?", [id]);
+
+    await logActivity(
+      actorId,
+      actorName,
+      actorRole,
+      "delete_user",
+      "user",
+      id,
+      `Pengguna ID ${id} dihapus oleh ${actorName || 'Sistem'}`
+    );
+
     return res.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting user:", error);
@@ -470,6 +593,8 @@ export const checkDatabaseConnection = async (req: Request, res: Response) => {
 // ============ ORDERS AND PAYMENTS (ONLINE CHECKOUT) ============
 
 // Create Order and Payment
+// CATATAN KEAMANAN: Input sudah divalidasi oleh Zod middleware (createOrderSchema) di server.ts
+// sebelum handler ini dipanggil. Validasi manual di bawah ini berfungsi sebagai defense-in-depth.
 export const createOrderAndPayment = async (req: Request, res: Response) => {
   const connection = await getConnection();
   try {
@@ -485,6 +610,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
     // Resolve items and prices from database using variant_id (locking rows)
     const resolvedItems: any[] = [];
     let calculatedSubtotal = 0;
+    const isUb = isUbEmail(details.customerEmail);
 
     for (const item of details.items) {
       const variantId = item.variant_id;
@@ -494,7 +620,8 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
 
       // Query variant details joined with product info
       const [rows] = await connection.execute(
-        `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix
+        `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix,
+                p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
@@ -512,8 +639,8 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         throw new Error(`Stok tidak cukup untuk ${variant.product_name} (${variant.size}${variant.color ? ` / ${variant.color}` : ""}). Tersedia: ${availableStock}`);
       }
 
-      // Determine correct price: override takes priority
-      const price = variant.price_override !== null ? variant.price_override : variant.product_price;
+      // Determine correct price based on email domain
+      const price = determinePrice(variant, isUb);
       const subtotalItem = price * item.quantity;
       calculatedSubtotal += subtotalItem;
 
@@ -646,6 +773,17 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       [transaction.token, "qris", details.orderId]
     );
 
+    // Record activity log
+    await logActivity(
+      details.userId || null,
+      details.customerName || null,
+      "customer",
+      "create_order",
+      "order",
+      details.orderId,
+      `Pesanan online dibuat untuk ${details.customerName} (${details.orderId})`
+    );
+
     await connection.commit();
 
     return res.json({
@@ -716,10 +854,16 @@ export const getCategories = async (req: Request, res: Response) => {
   }
 };
 
+
+
 // Create category
 export const createCategory = async (req: Request, res: Response) => {
   try {
     const { name } = req.body;
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
+
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, error: "Nama kategori wajib diisi" });
     }
@@ -736,6 +880,16 @@ export const createCategory = async (req: Request, res: Response) => {
       [name.trim(), slug]
     );
 
+    await logActivity(
+      userId,
+      userName,
+      userRole,
+      "create_category",
+      "category",
+      result.insertId,
+      `Kategori "${name.trim()}" ditambahkan oleh ${userName || 'Sistem'}`
+    );
+
     return res.json({ success: true, category: { id: result.insertId, name: name.trim(), slug, is_active: true } });
   } catch (error: any) {
     console.error("Error creating category:", error);
@@ -748,6 +902,10 @@ export const updateCategory = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
+
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, error: "Nama kategori wajib diisi" });
     }
@@ -764,6 +922,16 @@ export const updateCategory = async (req: Request, res: Response) => {
       [name.trim(), slug, id]
     );
 
+    await logActivity(
+      userId,
+      userName,
+      userRole,
+      "update_category",
+      "category",
+      id,
+      `Kategori "${name.trim()}" diperbarui oleh ${userName || 'Sistem'}`
+    );
+
     return res.json({ success: true, category: { id: parseInt(id), name: name.trim(), slug } });
   } catch (error: any) {
     console.error("Error updating category:", error);
@@ -775,11 +943,24 @@ export const updateCategory = async (req: Request, res: Response) => {
 export const deleteCategory = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
     
     // Soft delete by updating is_active to false
     await execute(
       "UPDATE categories SET is_active = FALSE WHERE id = ?",
       [id]
+    );
+
+    await logActivity(
+      userId,
+      userName,
+      userRole,
+      "delete_category",
+      "category",
+      id,
+      `Kategori ID ${id} dinonaktifkan oleh ${userName || 'Sistem'}`
     );
 
     return res.json({ success: true });
@@ -823,23 +1004,44 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
   }
 };
 
+
+
 // Create product
 export const createProduct = async (req: Request, res: Response) => {
   try {
     const input = req.body;
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
     
     // Set the first image from images array as main image_url if provided
     const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
 
     const result = await execute(
-      `INSERT INTO products (category_id, name, slug, description, price, image_url, is_active, bahan, asal, aplikasi, size_chart_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO products (
+        category_id, name, slug, description, price, original_price, filkom_price, promo_price,
+        sale_type, product_type, low_stock_threshold, is_best_seller, is_limited,
+        preorder_start_at, preorder_end_at, preorder_moq, production_eta_days,
+        image_url, is_active, bahan, asal, aplikasi, size_chart_url
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.category_id,
         input.name,
         input.slug,
         input.description || null,
         input.price,
+        input.original_price || null,
+        input.filkom_price || null,
+        input.promo_price || null,
+        input.sale_type || 'ready_stock',
+        input.product_type || 'apparel',
+        input.low_stock_threshold ?? 5,
+        input.is_best_seller ? 1 : 0,
+        input.is_limited ? 1 : 0,
+        input.preorder_start_at || null,
+        input.preorder_end_at || null,
+        input.preorder_moq || null,
+        input.production_eta_days || null,
         mainImageUrl,
         input.is_active ?? true,
         input.bahan || null,
@@ -854,8 +1056,8 @@ export const createProduct = async (req: Request, res: Response) => {
     // Insert variants
     for (const variant of input.variants) {
       await execute(
-        "INSERT INTO product_variants (product_id, size, color, stock) VALUES (?, ?, ?, ?)",
-        [productId, variant.size, variant.color || null, variant.stock]
+        "INSERT INTO product_variants (product_id, size, color, stock, filkom_price) VALUES (?, ?, ?, ?, ?)",
+        [productId, variant.size, variant.color || null, variant.stock, variant.filkom_price || null]
       );
     }
 
@@ -870,6 +1072,16 @@ export const createProduct = async (req: Request, res: Response) => {
       }
     }
 
+    await logActivity(
+      userId,
+      userName,
+      userRole,
+      "create_product",
+      "product",
+      productId,
+      `Produk "${input.name}" ditambahkan oleh ${userName || 'Sistem'}`
+    );
+
     return res.json({ success: true, product_id: productId });
   } catch (error: any) {
     console.error("Error creating product:", error);
@@ -880,18 +1092,22 @@ export const createProduct = async (req: Request, res: Response) => {
   }
 };
 
-// Update product
 export const updateProduct = async (req: Request, res: Response) => {
   try {
     const input = req.body;
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
     
     // Set the first image from images array as main image_url if provided
     const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
 
     await execute(
       `UPDATE products 
-       SET category_id = ?, name = ?, slug = ?, description = ?, price = ?, image_url = ?, is_active = ?,
-           bahan = ?, asal = ?, aplikasi = ?, size_chart_url = ? 
+       SET category_id = ?, name = ?, slug = ?, description = ?, price = ?, original_price = ?, filkom_price = ?, promo_price = ?,
+           sale_type = ?, product_type = ?, low_stock_threshold = ?, is_best_seller = ?, is_limited = ?,
+           preorder_start_at = ?, preorder_end_at = ?, preorder_moq = ?, production_eta_days = ?,
+           image_url = ?, is_active = ?, bahan = ?, asal = ?, aplikasi = ?, size_chart_url = ? 
        WHERE id = ?`,
       [
         input.category_id,
@@ -899,6 +1115,18 @@ export const updateProduct = async (req: Request, res: Response) => {
         input.slug,
         input.description || null,
         input.price,
+        input.original_price || null,
+        input.filkom_price || null,
+        input.promo_price || null,
+        input.sale_type || 'ready_stock',
+        input.product_type || 'apparel',
+        input.low_stock_threshold ?? 5,
+        input.is_best_seller ? 1 : 0,
+        input.is_limited ? 1 : 0,
+        input.preorder_start_at || null,
+        input.preorder_end_at || null,
+        input.preorder_moq || null,
+        input.production_eta_days || null,
         mainImageUrl,
         input.is_active ?? true,
         input.bahan || null,
@@ -920,13 +1148,13 @@ export const updateProduct = async (req: Request, res: Response) => {
 
       if (existing) {
         await execute(
-          "UPDATE product_variants SET stock = ?, is_active = TRUE WHERE id = ?",
-          [variant.stock, existing.id]
+          "UPDATE product_variants SET stock = ?, filkom_price = ?, is_active = TRUE WHERE id = ?",
+          [variant.stock, variant.filkom_price || null, existing.id]
         );
       } else {
         await execute(
-          "INSERT INTO product_variants (product_id, size, color, stock, is_active) VALUES (?, ?, ?, ?, TRUE)",
-          [input.id, variant.size, variant.color || null, variant.stock]
+          "INSERT INTO product_variants (product_id, size, color, stock, filkom_price, is_active) VALUES (?, ?, ?, ?, ?, TRUE)",
+          [input.id, variant.size, variant.color || null, variant.stock, variant.filkom_price || null]
         );
       }
     }
@@ -946,6 +1174,16 @@ export const updateProduct = async (req: Request, res: Response) => {
       }
     }
 
+    await logActivity(
+      userId,
+      userName,
+      userRole,
+      "update_product",
+      "product",
+      input.id,
+      `Produk "${input.name}" diperbarui oleh ${userName || 'Sistem'}`
+    );
+
     return res.json({ success: true });
   } catch (error: any) {
     console.error("Error updating product:", error);
@@ -960,7 +1198,22 @@ export const updateProduct = async (req: Request, res: Response) => {
 export const deleteProduct = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
+
     await execute("UPDATE products SET is_active = FALSE WHERE id = ?", [id]);
+
+    await logActivity(
+      userId,
+      userName,
+      userRole,
+      "delete_product",
+      "product",
+      id,
+      `Produk ID ${id} dinonaktifkan oleh ${userName || 'Sistem'}`
+    );
+
     return res.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting product:", error);
@@ -970,6 +1223,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
     });
   }
 };
+
 
 // Get online orders
 export const getOnlineOrders = async (req: Request, res: Response) => {
@@ -1244,6 +1498,8 @@ export const createSale = async (req: Request, res: Response) => {
     const saleId = `POS-${Date.now()}`;
     const resolvedItems: any[] = [];
     let calculatedSubtotal = 0;
+    const customerEmail = input.customer_email || "pos@filkommerch.com";
+    const isUb = isUbEmail(customerEmail);
 
     for (const item of input.items) {
       const variantId = item.variant_id;
@@ -1253,7 +1509,8 @@ export const createSale = async (req: Request, res: Response) => {
 
       // Query variant joined with product info
       const [rows] = await connection.execute(
-        `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix
+        `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix,
+                p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
@@ -1271,7 +1528,7 @@ export const createSale = async (req: Request, res: Response) => {
         throw new Error(`Stok tidak cukup untuk ${variant.product_name}. Tersedia: ${availableStock}`);
       }
 
-      const price = variant.price_override !== null ? variant.price_override : variant.product_price;
+      const price = determinePrice(variant, isUb);
       const subtotalItem = price * item.quantity;
       calculatedSubtotal += subtotalItem;
 
@@ -1300,11 +1557,13 @@ export const createSale = async (req: Request, res: Response) => {
         order_id, channel, fulfillment_type, fulfillment_status, cashier_id, customer_name,
         customer_email, customer_phone, subtotal, discount_amount, tax_amount, gross_amount,
         payment_status, order_status, notes, transaction_status
-      ) VALUES (?, 'pos', 'walk_in', 'completed', ?, ?, 'pos@filkommerch.com', '081234567890', ?, ?, ?, ?, 'paid', 'completed', ?, 'settlement')`,
+      ) VALUES (?, 'pos', 'walk_in', 'completed', ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'completed', ?, 'settlement')`,
       [
         saleId,
         input.admin_id || null,
         input.customer_name || "Pelanggan POS",
+        customerEmail,
+        input.customer_phone || "081234567890",
         calculatedSubtotal,
         discountAmount,
         taxAmount,
@@ -1368,6 +1627,17 @@ export const createSale = async (req: Request, res: Response) => {
         paymentLabel,
         grossAmount
       ]
+    );
+
+    // Record activity log for POS sale
+    await logActivity(
+      input.admin_id || null,
+      "Kasir POS",
+      "cashier",
+      "create_sale",
+      "order",
+      saleId,
+      `Transaksi POS langsung dibuat oleh Kasir (${saleId})`
     );
 
     await connection.commit();
@@ -1513,10 +1783,16 @@ export const getStoreSettings = async (req: Request, res: Response) => {
   }
 };
 
+
+
 // Update store settings
 export const updateStoreSettings = async (req: Request, res: Response) => {
   try {
     const input = req.body;
+    const actorId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const actorName = req.header("x-user-name") || null;
+    const actorRole = req.header("x-user-role") || null;
+
     const existing = await queryOne<{ id: number }>("SELECT id FROM store_settings LIMIT 1");
     if (existing) {
       await execute(
@@ -1546,6 +1822,17 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
         ]
       );
     }
+
+    await logActivity(
+      actorId,
+      actorName,
+      actorRole,
+      "update_settings",
+      "settings",
+      existing ? existing.id : 1,
+      `Pengaturan toko diperbarui oleh ${actorName || 'Sistem'}`
+    );
+
     return res.json({ success: true });
   } catch (error: any) {
     console.error("Error updating store settings:", error);
@@ -1553,6 +1840,19 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
       success: false,
       error: error.message || "Failed to update settings",
     });
+  }
+};
+
+// Get activity logs (Admin only)
+export const getActivityLogs = async (req: Request, res: Response) => {
+  try {
+    const logs = await query<any>(
+      `SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 500`
+    );
+    return res.json({ success: true, logs });
+  } catch (error: any) {
+    console.error("Error getting activity logs:", error);
+    return res.status(500).json({ success: false, error: error.message || "Failed to fetch activity logs" });
   }
 };
 

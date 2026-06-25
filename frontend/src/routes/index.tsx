@@ -86,13 +86,14 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const NAV: { label: string; target: string; filter?: string }[] = [
-  { label: "NEW DROP", target: "shop", filter: "ALL" },
-  { label: "JACKETS", target: "shop", filter: "JACKET" },
-  { label: "HOODIES", target: "shop", filter: "HOODIE" },
-  { label: "TEES", target: "shop", filter: "TEE" },
-  { label: "ACCESSORIES", target: "shop", filter: "ACCESSORIES" },
-  { label: "PRE-ORDER", target: "about" },
+
+
+const NAV = [
+  { label: "BERANDA", href: "/", isScroll: true, target: "top" },
+  { label: "PRODUK", href: "/products" },
+  { label: "PRE-ORDER", href: "/products?sale_type=pre_order" },
+  { label: "TENTANG KAMI", href: "/#about", isScroll: true, target: "about" },
+  { label: "HUBUNGI KAMI", href: "/#contact", isScroll: true, target: "contact" },
 ];
 
 const FILTERS = ["ALL", "JACKET", "HOODIE", "TEE", "ACCESSORIES"] as const;
@@ -220,6 +221,23 @@ function Index() {
       localStorage.setItem("indexCart", JSON.stringify(cart));
     }
   }, [cart, cartLoaded]);
+
+  // Listen to hash on mount/hashchange to scroll
+  useEffect(() => {
+    const handleHashScroll = () => {
+      if (window.location.hash) {
+        const id = window.location.hash.substring(1);
+        const timer = setTimeout(() => {
+          scrollToId(id);
+        }, 300);
+        return () => clearTimeout(timer);
+      }
+    };
+    handleHashScroll();
+    window.addEventListener("hashchange", handleHashScroll);
+    return () => window.removeEventListener("hashchange", handleHashScroll);
+  }, []);
+
   const [cartOpen, setCartOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -275,10 +293,15 @@ function Index() {
     setCart((c) => c.filter((i) => i.id !== id));
   }, []);
 
+
+
   const handleNav = (item: (typeof NAV)[number]) => {
     setMenuOpen(false);
-    if (item.filter) setFilter(item.filter as Filter);
-    scrollToId(item.target);
+    if (item.isScroll) {
+      scrollToId(item.target);
+    } else {
+      navigate({ to: item.href as any });
+    }
   };
 
   const handleCheckout = () => {
@@ -361,11 +384,17 @@ function Index() {
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border">
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 flex items-center justify-between h-16 sm:h-20">
-          <button
-            onClick={() => scrollToId("top")}
-            className="flex items-center gap-2 sm:gap-3 text-left"
+          <Link
+            to="/"
+            onClick={(e) => {
+              if (window.location.pathname === "/") {
+                e.preventDefault();
+                scrollToId("top");
+              }
+            }}
+            className="flex items-center gap-2 sm:gap-3 text-left hover:opacity-90 transition-opacity"
           >
             <div className="flex items-center gap-1.5 sm:gap-2">
               <img
@@ -380,28 +409,71 @@ function Index() {
               />
             </div>
             <div className="leading-tight hidden sm:block">
-              <div className="display text-lg text-ink flex items-center gap-1.5">
+              <div className="display text-lg text-ink flex items-center gap-1.5 font-bold uppercase">
                 Filkom Merch
                 <span className="text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded tracking-wide uppercase">
                   OFFICIAL
                 </span>
               </div>
-              <div className="text-[10px] tracking-[0.3em] text-muted-foreground">
+              <div className="text-[10px] tracking-[0.3em] text-muted-foreground font-bold">
                 UNIVERSITAS BRAWIJAYA
               </div>
             </div>
-          </button>
+          </Link>
+
           <nav className="hidden lg:flex items-center gap-7">
-            {NAV.map((n) => (
-              <button
-                key={n.label}
-                onClick={() => handleNav(n)}
-                className="text-xs font-semibold tracking-[0.18em] text-ink hover:text-brand-orange transition-colors"
-              >
-                {n.label}
-              </button>
-            ))}
+            {NAV.map((n) => {
+              const isActive =
+                n.href === "/products" && window.location.pathname === "/products" && !window.location.search.includes("sale_type=pre_order") ||
+                n.href.includes("pre_order") && window.location.search.includes("sale_type=pre_order") ||
+                n.href === "/" && window.location.pathname === "/" && !window.location.hash;
+
+              const isScrollOnHome = n.isScroll && window.location.pathname === "/";
+
+              if (isScrollOnHome) {
+                return (
+                  <button
+                    key={n.label}
+                    onClick={() => scrollToId(n.target!)}
+                    className={`text-xs font-bold tracking-[0.18em] transition-colors cursor-pointer uppercase ${
+                      isActive ? "text-brand-orange" : "text-ink hover:text-brand-orange"
+                    }`}
+                  >
+                    {n.label}
+                  </button>
+                );
+              }
+
+              if (n.href.includes("sale_type=pre_order")) {
+                return (
+                  <Link
+                    key={n.label}
+                    to="/products"
+                    search={{ sale_type: "pre_order" }}
+                    className={`text-xs font-bold tracking-[0.18em] transition-colors uppercase ${
+                      isActive ? "text-brand-orange" : "text-ink hover:text-brand-orange"
+                    }`}
+                  >
+                    {n.label}
+                  </Link>
+                );
+              }
+
+              return (
+                <Link
+                  key={n.label}
+                  to={n.href.startsWith("/#") ? "/" : (n.href as any)}
+                  hash={n.isScroll ? n.target : undefined}
+                  className={`text-xs font-bold tracking-[0.18em] transition-colors uppercase ${
+                    isActive ? "text-brand-orange" : "text-ink hover:text-brand-orange"
+                  }`}
+                >
+                  {n.label}
+                </Link>
+              );
+            })}
           </nav>
+
           <div className="flex items-center gap-4 text-ink">
             <button aria-label="Search" onClick={() => setSearchOpen((v) => !v)}>
               <Search className="w-5 h-5" />
@@ -891,6 +963,33 @@ function Index() {
               </ul>
             </div>
           ))}
+          <div>
+            <div className="text-xs font-bold tracking-[0.2em] text-ink mb-4">KONTAK (WA)</div>
+            <ul className="space-y-3 text-sm">
+              <li>
+                <a
+                  href="https://wa.me/6282235526105?text=Halo%20Admin%20Aliya,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 hover:text-brand-orange text-xs text-muted-foreground hover:font-bold transition"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  Admin Aliya
+                </a>
+              </li>
+              <li>
+                <a
+                  href="https://wa.me/6282287190402?text=Halo%20Admin%20Puty,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 hover:text-brand-orange text-xs text-muted-foreground hover:font-bold transition"
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                  Admin Puty
+                </a>
+              </li>
+            </ul>
+          </div>
         </div>
         <div className="border-t border-border">
           <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-5 flex flex-col md:flex-row justify-between gap-2 text-xs text-muted-foreground">
@@ -916,19 +1015,34 @@ function Index() {
             </button>
           </div>
           <nav className="flex-1 flex flex-col px-5 py-6 sm:py-8 gap-1">
-            {NAV.map((n, idx) => (
-              <button
-                key={n.label}
-                onClick={() => {
-                  handleNav(n);
-                  setUserMenuOpen(false);
-                }}
-                className="display text-3xl sm:text-4xl text-left py-2.5 sm:py-3 hover:text-brand-orange transition-colors animate-slide-up"
-                style={{ animationDelay: `${idx * 50}ms` }}
-              >
-                {n.label}
-              </button>
-            ))}
+            {NAV.map((n, idx) =>
+              n.isScroll ? (
+                <button
+                  key={n.label}
+                  onClick={() => {
+                    handleNav(n);
+                    setUserMenuOpen(false);
+                  }}
+                  className="display text-3xl sm:text-4xl text-left py-2.5 sm:py-3 hover:text-brand-orange transition-colors animate-slide-up"
+                  style={{ animationDelay: `${idx * 50}ms` }}
+                >
+                  {n.label}
+                </button>
+              ) : (
+                <Link
+                  key={n.label}
+                  to={n.href as any}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setUserMenuOpen(false);
+                  }}
+                  className="display text-3xl sm:text-4xl text-left py-2.5 sm:py-3 hover:text-brand-orange transition-colors animate-slide-up"
+                  style={{ animationDelay: `${idx * 50}ms` }}
+                >
+                  {n.label}
+                </Link>
+              )
+            )}
           </nav>
         </div>
       )}

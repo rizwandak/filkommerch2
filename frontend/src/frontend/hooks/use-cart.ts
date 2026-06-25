@@ -1,5 +1,16 @@
 import { useState, useEffect } from "react";
-import type { CartItem } from "@backend/services/midtrans";
+
+export interface CartItem {
+  id: string;
+  product_id: number;
+  product_name: string;
+  name: string;
+  price: number;
+  quantity: number;
+  size?: string;
+  variant_id?: number;
+  category?: string;
+}
 
 export function useCart() {
   const [cart, setCart] = useState<CartItem[]>([]);

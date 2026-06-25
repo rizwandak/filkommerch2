@@ -46,13 +46,23 @@ interface ProductForm {
   slug: string;
   description: string;
   price: string;
+  original_price: string;
+  filkom_price: string;
+  promo_price: string;
+  sale_type: string;
+  product_type: string;
+  low_stock_threshold: string;
+  preorder_start_at: string;
+  preorder_end_at: string;
+  preorder_moq: string;
+  production_eta_days: string;
   image_url: string;
   bahan: string;
   asal: string;
   aplikasi: string;
   size_chart_url: string;
   images: string[];
-  variants: Array<{ size: string; color: string; stock: string }>;
+  variants: Array<{ size: string; color: string; stock: string; filkom_price: string }>;
 }
 
 const emptyForm = (): ProductForm => ({
@@ -61,14 +71,41 @@ const emptyForm = (): ProductForm => ({
   slug: "",
   description: "",
   price: "",
+  original_price: "",
+  filkom_price: "",
+  promo_price: "",
+  sale_type: "",
+  product_type: "ready",
+  low_stock_threshold: "5",
+  preorder_start_at: "",
+  preorder_end_at: "",
+  preorder_moq: "",
+  production_eta_days: "",
   image_url: "",
   bahan: "",
   asal: "",
   aplikasi: "",
   size_chart_url: "",
   images: [],
-  variants: [{ size: "One Size", color: "", stock: "0" }],
+  variants: [{ size: "One Size", color: "", stock: "0", filkom_price: "" }],
 });
+
+const formatDateForInput = (dateVal: any) => {
+  if (!dateVal) return "";
+  try {
+    const d = new Date(dateVal);
+    if (isNaN(d.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  } catch (e) {
+    return "";
+  }
+};
 
 function AdminProductsPage() {
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
@@ -109,6 +146,16 @@ function AdminProductsPage() {
       slug: product.slug,
       description: product.description || "",
       price: String(product.price),
+      original_price: product.original_price ? String(product.original_price) : "",
+      filkom_price: product.filkom_price ? String(product.filkom_price) : "",
+      promo_price: product.promo_price ? String(product.promo_price) : "",
+      sale_type: product.sale_type || "",
+      product_type: product.product_type || "ready",
+      low_stock_threshold: product.low_stock_threshold ? String(product.low_stock_threshold) : "5",
+      preorder_start_at: formatDateForInput(product.preorder_start_at),
+      preorder_end_at: formatDateForInput(product.preorder_end_at),
+      preorder_moq: product.preorder_moq ? String(product.preorder_moq) : "",
+      production_eta_days: product.production_eta_days ? String(product.production_eta_days) : "",
       image_url: product.image_url || "",
       bahan: product.bahan || "",
       asal: product.asal || "",
@@ -119,6 +166,7 @@ function AdminProductsPage() {
         size: v.size,
         color: v.color || "",
         stock: String(v.stock),
+        filkom_price: v.filkom_price ? String(v.filkom_price) : "",
       })),
     });
     setDialogOpen(true);
@@ -204,6 +252,16 @@ function AdminProductsPage() {
       slug: form.slug,
       description: form.description,
       price: parseFloat(form.price),
+      original_price: form.original_price ? parseFloat(form.original_price) : null,
+      filkom_price: form.filkom_price ? parseFloat(form.filkom_price) : null,
+      promo_price: form.promo_price ? parseFloat(form.promo_price) : null,
+      sale_type: form.sale_type || null,
+      product_type: form.product_type || "ready",
+      low_stock_threshold: form.low_stock_threshold ? parseInt(form.low_stock_threshold) : 5,
+      preorder_start_at: form.preorder_start_at || null,
+      preorder_end_at: form.preorder_end_at || null,
+      preorder_moq: form.preorder_moq ? parseInt(form.preorder_moq) : null,
+      production_eta_days: form.production_eta_days ? parseInt(form.production_eta_days) : null,
       image_url: form.image_url || undefined,
       bahan: form.bahan || undefined,
       asal: form.asal || undefined,
@@ -214,6 +272,7 @@ function AdminProductsPage() {
         size: v.size,
         color: v.color || null,
         stock: parseInt(v.stock) || 0,
+        filkom_price: v.filkom_price ? parseFloat(v.filkom_price) : null,
       })),
     };
 
@@ -497,14 +556,137 @@ function AdminProductsPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Harga (Rp)</Label>
-              <Input
-                type="number"
-                value={form.price}
-                onChange={(e) => setForm({ ...form, price: e.target.value })}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Harga Utama / Promo (Rp)</Label>
+                <Input
+                  type="number"
+                  value={form.price}
+                  onChange={(e) => setForm({ ...form, price: e.target.value })}
+                  placeholder="Harga jual"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Harga Asli / Sebelum Diskon (Rp)</Label>
+                <Input
+                  type="number"
+                  value={form.original_price}
+                  onChange={(e) => setForm({ ...form, original_price: e.target.value })}
+                  placeholder="Opsional, untuk coret harga"
+                />
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Harga Civitas UB (Rp)</Label>
+                <Input
+                  type="number"
+                  value={form.filkom_price}
+                  onChange={(e) => setForm({ ...form, filkom_price: e.target.value })}
+                  placeholder="Harga khusus Civitas UB"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Harga Promo Khusus (Rp)</Label>
+                <Input
+                  type="number"
+                  value={form.promo_price}
+                  onChange={(e) => setForm({ ...form, promo_price: e.target.value })}
+                  placeholder="Harga promo diskon (jika ada)"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Tipe Produk</Label>
+                <Select
+                  value={form.product_type}
+                  onValueChange={(v) => setForm({ ...form, product_type: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Ready Stock" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ready">Ready Stock</SelectItem>
+                    <SelectItem value="preorder">Pre-Order</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Label Penjualan</Label>
+                <Select
+                  value={form.sale_type || "none"}
+                  onValueChange={(v) => setForm({ ...form, sale_type: v === "none" ? "" : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tidak Ada" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Tidak Ada</SelectItem>
+                    <SelectItem value="sale">SALE</SelectItem>
+                    <SelectItem value="promo">PROMO</SelectItem>
+                    <SelectItem value="preorder">PRE-ORDER</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Batas Stok Menipis</Label>
+                <Input
+                  type="number"
+                  value={form.low_stock_threshold}
+                  onChange={(e) => setForm({ ...form, low_stock_threshold: e.target.value })}
+                  placeholder="Default 5"
+                />
+              </div>
+            </div>
+
+            {form.product_type === "preorder" && (
+              <div className="border border-brand-orange/30 bg-orange-50/20 p-4 rounded-lg space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-orange">Parameter Pre-Order</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Mulai Pre-Order</Label>
+                    <Input
+                      type="datetime-local"
+                      value={form.preorder_start_at}
+                      onChange={(e) => setForm({ ...form, preorder_start_at: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Selesai Pre-Order</Label>
+                    <Input
+                      type="datetime-local"
+                      value={form.preorder_end_at}
+                      onChange={(e) => setForm({ ...form, preorder_end_at: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs">Minimum Order Qty (MOQ)</Label>
+                    <Input
+                      type="number"
+                      placeholder="Kuota minimum"
+                      value={form.preorder_moq}
+                      onChange={(e) => setForm({ ...form, preorder_moq: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Estimasi Produksi (Hari)</Label>
+                    <Input
+                      type="number"
+                      placeholder="Contoh: 14 hari"
+                      value={form.production_eta_days}
+                      onChange={(e) => setForm({ ...form, production_eta_days: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Multiple Product Images Upload */}
             <div className="space-y-2">
@@ -642,7 +824,7 @@ function AdminProductsPage() {
                   onClick={() =>
                     setForm({
                       ...form,
-                      variants: [...form.variants, { size: "", color: "", stock: "0" }],
+                      variants: [...form.variants, { size: "", color: "", stock: "0", filkom_price: "" }],
                     })
                   }
                   className="h-8 text-xs font-bold"
@@ -682,7 +864,18 @@ function AdminProductsPage() {
                         variants[i] = { ...variants[i], stock: e.target.value };
                         setForm({ ...form, variants });
                       }}
-                      className="w-24"
+                      className="w-20"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Harga Filkom"
+                      value={v.filkom_price}
+                      onChange={(e) => {
+                        const variants = [...form.variants];
+                        variants[i] = { ...variants[i], filkom_price: e.target.value };
+                        setForm({ ...form, variants });
+                      }}
+                      className="w-28 text-xs"
                     />
                     {form.variants.length > 1 && (
                       <Button

@@ -1,19 +1,32 @@
 import { Router } from "express";
 import { snap } from "../config/midtrans";
 import { query, queryOne, execute, getConnection } from "../config/database";
-import crypto from "crypto";
 import { config } from "../config/config";
+import { verifyMidtransSignature } from "../utils/midtrans-signature";
+import { validateBody, checkoutSchema } from "../middleware/validation";
+import rateLimit from "express-rate-limit";
 
 const router = Router();
 
-// POST /api/payment/checkout
-router.post("/checkout", async (req, res) => {
+// Rate limiter khusus untuk checkout via payment route
+const paymentCheckoutLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 menit
+  max: 5, // Maksimal 5 request per IP per menit
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "Terlalu banyak percobaan checkout. Silakan coba lagi dalam 1 menit.",
+  },
+});
+
+// POST /api/payment/checkout — dilindungi rate limiter + validasi Zod
+router.post("/checkout", paymentCheckoutLimiter, validateBody(checkoutSchema), async (req, res) => {
   try {
     const { orderId, grossAmount, customerName, customerEmail, customerPhone, items } = req.body;
 
-    if (!orderId || !grossAmount) {
-      return res.status(400).json({ error: "Missing required checkout parameters" });
-    }
+    // Validasi tambahan: grossAmount sudah dipastikan positif oleh Zod schema
+    // Items juga sudah divalidasi — price dan quantity dijamin positif
 
     // Create Midtrans snap transaction parameters
     const parameter = {
@@ -58,25 +71,33 @@ router.post("/checkout", async (req, res) => {
   }
 });
 
-// POST /api/payment/notification
+// POST /api/payment/notification — Midtrans Webhook/Callback
+// PENTING: Endpoint ini menerima request dari server Midtrans, bukan dari frontend.
+// Verifikasi dilakukan via SHA-512 signature key dengan timing-safe comparison.
 router.post("/notification", async (req, res) => {
   const connection = await getConnection();
   try {
     const payload = req.body;
     const { order_id, status_code, gross_amount, signature_key, transaction_status, transaction_id, payment_type } = payload;
 
-    // Verify signature key
-    const localSignature = crypto
-      .createHash("sha512")
-      .update(`${order_id}${status_code}${gross_amount}${config.midtrans.serverKey}`)
-      .digest("hex");
+    // ============ VERIFIKASI SIGNATURE KEY MIDTRANS ============
+    // Formula: SHA512(order_id + status_code + gross_amount + server_key)
+    // Menggunakan crypto.timingSafeEqual() untuk mencegah timing attack
+    const isSignatureValid = verifyMidtransSignature(
+      order_id,
+      status_code,
+      gross_amount,
+      config.midtrans.serverKey,
+      signature_key
+    );
 
-    if (localSignature !== signature_key) {
-      console.error("❌ Invalid signature for order:", order_id);
-      return res.status(400).json({ error: "Invalid signature key" });
+    if (!isSignatureValid) {
+      console.error(`❌ [SECURITY] Invalid Midtrans signature for order: ${order_id}`);
+      console.error(`   Received signature: ${signature_key?.substring(0, 32)}...`);
+      return res.status(403).json({ error: "Invalid signature key — request ditolak" });
     }
 
-    console.log(`🔔 Payment notification received for order: ${order_id}, status: ${transaction_status}`);
+    console.log(`🔔 ✅ Payment notification VERIFIED for order: ${order_id}, status: ${transaction_status}`);
 
     await connection.beginTransaction();
 
@@ -201,7 +222,7 @@ router.post("/notification", async (req, res) => {
 
     const orderItemsList = items as any[];
 
-    // Import helper dynamic import or call local logger to avoid circular references if necessary
+    // Local stock movement logger to avoid circular references
     const logLocalStockMovement = async (
       conn: any,
       vId: number,

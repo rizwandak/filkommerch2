@@ -9,6 +9,7 @@ import {
   MonitorSmartphone,
   Users,
   Sliders,
+  History,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, type AdminRole } from "@/lib/auth";
@@ -28,6 +29,7 @@ const adminNavItems: NavItem[] = [
   { label: "Transaksi", to: "/admin/transactions", icon: Receipt, roles: ["admin"] },
   { label: "Pengguna", to: "/admin/users", icon: Users, roles: ["admin"] },
   { label: "Tata Letak", to: "/admin/homepage", icon: Sliders, roles: ["admin"] },
+  { label: "Log Aktivitas", to: "/admin/activity-logs", icon: History, roles: ["admin"] },
   { label: "Pengaturan Toko", to: "/admin/settings", icon: Settings, roles: ["admin"] },
 ];
 

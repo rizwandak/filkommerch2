@@ -27,6 +27,7 @@ interface AuthContextType {
   loginAsAdmin: (username: string, password: string) => Promise<void>;
   loginAsGoogle: (userInfo: Omit<BuyerUser, "type">) => void | Promise<void>;
   logout: () => void;
+  upsertBuyer: (buyer: BuyerUser) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -47,6 +48,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     setLoading(false);
   }, []);
+
+  // Sync cookies whenever user changes
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (user) {
+      const role = user.type === "admin" ? user.role : "buyer";
+      const name = user.type === "admin" ? user.username : user.name;
+      const id = String(user.id || "");
+      
+      document.cookie = `user_role=${role}; path=/; max-age=604800; SameSite=Lax`;
+      document.cookie = `user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
+      document.cookie = `user_id=${id}; path=/; max-age=604800; SameSite=Lax`;
+    } else {
+      document.cookie = "user_role=; path=/; max-age=0; SameSite=Lax";
+      document.cookie = "user_name=; path=/; max-age=0; SameSite=Lax";
+      document.cookie = "user_id=; path=/; max-age=0; SameSite=Lax";
+    }
+  }, [user]);
 
   const loginAsAdmin = async (username: string, password: string) => {
     const result = await authLogin({ data: { username, password } });

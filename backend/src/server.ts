@@ -1,9 +1,13 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import { validateConfig } from "./config/config";
 import paymentRoutes from "./routes/payment";
 import * as apiControllers from "./controllers/api";
+import { validateBody, createOrderSchema } from "./middleware/validation";
+import { checkRole } from "./middleware/auth";
 
 // Initialize environment variables
 dotenv.config();
@@ -14,12 +18,34 @@ validateConfig();
 const app = express();
 const port = process.env.PORT || 8080;
 
-// Enable CORS
+// ============ SECURITY MIDDLEWARE ============
+
+// Helmet — Mengamankan HTTP headers (X-Content-Type-Options, X-Frame-Options, HSTS, dll.)
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+
+// CORS — Konfigurasi ketat, hanya menerima request dari origin frontend yang diizinkan
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+  .split(",")
+  .map((origin) => origin.trim());
+
 app.use(
   cors({
-    origin: "*", // Mengizinkan semua origin untuk kemudahan integrasi dengan Vercel & lokal
+    origin: (origin, callback) => {
+      // Izinkan request tanpa origin (Postman, curl, server-to-server, Midtrans webhook)
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.warn(`[CORS] Blocked request from origin: ${origin}`);
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   })
 );
 
@@ -27,7 +53,46 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Setup file upload via Multer
+// ============ RATE LIMITERS ============
+
+// Rate limiter untuk endpoint autentikasi (login) — anti brute force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 menit
+  max: 10, // Maksimal 10 percobaan per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "Terlalu banyak percobaan login. Silakan coba lagi dalam 15 menit.",
+  },
+});
+
+// Rate limiter untuk registrasi — anti spam akun
+const registerLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 menit
+  max: 5, // Maksimal 5 registrasi per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "Terlalu banyak percobaan registrasi. Silakan coba lagi dalam 15 menit.",
+  },
+});
+
+// Rate limiter untuk checkout/order — anti spam transaksi
+const checkoutLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 1 menit
+  max: 5, // Maksimal 5 transaksi per IP per menit
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "Terlalu banyak transaksi. Silakan coba lagi dalam 1 menit.",
+  },
+});
+
+// ============ FILE UPLOAD (MULTER) ============
+
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -36,6 +101,15 @@ const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
+
+// Daftar MIME types yang diizinkan
+const ALLOWED_MIME_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+];
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -48,7 +122,20 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage });
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // Maksimal 5MB per file
+    files: 10, // Maksimal 10 file per request
+  },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error(`Tipe file tidak diizinkan: ${file.mimetype}. Hanya gambar yang diperbolehkan.`));
+    }
+  },
+});
 
 // Serve static uploaded files
 app.use("/uploads", express.static(uploadsDir));
@@ -95,23 +182,25 @@ app.get("/api", (req, res) => {
 // payment routes (Integrasi Midtrans Client)
 app.use("/api/payment", paymentRoutes);
 
-// Auth API Routes
-app.post("/api/auth/register", apiControllers.registerBuyer);
-app.post("/api/auth/login", apiControllers.loginUser);
-app.post("/api/auth/google", apiControllers.loginGoogleUser);
+// Auth API Routes — dilindungi rate limiter
+app.post("/api/auth/register", registerLimiter, apiControllers.registerBuyer);
+app.post("/api/auth/login", authLimiter, apiControllers.loginUser);
+app.post("/api/auth/google", authLimiter, apiControllers.loginGoogleUser);
 
 // Catalog / General API Routes
 app.get("/api/products", apiControllers.getProducts);
 app.get("/api/products/:slug", apiControllers.getProductBySlug);
 app.get("/api/db-check", apiControllers.checkDatabaseConnection);
 app.get("/api/payment-methods", apiControllers.getPaymentMethods);
-app.get("/api/categories", apiControllers.getCategories);
-app.post("/api/categories", apiControllers.createCategory);
-app.put("/api/categories/:id", apiControllers.updateCategory);
-app.delete("/api/categories/:id", apiControllers.deleteCategory);
 
-// Order / Checkout online API Routes
-app.post("/api/orders", apiControllers.createOrderAndPayment);
+
+app.get("/api/categories", apiControllers.getCategories);
+app.post("/api/categories", checkRole(["admin"]), apiControllers.createCategory);
+app.put("/api/categories/:id", checkRole(["admin"]), apiControllers.updateCategory);
+app.delete("/api/categories/:id", checkRole(["admin"]), apiControllers.deleteCategory);
+
+// Order / Checkout online API Routes — dilindungi rate limiter + validasi Zod
+app.post("/api/orders", checkoutLimiter, validateBody(createOrderSchema), apiControllers.createOrderAndPayment);
 app.get("/api/orders/:id", apiControllers.getOrderById);
 app.get("/api/orders/user/:userId", apiControllers.getUserOrders);
 
@@ -119,35 +208,48 @@ app.get("/api/orders/user/:userId", apiControllers.getUserOrders);
 app.post("/api/sales", apiControllers.createSale);
 app.get("/api/sales", apiControllers.getOfflineSales);
 app.get("/api/sales/:id", apiControllers.getOfflineSaleById);
-app.delete("/api/sales/:id", apiControllers.deleteOfflineSale);
+app.delete("/api/sales/:id", checkRole(["admin"]), apiControllers.deleteOfflineSale);
 
 // Admin Specific API Routes
 app.get("/api/admin/products", apiControllers.getAllProductsAdmin);
-app.post("/api/admin/products", apiControllers.createProduct);
-app.put("/api/admin/products", apiControllers.updateProduct);
-app.delete("/api/admin/products/:id", apiControllers.deleteProduct);
-app.get("/api/admin/orders", apiControllers.getOnlineOrders);
-app.put("/api/admin/orders/:id/status", apiControllers.updateOrderStatus);
-app.delete("/api/admin/orders/:id", apiControllers.deleteOrder);
+app.post("/api/admin/products", checkRole(["admin"]), apiControllers.createProduct);
+app.put("/api/admin/products", checkRole(["admin"]), apiControllers.updateProduct);
+app.delete("/api/admin/products/:id", checkRole(["admin"]), apiControllers.deleteProduct);
+app.get("/api/admin/orders", checkRole(["admin", "cashier"]), apiControllers.getOnlineOrders);
+app.put("/api/admin/orders/:id/status", checkRole(["admin", "cashier"]), apiControllers.updateOrderStatus);
+app.delete("/api/admin/orders/:id", checkRole(["admin"]), apiControllers.deleteOrder);
+app.get("/api/admin/activity-logs", checkRole(["admin"]), apiControllers.getActivityLogs);
 
 // Admin User CRUD API Routes
-app.get("/api/admin/users", apiControllers.getAllUsersAdmin);
-app.post("/api/admin/users", apiControllers.createUser);
-app.put("/api/admin/users", apiControllers.updateUser);
-app.delete("/api/admin/users/:id", apiControllers.deleteUser);
+app.get("/api/admin/users", checkRole(["admin"]), apiControllers.getAllUsersAdmin);
+app.post("/api/admin/users", checkRole(["admin"]), apiControllers.createUser);
+app.put("/api/admin/users", checkRole(["admin"]), apiControllers.updateUser);
+app.delete("/api/admin/users/:id", checkRole(["admin"]), apiControllers.deleteUser);
 
 // Store Settings API Routes
 app.get("/api/settings", apiControllers.getStoreSettings);
-app.post("/api/settings", apiControllers.updateStoreSettings);
+app.post("/api/settings", checkRole(["admin"]), apiControllers.updateStoreSettings);
 
 // Analytics API Routes
-app.get("/api/analytics/daily", apiControllers.getDailySalesSummary);
-app.get("/api/analytics/top-products", apiControllers.getTopProducts);
-app.get("/api/analytics/inventory", apiControllers.getInventory);
+app.get("/api/analytics/daily", checkRole(["admin"]), apiControllers.getDailySalesSummary);
+app.get("/api/analytics/top-products", checkRole(["admin"]), apiControllers.getTopProducts);
+app.get("/api/analytics/inventory", checkRole(["admin"]), apiControllers.getInventory);
+
+// Error handling middleware
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("[Error Handler]", err);
+  res.status(500).json({
+    success: false,
+    error: err.message || "Internal Server Error",
+  });
+});
 
 // Start server
 app.listen(port, () => {
   console.log(`====================================================`);
   console.log(`🚀 Server backend berjalan di http://localhost:${port}`);
+  console.log(`🔒 Helmet: HTTP security headers aktif`);
+  console.log(`🌐 CORS: Hanya menerima dari ${allowedOrigins.join(", ")}`);
+  console.log(`⏱️  Rate Limiting: Aktif pada auth & checkout endpoints`);
   console.log(`====================================================`);
 });
