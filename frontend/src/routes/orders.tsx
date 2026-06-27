@@ -24,7 +24,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { getUserOrders } from "@backend/server-actions";
+import { getUserOrders, regeneratePaymentToken } from "@backend/server-actions";
+import { VerificationModal } from "@frontend/components/VerificationModal";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logo from "@/assets/logo-fm.jpg";
 
@@ -36,9 +37,9 @@ const scrollToId = (id: string) => {
 const NAV = [
   { label: "BERANDA", href: "/", isScroll: true, target: "top" },
   { label: "PRODUK", href: "/products" },
-  { label: "PRE-ORDER", href: "/products?sale_type=pre_order" },
+  { label: "PRE-ORDER", href: "/pre-order" },
   { label: "TENTANG KAMI", href: "/#about", isScroll: true, target: "about" },
-  { label: "HUBUNGI KAMI", href: "/#contact", isScroll: true, target: "contact" },
+  { label: "FAQ", href: "/faq" },
 ];
 
 export const Route = createFileRoute("/orders")({
@@ -60,12 +61,18 @@ function UserOrdersPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const hash = typeof window !== "undefined" ? window.location.hash : "";
+
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState<TabStatus>("all");
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -203,31 +210,49 @@ function UserOrdersPage() {
     setTimeout(() => setCopiedOrderId(null), 2000);
   };
 
-  const handlePayNow = (order: any) => {
-    if (!order.snap_token) {
-      toast.error("Token pembayaran tidak ditemukan. Silakan hubungi admin.");
-      return;
-    }
+  const handlePayNow = async (order: any, shouldRegenerate: boolean = true) => {
+    try {
+      let snapToken = order.snap_token;
 
-    if ((window as any).snap) {
-      (window as any).snap.pay(order.snap_token, {
-        onSuccess: (snapResult: any) => {
-          toast.success("Pembayaran berhasil!");
-          void fetchOrders();
-        },
-        onPending: (snapResult: any) => {
-          toast.info("Pembayaran tertunda. Silakan selesaikan pembayaran Anda.");
-          void fetchOrders();
-        },
-        onError: (snapResult: any) => {
-          toast.error("Pembayaran gagal!");
-        },
-        onClose: () => {
-          toast.warning("Anda menutup popup pembayaran sebelum menyelesaikan transaksi.");
-        },
-      });
-    } else {
-      toast.error("Sistem pembayaran Midtrans gagal dimuat. Coba segarkan halaman.");
+      if (shouldRegenerate || !snapToken) {
+        setPayingOrderId(order.order_id);
+        const res = await regeneratePaymentToken({ data: { orderId: order.order_id } });
+        if (!res.success || !res.token) {
+          toast.error(res.error || "Gagal memproses pembayaran baru. Silakan coba lagi.");
+          return;
+        }
+        snapToken = res.token;
+        // Update local order snap_token
+        setOrders((prev) =>
+          prev.map((o) => (o.order_id === order.order_id ? { ...o, snap_token: res.token } : o))
+        );
+      }
+
+      if ((window as any).snap) {
+        (window as any).snap.pay(snapToken, {
+          onSuccess: (snapResult: any) => {
+            toast.success("Pembayaran berhasil!");
+            void fetchOrders();
+          },
+          onPending: (snapResult: any) => {
+            toast.info("Pembayaran tertunda. Silakan selesaikan pembayaran Anda.");
+            void fetchOrders();
+          },
+          onError: (snapResult: any) => {
+            toast.error("Pembayaran gagal!");
+          },
+          onClose: () => {
+            toast.warning("Anda menutup popup pembayaran sebelum menyelesaikan transaksi.");
+          },
+        });
+      } else {
+        toast.error("Sistem pembayaran Midtrans gagal dimuat. Coba segarkan halaman.");
+      }
+    } catch (err: any) {
+      console.error("Error paying:", err);
+      toast.error("Gagal memulai proses pembayaran.");
+    } finally {
+      setPayingOrderId(null);
     }
   };
 
@@ -371,12 +396,8 @@ function UserOrdersPage() {
 
           <nav className="hidden lg:flex items-center gap-7">
             {NAV.map((n) => {
-              const isActive =
-                n.href === "/products" && window.location.pathname === "/products" && !window.location.search.includes("sale_type=pre_order") ||
-                n.href.includes("pre_order") && window.location.search.includes("sale_type=pre_order") ||
-                n.href === "/" && window.location.pathname === "/" && !window.location.hash;
-
-              const isScrollOnHome = n.isScroll && window.location.pathname === "/";
+              const isActive = pathname === n.href || (n.href === "/" && pathname === "/" && !hash);
+              const isScrollOnHome = n.isScroll && pathname === "/";
 
               if (isScrollOnHome) {
                 return (
@@ -392,20 +413,7 @@ function UserOrdersPage() {
                 );
               }
 
-              if (n.href.includes("sale_type=pre_order")) {
-                return (
-                  <Link
-                    key={n.label}
-                    to="/products"
-                    search={{ sale_type: "pre_order" }}
-                    className={`text-xs font-bold tracking-[0.18em] transition-colors uppercase ${
-                      isActive ? "text-brand-orange" : "text-ink hover:text-brand-orange"
-                    }`}
-                  >
-                    {n.label}
-                  </Link>
-                );
-              }
+              
 
               return (
                 <Link
@@ -431,17 +439,36 @@ function UserOrdersPage() {
                 <User className="w-5 h-5" />
               </button>
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-background border-2 border-ink rounded-lg shadow-lg z-50 animate-scale-in py-1">
+                <div className="absolute right-0 mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-lg z-50 animate-scale-in py-1">
                   {user ? (
                     <>
                       <div className="px-5 py-3 border-b border-border">
-                        <p className="text-sm font-semibold text-foreground truncate">
+                        <p className="text-sm font-semibold text-foreground break-words">
                           {user.type === "admin" ? user.username : user.name}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-xs text-muted-foreground break-all">{user.email}</p>
                         <span className="inline-block mt-1 px-2 py-1 text-[10px] font-bold bg-blue-100 text-blue-900 rounded">
                           {user.type === "admin" ? "ADMIN" : "BUYER"}
                         </span>
+                        {user.type === "buyer" && (
+                          <div className="mt-1.5">
+                            {user.is_filkom_verified === 1 ? (
+                              <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-green-100 text-green-800 rounded">
+                                ✓ FILKOM VERIFIED
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setIsVerifyOpen(true);
+                                  setUserMenuOpen(false);
+                                }}
+                                className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/20 border border-brand-orange/30 px-2 py-1 rounded w-full text-center transition-all cursor-pointer block"
+                              >
+                                Verifikasi FILKOM
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                       {user.type === "buyer" && (
                         <Link
@@ -744,13 +771,30 @@ function UserOrdersPage() {
                       {/* Pay now button for pending payments */}
                       {(order.payment_status === "unpaid" || order.payment_status === "pending") &&
                         order.order_status !== "cancelled" && (
-                          <button
-                            onClick={() => handlePayNow(order)}
-                            className="inline-flex items-center gap-1.5 px-4 py-2 border-2 border-ink text-xs font-extrabold uppercase bg-brand-orange text-white hover:bg-brand-orange/95 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"
-                          >
-                            <CreditCard className="w-3.5 h-3.5" />
-                            Bayar Sekarang
-                          </button>
+                          <div className="flex flex-wrap gap-2">
+                            {order.snap_token && (
+                              <button
+                                onClick={() => handlePayNow(order, false)}
+                                disabled={payingOrderId !== null}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 border-2 border-ink text-xs font-extrabold uppercase bg-emerald-600 text-white hover:bg-emerald-600/95 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <CreditCard className="w-3.5 h-3.5" />
+                                Lanjutkan Pembayaran
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handlePayNow(order, true)}
+                              disabled={payingOrderId !== null}
+                              className="inline-flex items-center gap-1.5 px-4 py-2 border-2 border-ink text-xs font-extrabold uppercase bg-brand-orange text-white hover:bg-brand-orange/95 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {payingOrderId === order.order_id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <CreditCard className="w-3.5 h-3.5" />
+                              )}
+                              {payingOrderId === order.order_id ? "Memproses..." : (order.snap_token ? "Ubah Metode" : "Bayar Sekarang")}
+                            </button>
+                          </div>
                         )}
                     </div>
                   </div>
@@ -779,23 +823,7 @@ function UserOrdersPage() {
           </div>
           <nav className="flex-1 flex flex-col px-5 py-6 sm:py-8 gap-1">
             {NAV.map((n, idx) => {
-              if (n.href.includes("sale_type=pre_order")) {
-                return (
-                  <Link
-                    key={n.label}
-                    to="/products"
-                    search={{ sale_type: "pre_order" }}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setUserMenuOpen(false);
-                    }}
-                    className="display text-3xl sm:text-4xl text-left py-2.5 sm:py-3 hover:text-brand-orange transition-colors animate-slide-up"
-                    style={{ animationDelay: `${idx * 50}ms` }}
-                  >
-                    {n.label}
-                  </Link>
-                );
-              }
+              
 
               return (
                 <Link
@@ -917,6 +945,12 @@ function UserOrdersPage() {
             )}
           </aside>
         </div>
+      )}
+      {user?.type === "buyer" && (
+        <VerificationModal
+          isOpen={isVerifyOpen}
+          onClose={() => setIsVerifyOpen(false)}
+        />
       )}
     </div>
   );

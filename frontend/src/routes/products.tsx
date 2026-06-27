@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { getProducts, getCategories, type ProductWithVariants } from "@backend/server-actions";
 import { useAuth } from "@/lib/auth";
+import { VerificationModal } from "@frontend/components/VerificationModal";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent } from "@frontend/components/ui/card";
 import { toast } from "sonner";
@@ -37,9 +38,9 @@ const scrollToId = (id: string) => {
 const NAV = [
   { label: "BERANDA", href: "/", isScroll: true, target: "top" },
   { label: "PRODUK", href: "/products" },
-  { label: "PRE-ORDER", href: "/products?sale_type=pre_order" },
+  { label: "PRE-ORDER", href: "/pre-order" },
   { label: "TENTANG KAMI", href: "/#about", isScroll: true, target: "about" },
-  { label: "HUBUNGI KAMI", href: "/#contact", isScroll: true, target: "contact" },
+  { label: "FAQ", href: "/faq" },
 ];
 
 export const Route = createFileRoute("/products")({
@@ -83,6 +84,10 @@ function ProductsCatalogPage() {
   const searchParams = useSearch({ from: "/products" });
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const hash = typeof window !== "undefined" ? window.location.hash : "";
   
   // Cart state & handlers
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -173,6 +178,7 @@ function ProductsCatalogPage() {
   };
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>(searchParams.category || "ALL");
   const [selectedSaleType, setSelectedSaleType] = useState<string>(searchParams.sale_type || "ALL");
@@ -192,7 +198,7 @@ function ProductsCatalogPage() {
 
   // Determine active price helper
   const getActivePrice = (product: any) => {
-    const isUb = user?.email ? (user.email.endsWith("@student.ub.ac.id") || user.email.endsWith("@ub.ac.id")) : false;
+    const isUb = user?.type === "buyer" && user.is_filkom_verified === 1;
     if (product.promo_price && Number(product.promo_price) > 0) {
       return Number(product.promo_price);
     }
@@ -313,7 +319,7 @@ function ProductsCatalogPage() {
     setSearchTerm("");
   };
 
-  const isUbCivitas = user?.email ? (user.email.endsWith("@student.ub.ac.id") || user.email.endsWith("@ub.ac.id")) : false;
+  const isUbCivitas = user?.type === "buyer" && user.is_filkom_verified === 1;
 
   return (
     <div className="min-h-screen bg-[#FCFAF7] text-ink font-sans">
@@ -380,12 +386,8 @@ function ProductsCatalogPage() {
 
           <nav className="hidden lg:flex items-center gap-7">
             {NAV.map((n) => {
-              const isActive =
-                n.href === "/products" && window.location.pathname === "/products" && !window.location.search.includes("sale_type=pre_order") ||
-                n.href.includes("pre_order") && window.location.search.includes("sale_type=pre_order") ||
-                n.href === "/" && window.location.pathname === "/" && !window.location.hash;
-
-              const isScrollOnHome = n.isScroll && window.location.pathname === "/";
+              const isActive = pathname === n.href || (n.href === "/" && pathname === "/" && !hash);
+              const isScrollOnHome = n.isScroll && pathname === "/";
 
               if (isScrollOnHome) {
                 return (
@@ -401,23 +403,7 @@ function ProductsCatalogPage() {
                 );
               }
 
-              if (n.href.includes("sale_type=pre_order")) {
-                return (
-                  <Link
-                    key={n.label}
-                    to="/products"
-                    search={{ sale_type: "pre_order" }}
-                    onClick={() => {
-                      setSelectedSaleType("pre_order");
-                    }}
-                    className={`text-xs font-bold tracking-[0.18em] transition-colors uppercase ${
-                      isActive ? "text-brand-orange" : "text-ink hover:text-brand-orange"
-                    }`}
-                  >
-                    {n.label}
-                  </Link>
-                );
-              }
+              
 
               return (
                 <Link
@@ -448,17 +434,36 @@ function ProductsCatalogPage() {
                 <User className="w-5 h-5" />
               </button>
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-background border-2 border-ink rounded-lg shadow-lg z-50 animate-scale-in py-1">
+                <div className="absolute right-0 mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-lg z-50 animate-scale-in py-1">
                   {user ? (
                     <>
                       <div className="px-5 py-3 border-b border-border">
-                        <p className="text-sm font-semibold text-foreground truncate">
+                        <p className="text-sm font-semibold text-foreground break-words">
                           {user.type === "admin" ? user.username : user.name}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-xs text-muted-foreground break-all">{user.email}</p>
                         <span className="inline-block mt-1 px-2 py-1 text-[10px] font-bold bg-blue-100 text-blue-900 rounded">
                           {user.type === "admin" ? "ADMIN" : "BUYER"}
                         </span>
+                        {user.type === "buyer" && (
+                          <div className="mt-1.5">
+                            {user.is_filkom_verified === 1 ? (
+                              <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-green-100 text-green-800 rounded">
+                                ✓ FILKOM VERIFIED
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setIsVerifyOpen(true);
+                                  setUserMenuOpen(false);
+                                }}
+                                className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/20 border border-brand-orange/30 px-2 py-1 rounded w-full text-center transition-all cursor-pointer block"
+                              >
+                                Verifikasi FILKOM
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                       {user.type === "buyer" && (
                         <Link
@@ -538,24 +543,37 @@ function ProductsCatalogPage() {
           <div>
             <div className="inline-flex items-center gap-1.5 bg-brand-orange text-cream border-2 border-ink px-4 py-1.5 rounded-full text-[10px] font-extrabold mb-4 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] tracking-wider uppercase">
               <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-              Civitas UB Discount Active
+              Civitas FILKOM UB Discount Active
             </div>
             <h1 className="display text-3xl sm:text-5xl text-ink uppercase tracking-tight">Katalog Resmi FILKOM Merch</h1>
             <p className="mt-3 text-sm text-muted-foreground max-w-xl font-medium leading-relaxed">
               Temukan koleksi eksklusif, apparel premium, lanyard, gantungan kunci, dan drop limited pre-order Fakultas Ilmu Komputer.
             </p>
           </div>
-          {isUbCivitas ? (
-            <div className="bg-white border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
-              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Harga Terdeteksi:</p>
-              <p className="text-lg font-extrabold text-brand-orange uppercase mt-1">Spesial Civitas UB 🔥</p>
-              <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">Diskon otomatis aktif berdasarkan email UB Anda</p>
-            </div>
+          {user?.type === "buyer" ? (
+            user.is_filkom_verified === 1 ? (
+              <div className="bg-white border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Status Akun:</p>
+                <p className="text-lg font-extrabold text-brand-orange uppercase mt-1">Spesial Civitas FILKOM UB 🔥</p>
+                <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">Diskon otomatis aktif karena akun FILKOM Anda terverifikasi.</p>
+              </div>
+            ) : (
+              <div className="bg-white border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Diskon Civitas:</p>
+                <p className="text-lg font-extrabold text-amber-600 uppercase mt-1">Belum Terverifikasi ⚠️</p>
+                <button
+                  onClick={() => setIsVerifyOpen(true)}
+                  className="mt-2 w-full bg-brand-orange text-cream text-[10px] font-bold py-2 rounded-lg border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none transition-all cursor-pointer block"
+                >
+                  Verifikasi NIM/NIDN
+                </button>
+              </div>
+            )
           ) : (
             <div className="bg-white border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
-              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Punya Email UB?</p>
-              <p className="text-lg font-extrabold text-ink uppercase mt-1">Login Akun UB 🎓</p>
-              <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">Gunakan email student / staff UB untuk mendapatkan diskon khusus.</p>
+              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Punya NIM FILKOM?</p>
+              <p className="text-lg font-extrabold text-ink uppercase mt-1">Login & Verifikasi 🎓</p>
+              <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">Gunakan email UB & hubungkan NIM/NIDN Anda untuk mendapatkan diskon khusus FILKOM.</p>
             </div>
           )}
         </div>
@@ -773,7 +791,7 @@ function ProductsCatalogPage() {
 
             {/* Products Grid */}
             {filteredProducts.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-6">
                 {filteredProducts.map((p) => {
                   const currentPrice = getActivePrice(p);
                   const showDiscount = p.original_price && p.original_price > currentPrice;
@@ -1051,24 +1069,7 @@ function ProductsCatalogPage() {
           </div>
           <nav className="flex-1 flex flex-col px-5 py-6 sm:py-8 gap-1">
             {NAV.map((n, idx) => {
-              if (n.href.includes("sale_type=pre_order")) {
-                return (
-                  <Link
-                    key={n.label}
-                    to="/products"
-                    search={{ sale_type: "pre_order" }}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setUserMenuOpen(false);
-                      setSelectedSaleType("pre_order");
-                    }}
-                    className="display text-3xl sm:text-4xl text-left py-2.5 sm:py-3 hover:text-brand-orange transition-colors animate-slide-up"
-                    style={{ animationDelay: `${idx * 50}ms` }}
-                  >
-                    {n.label}
-                  </Link>
-                );
-              }
+              
 
               return (
                 <Link
@@ -1193,6 +1194,12 @@ function ProductsCatalogPage() {
             )}
           </aside>
         </div>
+      )}
+      {user?.type === "buyer" && (
+        <VerificationModal
+          isOpen={isVerifyOpen}
+          onClose={() => setIsVerifyOpen(false)}
+        />
       )}
     </div>
   );

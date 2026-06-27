@@ -26,6 +26,11 @@ export interface CartItem {
   size?: string;
   variant_id?: number;
   category?: string;
+  bundle_selections?: Array<{
+    product_id: number;
+    variant_id: number;
+    quantity: number;
+  }>;
 }
 
 interface CheckoutStep {

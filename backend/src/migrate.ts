@@ -23,6 +23,17 @@ async function run() {
 
     const queries = [
       {
+        name: "bundle_items",
+        sql: `CREATE TABLE IF NOT EXISTS bundle_items (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          bundle_product_id INT NOT NULL,
+          component_product_id INT NOT NULL,
+          quantity INT DEFAULT 1,
+          FOREIGN KEY (bundle_product_id) REFERENCES products(id) ON DELETE CASCADE,
+          FOREIGN KEY (component_product_id) REFERENCES products(id) ON DELETE CASCADE
+        )`
+      },
+      {
         name: "product_variants.color",
         sql: "ALTER TABLE product_variants ADD COLUMN color varchar(50) DEFAULT NULL"
       },
@@ -57,6 +68,10 @@ async function run() {
       {
         name: "products.size_chart_url",
         sql: "ALTER TABLE products ADD COLUMN size_chart_url VARCHAR(255) DEFAULT NULL"
+      },
+      {
+        name: "users.is_filkom_verified",
+        sql: "ALTER TABLE users ADD COLUMN is_filkom_verified TINYINT(1) DEFAULT 0"
       }
     ];
 

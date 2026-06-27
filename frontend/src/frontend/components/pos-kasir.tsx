@@ -51,6 +51,11 @@ interface CartItem {
   quantity: number;
   unit_price: number;
   discount: number;
+  bundle_selections?: Array<{
+    product_id: number;
+    variant_id: number;
+    quantity: number;
+  }>;
 }
 
 type PaymentMethod = "cash" | "online";
@@ -117,6 +122,10 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     useState<ProductWithVariants | null>(null);
   const [dialogSelectedSize, setDialogSelectedSize] = useState<string | null>(null);
   const [dialogSelectedColor, setDialogSelectedColor] = useState<string | null>(null);
+
+  // States for bundle variant selection dialog
+  const [activeBundleForSelection, setActiveBundleForSelection] = useState<ProductWithVariants | null>(null);
+  const [selectedBundleVariants, setSelectedBundleVariants] = useState<Record<number, ProductVariant>>({});
 
   const [currentReceiptData, setCurrentReceiptData] = useState<ReceiptData | null>(null);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
@@ -326,6 +335,23 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
   const total = subtotal - discount;
 
   const handleProductClick = (product: ProductWithVariants) => {
+    if (product.product_type === "bundle") {
+      if (!product.bundle_components || product.bundle_components.length === 0) {
+        toast.error("Paket ini tidak memiliki produk komponen!");
+        return;
+      }
+      setActiveBundleForSelection(product);
+      const initialSelections: Record<number, ProductVariant> = {};
+      for (const comp of product.bundle_components) {
+        const firstAvailable = comp.variants.find((v) => v.stock > 0) || comp.variants[0];
+        if (firstAvailable) {
+          initialSelections[comp.id] = firstAvailable;
+        }
+      }
+      setSelectedBundleVariants(initialSelections);
+      return;
+    }
+
     const uniqueSizes = Array.from(new Set(product.variants.map((v) => v.size).filter(Boolean)));
     const uniqueColors = Array.from(new Set(product.variants.map((v) => v.color).filter(Boolean)));
 
@@ -386,6 +412,125 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     });
   };
 
+  const addBundleToCart = (
+    product: ProductWithVariants,
+    parentVariant: ProductVariant,
+    selections: Record<number, ProductVariant>,
+    customQty = 1
+  ) => {
+    // Validate stock for all component variants
+    for (const comp of product.bundle_components || []) {
+      const selectedVar = selections[comp.id];
+      if (!selectedVar) {
+        toast.error(`Pilih varian untuk komponen: ${comp.name}`);
+        return;
+      }
+
+      const requiredQty = customQty;
+      const cartQuantity = cart.reduce((sum, item) => {
+        if (item.bundle_selections) {
+          const foundSel = item.bundle_selections.find((s) => s.variant_id === selectedVar.id);
+          if (foundSel) {
+            return sum + foundSel.quantity * item.quantity;
+          }
+        }
+        if (item.variant_id === selectedVar.id) {
+          return sum + item.quantity;
+        }
+        return sum;
+      }, 0);
+
+      if (cartQuantity + requiredQty > selectedVar.stock) {
+        toast.error(`Stok komponen ${comp.name} tidak mencukupi!`);
+        return;
+      }
+    }
+
+    const selectionDetails = (product.bundle_components || [])
+      .map((comp) => {
+        const variant = selections[comp.id];
+        const variantStr = [variant?.color, variant?.size]
+          .filter((v) => v && v !== "One Size" && v !== "All Size")
+          .join(" — ");
+        return `${comp.name}${variantStr ? `: ${variantStr}` : ""}`;
+      })
+      .join(", ");
+    const compositeName = `${product.name} (${selectionDetails})`;
+
+    const selectionsPayload = (product.bundle_components || []).map((comp) => {
+      const variant = selections[comp.id];
+      return {
+        product_id: comp.id,
+        variant_id: variant.id,
+        quantity: 1,
+      };
+    });
+
+    const stringifySelections = (payload: typeof selectionsPayload) =>
+      payload
+        .map((s) => `${s.product_id}-${s.variant_id}`)
+        .sort()
+        .join("|");
+
+    const existing = cart.find(
+      (item) =>
+        item.product_id === product.id &&
+        item.bundle_selections &&
+        stringifySelections(item.bundle_selections) === stringifySelections(selectionsPayload),
+    );
+
+    if (existing) {
+      for (const comp of product.bundle_components || []) {
+        const selectedVar = selections[comp.id];
+        const totalReqQty = existing.quantity + customQty;
+        const cartQuantity = cart.reduce((sum, item) => {
+          if (item.id === existing.id) return sum;
+          if (item.bundle_selections) {
+            const foundSel = item.bundle_selections.find((s) => s.variant_id === selectedVar.id);
+            if (foundSel) {
+              return sum + foundSel.quantity * item.quantity;
+            }
+          }
+          if (item.variant_id === selectedVar.id) {
+            return sum + item.quantity;
+          }
+          return sum;
+        }, 0);
+
+        if (cartQuantity + totalReqQty > selectedVar.stock) {
+          toast.error(`Stok komponen ${comp.name} tidak mencukupi!`);
+          return;
+        }
+      }
+
+      setCart(
+        cart.map((item) =>
+          item.id === existing.id ? { ...item, quantity: item.quantity + customQty } : item,
+        ),
+      );
+    } else {
+      setCart([
+        ...cart,
+        {
+          id: `cart-${Date.now()}`,
+          product_id: product.id,
+          product_name: compositeName,
+          variant_id: parentVariant.id,
+          size: parentVariant.size,
+          color: parentVariant.color || undefined,
+          quantity: customQty,
+          unit_price: product.price,
+          discount: 0,
+          bundle_selections: selectionsPayload,
+        },
+      ]);
+    }
+
+    toast.success("Paket ditambahkan ke keranjang", {
+      description: product.name,
+    });
+  };
+
   const updateQuantity = (itemId: string, newQty: number) => {
     if (newQty <= 0) {
       setCart(cart.filter((item) => item.id !== itemId));
@@ -394,10 +539,35 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     const item = cart.find((i) => i.id === itemId);
     if (item) {
       const product = products.find((p) => p.id === item.product_id);
-      const variant = product?.variants.find((v) => v.id === item.variant_id);
-      if (variant && newQty > variant.stock) {
-        toast.error("Stok tidak cukup");
-        return;
+      
+      if (product?.product_type === "bundle" && item.bundle_selections) {
+        for (const sel of item.bundle_selections) {
+          const compProduct = products.find((p) => p.id === sel.product_id);
+          const compVar = compProduct?.variants.find((v) => v.id === sel.variant_id);
+          if (compVar) {
+            const otherCartQuantity = cart.reduce((sum, c) => {
+              if (c.id === itemId) return sum;
+              if (c.bundle_selections) {
+                const s = c.bundle_selections.find((x) => x.variant_id === compVar.id);
+                if (s) return sum + s.quantity * c.quantity;
+              }
+              if (c.variant_id === compVar.id) return sum + c.quantity;
+              return sum;
+            }, 0);
+
+            const totalRequired = otherCartQuantity + sel.quantity * newQty;
+            if (totalRequired > compVar.stock) {
+              toast.error(`Stok komponen ${compProduct.name} tidak mencukupi untuk jumlah ini`);
+              return;
+            }
+          }
+        }
+      } else {
+        const variant = product?.variants.find((v) => v.id === item.variant_id);
+        if (variant && newQty > variant.stock) {
+          toast.error("Stok tidak cukup");
+          return;
+        }
       }
     }
     setCart(cart.map((item) => (item.id === itemId ? { ...item, quantity: newQty } : item)));
@@ -494,6 +664,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
             name: item.product_name,
             price: item.unit_price,
             quantity: item.quantity,
+            bundle_selections: item.bundle_selections,
           })),
         };
 
@@ -641,12 +812,43 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               {filteredProducts.map((product) => {
                 const stock = getTotalStock(product);
                 const sizes = product.variants.filter((v) => v.stock > 0).map((v) => v.size);
+                
+                const hasPromo = product.promo_price && Number(product.promo_price) > 0;
+                const displayPrice = hasPromo ? Number(product.promo_price) : Number(product.price);
+                const strikePrice = hasPromo 
+                  ? (product.original_price ? Number(product.original_price) : Number(product.price)) 
+                  : (product.original_price ? Number(product.original_price) : null);
+
                 return (
                   <button
                     key={product.id}
                     onClick={() => handleProductClick(product)}
                     className="group flex flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-all duration-300 hover:border-brand-blue hover:shadow-lg hover:shadow-brand-blue/8 hover:-translate-y-0.5 active:scale-[0.97] relative"
                   >
+                    {/* Catalog Badges Overlay */}
+                    <div className="absolute left-2 top-2 flex flex-col gap-1 z-10 pointer-events-none">
+                      {product.product_type === 'bundle' && (
+                        <Badge className="bg-indigo-600 hover:bg-indigo-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-sm uppercase border-0">
+                          Paket
+                        </Badge>
+                      )}
+                      {product.is_featured === true && (
+                        <Badge className="bg-blue-600 hover:bg-blue-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-sm uppercase border-0">
+                          Featured
+                        </Badge>
+                      )}
+                      {product.is_best_seller === true && (
+                        <Badge className="bg-amber-600 hover:bg-amber-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-sm uppercase border-0">
+                          Best Seller
+                        </Badge>
+                      )}
+                      {product.is_limited === true && (
+                        <Badge className="bg-red-600 hover:bg-red-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-sm uppercase border-0">
+                          Limited
+                        </Badge>
+                      )}
+                    </div>
+
                     {/* Hover Plus Button Overlay */}
                     <div className="absolute right-2.5 top-2.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-brand-blue text-white p-1.5 rounded-full shadow-md z-10 hidden sm:block">
                       <Plus className="h-3 w-3" />
@@ -674,9 +876,18 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                           Ukuran: {sizes.join(", ")}
                         </p>
                       )}
-                      <p className="mt-auto pt-2 text-xs sm:text-sm font-extrabold text-brand-orange">
-                        Rp {Number(product.price).toLocaleString("id-ID")}
-                      </p>
+                      
+                      <div className="mt-auto pt-2 flex items-baseline gap-1.5 flex-wrap">
+                        <span className="text-xs sm:text-sm font-extrabold text-brand-orange">
+                          Rp {displayPrice.toLocaleString("id-ID")}
+                        </span>
+                        {strikePrice && strikePrice > displayPrice && (
+                          <span className="text-[9px] sm:text-[10px] text-muted-foreground line-through decoration-muted-foreground/60">
+                            Rp {strikePrice.toLocaleString("id-ID")}
+                          </span>
+                        )}
+                      </div>
+
                       <Badge
                         variant="outline"
                         className={`mt-1.5 w-fit text-[9px] sm:text-[10px] font-semibold px-2 py-0.2 rounded-md ${
@@ -1135,6 +1346,184 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest flex-1 py-5 px-6 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
               >
                 <Printer className="mr-2 h-4 w-4" /> Cetak Struk
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Dialog Pemilihan Varian Komponen Paket Bundel */}
+      {activeBundleForSelection && (
+        <Dialog
+          open={!!activeBundleForSelection}
+          onOpenChange={(open) => !open && setActiveBundleForSelection(null)}
+        >
+          <DialogContent className="max-w-md bg-white border-2 border-ink max-h-[85vh] flex flex-col p-0">
+            <DialogHeader className="p-4 sm:p-6 border-b border-border bg-cream/20">
+              <DialogTitle className="display text-base sm:text-lg tracking-wider text-ink uppercase">
+                Konfigurasi Varian Paket
+              </DialogTitle>
+              <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider mt-1">
+                Pilih ukuran & warna untuk tiap produk komponen
+              </p>
+            </DialogHeader>
+
+            <ScrollArea className="flex-1 p-4 sm:p-6 overflow-y-auto">
+              <div className="space-y-6">
+                {/* Bundle Info */}
+                <div className="flex gap-4 p-3 bg-cream/30 rounded-xl border border-border/80">
+                  {activeBundleForSelection.image_url ? (
+                    <img
+                      src={activeBundleForSelection.image_url}
+                      alt={activeBundleForSelection.name}
+                      className="w-16 h-16 rounded object-cover border border-ink"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-cream rounded border border-ink flex items-center justify-center text-[10px] text-muted-foreground">
+                      No Image
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-bold text-ink uppercase leading-snug text-xs sm:text-sm">
+                      {activeBundleForSelection.name}
+                    </h3>
+                    <p className="text-brand-orange font-extrabold text-sm mt-1">
+                      Rp {activeBundleForSelection.price.toLocaleString("id-ID")}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Component Products Selectors */}
+                {activeBundleForSelection.bundle_components?.map((comp) => {
+                  const selectedVar = selectedBundleVariants[comp.id];
+                  
+                  // Extract unique colors and sizes for this component product
+                  const compColors = Array.from(new Set(comp.variants.map((v) => v.color).filter(Boolean))) as string[];
+                  const compSizes = Array.from(new Set(comp.variants.map((v) => v.size).filter(Boolean))) as string[];
+
+                  // Find matched variant based on current selections for size/color
+                  const currentSize = selectedVar?.size || "";
+                  const currentColor = selectedVar?.color || null;
+
+                  return (
+                    <div key={comp.id} className="space-y-3.5 border-b border-dashed border-border pb-4 last:border-0 last:pb-0">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-ink text-xs uppercase tracking-tight">
+                          {comp.name}
+                        </h4>
+                        {selectedVar && (
+                          <span className={`text-[10px] font-bold ${selectedVar.stock <= 3 ? "text-red-600 bg-red-50" : "text-emerald-700 bg-emerald-50"} px-2 py-0.5 rounded border border-current/25`}>
+                            Stok: {selectedVar.stock} pcs
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Colors Selector */}
+                      {compColors.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Pilih Warna
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {compColors.map((color) => (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => {
+                                  const matched = comp.variants.find(v => v.color === color && v.size === currentSize) 
+                                    || comp.variants.find(v => v.color === color)
+                                    || comp.variants[0];
+                                  if (matched) {
+                                    setSelectedBundleVariants(prev => ({
+                                      ...prev,
+                                      [comp.id]: matched
+                                    }));
+                                  }
+                                }}
+                                className={`rounded px-2.5 py-1 text-[11px] font-semibold border-2 transition ${
+                                  currentColor === color
+                                    ? "bg-ink text-white border-ink scale-95"
+                                    : "bg-background text-ink border-border hover:border-ink"
+                                }`}
+                              >
+                                {color}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sizes Selector */}
+                      {compSizes.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                            Pilih Ukuran
+                          </p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {compSizes.map((size) => (
+                              <button
+                                key={size}
+                                type="button"
+                                onClick={() => {
+                                  const matched = comp.variants.find(v => v.size === size && v.color === currentColor)
+                                    || comp.variants.find(v => v.size === size)
+                                    || comp.variants[0];
+                                  if (matched) {
+                                    setSelectedBundleVariants(prev => ({
+                                      ...prev,
+                                      [comp.id]: matched
+                                    }));
+                                  }
+                                }}
+                                className={`rounded w-9 h-8 flex items-center justify-center text-[11px] font-bold border-2 transition ${
+                                  currentSize === size
+                                    ? "bg-ink text-white border-ink scale-95"
+                                    : "bg-background text-ink border-border hover:border-ink"
+                                }`}
+                              >
+                                {size}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+
+            <DialogFooter className="p-4 sm:p-6 border-t border-border bg-cream/10 gap-2 flex sm:gap-0">
+              <Button
+                variant="outline"
+                type="button"
+                onClick={() => setActiveBundleForSelection(null)}
+                className="border-2 border-ink text-xs font-bold uppercase tracking-wider hover:bg-cream/40 flex-1 sm:flex-none"
+              >
+                Batal
+              </Button>
+              <Button
+                type="button"
+                onClick={() => {
+                  const parentVariant = activeBundleForSelection.variants[0];
+                  if (!parentVariant) {
+                    toast.error("Varian utama bundel tidak ditemukan");
+                    return;
+                  }
+                  
+                  for (const comp of activeBundleForSelection.bundle_components || []) {
+                    if (!selectedBundleVariants[comp.id]) {
+                      toast.error(`Pilih varian untuk komponen: ${comp.name}`);
+                      return;
+                    }
+                  }
+
+                  addBundleToCart(activeBundleForSelection, parentVariant, selectedBundleVariants);
+                  setActiveBundleForSelection(null);
+                }}
+                className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex-1 sm:flex-none"
+              >
+                Tambah Ke Keranjang
               </Button>
             </DialogFooter>
           </DialogContent>

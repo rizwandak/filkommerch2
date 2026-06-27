@@ -8,6 +8,7 @@ import paymentRoutes from "./routes/payment";
 import * as apiControllers from "./controllers/api";
 import { validateBody, createOrderSchema } from "./middleware/validation";
 import { checkRole } from "./middleware/auth";
+import { verifyFilkomUser } from "./controllers/verification";
 
 // Initialize environment variables
 dotenv.config();
@@ -88,6 +89,18 @@ const checkoutLimiter = rateLimit({
   message: {
     success: false,
     error: "Terlalu banyak transaksi. Silakan coba lagi dalam 1 menit.",
+  },
+});
+
+// Rate limiter untuk verifikasi NIM/NIDN
+const verifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 menit
+  max: 10, // Maksimal 10 verifikasi per IP per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: "Terlalu banyak percobaan verifikasi. Silakan coba lagi dalam 15 menit.",
   },
 });
 
@@ -186,6 +199,7 @@ app.use("/api/payment", paymentRoutes);
 app.post("/api/auth/register", registerLimiter, apiControllers.registerBuyer);
 app.post("/api/auth/login", authLimiter, apiControllers.loginUser);
 app.post("/api/auth/google", authLimiter, apiControllers.loginGoogleUser);
+app.post("/api/auth/verify-filkom", verifyLimiter, verifyFilkomUser);
 
 // Catalog / General API Routes
 app.get("/api/products", apiControllers.getProducts);

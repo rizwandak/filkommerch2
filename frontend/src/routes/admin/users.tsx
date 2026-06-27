@@ -43,6 +43,7 @@ interface UserForm {
   phone: string;
   address: string;
   role: "admin" | "cashier" | "customer";
+  is_filkom_verified?: boolean;
 }
 
 const emptyForm = (): UserForm => ({
@@ -53,6 +54,7 @@ const emptyForm = (): UserForm => ({
   phone: "",
   address: "",
   role: "customer",
+  is_filkom_verified: false,
 });
 
 function AdminUsersPage() {
@@ -99,6 +101,7 @@ function AdminUsersPage() {
       phone: user.phone || "",
       address: user.address || "",
       role: user.role,
+      is_filkom_verified: user.is_filkom_verified === 1,
     });
     setDialogOpen(true);
   };
@@ -124,6 +127,7 @@ function AdminUsersPage() {
         phone: form.phone || undefined,
         address: form.address || undefined,
         role: form.role,
+        is_filkom_verified: form.is_filkom_verified ? 1 : 0,
       };
 
       const result = form.id
@@ -269,9 +273,16 @@ function AdminUsersPage() {
                     <tr key={user.id} className="border-t border-border">
                       <td className="p-3">
                         <div>
-                          <p className="font-semibold text-ink uppercase text-xs tracking-wide">
-                            {user.name}
-                          </p>
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <p className="font-semibold text-ink uppercase text-xs tracking-wide">
+                              {user.name}
+                            </p>
+                            {user.is_filkom_verified === 1 && (
+                              <span className="bg-green-100 text-green-800 text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider uppercase">
+                                VERIFIED
+                              </span>
+                            )}
+                          </div>
                           <p className="text-[10px] text-muted-foreground font-mono">
                             {user.nim || "Non-Mahasiswa"}
                           </p>
@@ -398,6 +409,19 @@ function AdminUsersPage() {
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
                 placeholder="Jl. MT Haryono No. 167..."
               />
+            </div>
+
+            <div className="flex items-center space-x-2 pt-2 border-t border-slate-100">
+              <input
+                type="checkbox"
+                id="is_filkom_verified"
+                checked={!!form.is_filkom_verified}
+                onChange={(e) => setForm({ ...form, is_filkom_verified: e.target.checked })}
+                className="h-4.5 w-4.5 rounded border-gray-300 text-brand-orange focus:ring-brand-orange cursor-pointer"
+              />
+              <Label htmlFor="is_filkom_verified" className="cursor-pointer font-bold text-xs uppercase text-ink">
+                Verifikasi Civitas FILKOM UB (Aktifkan Diskon)
+              </Label>
             </div>
           </div>
 

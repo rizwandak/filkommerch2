@@ -78,7 +78,7 @@ router.post("/notification", async (req, res) => {
   const connection = await getConnection();
   try {
     const payload = req.body;
-    const { order_id, status_code, gross_amount, signature_key, transaction_status, transaction_id, payment_type } = payload;
+    let { order_id, status_code, gross_amount, signature_key, transaction_status, transaction_id, payment_type } = payload;
 
     // ============ VERIFIKASI SIGNATURE KEY MIDTRANS ============
     // Formula: SHA512(order_id + status_code + gross_amount + server_key)
@@ -98,6 +98,13 @@ router.post("/notification", async (req, res) => {
     }
 
     console.log(`🔔 ✅ Payment notification VERIFIED for order: ${order_id}, status: ${transaction_status}`);
+
+    // Reassign order_id to actual order ID if it has a suffix timestamp
+    const parts = order_id.split("-");
+    if (parts.length > 2 && /^\d+$/.test(parts[parts.length - 1])) {
+      order_id = parts.slice(0, -1).join("-");
+      console.log(`🧹 Cleaned suffix from order_id: ${payload.order_id} -> ${order_id}`);
+    }
 
     await connection.beginTransaction();
 
@@ -291,6 +298,133 @@ router.post("/notification", async (req, res) => {
     await connection.rollback();
     console.error("Error handling Midtrans notification:", error);
     return res.status(500).json({ error: error.message || "Failed to process webhook" });
+  } finally {
+    connection.release();
+  }
+});
+
+// POST /api/payment/regenerate-token — Regenerasi token Snap Midtrans untuk ganti metode pembayaran
+router.post("/regenerate-token", paymentCheckoutLimiter, async (req, res) => {
+  const connection = await getConnection();
+  try {
+    const { orderId } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: "Order ID wajib diisi" });
+    }
+
+    console.log("🔄 Regenerating snap token for order:", orderId);
+
+    await connection.beginTransaction();
+
+    // 1. Ambil data pesanan
+    const [orderRows] = await connection.execute(
+      "SELECT * FROM orders WHERE order_id = ? FOR UPDATE",
+      [orderId]
+    );
+    const order = (orderRows as any[])[0];
+
+    if (!order) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+    }
+
+    // 2. Pastikan pesanan masih pending / unpaid
+    if (order.payment_status !== "unpaid" && order.payment_status !== "pending") {
+      await connection.rollback();
+      return res.status(400).json({ 
+        success: false, 
+        error: `Pesanan sudah dibayar atau dibatalkan (Status: ${order.payment_status})` 
+      });
+    }
+
+    // 3. Ambil data items pesanan
+    const [itemRows] = await connection.execute(
+      "SELECT * FROM order_items WHERE order_id = ?",
+      [orderId]
+    );
+    const items = itemRows as any[];
+
+    // 4. Buat transaksi Snap baru dengan ID unik
+    const transactionId = `${orderId}-${Date.now()}`;
+    const itemDetails = items.map((item: any) => ({
+      id: String(item.variant_id || item.product_id || "item"),
+      price: Number(item.unit_price),
+      quantity: Number(item.quantity),
+      name: item.product_name.substring(0, 50)
+    }));
+
+    if (Number(order.shipping_cost) > 0) {
+      itemDetails.push({
+        id: "shipping-cost",
+        price: Number(order.shipping_cost),
+        quantity: 1,
+        name: "Shipping Cost"
+      });
+    }
+    if (Number(order.service_fee) > 0) {
+      itemDetails.push({
+        id: "service-fee",
+        price: Number(order.service_fee),
+        quantity: 1,
+        name: "Service Fee"
+      });
+    }
+    if (Number(order.tax_amount) > 0) {
+      itemDetails.push({
+        id: "tax-amount",
+        price: Number(order.tax_amount),
+        quantity: 1,
+        name: "Tax"
+      });
+    }
+    if (Number(order.discount_amount) > 0) {
+      itemDetails.push({
+        id: "discount",
+        price: -Number(order.discount_amount),
+        quantity: 1,
+        name: "Discount"
+      });
+    }
+
+    const parameter = {
+      transaction_details: {
+        order_id: transactionId,
+        gross_amount: Number(order.gross_amount)
+      },
+      credit_card: {
+        secure: true
+      },
+      customer_details: {
+        first_name: order.customer_name,
+        email: order.customer_email,
+        phone: order.customer_phone
+      },
+      item_details: itemDetails
+    };
+
+    const transaction = await snap.createTransaction(parameter);
+    console.log("✅ New Snap transaction created with ID:", transactionId);
+
+    // 5. Update snap_token di database
+    await connection.execute(
+      "UPDATE orders SET snap_token = ? WHERE order_id = ?",
+      [transaction.token, orderId]
+    );
+
+    await connection.commit();
+
+    return res.json({
+      success: true,
+      token: transaction.token,
+      redirectUrl: transaction.redirect_url
+    });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("❌ Error regenerating snap token:", error);
+    return res.status(500).json({ 
+      success: false, 
+      error: error.message || "Gagal melakukan regenerasi token pembayaran" 
+    });
   } finally {
     connection.release();
   }

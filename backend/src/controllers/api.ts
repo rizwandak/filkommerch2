@@ -24,14 +24,14 @@ export const isUbEmail = (email?: string | null): boolean => {
  * Determines the correct dynamic price for a product/variant based on user context.
  * Priority: promo_price -> filkom_price (if UB email) -> fallback price (variant override or base product price).
  */
-export const determinePrice = (variant: any, isUbEmail: boolean): number => {
+export const determinePrice = (variant: any, isFilkomVerified: boolean): number => {
   // 1. Promo price (product-level promo price takes priority)
   if (variant.product_promo_price !== undefined && variant.product_promo_price !== null && Number(variant.product_promo_price) > 0) {
     return Number(variant.product_promo_price);
   }
   
-  // 2. UB Email / Civitas UB price
-  if (isUbEmail) {
+  // 2. FILKOM Civitas price (requires isFilkomVerified = true)
+  if (isFilkomVerified) {
     if (variant.filkom_price !== undefined && variant.filkom_price !== null && Number(variant.filkom_price) > 0) {
       return Number(variant.filkom_price);
     }
@@ -307,6 +307,7 @@ export const loginUser = async (req: Request, res: Response) => {
           nim: dbUser.nim,
           phone: dbUser.phone,
           address: dbUser.address,
+          is_filkom_verified: dbUser.is_filkom_verified || 0,
         }
       });
     }
@@ -346,6 +347,7 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
         nim: dbUser.nim,
         phone: dbUser.phone,
         address: dbUser.address,
+        is_filkom_verified: dbUser.is_filkom_verified || 0,
       }
     });
   } catch (error: any) {
@@ -360,7 +362,7 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
 export const getAllUsersAdmin = async (req: Request, res: Response) => {
   try {
     const users = await query<any>(
-      "SELECT id, name, nim, email, phone, address, role, created_at FROM users ORDER BY role, name"
+      "SELECT id, name, nim, email, phone, address, role, is_filkom_verified, created_at FROM users ORDER BY role, name"
     );
     return res.json({ success: true, users });
   } catch (error: any) {
@@ -374,7 +376,7 @@ export const getAllUsersAdmin = async (req: Request, res: Response) => {
 // Create user
 export const createUser = async (req: Request, res: Response) => {
   try {
-    const { name, email, password, nim, phone, address, role } = req.body;
+    const { name, email, password, nim, phone, address, role, is_filkom_verified } = req.body;
     const actorId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
     const actorName = req.header("x-user-name") || null;
     const actorRole = req.header("x-user-role") || null;
@@ -390,9 +392,9 @@ export const createUser = async (req: Request, res: Response) => {
 
     const hash = await bcrypt.hash(password, 10);
     const result = await execute(
-      `INSERT INTO users (name, email, password_hash, nim, phone, address, role)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, email, hash, nim || null, phone || null, address || null, role]
+      `INSERT INTO users (name, email, password_hash, nim, phone, address, role, is_filkom_verified)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, email, hash, nim || null, phone || null, address || null, role, is_filkom_verified ? 1 : 0]
     );
 
     await logActivity(
@@ -415,7 +417,7 @@ export const createUser = async (req: Request, res: Response) => {
 // Update user
 export const updateUser = async (req: Request, res: Response) => {
   try {
-    const { id, name, email, password, nim, phone, address, role } = req.body;
+    const { id, name, email, password, nim, phone, address, role, is_filkom_verified } = req.body;
     const actorId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
     const actorName = req.header("x-user-name") || null;
     const actorRole = req.header("x-user-role") || null;
@@ -432,13 +434,13 @@ export const updateUser = async (req: Request, res: Response) => {
     if (password) {
       const hash = await bcrypt.hash(password, 10);
       await execute(
-        `UPDATE users SET name = ?, email = ?, password_hash = ?, nim = ?, phone = ?, address = ?, role = ? WHERE id = ?`,
-        [name, email, hash, nim || null, phone || null, address || null, role, id]
+        `UPDATE users SET name = ?, email = ?, password_hash = ?, nim = ?, phone = ?, address = ?, role = ?, is_filkom_verified = ? WHERE id = ?`,
+        [name, email, hash, nim || null, phone || null, address || null, role, is_filkom_verified ? 1 : 0, id]
       );
     } else {
       await execute(
-        `UPDATE users SET name = ?, email = ?, nim = ?, phone = ?, address = ?, role = ? WHERE id = ?`,
-        [name, email, nim || null, phone || null, address || null, role, id]
+        `UPDATE users SET name = ?, email = ?, nim = ?, phone = ?, address = ?, role = ?, is_filkom_verified = ? WHERE id = ?`,
+        [name, email, nim || null, phone || null, address || null, role, is_filkom_verified ? 1 : 0, id]
       );
     }
 
@@ -508,7 +510,25 @@ export const getProducts = async (req: Request, res: Response) => {
           "SELECT * FROM product_variants WHERE product_id = ?",
           [product.id]
         );
-        return { ...product, variants };
+        let bundle_components: any[] = [];
+        if (product.product_type === "bundle") {
+          const comps = await query<any>(
+            `SELECT p.* FROM products p
+             JOIN bundle_items bi ON bi.component_product_id = p.id
+             WHERE bi.bundle_product_id = ? AND p.is_active = TRUE`,
+            [product.id]
+          );
+          bundle_components = await Promise.all(
+            comps.map(async (comp: any) => {
+              const compVariants = await query<any>(
+                "SELECT * FROM product_variants WHERE product_id = ?",
+                [comp.id]
+              );
+              return { ...comp, variants: compVariants };
+            })
+          );
+        }
+        return { ...product, variants, bundle_components };
       })
     );
 
@@ -547,7 +567,26 @@ export const getProductBySlug = async (req: Request, res: Response) => {
 
     const imageUrls = images.length > 0 ? images.map((img: any) => img.image_url) : [product.image_url].filter(Boolean);
 
-    return res.json({ success: true, product: { ...product, variants, images: imageUrls } });
+    let bundle_components: any[] = [];
+    if (product.product_type === "bundle") {
+      const comps = await query<any>(
+        `SELECT p.* FROM products p
+         JOIN bundle_items bi ON bi.component_product_id = p.id
+         WHERE bi.bundle_product_id = ? AND p.is_active = TRUE`,
+        [product.id]
+      );
+      bundle_components = await Promise.all(
+        comps.map(async (comp: any) => {
+          const compVariants = await query<any>(
+            "SELECT * FROM product_variants WHERE product_id = ?",
+            [comp.id]
+          );
+          return { ...comp, variants: compVariants };
+        })
+      );
+    }
+
+    return res.json({ success: true, product: { ...product, variants, images: imageUrls, bundle_components } });
   } catch (error: any) {
     console.error("Error fetching product by slug:", error);
     return res.status(500).json({ success: false, error: "Gagal mengambil data produk" });
@@ -610,7 +649,18 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
     // Resolve items and prices from database using variant_id (locking rows)
     const resolvedItems: any[] = [];
     let calculatedSubtotal = 0;
-    const isUb = isUbEmail(details.customerEmail);
+    // Check if the user is verified as FILKOM civitas in our database
+    let isFilkomVerified = false;
+    if (details.userId) {
+      const [userRows] = await connection.execute(
+        "SELECT is_filkom_verified FROM users WHERE id = ?",
+        [details.userId]
+      );
+      const userRow = (userRows as any[])[0];
+      if (userRow && userRow.is_filkom_verified === 1) {
+        isFilkomVerified = true;
+      }
+    }
 
     for (const item of details.items) {
       const variantId = item.variant_id;
@@ -634,13 +684,15 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       }
 
       // Check stock availability (physical stock minus reserved stock)
-      const availableStock = variant.stock - variant.stock_reserved;
-      if (availableStock < item.quantity) {
-        throw new Error(`Stok tidak cukup untuk ${variant.product_name} (${variant.size}${variant.color ? ` / ${variant.color}` : ""}). Tersedia: ${availableStock}`);
+      if (variant.product_type !== 'bundle') {
+        const availableStock = variant.stock - variant.stock_reserved;
+        if (availableStock < item.quantity) {
+          throw new Error(`Stok tidak cukup untuk ${variant.product_name} (${variant.size}${variant.color ? ` / ${variant.color}` : ""}). Tersedia: ${availableStock}`);
+        }
       }
 
-      // Determine correct price based on email domain
-      const price = determinePrice(variant, isUb);
+      // Determine correct price based on verified status
+      const price = determinePrice(variant, isFilkomVerified);
       const subtotalItem = price * item.quantity;
       calculatedSubtotal += subtotalItem;
 
@@ -656,8 +708,50 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         quantity: item.quantity,
         price: price,
         subtotal: subtotalItem,
-        skuSnapshot: skuSnapshot
+        skuSnapshot: skuSnapshot,
+        bypassStockReservation: variant.product_type === 'bundle'
       });
+
+      // Resolve bundle component selections
+      if (variant.product_type === 'bundle') {
+        if (!item.bundle_selections || !Array.isArray(item.bundle_selections)) {
+          throw new Error(`Pilihan komponen wajib disertakan untuk produk bundel: ${variant.product_name}`);
+        }
+
+        for (const selection of item.bundle_selections) {
+          const [compRows] = await connection.execute(
+            `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix, p.product_type
+             FROM product_variants pv
+             JOIN products p ON p.id = pv.product_id
+             WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
+            [selection.variant_id]
+          );
+          const compVariant = (compRows as any[])[0];
+          if (!compVariant) {
+            throw new Error(`Komponen varian ID ${selection.variant_id} tidak ditemukan`);
+          }
+
+          const compAvailableStock = compVariant.stock - compVariant.stock_reserved;
+          const requiredQty = (selection.quantity || 1) * item.quantity;
+          if (compAvailableStock < requiredQty) {
+            throw new Error(`Stok komponen ${compVariant.product_name} (${compVariant.size}${compVariant.color ? ` / ${compVariant.color}` : ""}) tidak cukup. Tersedia: ${compAvailableStock}`);
+          }
+
+          const compSku = compVariant.sku || (compVariant.sku_prefix ? `${compVariant.sku_prefix}-${compVariant.id}` : `VAR-${compVariant.id}`);
+          resolvedItems.push({
+            product_id: compVariant.product_id,
+            variant_id: compVariant.id,
+            product_name: `[KOMPONEN BUNDLE] ${compVariant.product_name}`,
+            size: compVariant.size,
+            color: compVariant.color || "Default",
+            quantity: requiredQty,
+            price: 0,
+            subtotal: 0,
+            skuSnapshot: compSku,
+            bypassStockReservation: false
+          });
+        }
+      }
     }
 
     const shippingCost = Number(details.shippingCost) || 0;
@@ -721,7 +815,9 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       );
 
       // Reserve stock in database
-      await reserveVariantStock(connection, item.variant_id, item.quantity, details.orderId, details.userId);
+      if (!item.bypassStockReservation && item.variant_id) {
+        await reserveVariantStock(connection, item.variant_id, item.quantity, details.orderId, details.userId);
+      }
     }
 
     // 3. Generate QRIS payment via Midtrans Snap Client
@@ -993,7 +1089,27 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
           [product.id]
         );
         const imageUrls = images.length > 0 ? images.map((img: any) => img.image_url) : [product.image_url].filter(Boolean);
-        return { ...product, variants, images: imageUrls };
+        
+        let bundle_components: any[] = [];
+        if (product.product_type === "bundle") {
+          const comps = await query<any>(
+            `SELECT p.* FROM products p
+             JOIN bundle_items bi ON bi.component_product_id = p.id
+             WHERE bi.bundle_product_id = ?`,
+            [product.id]
+          );
+          bundle_components = await Promise.all(
+            comps.map(async (comp: any) => {
+              const compVariants = await query<any>(
+                "SELECT * FROM product_variants WHERE product_id = ?",
+                [comp.id]
+              );
+              return { ...comp, variants: compVariants };
+            })
+          );
+        }
+        
+        return { ...product, variants, images: imageUrls, bundle_components };
       })
     );
 
@@ -1068,6 +1184,16 @@ export const createProduct = async (req: Request, res: Response) => {
           `INSERT INTO product_images (product_id, image_url, sort_order, is_primary, alt_text)
            VALUES (?, ?, ?, ?, ?)`,
           [productId, input.images[i], i, i === 0 ? 1 : 0, input.name]
+        );
+      }
+    }
+
+    // Insert bundle components
+    if (input.product_type === 'bundle' && input.component_ids && Array.isArray(input.component_ids)) {
+      for (const compId of input.component_ids) {
+        await execute(
+          "INSERT INTO bundle_items (bundle_product_id, component_product_id, quantity) VALUES (?, ?, 1)",
+          [productId, compId]
         );
       }
     }
@@ -1170,6 +1296,17 @@ export const updateProduct = async (req: Request, res: Response) => {
           `INSERT INTO product_images (product_id, image_url, sort_order, is_primary, alt_text)
            VALUES (?, ?, ?, ?, ?)`,
           [input.id, input.images[i], i, i === 0 ? 1 : 0, input.name]
+        );
+      }
+    }
+
+    // Sync bundle components
+    await execute("DELETE FROM bundle_items WHERE bundle_product_id = ?", [input.id]);
+    if (input.product_type === 'bundle' && input.component_ids && Array.isArray(input.component_ids)) {
+      for (const compId of input.component_ids) {
+        await execute(
+          "INSERT INTO bundle_items (bundle_product_id, component_product_id, quantity) VALUES (?, ?, 1)",
+          [input.id, compId]
         );
       }
     }
@@ -1499,7 +1636,17 @@ export const createSale = async (req: Request, res: Response) => {
     const resolvedItems: any[] = [];
     let calculatedSubtotal = 0;
     const customerEmail = input.customer_email || "pos@filkommerch.com";
-    const isUb = isUbEmail(customerEmail);
+    let isUb = isUbEmail(customerEmail);
+    if (input.customer_email) {
+      const [userRows] = await connection.execute(
+        "SELECT is_filkom_verified FROM users WHERE email = ?",
+        [input.customer_email]
+      );
+      const userRow = (userRows as any[])[0];
+      if (userRow && userRow.is_filkom_verified === 1) {
+        isUb = true;
+      }
+    }
 
     for (const item of input.items) {
       const variantId = item.variant_id;
@@ -1523,9 +1670,11 @@ export const createSale = async (req: Request, res: Response) => {
       }
 
       // Check stock availability (available stock = stock - stock_reserved)
-      const availableStock = variant.stock - variant.stock_reserved;
-      if (availableStock < item.quantity) {
-        throw new Error(`Stok tidak cukup untuk ${variant.product_name}. Tersedia: ${availableStock}`);
+      if (variant.product_type !== 'bundle') {
+        const availableStock = variant.stock - variant.stock_reserved;
+        if (availableStock < item.quantity) {
+          throw new Error(`Stok tidak cukup untuk ${variant.product_name}. Tersedia: ${availableStock}`);
+        }
       }
 
       const price = determinePrice(variant, isUb);
@@ -1543,8 +1692,50 @@ export const createSale = async (req: Request, res: Response) => {
         quantity: item.quantity,
         price: price,
         subtotal: subtotalItem,
-        skuSnapshot: skuSnapshot
+        skuSnapshot: skuSnapshot,
+        bypassStockDeduction: variant.product_type === 'bundle'
       });
+
+      // If it is a bundle, resolve and validate stock for component variants
+      if (variant.product_type === 'bundle') {
+        if (!item.bundle_selections || !Array.isArray(item.bundle_selections)) {
+          throw new Error(`Detail pilihan komponen wajib disertakan untuk bundel: ${variant.product_name}`);
+        }
+
+        for (const selection of item.bundle_selections) {
+          const [compRows] = await connection.execute(
+            `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix, p.product_type
+             FROM product_variants pv
+             JOIN products p ON p.id = pv.product_id
+             WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
+            [selection.variant_id]
+          );
+          const compVariant = (compRows as any[])[0];
+          if (!compVariant) {
+            throw new Error(`Komponen varian ID ${selection.variant_id} tidak ditemukan`);
+          }
+
+          const compAvailableStock = compVariant.stock - compVariant.stock_reserved;
+          const requiredQty = (selection.quantity || 1) * item.quantity;
+          if (compAvailableStock < requiredQty) {
+            throw new Error(`Stok komponen ${compVariant.product_name} (${compVariant.size}${compVariant.color ? ` / ${compVariant.color}` : ""}) tidak cukup. Tersedia: ${compAvailableStock}`);
+          }
+
+          const compSku = compVariant.sku || (compVariant.sku_prefix ? `${compVariant.sku_prefix}-${compVariant.id}` : `VAR-${compVariant.id}`);
+          resolvedItems.push({
+            product_id: compVariant.product_id,
+            variant_id: compVariant.id,
+            product_name: `[KOMPONEN BUNDLE] ${compVariant.product_name}`,
+            size: compVariant.size,
+            color: compVariant.color || "Default",
+            quantity: requiredQty,
+            price: 0,
+            subtotal: 0,
+            skuSnapshot: compSku,
+            bypassStockDeduction: false
+          });
+        }
+      }
     }
 
     const discountAmount = Number(input.discount) || 0;
@@ -1596,23 +1787,25 @@ export const createSale = async (req: Request, res: Response) => {
         ]
       );
 
-      // Decrement physical stock (No reservation needed for instant cashier cash sale)
-      await connection.execute(
-        "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
-        [item.quantity, item.variant_id]
-      );
+      if (!item.bypassStockDeduction) {
+        // Decrement physical stock (No reservation needed for instant cashier cash sale)
+        await connection.execute(
+          "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
+          [item.quantity, item.variant_id]
+        );
 
-      // Log movement in stock_movements
-      await logStockMovement(
-        connection,
-        item.variant_id,
-        'sale',
-        -item.quantity,
-        'order',
-        saleId,
-        input.admin_id,
-        'Penjualan POS langsung selesai'
-      );
+        // Log movement in stock_movements
+        await logStockMovement(
+          connection,
+          item.variant_id,
+          'sale',
+          -item.quantity,
+          'order',
+          saleId,
+          input.admin_id,
+          'Penjualan POS langsung selesai'
+        );
+      }
     }
 
     // 3. Create payments record

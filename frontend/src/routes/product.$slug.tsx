@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { getProductBySlug } from "@backend/server-actions";
 import { Button } from "@frontend/components/ui/button";
 import { useAuth } from "@/lib/auth";
+import { VerificationModal } from "@frontend/components/VerificationModal";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logo from "@/assets/logo-fm.jpg";
 
@@ -37,9 +38,9 @@ const scrollToId = (id: string) => {
 const NAV = [
   { label: "BERANDA", href: "/", isScroll: true, target: "top" },
   { label: "PRODUK", href: "/products" },
-  { label: "PRE-ORDER", href: "/products?sale_type=pre_order" },
+  { label: "PRE-ORDER", href: "/pre-order" },
   { label: "TENTANG KAMI", href: "/#about", isScroll: true, target: "about" },
-  { label: "HUBUNGI KAMI", href: "/#contact", isScroll: true, target: "contact" },
+  { label: "FAQ", href: "/faq" },
 ];
 
 export const Route = createFileRoute("/product/$slug")({
@@ -105,15 +106,22 @@ function ProductDetailPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
+  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
+  const search = typeof window !== "undefined" ? window.location.search : "";
+  const hash = typeof window !== "undefined" ? window.location.hash : "";
+
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState<string>("");
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [selectedBundleVariants, setSelectedBundleVariants] = useState<Record<number, any>>({});
+  const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   // Cart state & handlers
   const [cart, setCart] = useState<any[]>([]);
@@ -220,6 +228,19 @@ function ProductDetailPage() {
     }
   }, [product]);
 
+  useEffect(() => {
+    if (product && product.product_type === "bundle" && product.bundle_components) {
+      const initial: Record<number, any> = {};
+      for (const comp of product.bundle_components) {
+        const firstAvailable = comp.variants?.find((v) => v.stock > 0) || comp.variants?.[0];
+        if (firstAvailable) {
+          initial[comp.id] = firstAvailable;
+        }
+      }
+      setSelectedBundleVariants(initial);
+    }
+  }, [product]);
+
   // Extract color & size arrays for rendering
   const colors = useMemo(() => {
     if (!product) return [];
@@ -245,20 +266,31 @@ function ProductDetailPage() {
 
   const currentStock = useMemo(() => {
     if (!product) return 0;
+
+    if (product.product_type === "bundle") {
+      if (!product.bundle_components || product.bundle_components.length === 0) return 0;
+      let minStock = Infinity;
+      for (const comp of product.bundle_components) {
+        const selectedVar = selectedBundleVariants[comp.id];
+        if (!selectedVar) return 0;
+        minStock = Math.min(minStock, selectedVar.stock);
+      }
+      return minStock === Infinity ? 0 : minStock;
+    }
+
     if (product.variants.length === 0) return 0;
 
-    // If no variants filters are needed (like all size/no color)
     if (colors.length === 0 && sizes.length === 0) {
       return product.variants[0].stock;
     }
 
     return currentVariant ? currentVariant.stock : 0;
-  }, [product, currentVariant, colors, sizes]);
+  }, [product, currentVariant, colors, sizes, selectedBundleVariants]);
 
   // Dynamic Price computation
   const currentPrice = useMemo(() => {
     if (!product) return 0;
-    const isUb = user?.email ? (user.email.endsWith("@student.ub.ac.id") || user.email.endsWith("@ub.ac.id")) : false;
+    const isUb = user?.type === "buyer" && user.is_filkom_verified === 1;
     
     if (product.promo_price && Number(product.promo_price) > 0) {
       return Number(product.promo_price);
@@ -351,10 +383,39 @@ function ProductDetailPage() {
       return;
     }
 
-    // Build variant string details
-    const variantStr = [selectedColor, selectedSize].filter(Boolean).join(" — ");
-    const cartItemName = `${product.name}${variantStr ? ` (${variantStr})` : ""}`;
-    const cartItemId = `online-${product.id}-${selectedColor || ""}-${selectedSize || ""}`;
+    let cartItemName = product.name;
+    let selectionsPayload: any[] = [];
+    let uniqueSelectionsStr = "";
+
+    if (product.product_type === "bundle") {
+      const selectionDetails = (product.bundle_components || [])
+        .map((comp) => {
+          const variant = selectedBundleVariants[comp.id];
+          const variantStr = [variant?.color, variant?.size]
+            .filter((v) => v && v !== "One Size" && v !== "All Size")
+            .join(" — ");
+          return `${comp.name}${variantStr ? `: ${variantStr}` : ""}`;
+        })
+        .join(", ");
+      cartItemName = `${product.name} (${selectionDetails})`;
+      
+      selectionsPayload = (product.bundle_components || []).map((comp) => {
+        const variant = selectedBundleVariants[comp.id];
+        return {
+          product_id: comp.id,
+          variant_id: variant?.id || 0,
+          quantity: 1,
+        };
+      });
+      uniqueSelectionsStr = selectionsPayload.map((s) => `${s.product_id}-${s.variant_id}`).sort().join("-");
+    } else {
+      const variantStr = [selectedColor, selectedSize].filter(Boolean).join(" — ");
+      cartItemName = `${product.name}${variantStr ? ` (${variantStr})` : ""}`;
+    }
+
+    const cartItemId = product.product_type === "bundle"
+      ? `online-bundle-${product.id}-${uniqueSelectionsStr}`
+      : `online-${product.id}-${selectedColor || ""}-${selectedSize || ""}`;
 
     // Read indexCart
     let indexCart: any[] = [];
@@ -374,9 +435,10 @@ function ProductDetailPage() {
       img: product.image_url || "",
       qty: quantity,
       product_id: product.id,
-      variant_id: currentVariant?.id,
+      variant_id: currentVariant?.id || product.variants[0]?.id,
       size: selectedSize || "One Size",
       color: selectedColor || undefined,
+      bundle_selections: selectionsPayload.length > 0 ? selectionsPayload : undefined,
     };
 
     if (existingIndexIdx > -1) {
@@ -396,8 +458,9 @@ function ProductDetailPage() {
       quantity: quantity,
       size: selectedSize || "One Size",
       color: selectedColor || undefined,
-      variant_id: currentVariant?.id,
+      variant_id: currentVariant?.id || product.variants[0]?.id,
       category: product.category_name || "Apparel",
+      bundle_selections: selectionsPayload.length > 0 ? selectionsPayload : undefined,
     };
 
     // Save to checkout cart (usually replaces or appends)
@@ -478,12 +541,8 @@ function ProductDetailPage() {
 
           <nav className="hidden lg:flex items-center gap-7">
             {NAV.map((n) => {
-              const isActive =
-                n.href === "/products" && window.location.pathname === "/products" && !window.location.search.includes("sale_type=pre_order") ||
-                n.href.includes("pre_order") && window.location.search.includes("sale_type=pre_order") ||
-                n.href === "/" && window.location.pathname === "/" && !window.location.hash;
-
-              const isScrollOnHome = n.isScroll && window.location.pathname === "/";
+              const isActive = pathname === n.href || (n.href === "/" && pathname === "/" && !hash);
+              const isScrollOnHome = n.isScroll && pathname === "/";
 
               if (isScrollOnHome) {
                 return (
@@ -499,20 +558,7 @@ function ProductDetailPage() {
                 );
               }
 
-              if (n.href.includes("sale_type=pre_order")) {
-                return (
-                  <Link
-                    key={n.label}
-                    to="/products"
-                    search={{ sale_type: "pre_order" }}
-                    className={`text-xs font-bold tracking-[0.18em] transition-colors uppercase ${
-                      isActive ? "text-brand-orange" : "text-ink hover:text-brand-orange"
-                    }`}
-                  >
-                    {n.label}
-                  </Link>
-                );
-              }
+              
 
               return (
                 <Link
@@ -538,17 +584,36 @@ function ProductDetailPage() {
                 <User className="w-5 h-5" />
               </button>
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-background border-2 border-ink rounded-lg shadow-lg z-50 animate-scale-in py-1">
+                <div className="absolute right-0 mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-lg z-50 animate-scale-in py-1">
                   {user ? (
                     <>
                       <div className="px-5 py-3 border-b border-border">
-                        <p className="text-sm font-semibold text-foreground truncate">
+                        <p className="text-sm font-semibold text-foreground break-words">
                           {user.type === "admin" ? user.username : user.name}
                         </p>
-                        <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                        <p className="text-xs text-muted-foreground break-all">{user.email}</p>
                         <span className="inline-block mt-1 px-2 py-1 text-[10px] font-bold bg-blue-100 text-blue-900 rounded">
                           {user.type === "admin" ? "ADMIN" : "BUYER"}
                         </span>
+                        {user.type === "buyer" && (
+                          <div className="mt-1.5">
+                            {user.is_filkom_verified === 1 ? (
+                              <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-green-100 text-green-800 rounded">
+                                ✓ FILKOM VERIFIED
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setIsVerifyOpen(true);
+                                  setUserMenuOpen(false);
+                                }}
+                                className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/20 border border-brand-orange/30 px-2 py-1 rounded w-full text-center transition-all cursor-pointer block"
+                              >
+                                Verifikasi FILKOM
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                       {user.type === "buyer" && (
                         <Link
@@ -604,16 +669,30 @@ function ProductDetailPage() {
         <div className="bg-white border-2 border-ink rounded-xl shadow-[6px_6px_0px_0px_rgba(27,27,27,1)] overflow-hidden grid md:grid-cols-12">
           {/* LEFT: Image gallery (5 cols) */}
           <div className="md:col-span-6 p-6 border-b-2 md:border-b-0 md:border-r-2 border-ink flex flex-col justify-between">
-            <div className="aspect-[4/5] bg-cream border-2 border-ink rounded-lg overflow-hidden relative">
-              <img src={activeImage} alt={product.name} className="w-full h-full object-cover" />
+            <div
+              onClick={() => setIsZoomOpen(true)}
+              className="aspect-[4/5] bg-cream border-2 border-ink rounded-lg overflow-hidden relative cursor-zoom-in group/img"
+            >
+              <img src={activeImage} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-[1.02]" />
               <button
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   setIsWishlisted(!isWishlisted);
                   toast.success(isWishlisted ? "Dihapus dari wishlist" : "Ditambahkan ke wishlist");
                 }}
-                className="absolute top-4 right-4 p-2.5 bg-white/95 rounded-full shadow border border-ink hover:scale-105 transition-transform"
+                className="absolute top-4 right-4 p-2.5 bg-white/95 rounded-full shadow border border-ink hover:scale-105 transition-transform z-10"
               >
                 <Heart className={`w-5 h-5 ${isWishlisted ? "fill-red-500 text-red-500" : ""}`} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsZoomOpen(true);
+                }}
+                className="absolute bottom-4 right-4 p-2 bg-white/95 rounded-full shadow border border-ink hover:scale-105 transition-transform z-10"
+                aria-label="Zoom image"
+              >
+                <Search className="w-4 h-4 text-ink" />
               </button>
             </div>
 
@@ -667,16 +746,59 @@ function ProductDetailPage() {
                 )}
               </div>
 
-              {user?.email && (user.email.endsWith("@student.ub.ac.id") || user.email.endsWith("@ub.ac.id")) ? (
-                <div className="mt-2 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded px-2.5 py-1.5 w-fit">
-                  🎉 Harga Khusus Civitas UB Aktif!
+              {user?.type === "buyer" && user.is_filkom_verified === 1 ? (
+                <div className="mt-2 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded px-2.5 py-1.5 w-fit flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  🎉 Harga Khusus Civitas FILKOM Aktif!
                 </div>
               ) : (
                 product.filkom_price && Number(product.filkom_price) > 0 ? (
                   <div className="mt-2 text-xs font-medium text-muted-foreground bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 w-fit">
-                    💡 Punya email UB? Masuk untuk dapat harga civitas Rp {Number(product.filkom_price).toLocaleString("id-ID")}
+                    {user?.type === "buyer" ? (
+                      <span>
+                        💡{" "}
+                        <button
+                          onClick={() => setIsVerifyOpen(true)}
+                          className="font-bold text-brand-orange hover:underline cursor-pointer"
+                        >
+                          Verifikasi NIM/NIDN Anda
+                        </button>{" "}
+                        untuk mendapatkan harga khusus FILKOM Rp {Number(product.filkom_price).toLocaleString("id-ID")}
+                      </span>
+                    ) : (
+                      <span>💡 Login & verifikasi NIM/NIDN untuk mendapatkan harga khusus FILKOM Rp {Number(product.filkom_price).toLocaleString("id-ID")}</span>
+                    )}
                   </div>
                 ) : null
+              )}
+
+              {product.product_type === "bundle" && product.bundle_components && product.bundle_components.length > 0 && (
+                <div className="p-4 bg-brand-blue/5 border-2 border-brand-blue/30 rounded-xl space-y-2 mt-4">
+                  <h4 className="font-extrabold text-brand-blue text-xs uppercase tracking-wider flex items-center gap-2">
+                    <span className="h-2 w-2 rounded-full bg-brand-blue animate-pulse" />
+                    Isi Paket Bundling (Komponen Produk):
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {product.bundle_components.map((comp) => (
+                      <div key={comp.id} className="flex gap-2 p-2 bg-white border border-border rounded-lg shadow-sm items-center">
+                        {comp.image_url ? (
+                          <img
+                            src={comp.image_url}
+                            alt={comp.name}
+                            className="w-10 h-10 object-cover rounded border border-border shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-cream rounded border border-border flex items-center justify-center text-[9px] text-muted-foreground shrink-0 font-bold">
+                            No Image
+                          </div>
+                        )}
+                        <p className="font-bold text-ink uppercase tracking-tight text-[11px] truncate">
+                          {comp.name}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {product.product_type === "preorder" && (
@@ -714,54 +836,152 @@ function ProductDetailPage() {
                 </div>
               )}
 
-              {/* Selection: Colors */}
-              {colors.length > 0 && (
-                <div className="mt-6 space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Pilih Warna:{" "}
-                    <span className="text-ink font-extrabold">{selectedColor || "-"}</span>
+              {/* Selection: Colors & Sizes for Bundle Components OR Normal Product */}
+              {product.product_type === "bundle" ? (
+                <div className="mt-6 space-y-5 border-t border-border pt-4">
+                  <p className="font-extrabold text-ink uppercase text-xs tracking-wider">
+                    Pilih Ukuran / Warna Varian Paket:
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {colors.map((color) => (
-                      <button
-                        key={color}
-                        onClick={() => setSelectedColor(color)}
-                        className={`px-4 py-2 text-xs font-semibold border-2 transition rounded ${
-                          selectedColor === color
-                            ? "bg-ink text-white border-ink shadow-sm scale-95"
-                            : "bg-white text-ink border-border hover:border-ink"
-                        }`}
-                      >
-                        {color}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+                  {product.bundle_components?.map((comp) => {
+                    const selectedVar = selectedBundleVariants[comp.id];
+                    const compColors = Array.from(new Set(comp.variants?.map((v) => v.color).filter(Boolean))) as string[];
+                    const compSizes = Array.from(new Set(comp.variants?.map((v) => v.size).filter(Boolean))) as string[];
 
-              {/* Selection: Sizes */}
-              {sizes.length > 0 && (
-                <div className="mt-4 space-y-2">
-                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Pilih Ukuran:{" "}
-                    <span className="text-ink font-extrabold">{selectedSize || "-"}</span>
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {sizes.map((size) => (
-                      <button
-                        key={size}
-                        onClick={() => setSelectedSize(size)}
-                        className={`w-12 h-10 flex items-center justify-center text-xs font-bold border-2 transition rounded ${
-                          selectedSize === size
-                            ? "bg-ink text-white border-ink shadow-sm scale-95"
-                            : "bg-white text-ink border-border hover:border-ink"
-                        }`}
-                      >
-                        {size}
-                      </button>
-                    ))}
-                  </div>
+                    const currentSize = selectedVar?.size || "";
+                    const currentColor = selectedVar?.color || null;
+
+                    return (
+                      <div key={comp.id} className="p-4 bg-cream/20 border-2 border-ink rounded-lg space-y-3.5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-extrabold text-ink text-xs uppercase tracking-tight">
+                            {comp.name}
+                          </h4>
+                          {selectedVar && (
+                            <span className={`text-[9px] font-bold ${selectedVar.stock <= 3 ? "text-red-600 bg-red-50 border-red-200" : "text-emerald-700 bg-emerald-50 border-emerald-200"} px-2 py-0.5 border rounded`}>
+                              Stok: {selectedVar.stock} pcs
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Colors Selector */}
+                        {compColors.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                              Warna
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {compColors.map((color) => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  onClick={() => {
+                                    const matched = comp.variants.find(v => v.color === color && v.size === currentSize)
+                                      || comp.variants.find(v => v.color === color)
+                                      || comp.variants[0];
+                                    if (matched) {
+                                      setSelectedBundleVariants(prev => ({ ...prev, [comp.id]: matched }));
+                                    }
+                                  }}
+                                  className={`px-3 py-1 text-[11px] font-semibold border-2 transition rounded ${
+                                    currentColor === color
+                                      ? "bg-ink text-white border-ink scale-95"
+                                      : "bg-white text-ink border-border hover:border-ink"
+                                  }`}
+                                >
+                                  {color}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Sizes Selector */}
+                        {compSizes.length > 0 && (
+                          <div className="space-y-1">
+                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
+                              Ukuran
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {compSizes.map((size) => (
+                                <button
+                                  key={size}
+                                  type="button"
+                                  onClick={() => {
+                                    const matched = comp.variants.find(v => v.size === size && v.color === currentColor)
+                                      || comp.variants.find(v => v.size === size)
+                                      || comp.variants[0];
+                                    if (matched) {
+                                      setSelectedBundleVariants(prev => ({ ...prev, [comp.id]: matched }));
+                                    }
+                                  }}
+                                  className={`w-9 h-8 flex items-center justify-center text-[11px] font-bold border-2 transition rounded ${
+                                    currentSize === size
+                                      ? "bg-ink text-white border-ink scale-95"
+                                      : "bg-white text-ink border-border hover:border-ink"
+                                  }`}
+                                >
+                                  {size}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+              ) : (
+                <>
+                  {/* Selection: Colors */}
+                  {colors.length > 0 && (
+                    <div className="mt-6 space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Pilih Warna:{" "}
+                        <span className="text-ink font-extrabold">{selectedColor || "-"}</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {colors.map((color) => (
+                          <button
+                            key={color}
+                            onClick={() => setSelectedColor(color)}
+                            className={`px-4 py-2 text-xs font-semibold border-2 transition rounded ${
+                              selectedColor === color
+                                ? "bg-ink text-white border-ink shadow-sm scale-95"
+                                : "bg-white text-ink border-border hover:border-ink"
+                            }`}
+                          >
+                            {color}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Selection: Sizes */}
+                  {sizes.length > 0 && (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Pilih Ukuran:{" "}
+                        <span className="text-ink font-extrabold">{selectedSize || "-"}</span>
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {sizes.map((size) => (
+                          <button
+                            key={size}
+                            onClick={() => setSelectedSize(size)}
+                            className={`w-12 h-10 flex items-center justify-center text-xs font-bold border-2 transition rounded ${
+                              selectedSize === size
+                                ? "bg-ink text-white border-ink shadow-sm scale-95"
+                                : "bg-white text-ink border-border hover:border-ink"
+                            }`}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
 
               {/* Quantity and Stock status */}
@@ -856,6 +1076,8 @@ function ProductDetailPage() {
                 </div>
               </div>
 
+
+
               <div className="pt-2 border-t border-border mt-4">
                 <p className="font-bold text-ink uppercase text-xs mb-2 tracking-wider">
                   Ukuran Chart:
@@ -901,23 +1123,7 @@ function ProductDetailPage() {
           </div>
           <nav className="flex-1 flex flex-col px-5 py-6 sm:py-8 gap-1">
             {NAV.map((n, idx) => {
-              if (n.href.includes("sale_type=pre_order")) {
-                return (
-                  <Link
-                    key={n.label}
-                    to="/products"
-                    search={{ sale_type: "pre_order" }}
-                    onClick={() => {
-                      setMenuOpen(false);
-                      setUserMenuOpen(false);
-                    }}
-                    className="display text-3xl sm:text-4xl text-left py-2.5 sm:py-3 hover:text-brand-orange transition-colors animate-slide-up"
-                    style={{ animationDelay: `${idx * 50}ms` }}
-                  >
-                    {n.label}
-                  </Link>
-                );
-              }
+              
 
               return (
                 <Link
@@ -1039,6 +1245,34 @@ function ProductDetailPage() {
             )}
           </aside>
         </div>
+      )}
+
+      {/* Lightbox / Zoom Dialog */}
+      {isZoomOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out select-none animate-fadeIn"
+          onClick={() => setIsZoomOpen(false)}
+        >
+          <button
+            onClick={() => setIsZoomOpen(false)}
+            className="absolute top-4 right-4 bg-white border-2 border-ink p-2 rounded-full shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:scale-105 transition active:scale-95 z-50 cursor-pointer"
+            aria-label="Close image view"
+          >
+            <X className="w-5 h-5 text-ink" />
+          </button>
+          <img
+            src={activeImage}
+            alt={product.name}
+            className="max-w-full max-h-[90vh] object-contain rounded-lg border-2 border-white/10 shadow-2xl scale-up"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+      {user?.type === "buyer" && (
+        <VerificationModal
+          isOpen={isVerifyOpen}
+          onClose={() => setIsVerifyOpen(false)}
+        />
       )}
     </div>
   );

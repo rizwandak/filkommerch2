@@ -63,6 +63,7 @@ interface ProductForm {
   size_chart_url: string;
   images: string[];
   variants: Array<{ size: string; color: string; stock: string; filkom_price: string }>;
+  component_ids: number[];
 }
 
 const emptyForm = (): ProductForm => ({
@@ -74,7 +75,7 @@ const emptyForm = (): ProductForm => ({
   original_price: "",
   filkom_price: "",
   promo_price: "",
-  sale_type: "",
+  sale_type: "ready_stock",
   product_type: "ready",
   low_stock_threshold: "5",
   preorder_start_at: "",
@@ -88,6 +89,7 @@ const emptyForm = (): ProductForm => ({
   size_chart_url: "",
   images: [],
   variants: [{ size: "One Size", color: "", stock: "0", filkom_price: "" }],
+  component_ids: [],
 });
 
 const formatDateForInput = (dateVal: any) => {
@@ -149,8 +151,10 @@ function AdminProductsPage() {
       original_price: product.original_price ? String(product.original_price) : "",
       filkom_price: product.filkom_price ? String(product.filkom_price) : "",
       promo_price: product.promo_price ? String(product.promo_price) : "",
-      sale_type: product.sale_type || "",
-      product_type: product.product_type || "ready",
+      sale_type: product.sale_type === "limited_drop" ? "limited_drop" : "ready_stock",
+      product_type: product.product_type === "bundle"
+        ? "bundle"
+        : (product.sale_type === "pre_order" ? "preorder" : "ready"),
       low_stock_threshold: product.low_stock_threshold ? String(product.low_stock_threshold) : "5",
       preorder_start_at: formatDateForInput(product.preorder_start_at),
       preorder_end_at: formatDateForInput(product.preorder_end_at),
@@ -168,6 +172,7 @@ function AdminProductsPage() {
         stock: String(v.stock),
         filkom_price: v.filkom_price ? String(v.filkom_price) : "",
       })),
+      component_ids: product.bundle_components ? product.bundle_components.map((c) => c.id) : [],
     });
     setDialogOpen(true);
   };
@@ -255,8 +260,10 @@ function AdminProductsPage() {
       original_price: form.original_price ? parseFloat(form.original_price) : null,
       filkom_price: form.filkom_price ? parseFloat(form.filkom_price) : null,
       promo_price: form.promo_price ? parseFloat(form.promo_price) : null,
-      sale_type: form.sale_type || null,
-      product_type: form.product_type || "ready",
+      sale_type: form.product_type === "preorder"
+        ? "pre_order"
+        : (form.sale_type === "limited_drop" ? "limited_drop" : "ready_stock"),
+      product_type: form.product_type === "bundle" ? "bundle" : "apparel",
       low_stock_threshold: form.low_stock_threshold ? parseInt(form.low_stock_threshold) : 5,
       preorder_start_at: form.preorder_start_at || null,
       preorder_end_at: form.preorder_end_at || null,
@@ -274,6 +281,7 @@ function AdminProductsPage() {
         stock: parseInt(v.stock) || 0,
         filkom_price: v.filkom_price ? parseFloat(v.filkom_price) : null,
       })),
+      component_ids: form.product_type === "bundle" ? form.component_ids : [],
     };
 
     const result = form.id
@@ -579,12 +587,12 @@ function AdminProductsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Harga Civitas UB (Rp)</Label>
+                <Label>Harga Civitas FILKOM UB (Rp)</Label>
                 <Input
                   type="number"
                   value={form.filkom_price}
                   onChange={(e) => setForm({ ...form, filkom_price: e.target.value })}
-                  placeholder="Harga khusus Civitas UB"
+                  placeholder="Harga khusus Civitas FILKOM UB"
                 />
               </div>
               <div className="space-y-2">
@@ -611,24 +619,23 @@ function AdminProductsPage() {
                   <SelectContent>
                     <SelectItem value="ready">Ready Stock</SelectItem>
                     <SelectItem value="preorder">Pre-Order</SelectItem>
+                    <SelectItem value="bundle">Bundle / Paket</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Label Penjualan</Label>
+                <Label>Model Rilis / Label</Label>
                 <Select
-                  value={form.sale_type || "none"}
-                  onValueChange={(v) => setForm({ ...form, sale_type: v === "none" ? "" : v })}
+                  value={form.sale_type || "ready_stock"}
+                  onValueChange={(v) => setForm({ ...form, sale_type: v })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Tidak Ada" />
+                    <SelectValue placeholder="Ready Stock" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Tidak Ada</SelectItem>
-                    <SelectItem value="sale">SALE</SelectItem>
-                    <SelectItem value="promo">PROMO</SelectItem>
-                    <SelectItem value="preorder">PRE-ORDER</SelectItem>
+                    <SelectItem value="ready_stock">Ready Stock (Normal)</SelectItem>
+                    <SelectItem value="limited_drop">Limited Drop</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -684,6 +691,38 @@ function AdminProductsPage() {
                       onChange={(e) => setForm({ ...form, production_eta_days: e.target.value })}
                     />
                   </div>
+                </div>
+              </div>
+            )}
+            {form.product_type === "bundle" && (
+              <div className="border border-brand-blue/30 bg-blue-50/5 p-4 rounded-lg space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-blue font-bold">Daftar Produk Komponen Paket</h4>
+                <div className="max-h-48 overflow-y-auto space-y-2 border border-border rounded p-2 bg-background">
+                  {products
+                    .filter((p) => p.id !== form.id && p.product_type !== "bundle")
+                    .map((p) => {
+                      const isChecked = form.component_ids?.includes(p.id) || false;
+                      return (
+                        <label key={p.id} className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted p-1.5 rounded">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              const currentIds = form.component_ids || [];
+                              const nextIds = e.target.checked
+                                ? [...currentIds, p.id]
+                                : currentIds.filter((id) => id !== p.id);
+                              setForm({ ...form, component_ids: nextIds });
+                            }}
+                            className="h-3.5 w-3.5 rounded border-border"
+                          />
+                          <span>{p.name} (Rp {p.price.toLocaleString("id-ID")})</span>
+                        </label>
+                      );
+                    })}
+                  {products.filter((p) => p.id !== form.id && p.product_type !== "bundle").length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4">Tidak ada produk lain tersedia</p>
+                  )}
                 </div>
               </div>
             )}

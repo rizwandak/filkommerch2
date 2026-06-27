@@ -10,9 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ProductsRouteImport } from './routes/products'
+import { Route as PreOrderRouteImport } from './routes/pre-order'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as OrderConfirmationRouteImport } from './routes/order-confirmation'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as FaqRouteImport } from './routes/faq'
 import { Route as DbTestRouteImport } from './routes/db-test'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as PosRouteRouteImport } from './routes/pos/route'
@@ -36,6 +38,11 @@ const ProductsRoute = ProductsRouteImport.update({
   path: '/products',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PreOrderRoute = PreOrderRouteImport.update({
+  id: '/pre-order',
+  path: '/pre-order',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OrdersRoute = OrdersRouteImport.update({
   id: '/orders',
   path: '/orders',
@@ -49,6 +56,11 @@ const OrderConfirmationRoute = OrderConfirmationRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DbTestRoute = DbTestRouteImport.update({
@@ -143,9 +155,11 @@ export interface FileRoutesByFullPath {
   '/pos': typeof PosRouteRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/db-test': typeof DbTestRoute
+  '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/orders': typeof OrdersRoute
+  '/pre-order': typeof PreOrderRoute
   '/products': typeof ProductsRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -164,9 +178,11 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
   '/db-test': typeof DbTestRoute
+  '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/orders': typeof OrdersRoute
+  '/pre-order': typeof PreOrderRoute
   '/products': typeof ProductsRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -188,9 +204,11 @@ export interface FileRoutesById {
   '/pos': typeof PosRouteRouteWithChildren
   '/checkout': typeof CheckoutRoute
   '/db-test': typeof DbTestRoute
+  '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/orders': typeof OrdersRoute
+  '/pre-order': typeof PreOrderRoute
   '/products': typeof ProductsRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
@@ -213,9 +231,11 @@ export interface FileRouteTypes {
     | '/pos'
     | '/checkout'
     | '/db-test'
+    | '/faq'
     | '/login'
     | '/order-confirmation'
     | '/orders'
+    | '/pre-order'
     | '/products'
     | '/admin/activity-logs'
     | '/admin/dashboard'
@@ -234,9 +254,11 @@ export interface FileRouteTypes {
     | '/'
     | '/checkout'
     | '/db-test'
+    | '/faq'
     | '/login'
     | '/order-confirmation'
     | '/orders'
+    | '/pre-order'
     | '/products'
     | '/admin/activity-logs'
     | '/admin/dashboard'
@@ -257,9 +279,11 @@ export interface FileRouteTypes {
     | '/pos'
     | '/checkout'
     | '/db-test'
+    | '/faq'
     | '/login'
     | '/order-confirmation'
     | '/orders'
+    | '/pre-order'
     | '/products'
     | '/admin/activity-logs'
     | '/admin/dashboard'
@@ -281,9 +305,11 @@ export interface RootRouteChildren {
   PosRouteRoute: typeof PosRouteRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
   DbTestRoute: typeof DbTestRoute
+  FaqRoute: typeof FaqRoute
   LoginRoute: typeof LoginRoute
   OrderConfirmationRoute: typeof OrderConfirmationRoute
   OrdersRoute: typeof OrdersRoute
+  PreOrderRoute: typeof PreOrderRoute
   ProductsRoute: typeof ProductsRoute
   ApiDbTestRoute: typeof ApiDbTestRoute
   ProductSlugRoute: typeof ProductSlugRoute
@@ -296,6 +322,13 @@ declare module '@tanstack/react-router' {
       path: '/products'
       fullPath: '/products'
       preLoaderRoute: typeof ProductsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pre-order': {
+      id: '/pre-order'
+      path: '/pre-order'
+      fullPath: '/pre-order'
+      preLoaderRoute: typeof PreOrderRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orders': {
@@ -317,6 +350,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/db-test': {
@@ -487,9 +527,11 @@ const rootRouteChildren: RootRouteChildren = {
   PosRouteRoute: PosRouteRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
   DbTestRoute: DbTestRoute,
+  FaqRoute: FaqRoute,
   LoginRoute: LoginRoute,
   OrderConfirmationRoute: OrderConfirmationRoute,
   OrdersRoute: OrdersRoute,
+  PreOrderRoute: PreOrderRoute,
   ProductsRoute: ProductsRoute,
   ApiDbTestRoute: ApiDbTestRoute,
   ProductSlugRoute: ProductSlugRoute,

@@ -17,6 +17,8 @@ export interface BuyerUser {
   email: string;
   name: string;
   picture?: string;
+  is_filkom_verified?: number;
+  nim?: string;
 }
 
 export type User = AdminUser | BuyerUser;
@@ -28,6 +30,7 @@ interface AuthContextType {
   loginAsGoogle: (userInfo: Omit<BuyerUser, "type">) => void | Promise<void>;
   logout: () => void;
   upsertBuyer: (buyer: BuyerUser) => void;
+  setUser: React.Dispatch<React.SetStateAction<User | null>>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -98,6 +101,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     localStorage.removeItem("user");
     localStorage.removeItem("cart");
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    }
   };
 
   /**
@@ -119,7 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, loginAsAdmin, loginAsGoogle, logout, upsertBuyer }}
+      value={{ user, loading, loginAsAdmin, loginAsGoogle, logout, upsertBuyer, setUser }}
     >
       {children}
     </AuthContext.Provider>

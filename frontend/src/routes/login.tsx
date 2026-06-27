@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Mail, Lock, LogIn, User, ArrowRight, ShieldAlert, Sparkles, UserPlus } from "lucide-react";
+import { Mail, Lock, LogIn, User, ArrowRight, ShieldAlert, Sparkles, UserPlus, ShoppingBag } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
@@ -192,7 +192,7 @@ function LoginPage() {
       const decoded = jwtDecode<GoogleJwtPayload>(token);
 
       const isUB = decoded.hd === "student.ub.ac.id" || decoded.email.endsWith("@student.ub.ac.id");
-      const organization = isUB ? "Universitas Brawijaya" : "Umum";
+      const organization = isUB ? "FILKOM UB" : "Umum";
 
       loginAsGoogle({
         id: decoded.sub,
@@ -226,90 +226,152 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FCFAF7] text-ink relative flex flex-col items-center justify-center px-4 md:px-8 py-8 md:py-12 overflow-hidden">
-      {/* Decorative Warm Shapes */}
-      <div className="absolute -top-40 -left-40 w-96 h-96 bg-brand-orange/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -right-40 w-96 h-96 bg-brand-blue/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-white text-ink flex flex-col lg:flex-row items-stretch overflow-hidden font-sans">
+      {/* LEFT: Branding/Hero Section (visible on desktop) */}
+      <div className="hidden lg:flex lg:w-[45%] relative flex-col justify-between p-12 text-white overflow-hidden border-r-2 border-ink">
+        {/* Background Image from Unsplash with Zoom Effect on Hover */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center transition-transform duration-[15000ms] ease-out hover:scale-110"
+          style={{ 
+            backgroundImage: `url('https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=1200&q=80')` 
+          }}
+        />
+        {/* Gradient Overlays for High Contrast */}
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/85 via-indigo-900/80 to-brand-blue/70 mix-blend-multiply pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-transparent to-ink/10 pointer-events-none" />
+        
+        {/* Floating Animated Geometric Objects */}
+        <div className="absolute top-[15%] left-[10%] w-24 h-24 rounded-full border border-white/10 bg-white/5 blur-[2px] animate-[spin_35s_linear_infinite] pointer-events-none" />
+        <div className="absolute bottom-[25%] right-[15%] w-36 h-36 bg-brand-orange/15 rounded-full blur-3xl animate-pulse duration-[8s] pointer-events-none" />
+        <div className="absolute top-[45%] right-[8%] w-16 h-16 bg-brand-blue/20 rounded-xl border border-white/10 rotate-12 animate-[bounce_10s_ease-in-out_infinite] pointer-events-none" />
+        <div className="absolute bottom-[15%] left-[8%] w-20 h-20 bg-indigo-500/10 rounded-full blur-md animate-[pulse_6s_ease-in-out_infinite] pointer-events-none" />
+        
+        {/* Top brand header */}
+        <div className="flex items-center gap-3.5 z-10">
+          <img
+            src={logo}
+            alt="Filkom Merch UB"
+            className="h-10 w-10 rounded-full object-cover border border-white/30 shadow-lg"
+          />
+          <img
+            src={logoFilkom}
+            alt="Logo FILKOM UB"
+            className="h-9 w-9 object-contain filter drop-shadow"
+          />
+          <span className="text-[10px] font-black tracking-[0.3em] uppercase drop-shadow-sm">
+            FILKOM MERCH UB
+          </span>
+        </div>
 
-      {/* Brand Header */}
-      <div className="flex flex-col items-center mb-8 z-10 text-center animate-fade-in">
-        <a href="/" className="flex flex-col items-center gap-3">
-          <div className="flex items-center gap-3">
-            <img
-              src={logo}
-              alt="Filkom Merch UB"
-              className="h-16 w-16 rounded-full object-cover border-2 border-ink shadow-md transition-transform hover:scale-105 duration-300"
-            />
-            <img
-              src={logoFilkom}
-              alt="Logo FILKOM UB"
-              className="h-14 w-14 object-contain transition-transform hover:scale-105 duration-300"
-            />
+        {/* Slogan and Brand representation */}
+        <div className="flex flex-col items-center justify-center space-y-6 z-10 text-center flex-grow py-20">
+          <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 shadow-2xl relative transition-all hover:scale-105 duration-300">
+            <ShoppingBag className="h-11 w-11 text-white animate-pulse" />
+            <Sparkles className="absolute -top-1.5 -right-1.5 h-6 w-6 text-brand-orange animate-bounce" />
           </div>
-          <div className="leading-tight">
-            <h1 className="display text-3xl text-ink tracking-tight flex items-center gap-2 justify-center">
-              Filkom Merch
-              <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded tracking-wide uppercase">
-                OFFICIAL
-              </span>
-            </h1>
-            <p className="text-[10px] tracking-[0.3em] text-muted-foreground uppercase">
-              Universitas Brawijaya
+          <div className="space-y-3">
+            <h2 className="display text-4xl font-black tracking-tight uppercase drop-shadow-md">
+              FILKOM MERCH
+            </h2>
+            <p className="text-[10px] font-bold tracking-[0.2em] text-blue-200 uppercase drop-shadow">
+              Official Store Merchandise FILKOM UB
             </p>
           </div>
-        </a>
+          <p className="text-xs font-semibold text-white/80 max-w-sm leading-relaxed drop-shadow">
+            Temukan koleksi apparel, aksesoris, dan merchandise eksklusif resmi Fakultas Ilmu Komputer Universitas Brawijaya.
+          </p>
+        </div>
+
+        {/* Bottom copyright representation */}
+        <div className="z-10 flex items-center justify-between text-[9px] text-white/50 font-bold tracking-wider drop-shadow-sm">
+          <span>&copy; 2026 FILKOM MERCH UB. ALL RIGHTS RESERVED.</span>
+          <span>MADE BY FILKOM UB</span>
+        </div>
       </div>
 
-      <Card className="w-full max-w-lg border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] bg-white z-10 transition-all duration-300 py-8">
-        <CardHeader className="space-y-1 pb-4">
-          <CardTitle className="text-2xl font-bold tracking-tight text-center">
-            {mode === "login" && "Welcome Back"}
-            {mode === "register" && "Create an Account"}
-            {mode === "admin" && "Control Center Access"}
-          </CardTitle>
-          <CardDescription className="text-center text-sm text-muted-foreground">
-            {mode === "login" && "Masuk untuk melanjutkan belanja merchandise resmi"}
-            {mode === "register" && "Daftarkan akun pembeli baru dalam beberapa detik"}
-            {mode === "admin" && "Hanya untuk administrator sistem Filkom Merch"}
-          </CardDescription>
-        </CardHeader>
+      {/* RIGHT: Form Section */}
+      <div className="w-full lg:w-[55%] bg-[#FCFAF7] flex flex-col justify-center px-6 sm:px-12 lg:px-20 py-16 relative overflow-hidden">
+        {/* Subtle decorative glow */}
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-brand-orange/5 rounded-full blur-3xl pointer-events-none" />
 
-        <CardContent className="space-y-6">
-          {/* BUYER LOGIN FORM */}
+        {/* Top Header Navigation (Mobile Logo + Back button) */}
+        <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-10">
+          {/* Mobile logo */}
+          <div className="flex items-center gap-2 lg:hidden">
+            <img src={logo} alt="Logo" className="h-8 w-8 rounded-full object-cover border border-ink" />
+            <img src={logoFilkom} alt="Logo FILKOM" className="h-7 w-7 object-contain" />
+            <span className="font-extrabold text-xs uppercase tracking-wider text-ink">FILKOM MERCH</span>
+          </div>
+
+          {/* Back Link */}
+          <a
+            href="/"
+            className="text-[10px] font-extrabold tracking-widest text-muted-foreground hover:text-ink transition-colors flex items-center gap-1.5 ml-auto uppercase"
+          >
+            &larr; Kembali ke Beranda
+          </a>
+        </div>
+
+        {/* Form Body Container */}
+        <div className="mx-auto w-full max-w-md space-y-8 z-10 animate-fade-in py-8">
+          {/* Section Header */}
+          <div className="space-y-2">
+            <h2 className="text-3xl font-extrabold tracking-tight text-ink uppercase">
+              {mode === "login" && "Sign In"}
+              {mode === "register" && "Create Account"}
+              {mode === "admin" && "Admin Access"}
+            </h2>
+            <p className="text-xs text-muted-foreground leading-normal">
+              {mode === "login" && "Masukkan akun Anda untuk melanjutkan belanja merchandise resmi."}
+              {mode === "register" && "Daftarkan akun pembeli baru untuk menikmati diskon khusus civitas."}
+              {mode === "admin" && "Sistem Administrasi Terproteksi untuk tim operasional Filkom Merch."}
+            </p>
+          </div>
+
+          {/* Alert panel for admin mode */}
+          {mode === "admin" && (
+            <div className="rounded-xl bg-amber-50 border-2 border-amber-200 p-3.5 text-[11px] text-amber-900 flex items-start gap-2.5 shadow-sm">
+              <ShieldAlert className="w-4.5 h-4.5 shrink-0 text-amber-600 mt-0.5" />
+              <div>
+                <span className="font-bold block">Protected Area</span>
+                <span>Halaman ini dikhususkan untuk administrator sistem.</span>
+              </div>
+            </div>
+          )}
+
+          {/* Mode Forms */}
           {mode === "login" && (
             <form onSubmit={handleBuyerLogin} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="username" className="text-xs font-bold uppercase tracking-wider">
+                <Label htmlFor="username" className="text-xs font-extrabold uppercase tracking-wider text-ink">
                   Username or Email
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="username"
                     placeholder="Masukkan username atau email"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="pl-10 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange"
+                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <Label htmlFor="password" className="text-xs font-bold uppercase tracking-wider">
-                    Password
-                  </Label>
-                </div>
+                <Label htmlFor="password" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                  Password
+                </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type="password"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange"
+                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
                     required
                   />
                 </div>
@@ -318,7 +380,7 @@ function LoginPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-ink text-cream hover:bg-brand-orange hover:text-white border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold tracking-wider py-5 transition-all"
+                className="w-full bg-ink text-cream hover:bg-brand-orange hover:text-white border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] font-bold tracking-wider h-11 transition-all text-xs uppercase"
               >
                 <LogIn className="w-4 h-4 mr-2" />
                 {loading ? "MEMPROSES..." : "MASUK KE AKUN"}
@@ -326,14 +388,14 @@ function LoginPage() {
 
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t-2 border-muted"></div>
+                  <div className="w-full border-t border-muted-foreground/20"></div>
                 </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="px-2 bg-white text-muted-foreground font-bold">ATAU</span>
+                <div className="relative flex justify-center text-[10px]">
+                  <span className="px-3.5 bg-[#FCFAF7] text-muted-foreground font-black tracking-widest">OR</span>
                 </div>
               </div>
 
-              {/* Google Login Option */}
+              {/* Google login option styled premium */}
               <div className="flex justify-center w-full py-1">
                 <GoogleLogin
                   onSuccess={handleGoogleSuccess}
@@ -346,7 +408,7 @@ function LoginPage() {
                 />
               </div>
 
-              <div className="text-center pt-3 text-sm">
+              <div className="text-center pt-4 text-xs font-semibold">
                 <span className="text-muted-foreground">Belum punya akun? </span>
                 <button
                   type="button"
@@ -357,92 +419,79 @@ function LoginPage() {
                   }}
                   className="font-bold text-brand-orange hover:underline inline-flex items-center gap-1"
                 >
-                  Daftar Sekarang <ArrowRight className="w-3 h-3" />
+                  Daftar Sekarang &rarr;
                 </button>
-              </div>
-
-              <div className="rounded-lg bg-[#FAF8F5] border border-dashed border-ink/20 p-3 text-xs text-muted-foreground">
-                <p className="font-bold text-ink">Demo Buyer Account:</p>
-                <p>Username: buyer</p>
-                <p>Password: password123</p>
               </div>
             </form>
           )}
 
-          {/* BUYER REGISTER FORM */}
           {mode === "register" && (
-            <form onSubmit={handleRegister} className="space-y-4 animate-fade-in">
+            <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="reg-name" className="text-xs font-bold uppercase tracking-wider">
+                <Label htmlFor="reg-name" className="text-xs font-extrabold uppercase tracking-wider text-ink">
                   Nama Lengkap
                 </Label>
                 <div className="relative">
-                  <Sparkles className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Sparkles className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="reg-name"
                     placeholder="Contoh: Muhammad Rafli"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="pl-10 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange"
+                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="reg-username"
-                  className="text-xs font-bold uppercase tracking-wider"
-                >
+                <Label htmlFor="reg-username" className="text-xs font-extrabold uppercase tracking-wider text-ink">
                   Username
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="reg-username"
                     placeholder="Contoh: raflimand"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="pl-10 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange"
+                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="reg-email" className="text-xs font-bold uppercase tracking-wider">
-                  Email Student/Valid
+                <Label htmlFor="reg-email" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                  Email
                 </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="reg-email"
                     type="email"
                     placeholder="rafli@student.ub.ac.id"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="pl-10 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange"
+                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="reg-password"
-                  className="text-xs font-bold uppercase tracking-wider"
-                >
-                  Password Baru
+                <Label htmlFor="reg-password" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                  Password
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="reg-password"
                     type="password"
                     placeholder="Minimal 6 karakter"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange"
+                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
                     required
                   />
                 </div>
@@ -451,13 +500,13 @@ function LoginPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-ink text-cream hover:bg-brand-orange hover:text-white border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold tracking-wider py-5 transition-all"
+                className="w-full bg-ink text-cream hover:bg-brand-orange hover:text-white border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] font-bold tracking-wider h-11 transition-all text-xs uppercase"
               >
                 <UserPlus className="w-4 h-4 mr-2" />
-                {loading ? "MENDAFTAR..." : "BUAT AKUN PEMBELI"}
+                {loading ? "MEMPROSES..." : "DAFTAR SEKARANG"}
               </Button>
 
-              <div className="text-center pt-2 text-sm">
+              <div className="text-center pt-3 text-xs font-semibold">
                 <span className="text-muted-foreground">Sudah punya akun? </span>
                 <button
                   type="button"
@@ -474,53 +523,38 @@ function LoginPage() {
             </form>
           )}
 
-          {/* ADMIN LOGIN FORM (SECRET) */}
           {mode === "admin" && (
             <form onSubmit={handleAdminLogin} className="space-y-4 animate-fade-in">
-              <div className="rounded-md bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 flex items-start gap-2">
-                <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-                <div>
-                  <p className="font-bold">Sistem Administrasi Terproteksi</p>
-                  <p>Halaman ini dikhususkan untuk tim operasional Filkom Merch.</p>
-                </div>
-              </div>
-
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="admin-username"
-                  className="text-xs font-bold uppercase tracking-wider"
-                >
+                <Label htmlFor="admin-username" className="text-xs font-extrabold uppercase tracking-wider text-ink">
                   Admin Username
                 </Label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="admin-username"
                     placeholder="Masukkan admin username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    className="pl-10 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange"
+                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-1.5">
-                <Label
-                  htmlFor="admin-password"
-                  className="text-xs font-bold uppercase tracking-wider"
-                >
+                <Label htmlFor="admin-password" className="text-xs font-extrabold uppercase tracking-wider text-ink">
                   Admin Password
                 </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     id="admin-password"
                     type="password"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange"
+                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
                     required
                   />
                 </div>
@@ -529,10 +563,10 @@ function LoginPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-amber-600 text-white hover:bg-amber-700 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold tracking-wider py-5 transition-all"
+                className="w-full bg-amber-600 text-white hover:bg-amber-700 border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] font-bold tracking-wider h-11 transition-all text-xs uppercase"
               >
                 <LogIn className="w-4 h-4 mr-2" />
-                {loading ? "SIGNING IN..." : "VERIFY ADMIN ACCESS"}
+                {loading ? "VERIFIKASI..." : "VERIFY ADMIN ACCESS"}
               </Button>
 
               <button
@@ -548,35 +582,25 @@ function LoginPage() {
               </button>
             </form>
           )}
-        </CardContent>
+        </div>
 
-        <CardFooter className="justify-center border-t border-muted bg-[#FAF9F6] py-4 text-[11px] text-muted-foreground font-medium rounded-b-lg relative">
-          <span>Official Store of Fakultas Ilmu Komputer UB</span>
-
-          {/* SECRET ADMIN BUTTON IN THE CORNER */}
-          <button
-            type="button"
-            onClick={() => {
-              setMode(mode === "admin" ? "login" : "admin");
-              setUsername("");
-              setPassword("");
-              toast.info(
-                mode === "admin" ? "Beralih ke halaman pembeli" : "Secret Admin Panel diaktifkan!",
-              );
-            }}
-            aria-label="Secret admin button"
-            className="absolute bottom-2 right-2 w-3 h-3 rounded-full bg-muted hover:bg-brand-orange transition-colors duration-300 opacity-60 hover:opacity-100"
-          />
-        </CardFooter>
-      </Card>
-
-      {/* Back to Home Button */}
-      <a
-        href="/"
-        className="mt-6 text-xs font-bold tracking-widest text-muted-foreground hover:text-ink transition-colors z-10"
-      >
-        ← KEMBALI KE BERANDA
-      </a>
+        {/* SECRET ADMIN PANEL TRIGGER */}
+        <button
+          type="button"
+          onClick={() => {
+            setMode(mode === "admin" ? "login" : "admin");
+            setUsername("");
+            setPassword("");
+            toast.info(
+              mode === "admin" ? "Beralih ke halaman pembeli" : "Secret Admin Panel diaktifkan!",
+            );
+          }}
+          aria-label="Secret admin button"
+          className="absolute bottom-4 right-4 w-8 h-8 rounded-full bg-slate-200 hover:bg-brand-orange text-muted-foreground hover:text-white flex items-center justify-center transition-all duration-300 shadow-md border border-ink/10 cursor-pointer"
+        >
+          <Lock className="w-3.5 h-3.5" />
+        </button>
+      </div>
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { getRequest } from "@tanstack/react-start/server";
 const API_URL =
   (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
   import.meta.env.VITE_API_URL ||
-  "http://localhost:8080";
+  "http://127.0.0.1:8080";
 
 // Helper to get auth headers from incoming request cookies
 const getAuthHeaders = () => {
@@ -74,6 +74,7 @@ export interface Product {
   product_type: string | null;
   low_stock_threshold: number;
   is_best_seller: boolean;
+  is_featured: boolean;
   is_limited: boolean;
   preorder_start_at: string | null;
   preorder_end_at: string | null;
@@ -108,6 +109,7 @@ export interface ProductWithVariants extends Product {
   category_name?: string | null;
   category_slug?: string | null;
   variants: ProductVariant[];
+  bundle_components?: ProductWithVariants[];
 }
 
 export interface DbUser {
@@ -118,6 +120,7 @@ export interface DbUser {
   phone: string | null;
   address: string | null;
   role: "admin" | "cashier" | "customer";
+  is_filkom_verified?: number;
   created_at?: string;
 }
 
@@ -222,6 +225,12 @@ export interface TransactionDetails {
     name: string;
     price: number;
     quantity: number;
+    variant_id?: number;
+    bundle_selections?: Array<{
+      product_id: number;
+      variant_id: number;
+      quantity: number;
+    }>;
   }>;
   userId?: number;
 }
@@ -251,6 +260,11 @@ export interface CreateSaleInput {
     quantity: number;
     unit_price: number;
     discount: number;
+    bundle_selections?: Array<{
+      product_id: number;
+      variant_id: number;
+      quantity: number;
+    }>;
   }>;
   subtotal: number;
   discount: number;
@@ -329,6 +343,7 @@ export interface CreateProductInput {
   size_chart_url?: string | null;
   images?: string[];
   variants: Array<{ size: string; color?: string | null; stock: number; filkom_price?: number | null }>;
+  component_ids?: number[];
 }
 
 export interface UpdateProductInput extends CreateProductInput {
@@ -414,6 +429,33 @@ export const createOrderAndPayment = createServerFn({ method: "POST" })
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error("Error creating order:", error);
+      return {
+        success: false,
+        error: errorMsg,
+      };
+    }
+  });
+
+// Regenerate payment token
+export const regeneratePaymentToken = createServerFn({ method: "POST" })
+  .validator((d: { orderId: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/payment/regenerate-token`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error("Error regenerating payment token:", error);
       return {
         success: false,
         error: errorMsg,
@@ -855,6 +897,27 @@ export const authGoogleLogin = createServerFn({ method: "POST" })
     } catch (error: any) {
       console.error("Error logging in with Google:", error);
       return { success: false, error: error.message || "Failed Google login" };
+    }
+  });
+
+// Verify FILKOM user using NIM/NIDN
+export const verifyFilkomUserAction = createServerFn({ method: "POST" })
+  .validator((d: { nimOrNidn: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/auth/verify-filkom`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error verifying FILKOM civitas:", error);
+      return { success: false, error: error.message || "Gagal melakukan verifikasi" };
     }
   });
 

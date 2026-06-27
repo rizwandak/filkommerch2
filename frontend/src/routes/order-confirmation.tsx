@@ -12,7 +12,7 @@ import {
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { useState, useEffect } from "react";
-import { getOrderById } from "@backend/server-actions";
+import { getOrderById, regeneratePaymentToken } from "@backend/server-actions";
 import { toast } from "sonner";
 
 interface OrderConfirmationSearch {
@@ -36,6 +36,7 @@ function OrderConfirmationPage() {
   const search = useSearch({ from: "/order-confirmation" });
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Load Midtrans Snap script dynamically
   useEffect(() => {
@@ -76,31 +77,51 @@ function OrderConfirmationPage() {
     void fetchOrderDetails();
   }, [search.orderId]);
 
-  const handlePayNow = () => {
-    if (!order?.snap_token) {
-      toast.error("Token pembayaran tidak ditemukan. Silakan hubungi admin.");
+  const handlePayNow = async (shouldRegenerate: boolean = true) => {
+    if (!order?.order_id) {
+      toast.error("Data pesanan tidak valid.");
       return;
     }
 
-    if ((window as any).snap) {
-      (window as any).snap.pay(order.snap_token, {
-        onSuccess: (snapResult: any) => {
-          toast.success("Pembayaran berhasil!");
-          void fetchOrderDetails();
-        },
-        onPending: (snapResult: any) => {
-          toast.info("Pembayaran tertunda. Silakan selesaikan pembayaran Anda.");
-          void fetchOrderDetails();
-        },
-        onError: (snapResult: any) => {
-          toast.error("Pembayaran gagal!");
-        },
-        onClose: () => {
-          toast.warning("Anda menutup popup pembayaran sebelum menyelesaikan transaksi.");
-        },
-      });
-    } else {
-      toast.error("Sistem pembayaran Midtrans gagal dimuat. Coba segarkan halaman.");
+    try {
+      let snapToken = order.snap_token;
+
+      if (shouldRegenerate || !snapToken) {
+        setIsRegenerating(true);
+        const res = await regeneratePaymentToken({ data: { orderId: order.order_id } });
+        if (!res.success || !res.token) {
+          toast.error(res.error || "Gagal memproses pembayaran baru. Silakan coba lagi.");
+          return;
+        }
+        snapToken = res.token;
+        setOrder((prev: any) => (prev ? { ...prev, snap_token: res.token } : prev));
+      }
+
+      if ((window as any).snap) {
+        (window as any).snap.pay(snapToken, {
+          onSuccess: (snapResult: any) => {
+            toast.success("Pembayaran berhasil!");
+            void fetchOrderDetails();
+          },
+          onPending: (snapResult: any) => {
+            toast.info("Pembayaran tertunda. Silakan selesaikan pembayaran Anda.");
+            void fetchOrderDetails();
+          },
+          onError: (snapResult: any) => {
+            toast.error("Pembayaran gagal!");
+          },
+          onClose: () => {
+            toast.warning("Anda menutup popup pembayaran sebelum menyelesaikan transaksi.");
+          },
+        });
+      } else {
+        toast.error("Sistem pembayaran Midtrans gagal dimuat. Coba segarkan halaman.");
+      }
+    } catch (err: any) {
+      console.error("Error paying:", err);
+      toast.error("Gagal memulai proses pembayaran.");
+    } finally {
+      setIsRegenerating(false);
     }
   };
 
@@ -270,13 +291,28 @@ function OrderConfirmationPage() {
 
             {/* Pay Now Button directly if order is pending */}
             {(pStatus === "unpaid" || pStatus === "pending") && oStatus !== "cancelled" && (
-              <div className="border-t border-dashed border-border pt-4 mt-2">
+              <div className="border-t border-dashed border-border pt-4 mt-2 space-y-2">
+                {order.snap_token && (
+                  <Button
+                    onClick={() => handlePayNow(false)}
+                    disabled={isRegenerating}
+                    className="w-full h-12 bg-emerald-600 text-white hover:bg-emerald-600/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    Lanjutkan Pembayaran
+                  </Button>
+                )}
                 <Button
-                  onClick={handlePayNow}
-                  className="w-full h-12 bg-brand-orange text-white hover:bg-brand-orange/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2"
+                  onClick={() => handlePayNow(true)}
+                  disabled={isRegenerating}
+                  className="w-full h-12 bg-brand-orange text-white hover:bg-brand-orange/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <CreditCard className="w-4 h-4" />
-                  Lanjutkan Pembayaran Sekarang
+                  {isRegenerating ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CreditCard className="w-4 h-4" />
+                  )}
+                  {isRegenerating ? "Memproses..." : (order.snap_token ? "Ubah Metode Pembayaran" : "Lanjutkan Pembayaran Sekarang")}
                 </Button>
               </div>
             )}
