@@ -63,10 +63,11 @@ interface HomepageLayoutConfig {
   whyTitle4: string; whyDesc4: string;
 
   // FAQ Section
-  faqQ1: string; faqA1: string;
-  faqQ2: string; faqA2: string;
-  faqQ3: string; faqA3: string;
-  faqQ4: string; faqA4: string;
+  faqQ1?: string; faqA1?: string;
+  faqQ2?: string; faqA2?: string;
+  faqQ3?: string; faqA3?: string;
+  faqQ4?: string; faqA4?: string;
+  faqItems: { id: string, q: string, a: string }[];
 }
 
 const defaultConfig = (): HomepageLayoutConfig => ({
@@ -109,7 +110,44 @@ const defaultConfig = (): HomepageLayoutConfig => ({
   faqQ3: "Berapa lama estimasi pengerjaan barang Pre-Order?",
   faqA3: "Proses produksi barang pre-order biasanya memakan waktu 14 hingga 21 hari kerja setelah sesi pemesanan ditutup, tergantung tingkat kerumitan desain dan antrean vendor.",
   faqQ4: "Apakah saya bisa menukar ukuran pakaian jika tidak pas?",
-  faqA4: "Penukaran ukuran diperbolehkan maksimal 2 hari setelah barang diterima, dengan syarat tag belum dilepas, belum dicuci, dan stok ukuran pengganti masih tersedia."
+  faqA4: "Penukaran ukuran diperbolehkan maksimal 2 hari setelah barang diterima, dengan syarat tag belum dilepas, belum dicuci, dan stok ukuran pengganti masih tersedia.",
+  faqItems: [
+    { 
+      id: "size", 
+      q: "Bara, kalau ukuranku kebesaran bisa ditukar nggak?", 
+      a: "Waduh kalau kebesaran, tenang aja bro/sis! Penukaran ukuran boleh maksimal 2 hari setelah barang diterima kok. Syaratnya tag belum dilepas, belum dicuci, dan stok ukuran pengganti masih ada. Aman! 😎" 
+    },
+    { 
+      id: "po", 
+      q: "Barang pre-order selesainya kapan nih?", 
+      a: "Proses produksi barang PO biasanya sekitar 14-21 hari kerja setelah sesi pemesanan ditutup yaa. Tergantung antrean vendor juga, tapi Bara bakal pastiin secepat mungkin! 🔥" 
+    },
+    { 
+      id: "pickup", 
+      q: "Ngambil pesanannya dimana Bar?", 
+      a: "Pilih aja 'Pickup di Kampus' pas checkout! Nanti tim Bara bakal nungguin kamu di Gazebo FILKOM UB sesuai jadwal yang dikirim via WhatsApp. Jangan lupa bawa bukti pesanan ya! 🐯" 
+    },
+    { 
+      id: "discount", 
+      q: "Dapet diskon mahasiswa gimana caranya?", 
+      a: "Gampang! Kamu tinggal login pake email student UB (@student.ub.ac.id) atau masukin NIM di menu Akun. Nanti otomatis dapet potongan harga civitas 5%! Lumayan kan buat beli es teh? 🥤" 
+    },
+    { 
+      id: "payment", 
+      q: "Pembayarannya bisa pakai apa aja?", 
+      a: "Lengkap bos! Kita pakai Midtrans, jadi bisa QRIS (Gopay, ShopeePay, Dana, dll) atau Transfer Bank (BCA, Mandiri, dll). Praktis abis!" 
+    },
+    { 
+      id: "shipping", 
+      q: "Bisa kirim ke luar kota Malang?", 
+      a: "Bisa banget! Bara siap anter pesananmu pake JNE, J&T, atau Sicepat ke seluruh penjuru Indonesia. Ongkirnya otomatis kehitung pas checkout ya." 
+    },
+    { 
+      id: "ori", 
+      q: "Ini barang ori dari FILKOM UB?", 
+      a: "Yoi dong! Filkom Merch itu toko merchandise resmi mahasiswa Fakultas Ilmu Komputer Universitas Brawijaya, hasil kolaborasi mantap sama fakultas dan BEM FILKOM UB. 100% Original! ⭐️" 
+    }
+  ]
 });
 
 function AdminHomepageEditorPage() {
@@ -197,6 +235,7 @@ function AdminHomepageEditorPage() {
             setLayout({
               ...defaultConfig(),
               ...parsed,
+              faqItems: parsed.faqItems || defaultConfig().faqItems
             });
           } catch {
             toast.error("Format layout sebelumnya rusak, menggunakan setelan bawaan");
@@ -676,78 +715,65 @@ function AdminHomepageEditorPage() {
               <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
                 <CardHeader>
                   <CardTitle className="display text-sm tracking-wider text-ink flex items-center gap-2">
-                    <HelpCircle className="w-4 h-4 text-brand-orange" /> Tanya Jawab (FAQ) Halaman Depan
+                    <HelpCircle className="w-4 h-4 text-brand-orange" /> Tanya Jawab (FAQ) Tanya Bara
                   </CardTitle>
-                  <CardDescription>Sesuaikan daftar FAQ sebelum footer untuk memangkas keraguan pembeli</CardDescription>
+                  <CardDescription>Sesuaikan daftar FAQ dan jawaban untuk Maskot Bara</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* FAQ 1 */}
-                  <div className="space-y-2 border-b border-border pb-4">
-                    <Label className="font-semibold">FAQ #1</Label>
-                    <Input
-                      value={layout.faqQ1}
-                      onChange={(e) => setLayout({ ...layout, faqQ1: e.target.value })}
-                      placeholder="Pertanyaan 1"
-                      className="font-bold"
-                    />
-                    <Textarea
-                      value={layout.faqA1}
-                      onChange={(e) => setLayout({ ...layout, faqA1: e.target.value })}
-                      placeholder="Jawaban 1"
-                      rows={2}
-                    />
-                  </div>
-
-                  {/* FAQ 2 */}
-                  <div className="space-y-2 border-b border-border pb-4">
-                    <Label className="font-semibold">FAQ #2</Label>
-                    <Input
-                      value={layout.faqQ2}
-                      onChange={(e) => setLayout({ ...layout, faqQ2: e.target.value })}
-                      placeholder="Pertanyaan 2"
-                      className="font-bold"
-                    />
-                    <Textarea
-                      value={layout.faqA2}
-                      onChange={(e) => setLayout({ ...layout, faqA2: e.target.value })}
-                      placeholder="Jawaban 2"
-                      rows={2}
-                    />
-                  </div>
-
-                  {/* FAQ 3 */}
-                  <div className="space-y-2 border-b border-border pb-4">
-                    <Label className="font-semibold">FAQ #3</Label>
-                    <Input
-                      value={layout.faqQ3}
-                      onChange={(e) => setLayout({ ...layout, faqQ3: e.target.value })}
-                      placeholder="Pertanyaan 3"
-                      className="font-bold"
-                    />
-                    <Textarea
-                      value={layout.faqA3}
-                      onChange={(e) => setLayout({ ...layout, faqA3: e.target.value })}
-                      placeholder="Jawaban 3"
-                      rows={2}
-                    />
-                  </div>
-
-                  {/* FAQ 4 */}
-                  <div className="space-y-2">
-                    <Label className="font-semibold">FAQ #4</Label>
-                    <Input
-                      value={layout.faqQ4}
-                      onChange={(e) => setLayout({ ...layout, faqQ4: e.target.value })}
-                      placeholder="Pertanyaan 4"
-                      className="font-bold"
-                    />
-                    <Textarea
-                      value={layout.faqA4}
-                      onChange={(e) => setLayout({ ...layout, faqA4: e.target.value })}
-                      placeholder="Jawaban 4"
-                      rows={2}
-                    />
-                  </div>
+                  {layout.faqItems.map((item, index) => (
+                    <div key={item.id} className="space-y-2 border-b border-border pb-4 relative">
+                      <div className="flex justify-between items-center">
+                        <Label className="font-semibold">FAQ #{index + 1}</Label>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          className="h-6 text-[10px] px-2"
+                          onClick={() => {
+                            const newFaq = [...layout.faqItems];
+                            newFaq.splice(index, 1);
+                            setLayout({ ...layout, faqItems: newFaq });
+                          }}
+                        >
+                          Hapus
+                        </Button>
+                      </div>
+                      <Input
+                        value={item.q}
+                        onChange={(e) => {
+                          const newFaq = [...layout.faqItems];
+                          newFaq[index].q = e.target.value;
+                          setLayout({ ...layout, faqItems: newFaq });
+                        }}
+                        placeholder="Pertanyaan"
+                        className="font-bold"
+                      />
+                      <Textarea
+                        value={item.a}
+                        onChange={(e) => {
+                          const newFaq = [...layout.faqItems];
+                          newFaq[index].a = e.target.value;
+                          setLayout({ ...layout, faqItems: newFaq });
+                        }}
+                        placeholder="Jawaban Bara"
+                        rows={2}
+                      />
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    className="w-full border-ink text-ink font-bold"
+                    onClick={() => {
+                      setLayout({
+                        ...layout,
+                        faqItems: [
+                          ...layout.faqItems,
+                          { id: Date.now().toString(), q: "", a: "" }
+                        ]
+                      });
+                    }}
+                  >
+                    + Tambah Pertanyaan
+                  </Button>
                 </CardContent>
               </Card>
             </div>
@@ -932,28 +958,25 @@ function AdminHomepageEditorPage() {
                 <div className="p-4 bg-background border-b border-ink/10 space-y-3">
                   <div className="text-center">
                     <div className="text-[6px] tracking-widest text-muted-foreground font-bold">05 — HELP CENTER</div>
-                    <h4 className="display text-xs text-ink font-bold">FAQ Accordion</h4>
+                    <h4 className="display text-xs text-ink font-bold">Tanya Bara</h4>
                   </div>
                   <div className="space-y-1.5 text-[7px] font-bold text-ink">
-                    <div className="border border-ink/10 rounded p-1.5 bg-cream/30 space-y-1">
-                      <div className="flex justify-between items-center text-brand-orange">
-                        <span>{layout.faqQ1}</span>
-                        <span>-</span>
+                    {layout.faqItems.slice(0, 4).map((item, idx) => (
+                      <div key={item.id} className="border border-ink/10 rounded p-1.5 bg-cream/30 space-y-1">
+                        <div className="flex justify-between items-center text-brand-orange">
+                          <span className="truncate">{item.q}</span>
+                          <span>-</span>
+                        </div>
+                        <div className="text-[6px] text-muted-foreground font-medium leading-relaxed line-clamp-2">
+                          {item.a}
+                        </div>
                       </div>
-                      <div className="text-[6px] text-muted-foreground font-medium leading-relaxed">{layout.faqA1}</div>
-                    </div>
-                    <div className="border border-ink/10 rounded p-1.5 bg-cream/30 flex justify-between items-center">
-                      <span>{layout.faqQ2}</span>
-                      <span>+</span>
-                    </div>
-                    <div className="border border-ink/10 rounded p-1.5 bg-cream/30 flex justify-between items-center">
-                      <span>{layout.faqQ3}</span>
-                      <span>+</span>
-                    </div>
-                    <div className="border border-ink/10 rounded p-1.5 bg-cream/30 flex justify-between items-center">
-                      <span>{layout.faqQ4}</span>
-                      <span>+</span>
-                    </div>
+                    ))}
+                    {layout.faqItems.length > 4 && (
+                      <div className="text-[6px] text-center text-muted-foreground pt-1 italic">
+                        + {layout.faqItems.length - 4} pertanyaan lainnya
+                      </div>
+                    )}
                   </div>
                 </div>
 

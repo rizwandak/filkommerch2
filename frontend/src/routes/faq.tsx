@@ -130,10 +130,25 @@ function FAQPage() {
     }
   }, [messages, isTyping]);
 
+  // Layout marquee
+  const layout = useMemo(() => {
+    const defaults = {
+      marqueeText: "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN",
+      faqItems: PRESET_QUESTIONS,
+    };
+    if (!settings?.homepage_layout) return defaults;
+    try {
+      const parsed = JSON.parse(settings.homepage_layout);
+      return { ...defaults, ...parsed, faqItems: parsed.faqItems || PRESET_QUESTIONS };
+    } catch {
+      return defaults;
+    }
+  }, [settings]);
+
   const handleAsk = (presetId: string) => {
     if (isTyping) return;
     
-    const question = PRESET_QUESTIONS.find(q => q.id === presetId);
+    const question = layout.faqItems.find((q: any) => q.id === presetId);
     if (!question) return;
 
     // Add user message
@@ -169,19 +184,7 @@ function FAQPage() {
     }
   }, [cart, cartLoaded]);
 
-  // Layout marquee
-  const layout = useMemo(() => {
-    const defaults = {
-      marqueeText: "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN",
-    };
-    if (!settings?.homepage_layout) return defaults;
-    try {
-      const parsed = JSON.parse(settings.homepage_layout);
-      return { ...defaults, ...parsed };
-    } catch {
-      return defaults;
-    }
-  }, [settings]);
+
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
   const cartTotal = cart.reduce((s, i) => s + parsePrice(i.price) * i.qty, 0);
@@ -385,7 +388,7 @@ function FAQPage() {
             </p>
 
             <div className="space-y-3">
-              {PRESET_QUESTIONS.map((q) => (
+              {layout.faqItems.map((q: any) => (
                 <button
                   key={q.id}
                   onClick={() => handleAsk(q.id)}
