@@ -223,29 +223,82 @@ function PreOrderPage() {
 
   // Filter only PRE-ORDER items
   const preOrderProducts = useMemo(() => {
-    const list = products.filter((p) => p.sale_type === "pre_order");
-    
-    // Fallback if db has no pre-orders
-    if (list.length === 0) {
-      return [
-        {
-          id: "varsity-jacket",
-          img: pVarsity,
-          name: "Varsity Jacket — Filkom Edition (Pre-Order)",
-          price: "Rp 185.000",
-          was: "Rp 210.000",
-          tag: "PRE-ORDER",
-          cat: "JACKET" as const,
-          variants: [
-            { id: 101, size: "S", stock: 20 },
-            { id: 102, size: "M", stock: 35 },
-            { id: 103, size: "L", stock: 40 },
-            { id: 104, size: "XL", stock: 15 },
-          ],
-        }
-      ];
-    }
-    return list;
+    // Using hardcoded catalog items as requested
+    return [
+      {
+        id: "kaos",
+        img: pTshirt,
+        name: "Kaos Cotton Combed 24s",
+        price: "Rp 105.000",
+        was: "Rp 120.000",
+        tag: "PRE-ORDER",
+        cat: "TEE" as const,
+        variants: [
+          { id: 1, size: "XS", stock: 100 },
+          { id: 2, size: "S", stock: 100 },
+          { id: 3, size: "M", stock: 100 },
+          { id: 4, size: "L", stock: 100 },
+          { id: 5, size: "XL", stock: 100 },
+          { id: 6, size: "XXL", stock: 100 },
+          { id: 7, size: "3XL", stock: 100 },
+          { id: 8, size: "4XL", stock: 100 },
+        ],
+      },
+      {
+        id: "topi",
+        img: pCap,
+        name: "Topi",
+        price: "Rp 80.000",
+        was: "Rp 100.000",
+        tag: "PRE-ORDER",
+        cat: "ACCESSORIES" as const,
+      },
+      {
+        id: "totebag",
+        img: pTote,
+        name: "Totebag Putih",
+        price: "Rp 40.000",
+        was: "Rp 60.000",
+        tag: "PRE-ORDER",
+        cat: "ACCESSORIES" as const,
+      },
+      {
+        id: "pin-enamel",
+        img: pTote,
+        name: "Pin Enamel",
+        price: "Rp 26.000",
+        was: "Rp 35.000",
+        tag: "PRE-ORDER",
+        cat: "ACCESSORIES" as const,
+      },
+      {
+        id: "keychain",
+        img: pTote,
+        name: "Keychain",
+        price: "Rp 10.000",
+        was: "Rp 15.000",
+        tag: "PRE-ORDER",
+        cat: "ACCESSORIES" as const,
+      },
+      {
+        id: "sticker-pack",
+        img: pTote,
+        name: "Sticker Pack",
+        price: "Rp 8.000",
+        was: "Rp 10.000",
+        tag: "PRE-ORDER",
+        cat: "ACCESSORIES" as const,
+      },
+      {
+        id: "pin-tas",
+        img: pTote,
+        name: "Pin Tas 44 mm",
+        price: "Rp 4.000",
+        was: "Rp 7.000",
+        tag: "PRE-ORDER",
+        cat: "ACCESSORIES" as const,
+      },
+    ];
   }, [products]);
 
   // Active filtered list
@@ -472,6 +525,12 @@ function PreOrderPage() {
               className="bg-transparent outline-none text-xs w-full text-ink"
             />
           </div>
+        </div>
+
+        <div className="bg-brand-orange text-cream font-bold text-center py-4 px-4 rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] mb-8 border-2 border-ink uppercase tracking-widest text-xs sm:text-sm animate-pulse flex items-center justify-center gap-2">
+          <Star className="w-5 h-5 fill-cream" />
+          PERHATIAN: HARGA INI ADALAH HARGA TERMURAH SEBELUM ON SALE!
+          <Star className="w-5 h-5 fill-cream" />
         </div>
 
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-4 sm:gap-x-6 gap-y-8 sm:gap-y-12">
