@@ -931,7 +931,7 @@ export const getProductBySlug = createServerFn({ method: "GET" })
       data: slug,
     }): Promise<{ success: boolean; product?: ProductWithVariants; error?: string }> => {
       try {
-        const res = await serverFetch(`${API_URL}/api/products/${slug}`);
+        const res = await serverFetch(`${API_URL}/api/products/${encodeURIComponent(slug)}`);
         if (!res.ok) throw new Error("Failed to fetch product detail");
         return res.json();
       } catch (error: any) {

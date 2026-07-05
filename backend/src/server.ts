@@ -29,7 +29,7 @@ app.use(
 );
 
 // CORS — Konfigurasi ketat, hanya menerima request dari origin frontend yang diizinkan
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173,http://localhost:3000")
   .split(",")
   .map((origin) => origin.trim());
 

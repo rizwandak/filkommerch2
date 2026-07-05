@@ -125,8 +125,15 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  useEffect(() => {
+    if (localStorage.getItem("theme") === "dark") {
+      document.documentElement.classList.add("dark");
+    }
+  }, []);
 
   return (
     <GoogleOAuthProvider clientId="159528757023-4sr74hnesnfc377l0pule7b7fhh3g65n.apps.googleusercontent.com">

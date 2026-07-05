@@ -507,7 +507,7 @@ export const getProducts = async (req: Request, res: Response) => {
     const productsWithVariants = await Promise.all(
       products.map(async (product: any) => {
         const variants = await query<any>(
-          "SELECT * FROM product_variants WHERE product_id = ?",
+          "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
           [product.id]
         );
         let bundle_components: any[] = [];
@@ -521,7 +521,7 @@ export const getProducts = async (req: Request, res: Response) => {
           bundle_components = await Promise.all(
             comps.map(async (comp: any) => {
               const compVariants = await query<any>(
-                "SELECT * FROM product_variants WHERE product_id = ?",
+                "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
                 [comp.id]
               );
               return { ...comp, variants: compVariants };
@@ -556,7 +556,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
     }
 
     const variants = await query<any>(
-      "SELECT * FROM product_variants WHERE product_id = ?",
+      "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
       [product.id]
     );
 
@@ -578,7 +578,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
       bundle_components = await Promise.all(
         comps.map(async (comp: any) => {
           const compVariants = await query<any>(
-            "SELECT * FROM product_variants WHERE product_id = ?",
+            "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
             [comp.id]
           );
           return { ...comp, variants: compVariants };
@@ -1081,7 +1081,7 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
     const productsWithVariants = await Promise.all(
       products.map(async (product: any) => {
         const variants = await query<any>(
-          "SELECT * FROM product_variants WHERE product_id = ?",
+          "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
           [product.id]
         );
         const images = await query<any>(
@@ -1101,7 +1101,7 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
           bundle_components = await Promise.all(
             comps.map(async (comp: any) => {
               const compVariants = await query<any>(
-                "SELECT * FROM product_variants WHERE product_id = ?",
+                "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
                 [comp.id]
               );
               return { ...comp, variants: compVariants };

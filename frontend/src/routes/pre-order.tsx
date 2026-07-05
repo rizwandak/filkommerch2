@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search,
@@ -17,6 +18,7 @@ import {
   Calendar,
   Lock,
   User,
+  ShieldCheck,
 } from "lucide-react";
 import { getProducts, getStoreSettings, type ProductWithVariants } from "@backend/server-actions";
 import { useAuth } from "@/lib/auth";
@@ -406,6 +408,7 @@ function PreOrderPage() {
           </nav>
 
           <div className="flex items-center gap-4 text-ink">
+            <HackerModeToggle />
             <button aria-label="Search" onClick={() => setSearchOpen((v) => !v)} className="hover:text-brand-orange">
               <Search className="w-5 h-5" />
             </button>
@@ -515,7 +518,7 @@ function PreOrderPage() {
                       <div className="w-full bg-cream/90 p-2 rounded text-center border border-ink/20">
                         <div className="text-[8px] tracking-wider font-extrabold text-ink uppercase mb-1">Quick Select:</div>
                         <div className="flex flex-wrap justify-center gap-1">
-                          {sizes.slice(0, 4).map((size: any) => (
+                          {sizes.map((size: any) => (
                             <button
                               key={size}
                               onClick={() => addToCart(p, size)}

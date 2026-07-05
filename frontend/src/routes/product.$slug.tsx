@@ -1,4 +1,5 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useMemo, useEffect } from "react";
 import {
   ShoppingBag,
@@ -122,6 +123,29 @@ function ProductDetailPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedBundleVariants, setSelectedBundleVariants] = useState<Record<number, any>>({});
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+
+  // Size Fit Guide State
+  const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+  const [userHeight, setUserHeight] = useState("");
+  const [userWeight, setUserWeight] = useState("");
+  const [sizeRecommendation, setSizeRecommendation] = useState<{size: string, desc: string} | null>(null);
+
+  const calculateSize = () => {
+    const h = parseInt(userHeight);
+    const w = parseInt(userWeight);
+    if (!h || !w) return;
+    
+    let recommended = "L";
+    let desc = "Nyaman";
+    
+    if (h < 160 && w < 55) { recommended = "S"; desc = "Pas badan"; }
+    else if (h < 165 && w < 65) { recommended = "M"; desc = "Fit ideal"; }
+    else if (h < 175 && w < 75) { recommended = "L"; desc = "Nyaman"; }
+    else if (h < 185 && w < 85) { recommended = "XL"; desc = "Sedikit longgar"; }
+    else { recommended = "XXL"; desc = "Oversized"; }
+    
+    setSizeRecommendation({ size: recommended, desc });
+  };
 
   // Cart state & handlers
   const [cart, setCart] = useState<any[]>([]);
@@ -576,6 +600,7 @@ function ProductDetailPage() {
           </nav>
 
           <div className="flex items-center gap-4 text-ink">
+            <HackerModeToggle />
             <button aria-label="Search" onClick={() => navigate({ to: "/products" })}>
               <Search className="w-5 h-5" />
             </button>
@@ -960,10 +985,19 @@ function ProductDetailPage() {
                   {/* Selection: Sizes */}
                   {sizes.length > 0 && (
                     <div className="mt-4 space-y-2">
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Pilih Ukuran:{" "}
-                        <span className="text-ink font-extrabold">{selectedSize || "-"}</span>
-                      </p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                          Pilih Ukuran:{" "}
+                          <span className="text-ink font-extrabold">{selectedSize || "-"}</span>
+                        </p>
+                        <button 
+                          onClick={() => setIsSizeGuideOpen(true)}
+                          className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                          Cari Ukuranmu
+                        </button>
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         {sizes.map((size) => (
                           <button
@@ -1018,7 +1052,15 @@ function ProductDetailPage() {
               </div>
             </div>
 
-            {/* Buttons: Add to Bag and Buy Now */}
+            {/* FOMO Stock Indicator */}
+              {currentStock > 0 && currentStock <= 5 && (
+                <div className="mt-6 p-3 bg-red-50 border-2 border-red-500 rounded flex items-center gap-2 animate-pulse">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                  <p className="text-sm font-extrabold text-red-600 tracking-tight">Hurry up! Sisa stok tinggal {currentStock} pcs lagi di ukuran ini!</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
               <Button
                 variant="outline"
@@ -1101,6 +1143,43 @@ function ProductDetailPage() {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Lookbook / Gallery Box */}
+          <div className="mt-8 bg-white border-2 border-ink rounded-xl p-6 sm:p-8 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+            <div className="flex items-center justify-between border-b border-border pb-3 mb-6">
+              <h2 className="text-lg font-bold text-ink uppercase tracking-wider flex items-center gap-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                Dipakai Sama Siapa?
+              </h2>
+              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest hidden sm:inline-block">
+                On-Model Gallery
+              </span>
+            </div>
+            
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?w=500&q=80",
+                "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500&q=80",
+                "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=500&q=80",
+                "https://images.unsplash.com/photo-1532453288672-3a27e9be9efd?w=500&q=80"
+              ].map((img, idx) => (
+                <div key={idx} className="group relative aspect-[4/5] bg-cream border-2 border-ink rounded-lg overflow-hidden cursor-pointer" onClick={() => { setActiveImage(img); setIsZoomOpen(true); }}>
+                  <img 
+                    src={img} 
+                    alt={`Lookbook ${idx + 1}`} 
+                    className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-300 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/10 transition-colors" />
+                  <div className="absolute bottom-2 left-2 bg-white border-2 border-ink text-ink text-[10px] font-extrabold px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0">
+                    LIHAT
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs font-medium text-muted-foreground mt-4 text-center">
+              *Foto ini adalah contoh (dummy). Nantinya akan diisi dengan foto asli mahasiswa FILKOM yang memakai merch ini.
+            </p>
           </div>
         </div>
       </main>
@@ -1273,6 +1352,61 @@ function ProductDetailPage() {
           isOpen={isVerifyOpen}
           onClose={() => setIsVerifyOpen(false)}
         />
+      )}
+
+      {/* Size Fit Guide Modal */}
+      {isSizeGuideOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
+          <div className="bg-white border-2 border-ink rounded-xl shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-cream border-b-2 border-ink p-4 flex justify-between items-center">
+              <h3 className="font-extrabold text-ink uppercase tracking-tight flex items-center gap-2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                Kalkulator Ukuran
+              </h3>
+              <button onClick={() => setIsSizeGuideOpen(false)} className="hover:bg-black/10 p-1.5 rounded-full transition-colors">
+                <X className="w-5 h-5 text-ink" />
+              </button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-ink uppercase tracking-wider">Tinggi Badan (cm)</label>
+                  <input 
+                    type="number" 
+                    value={userHeight}
+                    onChange={(e) => setUserHeight(e.target.value)}
+                    placeholder="Contoh: 170" 
+                    className="w-full border-2 border-ink rounded p-2.5 outline-none focus:ring-2 focus:ring-primary font-medium"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-ink uppercase tracking-wider">Berat Badan (kg)</label>
+                  <input 
+                    type="number" 
+                    value={userWeight}
+                    onChange={(e) => setUserWeight(e.target.value)}
+                    placeholder="Contoh: 65" 
+                    className="w-full border-2 border-ink rounded p-2.5 outline-none focus:ring-2 focus:ring-primary font-medium"
+                  />
+                </div>
+              </div>
+              <button 
+                onClick={calculateSize}
+                className="w-full bg-ink text-white font-bold uppercase tracking-widest py-3 border-2 border-ink hover:bg-brand-orange transition-colors active:scale-95"
+              >
+                Cek Ukuranku
+              </button>
+
+              {sizeRecommendation && (
+                <div className="mt-6 bg-green-50 border-2 border-green-500 rounded p-4 text-center animate-in slide-in-from-bottom-2 fade-in duration-300">
+                  <p className="text-sm font-semibold text-green-800 mb-1">Ukuran Terbaik Untukmu:</p>
+                  <div className="text-4xl font-extrabold text-green-600 tracking-tight my-2">{sizeRecommendation.size}</div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-green-700 bg-green-100 px-3 py-1 w-fit mx-auto rounded-full">{sizeRecommendation.desc}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

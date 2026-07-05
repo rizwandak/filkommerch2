@@ -19,7 +19,12 @@ import {
   HelpCircle,
   ShieldCheck,
   Lock,
+  Phone,
+  Mail,
+  MapPin,
+  ChevronDown,
 } from "lucide-react";
+import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -682,6 +687,7 @@ function Index() {
           </nav>
 
           <div className="flex items-center gap-4 text-ink">
+            <HackerModeToggle />
             <button aria-label="Search" onClick={() => setSearchOpen((v) => !v)} className="hover:text-brand-orange transition-colors">
               <Search className="w-5 h-5" />
             </button>
@@ -842,7 +848,7 @@ function Index() {
 
             {/* Urgent Countdown Timer if enabled */}
             {layout.showHeroCountdown && (
-              <div className="mt-6 sm:mt-8 bg-neutral-100 border-2 border-ink p-4 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] w-fit flex flex-col gap-2">
+              <div className="mt-6 sm:mt-8 bg-secondary border-2 border-ink p-4 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] w-fit flex flex-col gap-2">
                 <div className="text-[9px] sm:text-[10px] font-extrabold tracking-widest text-brand-orange uppercase flex items-center gap-1.5 animate-pulse">
                   <span className="w-2 h-2 rounded-full bg-red-500" />
                   PRE-ORDER BATCH BERAKHIR DALAM:
@@ -1107,7 +1113,7 @@ function Index() {
                       <div className="w-full bg-cream/90 backdrop-blur-sm p-2 rounded text-center border border-ink/20 animate-scale-in">
                         <div className="text-[8px] tracking-wider font-extrabold text-ink uppercase mb-1">Quick Add Size:</div>
                         <div className="flex flex-wrap justify-center gap-1">
-                          {sizes.slice(0, 4).map((size) => (
+                          {sizes.map((size) => (
                             <button
                               key={size}
                               onClick={() => addToCart(p, size)}
@@ -1575,7 +1581,7 @@ function Index() {
                           </button>
                         </div>
                         {i.size && (
-                          <span className="text-[10px] bg-neutral-100 text-ink font-bold px-1.5 py-0.5 rounded w-fit mt-1 border border-ink/10">
+                          <span className="text-[10px] bg-secondary text-ink font-bold px-1.5 py-0.5 rounded w-fit mt-1 border border-ink/10">
                             Size: {i.size}
                           </span>
                         )}
