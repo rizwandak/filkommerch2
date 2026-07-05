@@ -35,12 +35,12 @@ export function SplashScreen() {
       <div className="flex flex-col items-center gap-6 z-10 relative">
         <div className="flex flex-col sm:flex-row items-center gap-6 sm:gap-8 overflow-hidden px-4">
           {/* Bara Animation sliding from left */}
-          <div className="animate-[splash-bara_1s_ease-out_forwards] opacity-0 -translate-x-[150%] rotate-[-15deg] shrink-0">
+          <div className="animate-splash-bara shrink-0">
              <img src={baraSmile} alt="Bara Mascot" className="w-32 h-32 sm:w-48 sm:h-48 object-contain drop-shadow-2xl" />
           </div>
           
           {/* Welcome Text sliding from right */}
-          <div className="animate-[splash-text_1s_ease-out_0.2s_forwards] opacity-0 translate-x-[150%] flex flex-col justify-center items-center sm:items-start text-center sm:text-left">
+          <div className="animate-splash-text flex flex-col justify-center items-center sm:items-start text-center sm:text-left">
              <h1 className="text-4xl sm:text-6xl font-extrabold text-cream display uppercase leading-none tracking-tight">
                Welcome To<br />
                <span className="text-brand-orange">Filkom Merch</span>
@@ -49,7 +49,7 @@ export function SplashScreen() {
         </div>
         
         {/* Subtitle fading up */}
-        <p className="text-cream/70 font-mono tracking-widest text-xs sm:text-sm font-bold animate-[fade-up_1s_ease-out_0.8s_forwards] opacity-0 translate-y-4">
+        <p className="text-cream/70 font-mono tracking-widest text-xs sm:text-sm font-bold animate-splash-fade-up">
           Official Merch Filkom UB
         </p>
       </div>

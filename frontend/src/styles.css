@@ -247,3 +247,13 @@
   0% { transform: translateY(1rem); opacity: 0; }
   100% { transform: translateY(0); opacity: 1; }
 }
+
+.animate-splash-bara {
+  animation: splash-bara 1.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-splash-text {
+  animation: splash-text 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+}
+.animate-splash-fade-up {
+  animation: fade-up 1s ease-out 0.8s both;
+}
