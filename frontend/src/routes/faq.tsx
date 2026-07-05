@@ -1,20 +1,18 @@
-import { createFileRoute, Link, useNavigate   } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Search,
   ShoppingBag,
-  ArrowRight,
   Menu,
   X,
   Plus,
   Minus,
   Trash2,
-  HelpCircle,
   MessageSquare,
   ChevronRight,
-  Check,
   User,
+  Send
 } from "lucide-react";
 import { getStoreSettings } from "@backend/server-actions";
 import { useAuth } from "@/lib/auth";
@@ -22,6 +20,7 @@ import { toast } from "sonner";
 
 import logo from "@/assets/logo-fm.jpg";
 import logoFilkom from "@/assets/logo_filkom.png";
+import baraSmile from "@/assets/bara-smile.png";
 
 export const Route = createFileRoute("/faq")({
   loader: async () => {
@@ -32,8 +31,8 @@ export const Route = createFileRoute("/faq")({
   },
   head: () => ({
     meta: [
-      { title: "FAQ & Bantuan — FILKOM Merch UB" },
-      { name: "description", content: "Pusat bantuan mahasiswa FILKOM Merch UB. Pertanyaan seputar pemesanan, verifikasi, pre-order, dan pengambilan." },
+      { title: "Tanya Bara — FILKOM Merch UB" },
+      { name: "description", content: "Tanya Bara, maskot FILKOM Merch UB. Pusat bantuan interaktif." },
     ],
   }),
   component: FAQPage,
@@ -59,6 +58,50 @@ type CartItem = {
   color?: string;
 };
 
+type ChatMessage = {
+  id: string;
+  role: "bara" | "user";
+  text: string;
+};
+
+const PRESET_QUESTIONS = [
+  { 
+    id: "size", 
+    q: "Bara, kalau ukuranku kebesaran bisa ditukar nggak?", 
+    a: "Waduh kalau kebesaran, tenang aja bro/sis! Penukaran ukuran boleh maksimal 2 hari setelah barang diterima kok. Syaratnya tag belum dilepas, belum dicuci, dan stok ukuran pengganti masih ada. Aman! 😎" 
+  },
+  { 
+    id: "po", 
+    q: "Barang pre-order selesainya kapan nih?", 
+    a: "Proses produksi barang PO biasanya sekitar 14-21 hari kerja setelah sesi pemesanan ditutup yaa. Tergantung antrean vendor juga, tapi Bara bakal pastiin secepat mungkin! 🔥" 
+  },
+  { 
+    id: "pickup", 
+    q: "Ngambil pesanannya dimana Bar?", 
+    a: "Pilih aja 'Pickup di Kampus' pas checkout! Nanti tim Bara bakal nungguin kamu di Gazebo FILKOM UB sesuai jadwal yang dikirim via WhatsApp. Jangan lupa bawa bukti pesanan ya! 🐯" 
+  },
+  { 
+    id: "discount", 
+    q: "Dapet diskon mahasiswa gimana caranya?", 
+    a: "Gampang! Kamu tinggal login pake email student UB (@student.ub.ac.id) atau masukin NIM di menu Akun. Nanti otomatis dapet potongan harga civitas 5%! Lumayan kan buat beli es teh? 🥤" 
+  },
+  { 
+    id: "payment", 
+    q: "Pembayarannya bisa pakai apa aja?", 
+    a: "Lengkap bos! Kita pakai Midtrans, jadi bisa QRIS (Gopay, ShopeePay, Dana, dll) atau Transfer Bank (BCA, Mandiri, dll). Praktis abis!" 
+  },
+  { 
+    id: "shipping", 
+    q: "Bisa kirim ke luar kota Malang?", 
+    a: "Bisa banget! Bara siap anter pesananmu pake JNE, J&T, atau Sicepat ke seluruh penjuru Indonesia. Ongkirnya otomatis kehitung pas checkout ya." 
+  },
+  { 
+    id: "ori", 
+    q: "Ini barang ori dari FILKOM UB?", 
+    a: "Yoi dong! Filkom Merch itu toko merchandise resmi mahasiswa Fakultas Ilmu Komputer Universitas Brawijaya, hasil kolaborasi mantap sama fakultas dan BEM FILKOM UB. 100% Original! ⭐️" 
+  }
+];
+
 function FAQPage() {
   const { settings } = Route.useLoaderData();
   const { user, logout } = useAuth();
@@ -70,12 +113,40 @@ function FAQPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({});
-
+  
   const [pathname, setPathname] = useState("");
   useEffect(() => setPathname(window.location.pathname), []);
-  const search = location.search.originalString || "";
+
+  // Chat State
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { id: "1", role: "bara", text: "Halo Ksatria! Namaku Bara, maskot FILKOM Merch. 😎 Ada yang bisa Bara bantu hari ini?" }
+  ]);
+  const [isTyping, setIsTyping] = useState(false);
+  const chatScrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
+    }
+  }, [messages, isTyping]);
+
+  const handleAsk = (presetId: string) => {
+    if (isTyping) return;
+    
+    const question = PRESET_QUESTIONS.find(q => q.id === presetId);
+    if (!question) return;
+
+    // Add user message
+    const newMessages = [...messages, { id: Date.now().toString(), role: "user" as const, text: question.q }];
+    setMessages(newMessages);
+    setIsTyping(true);
+
+    // Simulate Bara typing
+    setTimeout(() => {
+      setMessages([...newMessages, { id: (Date.now() + 1).toString(), role: "bara" as const, text: question.a }]);
+      setIsTyping(false);
+    }, 1500);
+  };
 
   // Load cart from localStorage
   useEffect(() => {
@@ -102,16 +173,7 @@ function FAQPage() {
   const layout = useMemo(() => {
     const defaults = {
       marqueeText: "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN",
-      faqQ1: "Apakah produk ini resmi (official) dari FILKOM?",
-      faqA1: "Ya, Filkom Merchandise adalah toko merchandise resmi mahasiswa Fakultas Ilmu Komputer Universitas Brawijaya yang bekerjasama dengan pihak fakultas dan BEM FILKOM UB.",
-      faqQ2: "Bagaimana cara mengambil pesanan saya?",
-      faqA2: "Anda dapat memilih metode pengambilan 'Pickup di Kampus' saat checkout. Tim kami akan bersiap di Gazebo FILKOM UB pada jadwal pengambilan yang diinfokan via WhatsApp.",
-      faqQ3: "Berapa lama estimasi pengerjaan barang Pre-Order?",
-      faqA3: "Proses produksi barang pre-order biasanya memakan waktu 14 hingga 21 hari kerja setelah sesi pemesanan ditutup, tergantung tingkat kerumitan desain dan antrean vendor.",
-      faqQ4: "Apakah saya bisa menukar ukuran pakaian jika tidak pas?",
-      faqA4: "Penukaran ukuran diperbolehkan maksimal 2 hari setelah barang diterima, dengan syarat tag belum dilepas, belum dicuci, dan stok ukuran pengganti masih tersedia."
     };
-
     if (!settings?.homepage_layout) return defaults;
     try {
       const parsed = JSON.parse(settings.homepage_layout);
@@ -120,54 +182,6 @@ function FAQPage() {
       return defaults;
     }
   }, [settings]);
-
-  // Comprehensive FAQ list
-  const faqs = useMemo(() => [
-    {
-      q: layout.faqQ1,
-      a: layout.faqA1,
-      cat: "UMUM"
-    },
-    {
-      q: layout.faqQ2,
-      a: layout.faqA2,
-      cat: "PENGIRIMAN & PICKUP"
-    },
-    {
-      q: layout.faqQ3,
-      a: layout.faqA3,
-      cat: "PRE-ORDER"
-    },
-    {
-      q: layout.faqQ4,
-      a: layout.faqA4,
-      cat: "PENGEMBALIAN & UKURAN"
-    },
-    {
-      q: "Bagaimana cara memverifikasi status mahasiswa FILKOM saya?",
-      a: "Anda dapat melakukan verifikasi di menu Akun -> 'Verifikasi FILKOM' dengan mengisi data NIM Anda atau masuk via Google OAuth menggunakan email student UB (@student.ub.ac.id). Setelah terverifikasi, Anda otomatis mendapatkan potongan harga civitas sebesar 5%.",
-      cat: "AKUN & CIVITAS"
-    },
-    {
-      q: "Apa saja metode pembayaran yang didukung?",
-      a: "Kami menggunakan Midtrans Payment Gateway, sehingga mendukung pembayaran otomatis via QRIS (Gopay, ShopeePay, Dana, LinkAja, OVO), Transfer Bank virtual account (BCA, Mandiri, BNI, BRI), serta kartu debit/kredit.",
-      cat: "PEMBAYARAN"
-    },
-    {
-      q: "Apakah pesanan bisa dikirim ke luar kota Malang?",
-      a: "Bisa. Kami bekerjasama dengan ekspedisi JNE, J&T, dan Sicepat untuk pengiriman ke seluruh wilayah Indonesia. Biaya kirim akan dihitung secara otomatis saat Anda memasukkan alamat tujuan pengiriman di halaman checkout.",
-      cat: "PENGIRIMAN & PICKUP"
-    }
-  ], [layout]);
-
-  // Filter FAQs based on query
-  const filteredFaqs = useMemo(() => {
-    if (!query.trim()) return faqs;
-    const q = query.toLowerCase();
-    return faqs.filter(
-      (f) => f.q.toLowerCase().includes(q) || f.a.toLowerCase().includes(q) || f.cat.toLowerCase().includes(q)
-    );
-  }, [query, faqs]);
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
   const cartTotal = cart.reduce((s, i) => s + parsePrice(i.price) * i.qty, 0);
@@ -220,9 +234,9 @@ function FAQPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground selection:bg-brand-orange selection:text-cream">
+    <div className="min-h-screen bg-background text-foreground selection:bg-brand-orange selection:text-cream flex flex-col">
       {/* Announcement marquee */}
-      <div className="bg-ink text-cream py-2.5 overflow-hidden border-b border-ink">
+      <div className="bg-ink text-cream py-2.5 overflow-hidden border-b border-ink shrink-0">
         <div className="flex marquee-track whitespace-nowrap text-[10px] sm:text-xs tracking-[0.2em] font-bold">
           {Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="flex shrink-0 items-center gap-10 px-5">
@@ -238,7 +252,7 @@ function FAQPage() {
       </div>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink">
+      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink shrink-0">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 flex items-center justify-between h-16 sm:h-20">
           <Link to="/" className="flex items-center gap-2 sm:gap-3 text-left hover:opacity-90">
             <img src={logo} alt="" className="h-9 w-9 sm:h-12 sm:w-12 rounded-full object-cover ring-2 ring-ink shadow-sm" />
@@ -297,82 +311,105 @@ function FAQPage() {
         </div>
       </header>
 
-      {/* Hero FAQ Section */}
-      <section className="bg-cream py-16 sm:py-24 border-b-2 border-ink text-center">
-        <div className="max-w-2xl mx-auto px-5 space-y-4 animate-slide-up">
-          <span className="inline-block bg-ink text-cream font-mono font-extrabold text-[9px] tracking-widest px-3 py-1 rounded uppercase">
-            FAQ & BANTUAN
-          </span>
-          <h1 className="display text-4xl sm:text-6xl text-ink font-bold uppercase leading-none">
-            Pusat Bantuan.
-          </h1>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed font-medium">
-            Temukan jawaban instan untuk pertanyaan umum Anda atau hubungi admin support kami.
-          </p>
-
-          <div className="flex border-2 border-ink rounded px-3 py-2 bg-white max-w-md mx-auto items-center gap-2 shadow-sm">
-            <Search className="w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Cari FAQ / Masalah Anda…"
-              className="bg-transparent outline-none text-xs w-full text-ink font-medium"
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Main FAQ list & Support Contacts Grid */}
-      <section className="max-w-[1200px] mx-auto px-5 py-16 sm:py-24 grid lg:grid-cols-12 gap-12">
+      {/* Main Chat Interface */}
+      <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-5 lg:px-10 py-6 sm:py-8 lg:py-10 grid lg:grid-cols-12 gap-8 h-full">
         
-        {/* Accordions (8 cols) */}
-        <div className="lg:col-span-8 space-y-6">
-          <h2 className="display text-xl sm:text-2xl text-ink font-bold uppercase border-b-2 border-ink pb-2">
-            Frequently Asked Qs ({filteredFaqs.length})
-          </h2>
+        {/* Chat Window (8 cols) */}
+        <div className="lg:col-span-8 flex flex-col bg-card border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden animate-slide-up h-[600px] lg:h-[700px]">
+          {/* Chat Header */}
+          <div className="bg-ink text-cream p-4 flex items-center gap-3 shrink-0">
+            <div className="relative">
+              <img src={baraSmile} alt="Bara" className="w-12 h-12 rounded-full object-cover bg-cream border-2 border-cream p-0.5" />
+              <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-ink rounded-full"></span>
+            </div>
+            <div>
+              <h1 className="font-bold text-lg leading-tight">Tanya Bara 🐯</h1>
+              <p className="text-[10px] text-cream/70 font-mono tracking-widest uppercase">Online • Fast Response</p>
+            </div>
+          </div>
 
-          <div className="space-y-4">
-            {filteredFaqs.map((faq, idx) => (
-              <div key={idx} className="border-2 border-ink bg-cream rounded p-4 shadow-sm">
-                <button
-                  onClick={() => setFaqOpen((prev) => ({ ...prev, [idx]: !prev[idx] }))}
-                  className="w-full flex justify-between items-center text-left text-sm sm:text-base font-bold text-ink hover:text-brand-orange transition-colors"
-                >
-                  <span className="pr-4">{faq.q}</span>
-                  <Plus className={`w-4 h-4 shrink-0 transition-transform duration-300 ${faqOpen[idx] ? "rotate-45 text-brand-orange" : ""}`} />
-                </button>
-                {faqOpen[idx] && (
-                  <div className="text-xs sm:text-sm text-muted-foreground leading-relaxed pt-3 border-t border-ink/10 mt-3 font-medium">
-                    <span className="inline-block bg-ink text-cream text-[8px] px-1.5 py-0.5 rounded font-mono font-bold tracking-wider mb-2">{faq.cat}</span>
-                    <p>{faq.a}</p>
-                  </div>
+          {/* Messages Area */}
+          <div 
+            ref={chatScrollRef}
+            className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 bg-cream/30 dark:bg-card scroll-smooth"
+          >
+            {messages.map((msg) => (
+              <div 
+                key={msg.id} 
+                className={`flex gap-3 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"} animate-fade-in`}
+              >
+                {msg.role === "bara" && (
+                  <img src={baraSmile} alt="Bara" className="w-8 h-8 rounded-full border-2 border-ink object-cover bg-white shrink-0 mt-1" />
                 )}
+                <div 
+                  className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl text-sm sm:text-base border-2 border-ink leading-relaxed font-medium ${
+                    msg.role === "user" 
+                      ? "bg-brand-blue text-cream rounded-tr-none" 
+                      : "bg-white text-ink rounded-tl-none shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                  }`}
+                >
+                  {msg.text}
+                </div>
               </div>
             ))}
 
-            {filteredFaqs.length === 0 && (
-              <div className="text-center py-10 text-muted-foreground">
-                <HelpCircle className="w-10 h-10 mx-auto mb-2 opacity-55" />
-                <p className="font-bold">Pertanyaan tidak ditemukan.</p>
-                <p className="text-xs mt-1">Coba gunakan kata kunci lain atau chat admin langsung di kanan.</p>
+            {isTyping && (
+              <div className="flex gap-3 flex-row animate-fade-in">
+                <img src={baraSmile} alt="Bara" className="w-8 h-8 rounded-full border-2 border-ink object-cover bg-white shrink-0 mt-1" />
+                <div className="bg-white text-ink p-4 rounded-2xl rounded-tl-none border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5 w-max">
+                  <span className="w-2 h-2 bg-ink/40 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                  <span className="w-2 h-2 bg-ink/40 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                  <span className="w-2 h-2 bg-ink/40 rounded-full animate-bounce"></span>
+                </div>
               </div>
             )}
           </div>
+          
+          {/* Bottom Chat Input (Decorative) */}
+          <div className="p-4 bg-background border-t-2 border-ink flex gap-2 shrink-0">
+            <div className="flex-1 bg-muted border-2 border-ink/20 rounded-full px-4 py-3 text-sm text-muted-foreground flex items-center cursor-not-allowed">
+              Pilih pertanyaan di sebelah kanan ya...
+            </div>
+            <button disabled className="bg-ink text-cream p-3 rounded-full opacity-50 cursor-not-allowed">
+              <Send className="w-5 h-5 ml-1" />
+            </button>
+          </div>
         </div>
 
-        {/* Support Sidebar (4 cols) */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="border-2 border-ink bg-ink text-cream p-6 rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-4">
-            <h3 className="display text-lg font-bold text-cream flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-brand-orange" /> Chat Admin
+        {/* Questions Sidebar (4 cols) */}
+        <div className="lg:col-span-4 flex flex-col gap-6 h-full">
+          <div className="bg-brand-orange text-cream p-6 rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] animate-slide-up [animation-delay:0.1s]">
+            <h2 className="display text-xl font-bold uppercase mb-2">Pilih Pertanyaan</h2>
+            <p className="text-xs font-medium text-cream/90 leading-relaxed mb-6">
+              Klik salah satu pertanyaan di bawah ini dan biarkan Bara menjawab semua kegundahanmu! 👇
+            </p>
+
+            <div className="space-y-3">
+              {PRESET_QUESTIONS.map((q) => (
+                <button
+                  key={q.id}
+                  onClick={() => handleAsk(q.id)}
+                  disabled={isTyping}
+                  className="w-full text-left p-3.5 bg-white text-ink hover:bg-cream border-2 border-ink rounded-lg font-bold text-sm shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-transform hover:-translate-y-0.5 active:translate-y-0 active:shadow-none disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:bg-white"
+                >
+                  <div className="flex justify-between items-center gap-3">
+                    <span>{q.q}</span>
+                    <ChevronRight className="w-4 h-4 shrink-0 opacity-50" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-2 border-ink bg-ink text-cream p-6 rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-4 animate-slide-up [animation-delay:0.2s]">
+            <h3 className="display text-lg font-bold flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-brand-orange" /> Masih Bingung?
             </h3>
             <p className="text-[11px] text-cream/70 leading-relaxed font-medium">
-              Pertanyaan Anda belum terjawab? Silakan hubungi admin kami melalui WhatsApp di bawah ini:
+              Kalau Bara belum bisa bantu, langsung aja chat manusia (baca: Admin) via WhatsApp!
             </p>
 
             <div className="space-y-3 pt-2">
-              {/* Admin 1 */}
               <a
                 href="https://wa.me/6282235526105?text=Halo%20Admin%20Aliya,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
                 target="_blank"
@@ -389,7 +426,6 @@ function FAQPage() {
                 <ChevronRight className="w-4 h-4" />
               </a>
 
-              {/* Admin 2 */}
               <a
                 href="https://wa.me/6282287190402?text=Halo%20Admin%20Puty,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
                 target="_blank"
@@ -406,17 +442,13 @@ function FAQPage() {
                 <ChevronRight className="w-4 h-4" />
               </a>
             </div>
-
-            <div className="text-[10px] opacity-50 font-mono text-center pt-2">
-              Jam Operasional: 09:00 - 17:00 WIB
-            </div>
           </div>
         </div>
 
-      </section>
+      </main>
 
       {/* Footer */}
-      <footer className="bg-background border-t border-border">
+      <footer className="bg-background border-t border-border mt-auto">
         <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-10 flex flex-col md:flex-row justify-between gap-4 text-xs text-muted-foreground">
           <div>© 2026 Filkom Merch UB · Official student merchandise.</div>
           <div>Integrated with Midtrans Payment.</div>
