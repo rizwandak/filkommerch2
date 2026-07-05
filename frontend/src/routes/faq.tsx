@@ -73,8 +73,9 @@ function FAQPage() {
   const [query, setQuery] = useState("");
   const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({});
 
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
-  const search = typeof window !== "undefined" ? window.location.search : "";
+  const { location } = useRouterState();
+  const pathname = location.pathname;
+  const search = location.search.originalString || "";
 
   // Load cart from localStorage
   useEffect(() => {

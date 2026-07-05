@@ -86,9 +86,10 @@ function ProductsCatalogPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
-  const search = typeof window !== "undefined" ? window.location.search : "";
-  const hash = typeof window !== "undefined" ? window.location.hash : "";
+  const { location } = useRouterState();
+  const pathname = location.pathname;
+  const search = location.search.originalString || "";
+  const hash = location.hash || "";
   
   // Cart state & handlers
   const [cart, setCart] = useState<CartItem[]>([]);

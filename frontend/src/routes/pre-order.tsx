@@ -139,8 +139,9 @@ function PreOrderPage() {
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
 
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
-  const search = typeof window !== "undefined" ? window.location.search : "";
+  const { location } = useRouterState();
+  const pathname = location.pathname;
+  const search = location.search.originalString || "";
 
   // Load wishlist & cart from localStorage
   useEffect(() => {

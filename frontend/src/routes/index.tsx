@@ -311,9 +311,10 @@ function Index() {
   const [quickViewProduct, setQuickViewProduct] = useState<ProductCard | null>(null);
   const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({});
 
-  const pathname = typeof window !== "undefined" ? window.location.pathname : "";
-  const search = typeof window !== "undefined" ? window.location.search : "";
-  const hash = typeof window !== "undefined" ? window.location.hash : "";
+  const { location } = useRouterState();
+  const pathname = location.pathname;
+  const search = location.search.originalString || "";
+  const hash = location.hash || "";
 
   // Load wishlist & cart from localStorage
   useEffect(() => {
