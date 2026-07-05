@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useSearch, useNavigate } from "@tanstack/react-router";
+import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import React from "react";
 import { 
@@ -363,7 +364,7 @@ function ProductsCatalogPage() {
               <img
                 src={logo}
                 alt="Filkom Merch UB"
-                className="h-9 w-9 sm:h-12 sm:w-12 rounded-full object-cover ring-2 ring-ink"
+                className="h-9 w-9 sm:h-12 sm:w-12 rounded-full object-cover ring-2 ring-border"
               />
               <img
                 src={logoFilkom}
@@ -426,7 +427,8 @@ function ProductsCatalogPage() {
           </nav>
 
           <div className="flex items-center gap-4 text-ink">
-            <button aria-label="Search" onClick={() => setSearchOpen((v) => !v)}>
+            <HackerModeToggle />
+              <button aria-label="Search" onClick={() => setSearchOpen((v) => !v)}>
               <Search className="w-5 h-5" />
             </button>
             <div className="relative">
@@ -552,13 +554,13 @@ function ProductsCatalogPage() {
           </div>
           {user?.type === "buyer" ? (
             user.is_filkom_verified === 1 ? (
-              <div className="bg-white border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
+              <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Status Akun:</p>
                 <p className="text-lg font-extrabold text-brand-orange uppercase mt-1">Spesial Civitas FILKOM UB 🔥</p>
                 <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">Diskon otomatis aktif karena akun FILKOM Anda terverifikasi.</p>
               </div>
             ) : (
-              <div className="bg-white border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
+              <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Diskon Civitas:</p>
                 <p className="text-lg font-extrabold text-amber-600 uppercase mt-1">Belum Terverifikasi ⚠️</p>
                 <button
@@ -570,7 +572,7 @@ function ProductsCatalogPage() {
               </div>
             )
           ) : (
-            <div className="bg-white border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
+            <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
               <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Punya NIM FILKOM?</p>
               <p className="text-lg font-extrabold text-ink uppercase mt-1">Login & Verifikasi 🎓</p>
               <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">Gunakan email UB & hubungkan NIM/NIDN Anda untuk mendapatkan diskon khusus FILKOM.</p>
@@ -583,7 +585,7 @@ function ProductsCatalogPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Sidebar Filters - Desktop */}
-          <aside className="hidden lg:block w-64 shrink-0 bg-white p-6 rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] h-fit sticky top-24 text-ink">
+          <aside className="hidden lg:block w-64 shrink-0 bg-card p-6 rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] h-fit sticky top-24 text-ink">
             <div className="flex items-center justify-between border-b-2 border-ink pb-4 mb-6">
               <h2 className="font-extrabold text-sm tracking-wider uppercase text-ink flex items-center gap-2">
                 <SlidersHorizontal className="w-4 h-4 text-brand-orange" />
@@ -621,7 +623,7 @@ function ProductsCatalogPage() {
                   className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${
                     selectedCategory === "ALL" 
                       ? "bg-brand-orange text-cream" 
-                      : "bg-white text-ink hover:bg-cream"
+                      : "bg-card text-ink hover:bg-cream"
                   }`}
                 >
                   Semua Produk
@@ -634,7 +636,7 @@ function ProductsCatalogPage() {
                     className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${
                       selectedCategory === String(cat.id) 
                         ? "bg-brand-orange text-cream" 
-                        : "bg-white text-ink hover:bg-cream"
+                        : "bg-card text-ink hover:bg-cream"
                     }`}
                   >
                     {cat.name}
@@ -660,7 +662,7 @@ function ProductsCatalogPage() {
                     className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${
                       selectedSaleType === type.id 
                         ? "bg-brand-orange text-cream" 
-                        : "bg-white text-ink hover:bg-cream"
+                        : "bg-card text-ink hover:bg-cream"
                     }`}
                   >
                     {type.name}
@@ -702,7 +704,7 @@ function ProductsCatalogPage() {
                     className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
                       selectedSize === "ALL" 
                         ? "bg-ink text-cream" 
-                        : "bg-white text-ink hover:bg-cream"
+                        : "bg-card text-ink hover:bg-cream"
                     }`}
                   >
                     ALL
@@ -714,7 +716,7 @@ function ProductsCatalogPage() {
                       className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
                         selectedSize === size 
                           ? "bg-ink text-cream" 
-                          : "bg-white text-ink hover:bg-cream"
+                          : "bg-card text-ink hover:bg-cream"
                       }`}
                     >
                       {size}
@@ -734,7 +736,7 @@ function ProductsCatalogPage() {
                     className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
                       selectedColor === "ALL" 
                         ? "bg-ink text-cream" 
-                        : "bg-white text-ink hover:bg-cream"
+                        : "bg-card text-ink hover:bg-cream"
                     }`}
                   >
                     ALL
@@ -746,7 +748,7 @@ function ProductsCatalogPage() {
                       className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
                         selectedColor === col 
                           ? "bg-ink text-cream" 
-                          : "bg-white text-ink hover:bg-cream"
+                          : "bg-card text-ink hover:bg-cream"
                       }`}
                     >
                       {col}
@@ -759,7 +761,7 @@ function ProductsCatalogPage() {
           {/* Product Grid Area */}
           <div className="flex-1">
             {/* Sorting & Result Count Bar */}
-            <div className="bg-white p-4 rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 text-ink">
+            <div className="bg-card p-4 rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 text-ink">
               <p className="text-xs text-ink font-bold">
                 Menampilkan <span className="text-brand-orange">{filteredProducts.length}</span> produk
               </p>
@@ -767,7 +769,7 @@ function ProductsCatalogPage() {
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <button
                   onClick={() => setShowMobileFilters(true)}
-                  className="flex lg:hidden items-center justify-center gap-1.5 bg-cream hover:bg-white text-ink px-3.5 py-2 rounded-lg text-xs font-bold border-2 border-ink flex-1 sm:flex-initial cursor-pointer"
+                  className="flex lg:hidden items-center justify-center gap-1.5 bg-cream hover:bg-card text-ink px-3.5 py-2 rounded-lg text-xs font-bold border-2 border-ink flex-1 sm:flex-initial cursor-pointer"
                 >
                   <SlidersHorizontal className="w-4 h-4 text-brand-orange" />
                   Filter
@@ -799,7 +801,7 @@ function ProductsCatalogPage() {
                   return (
                     <article
                       key={p.id}
-                      className="group flex flex-col bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 overflow-hidden relative h-full text-ink"
+                      className="group flex flex-col bg-card border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 overflow-hidden relative h-full text-ink"
                     >
                       <Link to="/product/$slug" params={{ slug: p.slug }} className="block relative aspect-square overflow-hidden bg-cream border-b-2 border-ink select-none">
                         {p.image_url ? (
@@ -892,7 +894,7 @@ function ProductsCatalogPage() {
                 })}
               </div>
             ) : (
-              <div className="bg-white rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-12 text-center text-ink">
+              <div className="bg-card rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-12 text-center text-ink">
                 <X className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-bold text-lg text-ink">Tidak ada produk yang cocok</h3>
                 <p className="text-xs text-muted-foreground mt-1">Coba sesuaikan kata kunci pencarian atau bersihkan filter Anda.</p>
@@ -906,7 +908,7 @@ function ProductsCatalogPage() {
       </main>
 
       {/* WhatsApp Floating Contact Widget */}
-      <footer className="bg-white border-t-2 border-ink mt-20 py-12 text-ink text-xs font-bold">
+      <footer className="bg-card border-t-2 border-ink mt-20 py-12 text-ink text-xs font-bold">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <div className="flex items-center gap-2 mb-3">
@@ -957,7 +959,7 @@ function ProductsCatalogPage() {
       {/* Mobile Filters Modal */}
       {showMobileFilters && (
         <div className="fixed inset-0 z-50 flex lg:hidden bg-black/60 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white w-80 h-full p-6 flex flex-col justify-between shadow-2xl border-r-2 border-ink animate-slide-right overflow-y-auto text-ink">
+          <div className="bg-card w-80 h-full p-6 flex flex-col justify-between shadow-2xl border-r-2 border-ink animate-slide-right overflow-y-auto text-ink">
             <div>
               <div className="flex items-center justify-between border-b-2 border-ink pb-4 mb-6">
                 <h3 className="font-extrabold text-sm text-ink uppercase">Filters</h3>
@@ -1036,7 +1038,7 @@ function ProductsCatalogPage() {
             <div className="pt-6 border-t-2 border-ink flex gap-3">
               <button 
                 onClick={clearFilters} 
-                className="flex-1 text-xs font-bold border-2 border-ink bg-white hover:bg-cream text-ink py-2 rounded transition cursor-pointer"
+                className="flex-1 text-xs font-bold border-2 border-ink bg-card hover:bg-cream text-ink py-2 rounded transition cursor-pointer"
               >
                 Reset
               </button>
@@ -1151,7 +1153,7 @@ function ProductsCatalogPage() {
                           </button>
                         </div>
                         <div className="mt-auto flex items-center justify-between">
-                          <div className="inline-flex items-center border border-ink bg-white">
+                          <div className="inline-flex items-center border border-ink bg-card">
                             <button
                               onClick={() => updateQty(i.id, -1)}
                               className="px-2 py-1.5 hover:bg-cream cursor-pointer"

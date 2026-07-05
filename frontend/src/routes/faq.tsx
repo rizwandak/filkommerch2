@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search,
@@ -265,7 +266,8 @@ function FAQPage() {
           </nav>
 
           <div className="flex items-center gap-4 text-ink">
-            <button aria-label="Search" onClick={() => setSearchOpen((v) => !v)} className="hover:text-brand-orange">
+            <HackerModeToggle />
+              <button aria-label="Search" onClick={() => setSearchOpen((v) => !v)} className="hover:text-brand-orange">
               <Search className="w-5 h-5" />
             </button>
             <div className="relative">
