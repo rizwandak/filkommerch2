@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link  , useRouterState } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link   } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useMemo, useEffect } from "react";
 import {
@@ -107,10 +107,14 @@ function ProductDetailPage() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
-  const { location } = useRouterState();
-  const pathname = location.pathname;
-  const search = location.search.originalString || "";
-  const hash = location.hash || "";
+  const [pathname, setPathname] = useState("");
+  const [search, setSearch] = useState("");
+  const [hash, setHash] = useState("");
+  useEffect(() => {
+    setPathname(window.location.pathname);
+    setSearch(window.location.search);
+    setHash(window.location.hash);
+  }, []);
 
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);

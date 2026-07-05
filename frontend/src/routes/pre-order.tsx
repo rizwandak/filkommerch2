@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate  , useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate   } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -139,8 +139,8 @@ function PreOrderPage() {
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
 
-  const { location } = useRouterState();
-  const pathname = location.pathname;
+  const [pathname, setPathname] = useState("");
+  useEffect(() => setPathname(window.location.pathname), []);
   const search = location.search.originalString || "";
 
   // Load wishlist & cart from localStorage

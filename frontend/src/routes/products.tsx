@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useSearch, useNavigate  , useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch, useNavigate   } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import React from "react";
@@ -86,10 +86,14 @@ function ProductsCatalogPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const { location } = useRouterState();
-  const pathname = location.pathname;
-  const search = location.search.originalString || "";
-  const hash = location.hash || "";
+  const [pathname, setPathname] = useState("");
+  const [search, setSearch] = useState("");
+  const [hash, setHash] = useState("");
+  useEffect(() => {
+    setPathname(window.location.pathname);
+    setSearch(window.location.search);
+    setHash(window.location.hash);
+  }, []);
   
   // Cart state & handlers
   const [cart, setCart] = useState<CartItem[]>([]);

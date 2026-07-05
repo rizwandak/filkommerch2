@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate  , useRouterState } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate   } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -73,8 +73,8 @@ function FAQPage() {
   const [query, setQuery] = useState("");
   const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({});
 
-  const { location } = useRouterState();
-  const pathname = location.pathname;
+  const [pathname, setPathname] = useState("");
+  useEffect(() => setPathname(window.location.pathname), []);
   const search = location.search.originalString || "";
 
   // Load cart from localStorage

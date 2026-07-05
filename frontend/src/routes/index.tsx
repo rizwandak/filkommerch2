@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link  , useRouterState } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link   } from "@tanstack/react-router";
 import {
   Search,
   User,
@@ -311,10 +311,14 @@ function Index() {
   const [quickViewProduct, setQuickViewProduct] = useState<ProductCard | null>(null);
   const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({});
 
-  const { location } = useRouterState();
-  const pathname = location.pathname;
-  const search = location.search.originalString || "";
-  const hash = location.hash || "";
+  const [pathname, setPathname] = useState("");
+  const [search, setSearch] = useState("");
+  const [hash, setHash] = useState("");
+  useEffect(() => {
+    setPathname(window.location.pathname);
+    setSearch(window.location.search);
+    setHash(window.location.hash);
+  }, []);
 
   // Load wishlist & cart from localStorage
   useEffect(() => {
