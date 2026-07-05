@@ -223,82 +223,29 @@ function PreOrderPage() {
 
   // Filter only PRE-ORDER items
   const preOrderProducts = useMemo(() => {
-    // Using hardcoded catalog items as requested
-    return [
-      {
-        id: "kaos",
-        img: pTshirt,
-        name: "Kaos Cotton Combed 24s",
-        price: "Rp 105.000",
-        was: "Rp 120.000",
-        tag: "PRE-ORDER",
-        cat: "TEE" as const,
-        variants: [
-          { id: 1, size: "XS", stock: 100 },
-          { id: 2, size: "S", stock: 100 },
-          { id: 3, size: "M", stock: 100 },
-          { id: 4, size: "L", stock: 100 },
-          { id: 5, size: "XL", stock: 100 },
-          { id: 6, size: "XXL", stock: 100 },
-          { id: 7, size: "3XL", stock: 100 },
-          { id: 8, size: "4XL", stock: 100 },
-        ],
-      },
-      {
-        id: "topi",
-        img: pCap,
-        name: "Topi",
-        price: "Rp 80.000",
-        was: "Rp 100.000",
-        tag: "PRE-ORDER",
-        cat: "ACCESSORIES" as const,
-      },
-      {
-        id: "totebag",
-        img: pTote,
-        name: "Totebag Putih",
-        price: "Rp 40.000",
-        was: "Rp 60.000",
-        tag: "PRE-ORDER",
-        cat: "ACCESSORIES" as const,
-      },
-      {
-        id: "pin-enamel",
-        img: pTote,
-        name: "Pin Enamel",
-        price: "Rp 26.000",
-        was: "Rp 35.000",
-        tag: "PRE-ORDER",
-        cat: "ACCESSORIES" as const,
-      },
-      {
-        id: "keychain",
-        img: pTote,
-        name: "Keychain",
-        price: "Rp 10.000",
-        was: "Rp 15.000",
-        tag: "PRE-ORDER",
-        cat: "ACCESSORIES" as const,
-      },
-      {
-        id: "sticker-pack",
-        img: pTote,
-        name: "Sticker Pack",
-        price: "Rp 8.000",
-        was: "Rp 10.000",
-        tag: "PRE-ORDER",
-        cat: "ACCESSORIES" as const,
-      },
-      {
-        id: "pin-tas",
-        img: pTote,
-        name: "Pin Tas 44 mm",
-        price: "Rp 4.000",
-        was: "Rp 7.000",
-        tag: "PRE-ORDER",
-        cat: "ACCESSORIES" as const,
-      },
-    ];
+    const list = products.filter((p) => p.sale_type === "pre_order");
+    
+    // Fallback if db has no pre-orders
+    if (list.length === 0) {
+      return [
+        {
+          id: "varsity-jacket",
+          img: pVarsity,
+          name: "Varsity Jacket — Filkom Edition (Pre-Order)",
+          price: "Rp 185.000",
+          was: "Rp 210.000",
+          tag: "PRE-ORDER",
+          cat: "JACKET" as const,
+          variants: [
+            { id: 101, size: "S", stock: 20 },
+            { id: 102, size: "M", stock: 35 },
+            { id: 103, size: "L", stock: 40 },
+            { id: 104, size: "XL", stock: 15 },
+          ],
+        }
+      ];
+    }
+    return list;
   }, [products]);
 
   // Active filtered list
