@@ -232,3 +232,18 @@
 .animate-scale-in {
   animation: scaleIn 0.25s ease-out both;
 }
+
+@keyframes splash-bara {
+  0% { transform: translateX(-150%) rotate(-15deg); opacity: 0; }
+  100% { transform: translateX(0) rotate(0); opacity: 1; }
+}
+
+@keyframes splash-text {
+  0% { transform: translateX(150%); opacity: 0; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes fade-up {
+  0% { transform: translateY(1rem); opacity: 0; }
+  100% { transform: translateY(0); opacity: 1; }
+}

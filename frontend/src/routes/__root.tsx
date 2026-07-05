@@ -15,6 +15,7 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AuthProvider } from "../lib/auth";
 import { Toaster } from "@frontend/components/ui/sonner";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { SplashScreen } from "../components/SplashScreen";
 
 function NotFoundComponent() {
   return (
@@ -139,6 +140,7 @@ function RootComponent() {
     <GoogleOAuthProvider clientId="159528757023-4sr74hnesnfc377l0pule7b7fhh3g65n.apps.googleusercontent.com">
       <AuthProvider>
         <QueryClientProvider client={queryClient}>
+          <SplashScreen />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
           <Outlet />
           <Toaster position="top-center" />
