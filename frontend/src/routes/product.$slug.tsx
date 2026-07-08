@@ -36,6 +36,7 @@ import pVarsity from "@/assets/p-varsity.jpg";
 import pHoodie from "@/assets/p-hoodie.jpg";
 import pTshirt from "@/assets/p-tshirt.jpg";
 import pTee2 from "@/assets/p-tee2.jpg";
+import { resolveImageUrl } from "@/lib/image-resolver";
 
 const scrollToId = (id: string) => {
   const el = document.getElementById(id);
@@ -754,7 +755,7 @@ function ProductDetailPage() {
               className="aspect-[4/5] bg-cream border-2 border-ink rounded-lg overflow-hidden relative cursor-zoom-in group/img"
             >
               <img
-                src={activeImage}
+                src={resolveImageUrl(activeImage)}
                 alt={product.name}
                 className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-[1.02]"
               />
@@ -792,7 +793,7 @@ function ProductDetailPage() {
                       : "border-ink/25 hover:border-ink"
                   }`}
                 >
-                  <img src={img} alt="thumb" className="w-full h-full object-cover" />
+                  <img src={resolveImageUrl(img)} alt="thumb" className="w-full h-full object-cover" />
                 </button>
               ))}
             </div>
@@ -874,7 +875,7 @@ function ProductDetailPage() {
                         >
                           {comp.image_url ? (
                             <img
-                              src={comp.image_url}
+                              src={resolveImageUrl(comp.image_url)}
                               alt={comp.name}
                               className="w-10 h-10 object-cover rounded border border-border shrink-0"
                             />
@@ -1250,7 +1251,7 @@ function ProductDetailPage() {
                 {product.size_chart_url ? (
                   <div className="mt-2 max-w-lg border-2 border-ink rounded-lg overflow-hidden bg-cream">
                     <img
-                      src={product.size_chart_url}
+                      src={resolveImageUrl(product.size_chart_url)}
                       alt="Size Chart"
                       className="w-full h-auto object-contain max-h-[350px]"
                     />
@@ -1306,7 +1307,7 @@ function ProductDetailPage() {
                   }}
                 >
                   <img
-                    src={img}
+                    src={resolveImageUrl(img)}
                     alt={`Lookbook ${idx + 1}`}
                     className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-300 group-hover:scale-105"
                   />

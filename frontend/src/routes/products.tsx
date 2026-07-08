@@ -32,6 +32,7 @@ import { Card, CardContent } from "@frontend/components/ui/card";
 import { toast } from "sonner";
 import logo from "@/assets/logo-fm.jpg";
 import logoFilkom from "@/assets/logo_filkom.png";
+import { resolveImageUrl } from "@/lib/image-resolver";
 
 const scrollToId = (id: string) => {
   const el = document.getElementById(id);
@@ -893,7 +894,7 @@ function ProductsCatalogPage() {
                       >
                         {p.image_url ? (
                           <img
-                            src={p.image_url}
+                            src={resolveImageUrl(p.image_url)}
                             alt={p.name}
                             className="object-cover w-full h-full group-hover:scale-102 transition-transform duration-500"
                           />
@@ -1273,7 +1274,7 @@ function ProductsCatalogPage() {
                   {cart.map((i) => (
                     <li key={i.id} className="py-4 flex gap-4">
                       <img
-                        src={i.img}
+                        src={resolveImageUrl(i.img)}
                         alt=""
                         className="w-20 h-24 object-cover border border-ink"
                       />

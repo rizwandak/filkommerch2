@@ -40,6 +40,7 @@ import {
 } from "@/lib/homepage-types";
 import { Carousel, CarouselContent, CarouselItem } from "@frontend/components/ui/carousel";
 import type { CarouselApi } from "@frontend/components/ui/carousel";
+import { resolveImageUrl } from "@/lib/image-resolver";
 
 import logo from "@/assets/logo-fm.jpg";
 import logoFilkom from "@/assets/logo_filkom.png";
@@ -376,7 +377,7 @@ function HeroCarousel({ images }: HeroCarouselProps) {
           {slideImages.map((imgUrl, index) => (
             <CarouselItem key={index} className="h-full pl-0 relative">
               <img
-                src={imgUrl}
+                src={resolveImageUrl(imgUrl)}
                 alt={`Filkom Merch Hero Lookbook Slide ${index + 1}`}
                 className="w-full h-full object-cover transition-transform duration-[15000ms] ease-out hover:scale-105"
               />
@@ -1137,7 +1138,7 @@ function Index() {
                                 className="relative aspect-[4/5] overflow-hidden block border-b-2 border-ink bg-secondary animate-fade-in"
                               >
                                 <img
-                                  src={p.img}
+                                  src={resolveImageUrl(p.img)}
                                   alt={p.name}
                                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                                 />
@@ -1274,7 +1275,7 @@ function Index() {
                           }}
                         >
                           <img
-                            src={el.config.image || about}
+                            src={resolveImageUrl(el.config.image) || about}
                             alt={el.config.alt || "Promo Banner"}
                             className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-102 opacity-90 group-hover:opacity-100"
                           />
@@ -1438,7 +1439,7 @@ function Index() {
 
                         <div className="lg:col-span-5 relative aspect-[4/5] border-4 border-cream rounded shadow-2xl bg-neutral-900 overflow-hidden">
                           <img
-                            src={el.config.image || resolvedProduct.img}
+                            src={resolveImageUrl(el.config.image || resolvedProduct.img)}
                             alt={el.config.title}
                             className="w-full h-full object-cover mix-blend-normal opacity-95 group-hover:scale-102 transition-transform duration-500"
                           />
@@ -1687,7 +1688,7 @@ function Index() {
                   {cart.map((i) => (
                     <li key={i.id} className="py-4 flex gap-4">
                       <img
-                        src={i.img}
+                        src={resolveImageUrl(i.img)}
                         alt=""
                         className="w-20 h-24 object-cover border border-ink/10 rounded"
                       />
@@ -1765,7 +1766,7 @@ function Index() {
             {/* Left Image column */}
             <div className="w-full md:w-1/2 aspect-[4/5] bg-secondary border-2 border-ink rounded overflow-hidden relative">
               <img
-                src={quickViewProduct.img}
+                src={resolveImageUrl(quickViewProduct.img)}
                 alt={quickViewProduct.name}
                 className="w-full h-full object-cover"
               />
