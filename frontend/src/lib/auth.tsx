@@ -9,6 +9,7 @@ export interface AdminUser {
   username: string;
   email: string;
   id?: number;
+  is_google?: boolean;
 }
 
 export interface BuyerUser {

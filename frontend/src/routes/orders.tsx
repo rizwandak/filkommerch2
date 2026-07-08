@@ -22,6 +22,8 @@ import {
   Minus,
   LogOut,
   X,
+  LayoutDashboard,
+  MonitorSmartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -154,6 +156,7 @@ function UserOrdersPage() {
       variant_id: item.variant_id,
       size: item.size,
       color: item.color,
+      image_url: item.img || item.image_url || "",
       category: item.name.includes("Varsity")
         ? "JACKET"
         : item.name.includes("Hoodie")
@@ -477,6 +480,26 @@ function UserOrdersPage() {
                           </div>
                         )}
                       </div>
+                      {user.type === "admin" && (
+                        <Link
+                          to="/admin/dashboard"
+                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-blue animate-fade-in"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          Panel Admin
+                        </Link>
+                      )}
+                      {user.type === "admin" && (
+                        <Link
+                          to="/pos"
+                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-orange animate-fade-in"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <MonitorSmartphone className="w-4 h-4" />
+                          Kasir / POS
+                        </Link>
+                      )}
                       {user.type === "buyer" && (
                         <Link
                           to="/orders"
@@ -675,25 +698,11 @@ function UserOrdersPage() {
                   {order.items && order.items.length > 0 ? (
                     order.items.map((item: any) => (
                       <div key={item.id} className="py-4 flex gap-4 items-start">
-                        {/* Dummy image representation based on category or default placeholder */}
                         <div className="w-16 h-20 bg-cream border border-ink rounded overflow-hidden flex items-center justify-center shrink-0">
-                          {item.product_name.includes("Varsity") ? (
-                            <div className="text-[10px] text-ink font-bold text-center p-1">
-                              VARSITY JACKET
-                            </div>
-                          ) : item.product_name.includes("Hoodie") ? (
-                            <div className="text-[10px] text-ink font-bold text-center p-1">
-                              HOODIE
-                            </div>
-                          ) : item.product_name.includes("T-Shirt") ||
-                            item.product_name.includes("Kaos") ? (
-                            <div className="text-[10px] text-ink font-bold text-center p-1">
-                              T-SHIRT TEE
-                            </div>
+                          {item.image_url ? (
+                            <img src={item.image_url} alt={item.product_name} className="w-full h-full object-cover" />
                           ) : (
-                            <div className="text-[10px] text-ink font-bold text-center p-1">
-                              UB MERCH
-                            </div>
+                            <ShoppingBag className="w-5 h-5 text-muted-foreground" />
                           )}
                         </div>
 

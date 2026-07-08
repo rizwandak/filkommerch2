@@ -52,11 +52,21 @@ function CheckoutPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [customerName, setCustomerName] = useState(user?.type === "buyer" ? user.name : "");
-  const [customerEmail, setCustomerEmail] = useState(user?.type === "buyer" ? user.email : "");
+  const [customerName, setCustomerName] = useState(
+    user ? (user.type === "buyer" ? user.name : user.username) : ""
+  );
+  const [customerEmail, setCustomerEmail] = useState(user ? user.email : "");
   const [customerPhone, setCustomerPhone] = useState("");
-  const [customerNim, setCustomerNim] = useState("");
-  const [shippingAddress, setShippingAddress] = useState("");
+  const [customerNim, setCustomerNim] = useState(
+    user && user.type === "buyer" ? (user.nim || "") : ""
+  );
+  const [streetAddress, setStreetAddress] = useState("");
+  const [rtRw, setRtRw] = useState("");
+  const [kelurahan, setKelurahan] = useState("");
+  const [kecamatan, setKecamatan] = useState("");
+  const [city, setCity] = useState("");
+  const [province, setProvince] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [fulfillmentType, setFulfillmentType] = useState<"pickup" | "shipping">("pickup");
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentStep, setCurrentStep] = useState<number>(1);
@@ -70,6 +80,15 @@ function CheckoutPage() {
     { step: 3, title: "Payment" },
     { step: 4, title: "Done" },
   ];
+
+  // Sync profile info if user loaded asynchronously
+  useEffect(() => {
+    if (user) {
+      if (!customerName) setCustomerName(user.type === "buyer" ? user.name : user.username);
+      if (!customerEmail) setCustomerEmail(user.email || "");
+      if (user.type === "buyer" && user.nim && !customerNim) setCustomerNim(user.nim);
+    }
+  }, [user]);
 
   // Check auth and load cart
   useEffect(() => {
@@ -109,6 +128,18 @@ function CheckoutPage() {
 
   const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
+  const formattedAddress = [
+    streetAddress.trim(),
+    rtRw.trim() ? `RT/RW ${rtRw.trim()}` : "",
+    kelurahan.trim() ? `Kel. ${kelurahan.trim()}` : "",
+    kecamatan.trim() ? `Kec. ${kecamatan.trim()}` : "",
+    city.trim(),
+    province.trim(),
+    postalCode.trim() ? `Kode Pos ${postalCode.trim()}` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
       setCartItems(cartItems.filter((item) => item.id !== itemId));
@@ -124,12 +155,28 @@ function CheckoutPage() {
   };
 
   const validateStep = (): boolean => {
+    if (currentStep === 1) {
+      if (cartItems.length === 0) {
+        toast.error("Your cart is empty");
+        return false;
+      }
+      // Validasi variant_id untuk mencegah error API
+      for (const item of cartItems) {
+        if (!item.variant_id || typeof item.variant_id !== "number" || item.variant_id <= 0) {
+          toast.error(`Produk "${item.name}" memiliki varian tidak valid. Silakan hapus dan tambahkan kembali ke keranjang.`);
+          return false;
+        }
+      }
+    }
     if (currentStep === 2) {
-      if (!customerName.trim()) {
+      const finalName = customerName.trim() || (user ? (user.type === "buyer" ? user.name : user.username) : "");
+      const finalEmail = customerEmail.trim() || user?.email || "";
+
+      if (!finalName) {
         toast.error("Please enter your name");
         return false;
       }
-      if (!customerEmail.trim()) {
+      if (!finalEmail) {
         toast.error("Please enter your email");
         return false;
       }
@@ -138,18 +185,36 @@ function CheckoutPage() {
         return false;
       }
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(customerEmail)) {
+      if (!emailRegex.test(finalEmail)) {
         toast.error("Please enter a valid email");
         return false;
       }
-      if (fulfillmentType === "shipping" && !shippingAddress.trim()) {
-        toast.error("Alamat pengiriman wajib diisi untuk metode Diantar!");
-        return false;
+      if (fulfillmentType === "shipping") {
+        if (!streetAddress.trim()) {
+          toast.error("Nama Jalan & No Rumah wajib diisi!");
+          return false;
+        }
+        if (!kelurahan.trim()) {
+          toast.error("Kelurahan wajib diisi!");
+          return false;
+        }
+        if (!kecamatan.trim()) {
+          toast.error("Kecamatan wajib diisi!");
+          return false;
+        }
+        if (!city.trim()) {
+          toast.error("Kota/Kabupaten wajib diisi!");
+          return false;
+        }
+        if (!province.trim()) {
+          toast.error("Provinsi wajib diisi!");
+          return false;
+        }
+        if (!postalCode.trim()) {
+          toast.error("Kode Pos wajib diisi!");
+          return false;
+        }
       }
-    }
-    if (currentStep === 1 && cartItems.length === 0) {
-      toast.error("Your cart is empty");
-      return false;
     }
     return true;
   };
@@ -171,15 +236,19 @@ function CheckoutPage() {
           ? parsedId
           : undefined;
 
+      const finalName = customerName.trim() || (user ? (user.type === "buyer" ? user.name : user.username) : "");
+      const finalEmail = customerEmail.trim() || user?.email || "";
+      const finalNim = customerNim.trim() || (user && user.type === "buyer" ? user.nim : "") || "";
+
       const transactionDetails = {
         orderId: newOrderId,
         grossAmount: totalAmount,
-        customerName,
-        customerNim: customerNim.trim() || undefined,
-        customerEmail,
-        customerPhone,
+        customerName: finalName,
+        customerNim: finalNim || undefined,
+        customerEmail: finalEmail,
+        customerPhone: customerPhone.trim(),
         shippingAddress:
-          fulfillmentType === "pickup" ? "Ambil di FILKOM Merch (gratis)" : shippingAddress.trim(),
+          fulfillmentType === "pickup" ? "Ambil di FILKOM Merch (gratis)" : formattedAddress,
         fulfillmentType,
         items: cartItems,
         userId: buyerUserId,
@@ -309,7 +378,7 @@ function CheckoutPage() {
       <div className="mx-auto max-w-6xl px-4 py-8">
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Left Section */}
-          <div className="lg:col-span-2">
+          <div className={currentStep === 1 ? "lg:col-span-3" : "lg:col-span-2"}>
             {currentStep === 1 && (
               <CartReviewStep
                 items={cartItems}
@@ -323,13 +392,25 @@ function CheckoutPage() {
                 email={customerEmail}
                 phone={customerPhone}
                 nim={customerNim}
-                address={shippingAddress}
+                streetAddress={streetAddress}
+                rtRw={rtRw}
+                kelurahan={kelurahan}
+                kecamatan={kecamatan}
+                city={city}
+                province={province}
+                postalCode={postalCode}
                 fulfillmentType={fulfillmentType}
                 onNameChange={setCustomerName}
                 onEmailChange={setCustomerEmail}
                 onPhoneChange={setCustomerPhone}
                 onNimChange={setCustomerNim}
-                onAddressChange={setShippingAddress}
+                onStreetAddressChange={setStreetAddress}
+                onRtRwChange={setRtRw}
+                onKelurahanChange={setKelurahan}
+                onKecamatanChange={setKecamatan}
+                onCityChange={setCity}
+                onProvinceChange={setProvince}
+                onPostalCodeChange={setPostalCode}
                 onFulfillmentTypeChange={setFulfillmentType}
               />
             )}
@@ -344,7 +425,7 @@ function CheckoutPage() {
                   address:
                     fulfillmentType === "pickup"
                       ? "Ambil di FILKOM Merch (gratis)"
-                      : shippingAddress,
+                      : formattedAddress,
                 }}
               />
             )}
@@ -398,65 +479,67 @@ function CheckoutPage() {
           </div>
 
           {/* Right Section - Order Summary */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-4">
-              <CardHeader>
-                <CardTitle>Order Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {cartItems.map((item) => (
-                  <div key={item.id} className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">
-                      {item.name} × {item.quantity}
-                    </span>
-                    <span className="font-medium">
-                      Rp {(item.price * item.quantity).toLocaleString("id-ID")}
-                    </span>
-                  </div>
-                ))}
-
-                <div className="border-t border-border pt-4 space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Metode Pengiriman:</span>
-                    <span className="font-semibold text-ink">
-                      {fulfillmentType === "pickup" ? "Ambil di FILKOM Merch" : "Diantar (Kurir)"}
-                    </span>
-                  </div>
-                  {fulfillmentType === "shipping" ? (
-                    <div className="flex justify-between text-[11px] text-brand-orange bg-brand-orange/5 p-2.5 rounded border border-brand-orange/20">
-                      <span>Ongkir:</span>
-                      <span className="font-bold text-right">Info Jarak via WhatsApp</span>
+          {currentStep > 1 && (
+            <div className="lg:col-span-1">
+              <Card className="sticky top-4 border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+                <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
+                  <CardTitle className="display text-xs tracking-wider uppercase text-ink">Ringkasan Pesanan</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-6">
+                  {cartItems.map((item) => (
+                    <div key={item.id} className="flex justify-between text-xs font-bold border-b border-muted pb-2 last:border-0 last:pb-0 text-ink">
+                      <span className="truncate max-w-[180px]">
+                        {item.name} <span className="text-muted-foreground font-normal">× {item.quantity}</span>
+                      </span>
+                      <span className="shrink-0 font-extrabold text-brand-orange">
+                        Rp {(item.price * item.quantity).toLocaleString("id-ID")}
+                      </span>
                     </div>
-                  ) : (
-                    <div className="flex justify-between text-[11px] text-emerald-700 bg-emerald-50 p-2.5 rounded border border-emerald-200">
-                      <span>Ongkir:</span>
-                      <span className="font-bold">GRATIS</span>
+                  ))}
+
+                  <div className="border-t-2 border-ink pt-4 space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground font-semibold">Metode Pengiriman:</span>
+                      <span className="font-black text-ink uppercase tracking-wider text-[10px]">
+                        {fulfillmentType === "pickup" ? "Ambil Sendiri" : "Diantar Kurir"}
+                      </span>
+                    </div>
+                    {fulfillmentType === "shipping" ? (
+                      <div className="flex justify-between text-[11px] text-brand-orange bg-brand-orange/5 p-2.5 rounded-lg border border-brand-orange/20">
+                        <span>Ongkir:</span>
+                        <span className="font-bold text-right">Info Jarak via WhatsApp</span>
+                      </div>
+                    ) : (
+                      <div className="flex justify-between text-[11px] text-emerald-700 bg-emerald-50 p-2.5 rounded-lg border border-emerald-200">
+                        <span>Ongkir:</span>
+                        <span className="font-bold">GRATIS</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between font-semibold pt-4 border-t border-dashed border-ink/20">
+                      <span className="text-xs uppercase font-extrabold text-ink">Total</span>
+                      <div className="text-right">
+                        <span className="text-lg font-black text-brand-orange">
+                          Rp {totalAmount.toLocaleString("id-ID")}
+                        </span>
+                        {fulfillmentType === "shipping" && (
+                          <span className="text-[9px] text-muted-foreground block font-normal italic mt-0.5">
+                            (Belum termasuk ongkir)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {currentStep === 3 && (
+                    <div className="rounded-lg bg-[#FCFAF7] p-3 text-xs text-ink border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] space-y-1.5">
+                      <p className="font-extrabold uppercase text-[10px] text-brand-orange">
+                        💳 Seluruh Metode Pembayaran Online Bisa
+                      </p>
+                      <p className="text-muted-foreground leading-relaxed text-[11px]">
+                        Mendukung pembayaran otomatis via Virtual Account Bank (BCA, Mandiri, BRI, BNI), QRIS (GoPay, OVO, Dana, ShopeePay), dan Kartu Kredit.
+                      </p>
                     </div>
                   )}
-                  <div className="flex justify-between font-semibold pt-2 border-t border-dashed">
-                    <span>Total</span>
-                    <div className="text-right font-bold">
-                      <span className="text-lg text-primary block">
-                        Rp {totalAmount.toLocaleString("id-ID")}
-                      </span>
-                      {fulfillmentType === "shipping" && (
-                        <span className="text-[10px] text-muted-foreground block font-normal italic">
-                          (Belum termasuk ongkir)
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {currentStep === 3 && (
-                  <div className="rounded-lg bg-blue-50 p-3 text-xs text-blue-900 border border-blue-200">
-                    <p className="font-bold">ℹ️ Midtrans Secure Payment</p>
-                    <p className="mt-1">
-                      Klik "Bayar Sekarang" untuk memilih metode pembayaran (Virtual Account, QRIS,
-                      Kartu Kredit, dll.)
-                    </p>
-                  </div>
-                )}
 
                 {currentStep === 4 && (
                   <div className="rounded-lg bg-green-50 p-3 text-xs text-green-900">
@@ -467,59 +550,74 @@ function CheckoutPage() {
               </CardContent>
             </Card>
           </div>
-        </div>
+        )}
       </div>
+    </div>
     </div>
   );
 }
 
-interface CartReviewStepProps {
-  items: CartItem[];
-  onQuantityChange: (itemId: string, newQuantity: number) => void;
-  onRemoveItem: (itemId: string) => void;
-}
-
 function CartReviewStep({ items, onQuantityChange, onRemoveItem }: CartReviewStepProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Review Your Items</CardTitle>
-        <CardDescription>Check your cart before proceeding</CardDescription>
+    <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+      <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
+        <CardTitle className="display text-sm tracking-wider uppercase text-ink">Keranjang Belanja</CardTitle>
+        <CardDescription className="text-xs">Periksa kembali item belanjaan Anda sebelum melanjutkan</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-6">
         <div className="space-y-4">
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex flex-col sm:flex-row sm:items-center justify-between rounded-lg border border-border p-3 sm:p-4 gap-3"
+              className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border-2 border-ink p-4 gap-4 bg-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
             >
-              <div className="flex-1">
-                <h3 className="font-medium text-foreground">{item.name}</h3>
-                <p className="text-sm text-muted-foreground">{item.category}</p>
-                <p className="mt-1 font-semibold text-foreground">
-                  Rp {item.price.toLocaleString("id-ID")}
-                </p>
+              <div className="flex items-center gap-4 flex-1 min-w-0">
+                <div className="w-16 h-20 bg-cream border-2 border-ink rounded overflow-hidden flex items-center justify-center shrink-0 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]">
+                  {item.image_url || (item as any).img ? (
+                    <img src={item.image_url || (item as any).img} alt={item.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <ShoppingBag className="w-6 h-6 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-extrabold text-sm text-ink normal-case leading-snug truncate">{item.name}</h3>
+                  <p className="text-[10px] uppercase font-bold text-brand-orange tracking-wider mt-1">{item.category}</p>
+                  {item.size && (
+                    <span className="inline-block text-[10px] font-bold bg-cream border border-ink/20 px-2 py-0.5 rounded-full mt-1.5 text-ink">
+                      Ukuran: {item.size}
+                    </span>
+                  )}
+                  <p className="mt-2 font-black text-ink text-sm">
+                    Rp {item.price.toLocaleString("id-ID")}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
+                <div className="flex items-center gap-2 border-2 border-ink rounded-lg bg-cream/15 p-1">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    className="h-7 w-7 p-0 font-bold border-0 hover:bg-ink hover:text-cream cursor-pointer"
                     onClick={() => onQuantityChange(item.id, item.quantity - 1)}
                   >
                     −
                   </Button>
-                  <span className="w-8 text-center font-medium">{item.quantity}</span>
+                  <span className="w-8 text-center font-bold text-xs text-ink">{item.quantity}</span>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    className="h-7 w-7 p-0 font-bold border-0 hover:bg-ink hover:text-cream cursor-pointer"
                     onClick={() => onQuantityChange(item.id, item.quantity + 1)}
                   >
                     +
                   </Button>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => onRemoveItem(item.id)}>
-                  Remove
+                <Button
+                  variant="ghost"
+                  className="text-red-500 hover:text-red-700 hover:bg-red-50 font-bold text-xs uppercase cursor-pointer"
+                  onClick={() => onRemoveItem(item.id)}
+                >
+                  Hapus
                 </Button>
               </div>
             </div>
@@ -535,13 +633,25 @@ interface CustomerDetailsStepProps {
   nim: string;
   email: string;
   phone: string;
-  address: string;
+  streetAddress: string;
+  rtRw: string;
+  kelurahan: string;
+  kecamatan: string;
+  city: string;
+  province: string;
+  postalCode: string;
   fulfillmentType: "pickup" | "shipping";
   onNameChange: (value: string) => void;
   onNimChange: (value: string) => void;
   onEmailChange: (value: string) => void;
   onPhoneChange: (value: string) => void;
-  onAddressChange: (value: string) => void;
+  onStreetAddressChange: (value: string) => void;
+  onRtRwChange: (value: string) => void;
+  onKelurahanChange: (value: string) => void;
+  onKecamatanChange: (value: string) => void;
+  onCityChange: (value: string) => void;
+  onProvinceChange: (value: string) => void;
+  onPostalCodeChange: (value: string) => void;
   onFulfillmentTypeChange: (value: "pickup" | "shipping") => void;
 }
 
@@ -550,15 +660,134 @@ function CustomerDetailsStep({
   nim,
   email,
   phone,
-  address,
+  streetAddress,
+  rtRw,
+  kelurahan,
+  kecamatan,
+  city,
+  province,
+  postalCode,
   fulfillmentType,
   onNameChange,
   onNimChange,
   onEmailChange,
   onPhoneChange,
-  onAddressChange,
+  onStreetAddressChange,
+  onRtRwChange,
+  onKelurahanChange,
+  onKecamatanChange,
+  onCityChange,
+  onProvinceChange,
+  onPostalCodeChange,
   onFulfillmentTypeChange,
 }: CustomerDetailsStepProps) {
+  const { user } = useAuth();
+
+  const [provinces, setProvinces] = useState<{ id: string; name: string }[]>([]);
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+  const [districts, setDistricts] = useState<{ id: string; name: string }[]>([]);
+  const [villages, setVillages] = useState<{ id: string; name: string }[]>([]);
+
+  const [provId, setProvId] = useState("");
+  const [cityId, setCityId] = useState("");
+  const [distId, setDistId] = useState("");
+  const [villId, setVillId] = useState("");
+
+  const [loadingProv, setLoadingProv] = useState(false);
+  const [loadingCity, setLoadingCity] = useState(false);
+  const [loadingDist, setLoadingDist] = useState(false);
+  const [loadingVill, setLoadingVill] = useState(false);
+
+  const [apiFailed, setApiFailed] = useState(false);
+
+  const toTitleCase = (str: string) => {
+    if (!str) return "";
+    return str
+      .toLowerCase()
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  // Load provinces on mount/shipping selection
+  useEffect(() => {
+    if (fulfillmentType === "shipping" && provinces.length === 0) {
+      setLoadingProv(true);
+      fetch("https://cdn.jsdelivr.net/gh/emsifa/api-wilayah-indonesia@gh-pages/api/provinces.json")
+        .then((res) => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
+        .then((data) => {
+          setProvinces(data);
+          setApiFailed(false);
+        })
+        .catch(() => {
+          setApiFailed(true);
+        })
+        .finally(() => {
+          setLoadingProv(false);
+        });
+    }
+  }, [fulfillmentType]);
+
+  // Fetch cities when provId changes
+  useEffect(() => {
+    if (provId) {
+      setLoadingCity(true);
+      setCities([]);
+      setDistricts([]);
+      setVillages([]);
+      setCityId("");
+      setDistId("");
+      setVillId("");
+      fetch(`https://cdn.jsdelivr.net/gh/emsifa/api-wilayah-indonesia@gh-pages/api/regencies/${provId}.json`)
+        .then((res) => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
+        .then((data) => setCities(data))
+        .catch(() => setApiFailed(true))
+        .finally(() => setLoadingCity(false));
+    }
+  }, [provId]);
+
+  // Fetch districts when cityId changes
+  useEffect(() => {
+    if (cityId) {
+      setLoadingDist(true);
+      setDistricts([]);
+      setVillages([]);
+      setDistId("");
+      setVillId("");
+      fetch(`https://cdn.jsdelivr.net/gh/emsifa/api-wilayah-indonesia@gh-pages/api/districts/${cityId}.json`)
+        .then((res) => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
+        .then((data) => setDistricts(data))
+        .catch(() => setApiFailed(true))
+        .finally(() => setLoadingDist(false));
+    }
+  }, [cityId]);
+
+  // Fetch villages when distId changes
+  useEffect(() => {
+    if (distId) {
+      setLoadingVill(true);
+      setVillages([]);
+      setVillId("");
+      fetch(`https://cdn.jsdelivr.net/gh/emsifa/api-wilayah-indonesia@gh-pages/api/villages/${distId}.json`)
+        .then((res) => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
+        .then((data) => setVillages(data))
+        .catch(() => setApiFailed(true))
+        .finally(() => setLoadingVill(false));
+    }
+  }, [distId]);
+  
   return (
     <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
       <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
@@ -570,6 +799,30 @@ function CustomerDetailsStep({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 pt-6 text-ink">
+        {/* User Auth Session Info Card */}
+        {user && (
+          <div className="bg-[#FCFAF7] border-2 border-ink p-4 rounded-xl text-ink text-xs space-y-2 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-black uppercase tracking-wider text-[10px] text-emerald-700">
+                Akun Terverifikasi
+              </span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-ink/10">
+              <div>
+                <span className="text-muted-foreground font-bold block text-[10px] uppercase">Email Anda</span>
+                <span className="font-semibold">{user.email}</span>
+              </div>
+              {user.type === "buyer" && user.nim && (
+                <div>
+                  <span className="text-muted-foreground font-bold block text-[10px] uppercase">NIM Anda</span>
+                  <span className="font-mono font-semibold text-brand-orange">{user.nim}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="space-y-2">
           <Label htmlFor="name" className="font-bold text-xs uppercase">
             Nama Lengkap *
@@ -579,34 +832,7 @@ function CustomerDetailsStep({
             placeholder="Nama Lengkap"
             value={name}
             onChange={(e) => onNameChange(e.target.value)}
-            className="border-2 border-ink bg-white"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="email" className="font-bold text-xs uppercase">
-            Email *
-          </Label>
-          <Input
-            id="email"
-            type="email"
-            placeholder="john@example.com"
-            value={email}
-            onChange={(e) => onEmailChange(e.target.value)}
-            className="border-2 border-ink bg-white"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="nim" className="font-bold text-xs uppercase">
-            NIM
-          </Label>
-          <Input
-            id="nim"
-            placeholder="NIM Mahasiswa (opsional)"
-            value={nim}
-            onChange={(e) => onNimChange(e.target.value)}
-            className="border-2 border-ink bg-white"
+            className="border-2 border-ink bg-white font-bold text-xs p-5"
           />
         </div>
 
@@ -620,7 +846,7 @@ function CustomerDetailsStep({
             placeholder="Contoh: 08123456789"
             value={phone}
             onChange={(e) => onPhoneChange(e.target.value)}
-            className="border-2 border-ink bg-white"
+            className="border-2 border-ink bg-white font-mono text-xs p-5"
           />
         </div>
 
@@ -633,7 +859,7 @@ function CustomerDetailsStep({
               onClick={() => onFulfillmentTypeChange("pickup")}
               className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${
                 fulfillmentType === "pickup"
-                  ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                  ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
                   : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
               }`}
             >
@@ -649,7 +875,7 @@ function CustomerDetailsStep({
               onClick={() => onFulfillmentTypeChange("shipping")}
               className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${
                 fulfillmentType === "shipping"
-                  ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                  ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
                   : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
               }`}
             >
@@ -665,17 +891,206 @@ function CustomerDetailsStep({
         </div>
 
         {fulfillmentType === "shipping" && (
-          <div className="space-y-2 animate-fade-in">
-            <Label htmlFor="address" className="font-bold text-xs uppercase text-brand-orange">
+          <div className="space-y-4 border-2 border-ink bg-[#FCFAF7] p-4 rounded-xl shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] animate-fade-in">
+            <h3 className="font-extrabold text-xs uppercase text-brand-orange">
               Alamat Pengiriman Lengkap *
-            </Label>
-            <Input
-              id="address"
-              placeholder="Tulis alamat pengiriman secara detail..."
-              value={address}
-              onChange={(e) => onAddressChange(e.target.value)}
-              className="border-2 border-ink bg-white"
-            />
+            </h3>
+            {apiFailed && (
+              <p className="text-[10px] text-red-500 font-bold bg-red-50 border border-red-200 p-2 rounded">
+                ⚠️ Sistem wilayah otomatis sedang offline, silakan isi alamat secara manual di bawah ini.
+              </p>
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="streetAddress" className="font-bold text-[10px] uppercase text-ink">
+                Nama Jalan / No Rumah *
+              </Label>
+              <Input
+                id="streetAddress"
+                placeholder="Contoh: Jl. Veteran No. 8"
+                value={streetAddress}
+                onChange={(e) => onStreetAddressChange(e.target.value)}
+                className="border-2 border-ink bg-white font-medium text-xs p-3.5"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="rtRw" className="font-bold text-[10px] uppercase text-ink">
+                  RT / RW (Opsional)
+                </Label>
+                <Input
+                  id="rtRw"
+                  placeholder="Contoh: 02/04"
+                  value={rtRw}
+                  onChange={(e) => onRtRwChange(e.target.value)}
+                  className="border-2 border-ink bg-white font-medium text-xs p-3.5"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="postalCode" className="font-bold text-[10px] uppercase text-ink">
+                  Kode Pos *
+                </Label>
+                <Input
+                  id="postalCode"
+                  placeholder="Contoh: 65145"
+                  value={postalCode}
+                  onChange={(e) => onPostalCodeChange(e.target.value)}
+                  className="border-2 border-ink bg-white font-medium text-xs p-3.5"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="province" className="font-bold text-[10px] uppercase text-ink">
+                  Provinsi *
+                </Label>
+                {apiFailed ? (
+                  <Input
+                    id="province"
+                    placeholder="Contoh: Jawa Timur"
+                    value={province}
+                    onChange={(e) => onProvinceChange(e.target.value)}
+                    className="border-2 border-ink bg-white font-medium text-xs p-3.5"
+                  />
+                ) : (
+                  <select
+                    id="province"
+                    value={provId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setProvId(id);
+                      const matched = provinces.find((p) => p.id === id);
+                      onProvinceChange(matched ? toTitleCase(matched.name) : "");
+                      onCityChange("");
+                      onKecamatanChange("");
+                      onKelurahanChange("");
+                    }}
+                    className="w-full border-2 border-ink bg-white font-bold text-xs p-3 rounded-lg focus:outline-none cursor-pointer"
+                    disabled={loadingProv}
+                  >
+                    <option value="">{loadingProv ? "Memuat..." : "-- Pilih Provinsi --"}</option>
+                    {provinces.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {toTitleCase(p.name)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="city" className="font-bold text-[10px] uppercase text-ink">
+                  Kota / Kabupaten *
+                </Label>
+                {apiFailed ? (
+                  <Input
+                    id="city"
+                    placeholder="Contoh: Malang"
+                    value={city}
+                    onChange={(e) => onCityChange(e.target.value)}
+                    className="border-2 border-ink bg-white font-medium text-xs p-3.5"
+                  />
+                ) : (
+                  <select
+                    id="city"
+                    value={cityId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setCityId(id);
+                      const matched = cities.find((c) => c.id === id);
+                      onCityChange(matched ? toTitleCase(matched.name) : "");
+                      onKecamatanChange("");
+                      onKelurahanChange("");
+                    }}
+                    className="w-full border-2 border-ink bg-white font-bold text-xs p-3 rounded-lg focus:outline-none cursor-pointer"
+                    disabled={!provId || loadingCity}
+                  >
+                    <option value="">{loadingCity ? "Memuat..." : provId ? "-- Pilih Kota/Kabupaten --" : "-- Pilih Provinsi Dulu --"}</option>
+                    {cities.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {toTitleCase(c.name)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="kecamatan" className="font-bold text-[10px] uppercase text-ink">
+                  Kecamatan *
+                </Label>
+                {apiFailed ? (
+                  <Input
+                    id="kecamatan"
+                    placeholder="Kecamatan"
+                    value={kecamatan}
+                    onChange={(e) => onKecamatanChange(e.target.value)}
+                    className="border-2 border-ink bg-white font-medium text-xs p-3.5"
+                  />
+                ) : (
+                  <select
+                    id="kecamatan"
+                    value={distId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setDistId(id);
+                      const matched = districts.find((d) => d.id === id);
+                      onKecamatanChange(matched ? toTitleCase(matched.name) : "");
+                      onKelurahanChange("");
+                    }}
+                    className="w-full border-2 border-ink bg-white font-bold text-xs p-3 rounded-lg focus:outline-none cursor-pointer"
+                    disabled={!cityId || loadingDist}
+                  >
+                    <option value="">{loadingDist ? "Memuat..." : cityId ? "-- Pilih Kecamatan --" : "-- Pilih Kota Dulu --"}</option>
+                    {districts.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {toTitleCase(d.name)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="kelurahan" className="font-bold text-[10px] uppercase text-ink">
+                  Desa / Kelurahan *
+                </Label>
+                {apiFailed ? (
+                  <Input
+                    id="kelurahan"
+                    placeholder="Kelurahan"
+                    value={kelurahan}
+                    onChange={(e) => onKelurahanChange(e.target.value)}
+                    className="border-2 border-ink bg-white font-medium text-xs p-3.5"
+                  />
+                ) : (
+                  <select
+                    id="kelurahan"
+                    value={villId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setVillId(id);
+                      const matched = villages.find((v) => v.id === id);
+                      onKelurahanChange(matched ? toTitleCase(matched.name) : "");
+                    }}
+                    className="w-full border-2 border-ink bg-white font-bold text-xs p-3 rounded-lg focus:outline-none cursor-pointer"
+                    disabled={!distId || loadingVill}
+                  >
+                    <option value="">{loadingVill ? "Memuat..." : distId ? "-- Pilih Kelurahan/Desa --" : "-- Pilih Kecamatan Dulu --"}</option>
+                    {villages.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {toTitleCase(v.name)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </CardContent>
@@ -696,18 +1111,35 @@ interface PaymentReviewStepProps {
 
 function PaymentReviewStep({ items, customer }: PaymentReviewStepProps) {
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Order Details</CardTitle>
+    <div className="space-y-6">
+      <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+        <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
+          <CardTitle className="display text-sm tracking-wider uppercase text-ink">Detail Pesanan Anda</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           {items.map((item) => (
-            <div key={item.id} className="flex justify-between">
-              <span className="text-muted-foreground">
-                {item.name} × {item.quantity}
-              </span>
-              <span className="font-medium">
+            <div key={item.id} className="flex gap-4 items-center justify-between border-b border-muted pb-3 last:border-0 last:pb-0">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="w-12 h-16 bg-cream border-2 border-ink rounded overflow-hidden flex items-center justify-center shrink-0">
+                  {item.image_url || (item as any).img ? (
+                    <img src={item.image_url || (item as any).img} alt={item.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <ShoppingBag className="w-5 h-5 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-ink leading-tight truncate">{item.name}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    {item.quantity} x Rp {item.price.toLocaleString("id-ID")}
+                  </p>
+                  {item.size && (
+                    <span className="inline-block text-[9px] font-bold bg-cream border border-ink/20 px-1.5 py-0.2 rounded-full mt-1 text-ink">
+                      Ukuran: {item.size}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span className="font-extrabold text-sm text-ink shrink-0">
                 Rp {(item.price * item.quantity).toLocaleString("id-ID")}
               </span>
             </div>
@@ -715,16 +1147,39 @@ function PaymentReviewStep({ items, customer }: PaymentReviewStepProps) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Delivery To</CardTitle>
+      <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+        <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
+          <CardTitle className="display text-sm tracking-wider uppercase text-ink">Informasi Pengiriman</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <p className="font-medium">{customer.name}</p>
-          {customer.nim && <p className="text-sm text-muted-foreground">NIM: {customer.nim}</p>}
-          <p className="text-sm text-muted-foreground">{customer.email}</p>
-          <p className="text-sm text-muted-foreground">{customer.phone}</p>
-          {customer.address && <p className="text-sm text-muted-foreground">{customer.address}</p>}
+        <CardContent className="space-y-3 pt-6 text-xs text-ink font-medium">
+          <div className="grid grid-cols-2 gap-3 border-b border-ink/10 pb-3">
+            <div>
+              <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">Penerima</span>
+              <span className="font-bold text-sm">{customer.name}</span>
+            </div>
+            {customer.nim && (
+              <div>
+                <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">NIM</span>
+                <span className="font-mono font-bold text-brand-orange">{customer.nim}</span>
+              </div>
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-3 border-b border-ink/10 pb-3">
+            <div>
+              <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">Email</span>
+              <span className="font-semibold">{customer.email}</span>
+            </div>
+            <div>
+              <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">WhatsApp</span>
+              <span className="font-mono font-semibold">{customer.phone}</span>
+            </div>
+          </div>
+          {customer.address && (
+            <div>
+              <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">Alamat Tujuan</span>
+              <p className="font-bold text-brand-blue">{customer.address}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

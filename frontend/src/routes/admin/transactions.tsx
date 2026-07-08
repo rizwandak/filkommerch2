@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
 import { Badge } from "@frontend/components/ui/badge";
@@ -49,6 +50,8 @@ const statusColor: Record<string, string> = {
 };
 
 function AdminTransactionsPage() {
+  const { user } = useAuth();
+  const isCashier = user?.role === "cashier";
   const [onlineOrders, setOnlineOrders] = useState<Order[]>([]);
   const [offlineSales, setOfflineSales] = useState<OfflineSale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,6 +119,10 @@ function AdminTransactionsPage() {
   };
 
   const handleOpenEditStatus = (order: Order) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah status transaksi.");
+      return;
+    }
     setEditOrderId(order.order_id);
     setEditStatus(order.transaction_status);
     setEditShippingAddress(order.shipping_address || "");
@@ -123,6 +130,10 @@ function AdminTransactionsPage() {
   };
 
   const handleSaveStatus = async () => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah status transaksi.");
+      return;
+    }
     if (!editOrderId || !editStatus) return;
     setSavingStatus(true);
     try {
@@ -148,6 +159,10 @@ function AdminTransactionsPage() {
   };
 
   const handleDeleteOrder = async (id: string) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menghapus transaksi.");
+      return;
+    }
     if (!window.confirm(`Hapus transaksi online ${id} secara permanen?`)) return;
     try {
       const result = await deleteOrder({ data: id });
@@ -163,6 +178,10 @@ function AdminTransactionsPage() {
   };
 
   const handleDeleteSale = async (id: string) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menghapus data POS.");
+      return;
+    }
     if (!window.confirm(`Hapus penjualan offline POS ${id} secara permanen?`)) return;
     try {
       const result = await deleteOfflineSale({ data: id });
@@ -290,22 +309,26 @@ function AdminTransactionsPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleOpenEditStatus(order)}
-                                className="hover:bg-muted text-ink"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:bg-red-50"
-                                onClick={() => void handleDeleteOrder(order.order_id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {!isCashier && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleOpenEditStatus(order)}
+                                  className="hover:bg-muted text-ink"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                              )}
+                              {!isCashier && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:bg-red-50"
+                                  onClick={() => void handleDeleteOrder(order.order_id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -404,14 +427,16 @@ function AdminTransactionsPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-destructive hover:bg-red-50"
-                                onClick={() => void handleDeleteSale(sale.sale_id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {!isCashier && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="text-destructive hover:bg-red-50"
+                                  onClick={() => void handleDeleteSale(sale.sale_id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>

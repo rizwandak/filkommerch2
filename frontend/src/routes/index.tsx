@@ -23,6 +23,8 @@ import {
   Mail,
   MapPin,
   ChevronDown,
+  LayoutDashboard,
+  MonitorSmartphone,
 } from "lucide-react";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useMemo, useState, useEffect, useCallback } from "react";
@@ -36,6 +38,8 @@ import {
   getDefaultSegments,
   extractLegacyConfigFromSegments,
 } from "@/lib/homepage-types";
+import { Carousel, CarouselContent, CarouselItem } from "@frontend/components/ui/carousel";
+import type { CarouselApi } from "@frontend/components/ui/carousel";
 
 import logo from "@/assets/logo-fm.jpg";
 import logoFilkom from "@/assets/logo_filkom.png";
@@ -325,6 +329,79 @@ function CountdownTimer({ targetDate }: { targetDate: string }) {
           Det
         </span>
       </div>
+    </div>
+  );
+}
+
+interface HeroCarouselProps {
+  images: string[];
+}
+
+function HeroCarousel({ images }: HeroCarouselProps) {
+  const [api, setApi] = useState<CarouselApi>();
+  const [current, setCurrent] = useState(0);
+  const [count, setCount] = useState(0);
+
+  useEffect(() => {
+    if (!api) return;
+
+    setCount(api.scrollSnapList().length);
+    setCurrent(api.selectedScrollSnap());
+
+    api.on("select", () => {
+      setCurrent(api.selectedScrollSnap());
+    });
+  }, [api]);
+
+  // Autoplay
+  useEffect(() => {
+    if (!api) return;
+    const interval = setInterval(() => {
+      if (api.canScrollNext()) {
+        api.scrollNext();
+      } else {
+        api.scrollTo(0);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [api]);
+
+  const slideImages = images && images.length > 0 ? images : [hero];
+
+  return (
+    <div className="w-full h-full relative group">
+      <Carousel setApi={setApi} className="w-full h-full" opts={{ loop: true }}>
+        <CarouselContent className="h-full -ml-0">
+          {slideImages.map((imgUrl, index) => (
+            <CarouselItem key={index} className="h-full pl-0 relative">
+              <img
+                src={imgUrl}
+                alt={`Filkom Merch Hero Lookbook Slide ${index + 1}`}
+                className="w-full h-full object-cover transition-transform duration-[15000ms] ease-out hover:scale-105"
+              />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
+      </Carousel>
+
+      {/* dots indicator */}
+      {slideImages.length > 1 && (
+        <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2.5 z-20">
+          {slideImages.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => api?.scrollTo(index)}
+              className={`h-2.5 rounded-full transition-all duration-300 border border-ink cursor-pointer ${
+                index === current
+                  ? "bg-brand-orange w-7 shadow-sm"
+                  : "bg-cream/60 hover:bg-cream w-2.5"
+              }`}
+              aria-label={`Buka slide ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -624,6 +701,7 @@ function Index() {
       variant_id: item.variant_id,
       size: item.size,
       color: item.color,
+      image_url: item.img || item.image_url || "",
       category: item.name.includes("Varsity")
         ? "JACKET"
         : item.name.includes("Hoodie")
@@ -795,6 +873,26 @@ function Index() {
                           </div>
                         )}
                       </div>
+                      {user.type === "admin" && (
+                        <Link
+                          to="/admin/dashboard"
+                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-blue"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          Panel Admin
+                        </Link>
+                      )}
+                      {user.type === "admin" && (
+                        <Link
+                          to="/pos"
+                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-orange"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <MonitorSmartphone className="w-4 h-4" />
+                          Kasir / POS
+                        </Link>
+                      )}
                       {user.type === "buyer" && (
                         <Link
                           to="/orders"
@@ -968,12 +1066,8 @@ function Index() {
                           </div>
                         </div>
 
-                        <div className="lg:col-span-6 relative aspect-square lg:aspect-[5/6] border-t-2 lg:border-t-0 lg:border-l-2 border-ink bg-neutral-900 overflow-hidden flex items-center justify-center order-1 lg:order-2">
-                          <img
-                            src={el.config.image || hero}
-                            alt="Filkom Merch Hero Lookbook"
-                            className="w-full h-full object-cover transition-transform duration-[15000ms] ease-out hover:scale-105"
-                          />
+                        <div className="lg:col-span-6 relative aspect-[5/6] border-t-2 lg:border-t-0 lg:border-l-2 border-ink bg-neutral-900 overflow-hidden order-1 lg:order-2">
+                          <HeroCarousel images={el.config.images || (el.config.image ? [el.config.image] : [])} />
                         </div>
                       </div>
                     </section>

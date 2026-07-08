@@ -24,13 +24,13 @@ interface NavItem {
 }
 
 const adminNavItems: NavItem[] = [
-  { label: "Dashboard", to: "/admin/dashboard", icon: LayoutDashboard, roles: ["admin"] },
-  { label: "Produk", to: "/admin/products", icon: Package, roles: ["admin"] },
-  { label: "Transaksi", to: "/admin/transactions", icon: Receipt, roles: ["admin"] },
-  { label: "Pengguna", to: "/admin/users", icon: Users, roles: ["admin"] },
-  { label: "Tata Letak", to: "/admin/homepage", icon: Sliders, roles: ["admin"] },
-  { label: "Log Aktivitas", to: "/admin/activity-logs", icon: History, roles: ["admin"] },
-  { label: "Pengaturan Toko", to: "/admin/settings", icon: Settings, roles: ["admin"] },
+  { label: "Dashboard", to: "/admin/dashboard", icon: LayoutDashboard, roles: ["admin", "cashier"] },
+  { label: "Produk", to: "/admin/products", icon: Package, roles: ["admin", "cashier"] },
+  { label: "Transaksi", to: "/admin/transactions", icon: Receipt, roles: ["admin", "cashier"] },
+  { label: "Pengguna", to: "/admin/users", icon: Users, roles: ["admin", "cashier"] },
+  { label: "Tata Letak", to: "/admin/homepage", icon: Sliders, roles: ["admin", "cashier"] },
+  { label: "Log Aktivitas", to: "/admin/activity-logs", icon: History, roles: ["admin", "cashier"] },
+  { label: "Pengaturan Toko", to: "/admin/settings", icon: Settings, roles: ["admin", "cashier"] },
 ];
 
 interface AdminSidebarProps {

@@ -32,6 +32,7 @@ export interface HeroBannerConfig {
   btnText: string;
   btnLink?: string;
   image: string;
+  images?: string[];
   showCountdown: boolean;
   countdownEnd: string;
 }
@@ -109,7 +110,22 @@ function getTypeName(type: ElementType): string {
 
 export function convertLegacyToSegments(legacy: any): HomepageSegment[] {
   if (Array.isArray(legacy) && legacy.length > 0 && "elements" in legacy[0]) {
-    return legacy;
+    return legacy.map((seg: any) => ({
+      ...seg,
+      elements: seg.elements?.map((el: any) => {
+        if (el.type === "hero_banner" && el.config) {
+          const images = el.config.images || (el.config.image ? [el.config.image] : []);
+          return {
+            ...el,
+            config: {
+              ...el.config,
+              images,
+            },
+          };
+        }
+        return el;
+      }) || [],
+    }));
   }
 
   if (Array.isArray(legacy)) {
@@ -162,6 +178,7 @@ export function convertLegacyToSegments(legacy: any): HomepageSegment[] {
           btnText: legacyFlat.heroBtnText || "SHOP THE DROP",
           btnLink: "",
           image: legacyFlat.heroImage || "",
+          images: legacyFlat.heroImages || (legacyFlat.heroImage ? [legacyFlat.heroImage] : []),
           showCountdown: legacyFlat.showHeroCountdown !== undefined ? legacyFlat.showHeroCountdown : true,
           countdownEnd: legacyFlat.heroCountdownEnd || "2026-07-15T23:59:59+07:00"
         }
@@ -317,6 +334,7 @@ export function getDefaultSegments(): HomepageSegment[] {
             btnText: "SHOP THE DROP",
             btnLink: "",
             image: "",
+            images: [],
             showCountdown: true,
             countdownEnd: "2026-07-15T23:59:59+07:00"
           }
@@ -484,6 +502,7 @@ export function extractLegacyConfigFromSegments(input: any): any {
     legacy.heroSubLabel = hero.config?.subLabel;
     legacy.heroBtnText = hero.config?.btnText;
     legacy.heroImage = hero.config?.image;
+    legacy.heroImages = hero.config?.images || [];
     legacy.showHeroCountdown = hero.config?.showCountdown;
     legacy.heroCountdownEnd = hero.config?.countdownEnd;
   }

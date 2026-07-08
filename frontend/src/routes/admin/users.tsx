@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Search, User } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Input } from "@frontend/components/ui/input";
@@ -58,6 +59,8 @@ const emptyForm = (): UserForm => ({
 });
 
 function AdminUsersPage() {
+  const { user } = useAuth();
+  const isCashier = user?.role === "cashier";
   const [users, setUsers] = useState<DbUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -110,6 +113,10 @@ function AdminUsersPage() {
   };
 
   const handleSave = async () => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah pengguna.");
+      return;
+    }
     if (!form.name || !form.email || !form.role) {
       toast.error("Nama, username, dan peran wajib diisi!");
       return;
@@ -154,6 +161,10 @@ function AdminUsersPage() {
   };
 
   const openDeleteConfirm = (user: DbUser) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menghapus pengguna.");
+      return;
+    }
     if (user.id === 1) {
       toast.error("Admin utama tidak dapat dihapus!");
       return;
@@ -164,6 +175,10 @@ function AdminUsersPage() {
   };
 
   const confirmDelete = async () => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menghapus pengguna.");
+      return;
+    }
     if (!userToDelete) return;
     setSaving(true);
     try {
@@ -219,13 +234,15 @@ function AdminUsersPage() {
             Kelola data mahasiswa dan tim operasional (Admin & Kasir)
           </p>
         </div>
-        <Button
-          onClick={openCreate}
-          className="display bg-ink text-white hover:bg-brand-orange transition-all duration-300 text-xs font-bold tracking-widest py-5 px-6 self-start sm:self-auto"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Tambah Pengguna
-        </Button>
+        {!isCashier && (
+          <Button
+            onClick={openCreate}
+            className="display bg-ink text-white hover:bg-brand-orange transition-all duration-300 text-xs font-bold tracking-widest py-5 px-6 self-start sm:self-auto"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Tambah Pengguna
+          </Button>
+        )}
       </div>
 
       {/* Filters & Search */}
@@ -291,9 +308,11 @@ function AdminUsersPage() {
                   <th className="p-3 text-center text-xs font-semibold tracking-wider text-ink uppercase">
                     Peran
                   </th>
-                  <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
-                    Aksi
-                  </th>
+                  {!isCashier && (
+                    <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
+                      Aksi
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -338,27 +357,29 @@ function AdminUsersPage() {
                           {user.role}
                         </span>
                       </td>
-                      <td className="p-3 text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(user)}
-                            className="hover:bg-muted text-ink"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            disabled={user.id === 1}
-                            className="text-destructive hover:bg-red-50 disabled:opacity-30"
-                            onClick={() => openDeleteConfirm(user)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
+                      {!isCashier && (
+                        <td className="p-3 text-right">
+                          <div className="flex justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEdit(user)}
+                              className="hover:bg-muted text-ink"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              disabled={user.id === 1}
+                              className="text-destructive hover:bg-red-50 disabled:opacity-30"
+                              onClick={() => openDeleteConfirm(user)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   ))
                 )}

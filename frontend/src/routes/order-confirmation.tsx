@@ -8,6 +8,7 @@ import {
   Loader2,
   CreditCard,
   MessageCircle,
+  ShoppingBag,
 } from "lucide-react";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
@@ -35,6 +36,7 @@ export const Route = createFileRoute("/order-confirmation")({
 function OrderConfirmationPage() {
   const search = useSearch({ from: "/order-confirmation" });
   const [order, setOrder] = useState<any>(null);
+  const [orderItems, setOrderItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
@@ -64,6 +66,7 @@ function OrderConfirmationPage() {
       const result = await getOrderById({ data: search.orderId });
       if (result.success && result.order) {
         setOrder(result.order);
+        setOrderItems(result.items || []);
       } else {
         toast.error(result.error || "Gagal mengambil data status pesanan");
       }
@@ -255,6 +258,45 @@ function OrderConfirmationPage() {
                     * Pengambilan barang gratis di toko fisik FILKOM Merch UB.
                   </div>
                 )}
+              </div>
+            )}
+
+            {orderItems && orderItems.length > 0 && (
+              <div className="border border-border rounded-lg p-4 space-y-3 bg-[#FCFAF7]">
+                <p className="text-[10px] font-black text-ink uppercase tracking-wider border-b border-ink/10 pb-2">
+                  Produk yang Dipesan
+                </p>
+                <div className="space-y-3">
+                  {orderItems.map((item) => (
+                    <div key={item.id} className="flex gap-4 items-center justify-between border-b border-ink/5 pb-3 last:border-0 last:pb-0">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className="w-12 h-16 bg-cream border border-ink rounded overflow-hidden flex items-center justify-center shrink-0 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]">
+                          {item.image_url ? (
+                            <img src={item.image_url} alt={item.product_name} className="w-full h-full object-cover" />
+                          ) : (
+                            <ShoppingBag className="w-5 h-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-bold text-ink leading-tight truncate">
+                            {item.product_name}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-1 font-medium">
+                            {item.quantity} x Rp {item.unit_price?.toLocaleString("id-ID")}
+                          </p>
+                          {item.size && (
+                            <span className="inline-block text-[9px] font-bold bg-cream border border-ink/10 px-2 py-0.5 rounded-full mt-1.5 text-ink">
+                              Ukuran: {item.size} {item.color && item.color !== 'Default' ? `| Warna: ${item.color}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-xs font-extrabold text-brand-orange shrink-0">
+                        Rp {item.subtotal?.toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

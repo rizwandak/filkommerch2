@@ -19,6 +19,8 @@ import {
   Lock,
   User,
   ShieldCheck,
+  LayoutDashboard,
+  MonitorSmartphone,
 } from "lucide-react";
 import { getProducts, getStoreSettings, type ProductWithVariants } from "@backend/server-actions";
 import { useAuth } from "@/lib/auth";
@@ -383,6 +385,7 @@ function PreOrderPage() {
       variant_id: item.variant_id,
       size: item.size,
       color: item.color,
+      image_url: item.img || item.image_url || "",
       category: "JACKET",
     }));
 
@@ -478,9 +481,30 @@ function PreOrderPage() {
                   {user ? (
                     <div className="p-3 border-b border-border text-xs space-y-1.5">
                       <p className="font-bold">{user.type === "admin" ? user.username : user.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{user.email}</p>
+                      {user.type === "admin" && (
+                        <div className="space-y-1.5 pt-1.5 border-t border-border mt-1.5">
+                          <Link
+                            to="/admin/dashboard"
+                            className="flex items-center gap-1.5 font-bold text-brand-blue hover:underline"
+                            onClick={() => setUserMenuOpen(false)}
+                          >
+                            <LayoutDashboard className="w-3.5 h-3.5" />
+                            Panel Admin
+                          </Link>
+                          <Link
+                            to="/pos"
+                            className="flex items-center gap-1.5 font-bold text-brand-orange hover:underline"
+                            onClick={() => setUserMenuOpen(false)}
+                          >
+                            <MonitorSmartphone className="w-3.5 h-3.5" />
+                            Kasir / POS
+                          </Link>
+                        </div>
+                      )}
                       <button
                         onClick={logout}
-                        className="w-full text-left text-brand-orange font-bold mt-2"
+                        className="w-full text-left text-red-600 font-bold mt-2 pt-1.5 border-t border-border"
                       >
                         Logout
                       </button>

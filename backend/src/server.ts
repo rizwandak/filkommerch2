@@ -17,6 +17,7 @@ dotenv.config();
 validateConfig();
 
 const app = express();
+app.set("trust proxy", true);
 const port = process.env.PORT || 8080;
 
 // ============ SECURITY MIDDLEWARE ============
@@ -45,7 +46,13 @@ app.use(
       }
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "ngrok-skip-browser-warning",
+      "bypass-tunnel-reminder",
+      "Bypass-Tunnel-Reminder"
+    ],
     credentials: true,
   })
 );
@@ -225,17 +232,17 @@ app.get("/api/sales/:id", apiControllers.getOfflineSaleById);
 app.delete("/api/sales/:id", checkRole(["admin"]), apiControllers.deleteOfflineSale);
 
 // Admin Specific API Routes
-app.get("/api/admin/products", apiControllers.getAllProductsAdmin);
+app.get("/api/admin/products", checkRole(["admin", "cashier"]), apiControllers.getAllProductsAdmin);
 app.post("/api/admin/products", checkRole(["admin"]), apiControllers.createProduct);
 app.put("/api/admin/products", checkRole(["admin"]), apiControllers.updateProduct);
 app.delete("/api/admin/products/:id", checkRole(["admin"]), apiControllers.deleteProduct);
 app.get("/api/admin/orders", checkRole(["admin", "cashier"]), apiControllers.getOnlineOrders);
 app.put("/api/admin/orders/:id/status", checkRole(["admin", "cashier"]), apiControllers.updateOrderStatus);
 app.delete("/api/admin/orders/:id", checkRole(["admin"]), apiControllers.deleteOrder);
-app.get("/api/admin/activity-logs", checkRole(["admin"]), apiControllers.getActivityLogs);
+app.get("/api/admin/activity-logs", checkRole(["admin", "cashier"]), apiControllers.getActivityLogs);
 
 // Admin User CRUD API Routes
-app.get("/api/admin/users", checkRole(["admin"]), apiControllers.getAllUsersAdmin);
+app.get("/api/admin/users", checkRole(["admin", "cashier"]), apiControllers.getAllUsersAdmin);
 app.post("/api/admin/users", checkRole(["admin"]), apiControllers.createUser);
 app.put("/api/admin/users", checkRole(["admin"]), apiControllers.updateUser);
 app.delete("/api/admin/users/:id", checkRole(["admin"]), apiControllers.deleteUser);
@@ -245,9 +252,9 @@ app.get("/api/settings", apiControllers.getStoreSettings);
 app.post("/api/settings", checkRole(["admin"]), apiControllers.updateStoreSettings);
 
 // Analytics API Routes
-app.get("/api/analytics/daily", checkRole(["admin"]), apiControllers.getDailySalesSummary);
-app.get("/api/analytics/top-products", checkRole(["admin"]), apiControllers.getTopProducts);
-app.get("/api/analytics/inventory", checkRole(["admin"]), apiControllers.getInventory);
+app.get("/api/analytics/daily", checkRole(["admin", "cashier"]), apiControllers.getDailySalesSummary);
+app.get("/api/analytics/top-products", checkRole(["admin", "cashier"]), apiControllers.getTopProducts);
+app.get("/api/analytics/inventory", checkRole(["admin", "cashier"]), apiControllers.getInventory);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

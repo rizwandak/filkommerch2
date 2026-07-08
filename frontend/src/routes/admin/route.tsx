@@ -18,12 +18,9 @@ function AdminLayout() {
     if (!loading && (!user || user.type !== "admin")) {
       void navigate({ to: "/login" });
     }
-    if (!loading && user?.type === "admin" && user.role === "cashier") {
-      void navigate({ to: "/pos" });
-    }
   }, [user, loading, navigate]);
 
-  if (loading || !user || user.type !== "admin" || user.role === "cashier") {
+  if (loading || !user || user.type !== "admin") {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-muted-foreground">Memuat panel admin...</p>

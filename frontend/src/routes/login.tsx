@@ -13,6 +13,7 @@ import {
   GraduationCap,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { authLogin, authGoogleLogin } from "@backend/server-actions";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import {
@@ -58,8 +59,8 @@ interface GoogleJwtPayload {
 }
 
 function LoginPage() {
-  const { loginAsAdmin, loginAsGoogle, upsertBuyer } = useAuth();
-  const [mode, setMode] = useState<"login" | "register" | "admin">("login");
+  const { setUser, loginAsGoogle, upsertBuyer } = useAuth();
+  const [mode, setMode] = useState<"login" | "register">("login");
 
   // Form fields
   const [name, setName] = useState("");
@@ -136,95 +137,118 @@ function LoginPage() {
     setLoading(false);
   };
 
-  const handleBuyerLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     if (!username || !password) {
-      toast.error("Username dan password wajib diisi!");
+      toast.error("Username/Email dan password wajib diisi!");
       setLoading(false);
       return;
     }
-
-    // Find account by username or email
-    const account = accounts.find(
-      (acc) => (acc.username === username || acc.email === username) && acc.password === password,
-    );
-
-    if (!account) {
-      toast.error("Username atau password salah!");
-      setLoading(false);
-      return;
-    }
-
-    // Log in using loginAsGoogle handler from AuthContext (which sets type: "buyer")
-    loginAsGoogle({
-      id: account.id,
-      email: account.email,
-      name: account.name,
-      picture: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(account.name)}`,
-    });
-    // Ensure buyer is stored in local registeredBuyers if not already present
-    upsertBuyer({
-      type: "buyer",
-      id: account.id,
-      email: account.email,
-      name: account.name,
-      picture: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(account.name)}`,
-    });
-
-    toast.success(`Selamat datang kembali, ${account.name}!`);
-    window.location.href = "/";
-    setLoading(false);
-  };
-
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
 
     try {
-      await loginAsAdmin(username, password);
-      toast.success("Login berhasil!");
-      const saved = localStorage.getItem("user");
-      const parsed = saved ? JSON.parse(saved) : null;
-      window.location.href = parsed?.role === "cashier" ? "/pos" : "/admin/dashboard";
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Admin login failed");
+      // 1. Attempt login to the backend database
+      const result = await authLogin({ data: { username, password } });
+      if (result && result.success && result.user) {
+        setUser(result.user);
+        localStorage.setItem("user", JSON.stringify(result.user));
+        toast.success(`Selamat datang kembali, ${result.user.type === "admin" ? result.user.username : result.user.name}!`);
+        
+        // Redirect to homepage for all users. Users with admin/cashier role can navigate to admin dashboard via navbar avatar dropdown.
+        window.location.href = "/";
+        setLoading(false);
+        return;
+      }
+
+      // 2. Fallback to local accounts if backend returned fail or offline
+      const account = accounts.find(
+        (acc) => (acc.username === username || acc.email === username) && acc.password === password
+      );
+      if (account) {
+        const fallbackUser: BuyerUser = {
+          type: "buyer",
+          id: account.id,
+          email: account.email,
+          name: account.name,
+          picture: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(account.name)}`,
+        };
+        setUser(fallbackUser);
+        localStorage.setItem("user", JSON.stringify(fallbackUser));
+        toast.success(`Selamat datang kembali (Offline), ${account.name}!`);
+        window.location.href = "/";
+      } else {
+        toast.error(result?.error || "Username atau password salah!");
+      }
+    } catch (error: any) {
+      // 3. Fallback on network/fetch error
+      const account = accounts.find(
+        (acc) => (acc.username === username || acc.email === username) && acc.password === password
+      );
+      if (account) {
+        const fallbackUser: BuyerUser = {
+          type: "buyer",
+          id: account.id,
+          email: account.email,
+          name: account.name,
+          picture: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(account.name)}`,
+        };
+        setUser(fallbackUser);
+        localStorage.setItem("user", JSON.stringify(fallbackUser));
+        toast.success(`Selamat datang kembali (Offline), ${account.name}!`);
+        window.location.href = "/";
+      } else {
+        toast.error(error.message || "Gagal login.");
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSuccess = (credentialResponse: any) => {
+  const handleGoogleSuccess = async (credentialResponse: any) => {
     setLoading(true);
     try {
       const token = credentialResponse.credential;
       if (!token) throw new Error("No credential returned");
 
       const decoded = jwtDecode<GoogleJwtPayload>(token);
-
       const isUB = decoded.hd === "student.ub.ac.id" || decoded.email.endsWith("@student.ub.ac.id");
       const organization = isUB ? "FILKOM UB" : "Umum";
 
-      loginAsGoogle({
-        id: decoded.sub,
-        email: decoded.email,
-        name: decoded.name,
-        picture: decoded.picture,
-      });
-      // Store Google user as buyer if not already in registeredBuyers
-      upsertBuyer({
-        type: "buyer",
-        id: decoded.sub,
-        email: decoded.email,
-        name: decoded.name,
-        picture: decoded.picture,
-      });
+      // Call backend google auth route
+      const result = await authGoogleLogin({ data: { email: decoded.email, name: decoded.name } });
+      if (result && result.success && result.user) {
+        const updatedUser = {
+          ...result.user,
+          is_google: true,
+        };
+        setUser(updatedUser);
+        localStorage.setItem("user", JSON.stringify(updatedUser));
 
-      toast.success(`Welcome, ${decoded.name}!`, {
-        description: `Masuk sebagai civitas ${organization}`,
-      });
-      window.location.href = "/";
+        const roleText = result.user.type === "admin" ? result.user.role.toUpperCase() : "BUYER";
+        toast.success(`Welcome, ${decoded.name}!`, {
+          description: `Masuk sebagai ${roleText}`,
+        });
+        window.location.href = "/";
+      } else {
+        // Fallback for buyer
+        const fallbackUser: BuyerUser = {
+          type: "buyer",
+          id: decoded.sub,
+          email: decoded.email,
+          name: decoded.name,
+          picture: decoded.picture,
+          is_google: true,
+        };
+        setUser(fallbackUser);
+        localStorage.setItem("user", JSON.stringify(fallbackUser));
+        upsertBuyer(fallbackUser);
+
+        toast.success(`Welcome, ${decoded.name}! (Offline)`, {
+          description: `Masuk sebagai civitas ${organization}`,
+        });
+        window.location.href = "/";
+      }
     } catch (error) {
       console.error("Google login failed", error);
       toast.error("Google login failed");
@@ -343,32 +367,18 @@ function LoginPage() {
             <h2 className="text-3xl font-extrabold tracking-tight text-ink uppercase">
               {mode === "login" && "Sign In"}
               {mode === "register" && "Create Account"}
-              {mode === "admin" && "Admin Access"}
             </h2>
             <p className="text-xs text-muted-foreground leading-normal">
               {mode === "login" &&
                 "Masukkan akun Anda untuk melanjutkan belanja merchandise resmi."}
               {mode === "register" &&
                 "Daftarkan akun pembeli baru untuk menikmati diskon khusus civitas."}
-              {mode === "admin" &&
-                "Sistem Administrasi Terproteksi untuk tim operasional Filkom Merch."}
             </p>
           </div>
 
-          {/* Alert panel for admin mode */}
-          {mode === "admin" && (
-            <div className="rounded-xl bg-amber-50 border-2 border-amber-200 p-3.5 text-[11px] text-amber-900 flex items-start gap-2.5 shadow-sm">
-              <ShieldAlert className="w-4.5 h-4.5 shrink-0 text-amber-600 mt-0.5" />
-              <div>
-                <span className="font-bold block">Protected Area</span>
-                <span>Halaman ini dikhususkan untuk administrator sistem.</span>
-              </div>
-            </div>
-          )}
-
           {/* Mode Forms */}
           {mode === "login" && (
-            <form onSubmit={handleBuyerLogin} className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
               <div className="space-y-1.5">
                 <Label
                   htmlFor="username"
@@ -585,90 +595,7 @@ function LoginPage() {
               </div>
             </form>
           )}
-
-          {mode === "admin" && (
-            <form onSubmit={handleAdminLogin} className="space-y-4 animate-fade-in">
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="admin-username"
-                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
-                >
-                  Admin Username
-                </Label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="admin-username"
-                    placeholder="Masukkan admin username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="admin-password"
-                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
-                >
-                  Admin Password
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="admin-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
-                    required
-                  />
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-amber-600 text-white hover:bg-amber-700 border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] font-bold tracking-wider h-11 transition-all text-xs uppercase"
-              >
-                <LogIn className="w-4 h-4 mr-2" />
-                {loading ? "VERIFIKASI..." : "VERIFY ADMIN ACCESS"}
-              </Button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("login");
-                  setUsername("");
-                  setPassword("");
-                }}
-                className="w-full text-center text-xs font-bold text-muted-foreground hover:text-ink hover:underline pt-2 block"
-              >
-                Kembali ke Login Pembeli
-              </button>
-            </form>
-          )}
         </div>
-
-        {/* SECRET ADMIN PANEL TRIGGER */}
-        <button
-          type="button"
-          onClick={() => {
-            setMode(mode === "admin" ? "login" : "admin");
-            setUsername("");
-            setPassword("");
-            toast.info(
-              mode === "admin" ? "Beralih ke halaman pembeli" : "Secret Admin Panel diaktifkan!",
-            );
-          }}
-          aria-label="Secret admin button"
-          className="absolute bottom-4 right-4 w-8 h-8 rounded-full bg-slate-200 hover:bg-brand-orange text-muted-foreground hover:text-white flex items-center justify-center transition-all duration-300 shadow-md border border-ink/10 cursor-pointer"
-        >
-          <Lock className="w-3.5 h-3.5" />
-        </button>
       </div>
     </div>
   );

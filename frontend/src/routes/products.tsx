@@ -21,6 +21,8 @@ import {
   LogOut,
   ArrowRight,
   User,
+  LayoutDashboard,
+  MonitorSmartphone,
 } from "lucide-react";
 import { getProducts, getCategories, type ProductWithVariants } from "@backend/server-actions";
 import { useAuth } from "@/lib/auth";
@@ -172,6 +174,7 @@ function ProductsCatalogPage() {
       variant_id: item.variant_id,
       size: item.size,
       color: item.color,
+      image_url: item.img || item.image_url || "",
       category: item.name.includes("Varsity")
         ? "JACKET"
         : item.name.includes("Hoodie")
@@ -475,6 +478,26 @@ function ProductsCatalogPage() {
                           </div>
                         )}
                       </div>
+                      {user.type === "admin" && (
+                        <Link
+                          to="/admin/dashboard"
+                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-blue animate-fade-in"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          Panel Admin
+                        </Link>
+                      )}
+                      {user.type === "admin" && (
+                        <Link
+                          to="/pos"
+                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-orange animate-fade-in"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <MonitorSmartphone className="w-4 h-4" />
+                          Kasir / POS
+                        </Link>
+                      )}
                       {user.type === "buyer" && (
                         <Link
                           to="/orders"

@@ -22,6 +22,8 @@ import {
   Search,
   X,
   User as UserIcon,
+  LayoutDashboard,
+  MonitorSmartphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getProductBySlug } from "@backend/server-actions";
@@ -235,6 +237,7 @@ function ProductDetailPage() {
       variant_id: item.variant_id,
       size: item.size,
       color: item.color,
+      image_url: item.img || item.image_url || "",
       category: item.name.includes("Varsity")
         ? "JACKET"
         : item.name.includes("Hoodie")
@@ -504,6 +507,7 @@ function ProductDetailPage() {
       size: selectedSize || "One Size",
       color: selectedColor || undefined,
       variant_id: currentVariant?.id || product.variants[0]?.id,
+      image_url: product.image_url || "",
       category: product.category_name || "Apparel",
       bundle_selections: selectionsPayload.length > 0 ? selectionsPayload : undefined,
     };
@@ -659,6 +663,26 @@ function ProductDetailPage() {
                           </div>
                         )}
                       </div>
+                      {user.type === "admin" && (
+                        <Link
+                          to="/admin/dashboard"
+                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-blue animate-fade-in"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <LayoutDashboard className="w-4 h-4" />
+                          Panel Admin
+                        </Link>
+                      )}
+                      {user.type === "admin" && (
+                        <Link
+                          to="/pos"
+                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-orange animate-fade-in"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          <MonitorSmartphone className="w-4 h-4" />
+                          Kasir / POS
+                        </Link>
+                      )}
                       {user.type === "buyer" && (
                         <Link
                           to="/orders"

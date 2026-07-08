@@ -337,19 +337,32 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
       dbUser = await queryOne<any>("SELECT * FROM users WHERE id = ?", [result.insertId]);
     }
 
-    return res.json({
-      success: true,
-      user: {
-        type: "buyer",
-        id: String(dbUser.id),
-        email: dbUser.email,
-        name: dbUser.name,
-        nim: dbUser.nim,
-        phone: dbUser.phone,
-        address: dbUser.address,
-        is_filkom_verified: dbUser.is_filkom_verified || 0,
-      }
-    });
+    if (dbUser.role === "admin" || dbUser.role === "cashier") {
+      return res.json({
+        success: true,
+        user: {
+          type: "admin",
+          role: dbUser.role,
+          username: dbUser.name,
+          email: dbUser.email,
+          id: dbUser.id,
+        }
+      });
+    } else {
+      return res.json({
+        success: true,
+        user: {
+          type: "buyer",
+          id: String(dbUser.id),
+          email: dbUser.email,
+          name: dbUser.name,
+          nim: dbUser.nim,
+          phone: dbUser.phone,
+          address: dbUser.address,
+          is_filkom_verified: dbUser.is_filkom_verified || 0,
+        }
+      });
+    }
   } catch (error: any) {
     console.error("Error with Google auth:", error);
     return res.status(500).json({ success: false, error: error.message || "Failed Google auth" });
@@ -928,7 +941,13 @@ export const getOrderById = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: "Order not found" });
     }
 
-    const items = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [id]);
+    const items = await query<any>(
+      `SELECT oi.*, p.image_url 
+       FROM order_items oi 
+       LEFT JOIN products p ON p.id = oi.product_id 
+       WHERE oi.order_id = ?`,
+      [id]
+    );
     return res.json({ success: true, order, items });
   } catch (error: any) {
     console.error("Error fetching order:", error);
@@ -2171,7 +2190,10 @@ export const getUserOrders = async (req: Request, res: Response) => {
     const orderIds = orders.map((o) => o.order_id);
     const placeholders = orderIds.map(() => "?").join(",");
     const items = await query<any>(
-      `SELECT * FROM order_items WHERE order_id IN (${placeholders})`,
+      `SELECT oi.*, p.image_url 
+       FROM order_items oi 
+       LEFT JOIN products p ON p.id = oi.product_id 
+       WHERE oi.order_id IN (${placeholders})`,
       orderIds
     );
 

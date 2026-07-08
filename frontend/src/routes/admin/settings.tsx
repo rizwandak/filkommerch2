@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Input } from "@frontend/components/ui/input";
@@ -14,6 +15,8 @@ export const Route = createFileRoute("/admin/settings")({
 });
 
 function AdminSettingsPage() {
+  const { user } = useAuth();
+  const isCashier = user?.role === "cashier";
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -21,6 +24,10 @@ function AdminSettingsPage() {
   const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
   const handleUploadQris = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah QRIS.");
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -66,6 +73,10 @@ function AdminSettingsPage() {
   }, []);
 
   const handleSave = async () => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah pengaturan toko.");
+      return;
+    }
     if (!settings) return;
     setSaving(true);
     const result = await updateStoreSettings({
@@ -98,11 +109,18 @@ function AdminSettingsPage() {
         </p>
       </div>
 
+      {isCashier && (
+        <div className="bg-amber-50 text-amber-800 border-2 border-amber-300 p-3 rounded-lg text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+          ⚠ READ-ONLY MODE: Kasir tidak diizinkan mengubah pengaturan toko.
+        </div>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="display text-sm tracking-wider text-ink">Informasi Toko</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <fieldset disabled={isCashier} className="space-y-4 w-full border-0 p-0 m-0">
           <div className="space-y-2">
             <Label>Nama Toko</Label>
             <Input
@@ -182,6 +200,7 @@ function AdminSettingsPage() {
           >
             {saving ? "Menyimpan..." : "Simpan Pengaturan"}
           </Button>
+          </fieldset>
         </CardContent>
       </Card>
     </div>

@@ -31,7 +31,7 @@ function PosLayout() {
     <div className="flex h-screen flex-col bg-background text-foreground overflow-hidden">
       <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-3 py-2 sm:px-4">
         <div className="flex items-center gap-2 sm:gap-3">
-          {user.role === "admin" && (
+          {user.type === "admin" && (
             <Button
               variant="ghost"
               size="sm"

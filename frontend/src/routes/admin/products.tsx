@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, FolderPlus, X, Check } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Input } from "@frontend/components/ui/input";
@@ -110,6 +111,8 @@ const formatDateForInput = (dateVal: any) => {
 };
 
 function AdminProductsPage() {
+  const { user } = useAuth();
+  const isCashier = user?.role === "cashier";
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -254,6 +257,10 @@ function AdminProductsPage() {
   };
 
   const handleSave = async () => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah produk.");
+      return;
+    }
     if (!form.category_id || !form.name || !form.slug || !form.price) {
       toast.error("Lengkapi data produk");
       return;
@@ -312,6 +319,10 @@ function AdminProductsPage() {
   };
 
   const handleDelete = async (id: number) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menghapus produk.");
+      return;
+    }
     if (!window.confirm("Nonaktifkan produk ini?")) return;
     const result = await deleteProduct({ data: id });
     if (result.success) {
@@ -323,6 +334,10 @@ function AdminProductsPage() {
   };
 
   const handleCreateCategory = async () => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan membuat kategori.");
+      return;
+    }
     if (!newCategoryName.trim()) {
       toast.error("Nama kategori tidak boleh kosong");
       return;
@@ -343,6 +358,10 @@ function AdminProductsPage() {
   };
 
   const handleUpdateCategory = async (id: number, newName: string) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah kategori.");
+      return;
+    }
     try {
       const result = await updateCategory({ data: { id, name: newName } });
       if (result.success && result.category) {
@@ -361,6 +380,10 @@ function AdminProductsPage() {
   };
 
   const handleDeleteCategory = async (id: number) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menghapus kategori.");
+      return;
+    }
     if (
       !window.confirm(
         "Hapus kategori ini? Produk yang menggunakan kategori ini tidak akan dihapus.",
@@ -400,13 +423,15 @@ function AdminProductsPage() {
             CRUD produk — stok tersinkron dengan POS
           </p>
         </div>
-        <Button
-          onClick={openCreate}
-          className="display bg-ink text-white hover:bg-brand-orange transition-all duration-300 text-xs font-bold tracking-widest py-5 px-6"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Tambah Produk
-        </Button>
+        {!isCashier && (
+          <Button
+            onClick={openCreate}
+            className="display bg-ink text-white hover:bg-brand-orange transition-all duration-300 text-xs font-bold tracking-widest py-5 px-6"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Tambah Produk
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -433,9 +458,11 @@ function AdminProductsPage() {
                   <th className="p-3 text-center text-xs font-semibold tracking-wider text-ink uppercase">
                     Status
                   </th>
-                  <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
-                    Aksi
-                  </th>
+                  {!isCashier && (
+                    <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
+                      Aksi
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody>
@@ -493,26 +520,28 @@ function AdminProductsPage() {
                         {product.is_active ? "Aktif" : "Nonaktif"}
                       </span>
                     </td>
-                    <td className="p-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(product)}
-                          className="hover:bg-muted text-ink"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-destructive hover:bg-red-50"
-                          onClick={() => void handleDelete(product.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </td>
+                    {!isCashier && (
+                      <td className="p-3 text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => openEdit(product)}
+                            className="hover:bg-muted text-ink"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:bg-red-50"
+                            onClick={() => void handleDelete(product.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

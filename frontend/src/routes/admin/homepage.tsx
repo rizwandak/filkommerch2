@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import {
   GripVertical,
@@ -34,6 +35,8 @@ import {
   convertLegacyToSegments,
   getDefaultSegments,
 } from "@/lib/homepage-types";
+import { ImageCropperModal } from "@frontend/components/admin/ImageCropperModal";
+
 
 // Drag and drop imports
 import {
@@ -169,6 +172,7 @@ interface SortableSegmentItemProps {
   onSelect: () => void;
   onToggleEnabled: () => void;
   onDelete: () => void;
+  isCashier?: boolean;
 }
 
 function SortableSegmentItem({
@@ -177,6 +181,7 @@ function SortableSegmentItem({
   onSelect,
   onToggleEnabled,
   onDelete,
+  isCashier,
 }: SortableSegmentItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: segment.id,
@@ -198,14 +203,16 @@ function SortableSegmentItem({
           : "bg-cream/40 text-ink hover:bg-cream/60"
       }`}
     >
-      <button
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-cream hover:bg-black/5 rounded"
-        title="Geser Urutan"
-      >
-        <GripVertical className="w-4 h-4" />
-      </button>
+      {!isCashier && (
+        <button
+          {...attributes}
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-cream hover:bg-black/5 rounded"
+          title="Geser Urutan"
+        >
+          <GripVertical className="w-4 h-4" />
+        </button>
+      )}
 
       <div
         className="flex-1 flex flex-col cursor-pointer min-w-0 py-0.5"
@@ -219,48 +226,52 @@ function SortableSegmentItem({
         </span>
       </div>
 
-      <div className="flex items-center gap-1 shrink-0 relative z-10" style={{ pointerEvents: 'auto' }}>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            onToggleEnabled();
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className={`p-1 rounded border transition-colors cursor-pointer ${
-            segment.enabled
-              ? isSelected ? "border-cream/20 text-cream hover:bg-white/10" : "border-ink/20 text-ink hover:bg-black/5"
-              : "border-dashed border-red-500/40 text-red-500 hover:bg-red-50"
-          }`}
-          title={segment.enabled ? "Sembunyikan dari Beranda" : "Tampilkan di Beranda"}
-        >
-          {segment.enabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-        </button>
+      {!isCashier && (
+        <div className="flex items-center gap-1 shrink-0 relative z-10" style={{ pointerEvents: 'auto' }}>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onToggleEnabled();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={`p-1 rounded border transition-colors cursor-pointer ${
+              segment.enabled
+                ? isSelected ? "border-cream/20 text-cream hover:bg-white/10" : "border-ink/20 text-ink hover:bg-black/5"
+                : "border-dashed border-red-500/40 text-red-500 hover:bg-red-50"
+            }`}
+            title={segment.enabled ? "Sembunyikan dari Beranda" : "Tampilkan di Beranda"}
+          >
+            {segment.enabled ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+          </button>
 
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            e.preventDefault();
-            onDelete();
-          }}
-          onPointerDown={(e) => e.stopPropagation()}
-          className={`p-1 rounded border transition-colors cursor-pointer ${
-            isSelected
-              ? "border-cream/20 text-red-400 hover:bg-white/10"
-              : "border-ink/20 text-red-500 hover:bg-red-50"
-          }`}
-          title="Hapus Segmen"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onDelete();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className={`p-1 rounded border transition-colors cursor-pointer ${
+              isSelected
+                ? "border-cream/20 text-red-400 hover:bg-white/10"
+                : "border-ink/20 text-red-500 hover:bg-red-50"
+            }`}
+            title="Hapus Segmen"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
 
 function AdminHomepageEditorPage() {
+  const { user } = useAuth();
+  const isCashier = user?.role === "cashier";
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [segments, setSegments] = useState<HomepageSegment[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
@@ -268,6 +279,17 @@ function AdminHomepageEditorPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showAddElementMenu, setShowAddElementMenu] = useState(false);
+
+  // Cropper states
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState("");
+  const [originalFile, setOriginalFile] = useState<File | null>(null);
+  const [cropperContext, setCropperContext] = useState<{
+    segmentId: string;
+    elementId: string;
+    key: string;
+    elementType: string;
+  } | null>(null);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
@@ -322,6 +344,10 @@ function AdminHomepageEditorPage() {
   }, []);
 
   const handleSave = async () => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menyimpan tata letak.");
+      return;
+    }
     if (!settings) return;
     setSaving(true);
 
@@ -352,6 +378,10 @@ function AdminHomepageEditorPage() {
   };
 
   const handleReset = () => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mereset tata letak.");
+      return;
+    }
     if (window.confirm("Kembalikan tata letak ke setelan bawaan modular? Semua kustomisasi segmen saat ini akan hilang.")) {
       const defaultSegs = getDefaultSegments();
       setSegments(defaultSegs);
@@ -363,6 +393,10 @@ function AdminHomepageEditorPage() {
   };
 
   const handleAddSegment = () => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menambah segmen.");
+      return;
+    }
     const newId = `seg-${Date.now()}`;
     const newSeg: HomepageSegment = {
       id: newId,
@@ -377,6 +411,10 @@ function AdminHomepageEditorPage() {
   };
 
   const handleDeleteSegment = (id: string) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menghapus segmen.");
+      return;
+    }
     setSegments((prev) => prev.filter((s) => s.id !== id));
     if (selectedSegmentId === id) {
       setSelectedSegmentId(null);
@@ -386,6 +424,10 @@ function AdminHomepageEditorPage() {
   };
 
   const handleToggleEnabled = (id: string) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah status segmen.");
+      return;
+    }
     setSegments((prev) =>
       prev.map((s) => {
         if (s.id === id) {
@@ -397,6 +439,7 @@ function AdminHomepageEditorPage() {
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    if (isCashier) return;
     const { active, over } = event;
     if (over && active.id !== over.id) {
       setSegments((items) => {
@@ -408,6 +451,10 @@ function AdminHomepageEditorPage() {
   };
 
   const handleAddElement = (segmentId: string, type: SegmentType) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menambah elemen.");
+      return;
+    }
     const newElId = `el-${type}-${Date.now()}`;
     const newEl = {
       id: newElId,
@@ -433,6 +480,10 @@ function AdminHomepageEditorPage() {
   };
 
   const handleDeleteElement = (segmentId: string, elementId: string) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan menghapus elemen.");
+      return;
+    }
     setSegments((prev) =>
       prev.map((seg) => {
         if (seg.id === segmentId) {
@@ -521,6 +572,114 @@ function AdminHomepageEditorPage() {
     }
   };
 
+  const handleFileChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    segmentId: string,
+    elementId: string,
+    key: string,
+    elementType: string
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const objectUrl = URL.createObjectURL(file);
+    setCropperImageSrc(objectUrl);
+    setOriginalFile(file);
+    setCropperContext({ segmentId, elementId, key, elementType });
+    setCropperOpen(true);
+
+    e.target.value = "";
+  };
+
+  const executeUpload = async (fileToUpload: File) => {
+    if (!cropperContext) return;
+    const { segmentId, elementId, key } = cropperContext;
+
+    const formData = new FormData();
+    formData.append("file", fileToUpload);
+
+    try {
+      toast.loading("Mengunggah gambar...");
+      const res = await fetch(`${API_BASE_URL}/api/upload`, {
+        method: "POST",
+        body: formData,
+        headers: {
+          "ngrok-skip-browser-warning": "true",
+        },
+      });
+      const data = await res.json();
+      toast.dismiss();
+
+      if (data.success && data.url) {
+        if (key === "images_append") {
+          setSegments((prev) =>
+            prev.map((seg) => {
+              if (seg.id === segmentId) {
+                return {
+                  ...seg,
+                  elements: seg.elements.map((el) => {
+                    if (el.id === elementId) {
+                      const existingImages = el.config.images || (el.config.image ? [el.config.image] : []);
+                      const updatedImages = [...existingImages, data.url];
+                      return {
+                        ...el,
+                        config: {
+                          ...el.config,
+                          images: updatedImages,
+                          image: el.config.image || data.url,
+                        },
+                      };
+                    }
+                    return el;
+                  }),
+                };
+              }
+              return seg;
+            })
+          );
+        } else {
+          setSegments((prev) =>
+            prev.map((seg) => {
+              if (seg.id === segmentId) {
+                return {
+                  ...seg,
+                  elements: seg.elements.map((el) => {
+                    if (el.id === elementId) {
+                      return {
+                        ...el,
+                        config: {
+                          ...el.config,
+                          [key]: data.url,
+                        },
+                      };
+                    }
+                    return el;
+                  }),
+                };
+              }
+              return seg;
+            })
+          );
+        }
+        toast.success("Gambar berhasil diunggah!");
+      } else {
+        toast.error(data.error || "Gagal mengunggah gambar");
+      }
+    } catch (err) {
+      toast.dismiss();
+      console.error(err);
+      toast.error("Gagal mengunggah gambar");
+    } finally {
+      if (cropperImageSrc) {
+        URL.revokeObjectURL(cropperImageSrc);
+      }
+      setCropperImageSrc("");
+      setOriginalFile(null);
+      setCropperContext(null);
+      setCropperOpen(false);
+    }
+  };
+
   const updateElementConfig = (segmentId: string, elementId: string, configUpdates: any) => {
     setSegments((prev) =>
       prev.map((seg) => {
@@ -566,23 +725,29 @@ function AdminHomepageEditorPage() {
             Sistem tata letak modular berbasis segmen. Tambah, hapus, drag-and-drop urutan, dan edit konten real-time.
           </p>
         </div>
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            onClick={handleReset}
-            disabled={saving}
-            className="border-2 border-ink hover:bg-neutral-100 text-xs font-bold uppercase tracking-wider py-5 px-5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-          >
-            Reset Setelan
-          </Button>
-          <Button
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest py-5 px-6 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-          >
-            {saving ? "Menyimpan..." : "Simpan Beranda"}
-          </Button>
-        </div>
+        {!isCashier ? (
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={handleReset}
+              disabled={saving}
+              className="border-2 border-ink hover:bg-neutral-100 text-xs font-bold uppercase tracking-wider py-5 px-5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+            >
+              Reset Setelan
+            </Button>
+            <Button
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest py-5 px-6 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+            >
+              {saving ? "Menyimpan..." : "Simpan Beranda"}
+            </Button>
+          </div>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+            ⚠ READ-ONLY MODE
+          </span>
+        )}
       </div>
 
       {/* Main Builder Grid */}
@@ -607,6 +772,7 @@ function AdminHomepageEditorPage() {
                         key={seg.id}
                         segment={seg}
                         isSelected={selectedSegmentId === seg.id}
+                        isCashier={isCashier}
                         onSelect={() => {
                           setSelectedSegmentId(seg.id);
                           setExpandedElementId(null);
@@ -626,14 +792,16 @@ function AdminHomepageEditorPage() {
               )}
 
               {/* Add Segment */}
-              <div className="pt-2 border-t border-ink/10">
-                <Button
-                  onClick={handleAddSegment}
-                  className="w-full bg-brand-orange hover:bg-brand-orange/95 text-ink font-bold text-xs uppercase tracking-wider py-4 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-                >
-                  <Plus className="w-4 h-4 mr-1" /> Tambah Segmen
-                </Button>
-              </div>
+              {!isCashier && (
+                <div className="pt-2 border-t border-ink/10">
+                  <Button
+                    onClick={handleAddSegment}
+                    className="w-full bg-brand-orange hover:bg-brand-orange/95 text-ink font-bold text-xs uppercase tracking-wider py-4 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4 mr-1" /> Tambah Segmen
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -658,7 +826,7 @@ function AdminHomepageEditorPage() {
                   <p className="mt-1 opacity-70">Atau klik "+ Tambah Segmen" untuk membuat baru</p>
                 </div>
               ) : (
-                <div className="space-y-6 animate-fade-in">
+                <fieldset disabled={isCashier} className="space-y-6 animate-fade-in w-full border-0 p-0 m-0">
                   {/* Segment Details */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pb-4 border-b-2 border-ink/10">
                     <div className="space-y-2">
@@ -891,35 +1059,104 @@ function AdminHomepageEditorPage() {
                                       </div>
                                     )}
 
-                                    <div className="space-y-2 pt-2 border-t border-ink/10">
-                                      <Label>Gambar Hero Lookbook</Label>
-                                      {el.config.image ? (
-                                        <div className="relative border-2 border-dashed border-ink/30 rounded p-3 bg-muted/20 flex flex-col items-center gap-2">
-                                          <img
-                                            src={el.config.image}
-                                            alt="Hero"
-                                            className="max-h-36 rounded object-cover border border-ink/10"
-                                          />
-                                          <Button
-                                            type="button"
-                                            variant="destructive"
-                                            size="sm"
-                                            onClick={() => updateElementConfig(activeSegment.id, el.id, { image: "" })}
-                                            className="h-7 text-[9px] uppercase tracking-wider font-bold cursor-pointer"
-                                          >
-                                            Hapus Gambar
-                                          </Button>
-                                        </div>
-                                      ) : (
-                                        <div className="space-y-1.5">
-                                          <Input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={(e) => handleUploadImage(e, activeSegment.id, el.id, "image")}
-                                            className="cursor-pointer text-xs"
-                                          />
-                                        </div>
-                                      )}
+                                    <div className="space-y-3 pt-2 border-t border-ink/10">
+                                      <Label className="font-bold text-xs uppercase tracking-wider text-brand-orange">
+                                        Foto Lookbook Hero Banner (Carousel)
+                                      </Label>
+                                      
+                                      {(() => {
+                                        const imagesList = el.config.images || (el.config.image ? [el.config.image] : []);
+                                        return (
+                                          <div className="space-y-3">
+                                            {imagesList.length > 0 && (
+                                              <div className="grid grid-cols-2 gap-3 border border-ink/10 p-3 rounded bg-cream/5">
+                                                {imagesList.map((imgUrl: string, idx: number) => (
+                                                  <div key={idx} className="relative border-2 border-ink rounded p-2 bg-cream/15 flex flex-col items-center gap-2 group shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
+                                                    <img
+                                                      src={imgUrl}
+                                                      alt={`Slide ${idx + 1}`}
+                                                      className="w-full h-24 rounded object-cover border border-ink/10"
+                                                    />
+                                                    {/* Actions for each slide */}
+                                                    <div className="flex gap-1.5 justify-center w-full mt-1">
+                                                      <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        disabled={idx === 0}
+                                                        onClick={() => {
+                                                          const newImgs = [...imagesList];
+                                                          const temp = newImgs[idx];
+                                                          newImgs[idx] = newImgs[idx - 1];
+                                                          newImgs[idx - 1] = temp;
+                                                          updateElementConfig(activeSegment.id, el.id, {
+                                                            images: newImgs,
+                                                            image: newImgs[0] || "",
+                                                          });
+                                                        }}
+                                                        className="h-7 w-7 p-0 border-2 border-ink cursor-pointer hover:bg-neutral-100"
+                                                        title="Geser Kiri"
+                                                      >
+                                                        <ChevronUp className="-rotate-90 w-3.5 h-3.5" />
+                                                      </Button>
+                                                      <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        disabled={idx === imagesList.length - 1}
+                                                        onClick={() => {
+                                                          const newImgs = [...imagesList];
+                                                          const temp = newImgs[idx];
+                                                          newImgs[idx] = newImgs[idx + 1];
+                                                          newImgs[idx + 1] = temp;
+                                                          updateElementConfig(activeSegment.id, el.id, {
+                                                            images: newImgs,
+                                                            image: newImgs[0] || "",
+                                                          });
+                                                        }}
+                                                        className="h-7 w-7 p-0 border-2 border-ink cursor-pointer hover:bg-neutral-100"
+                                                        title="Geser Kanan"
+                                                      >
+                                                        <ChevronDown className="-rotate-90 w-3.5 h-3.5" />
+                                                      </Button>
+                                                      <Button
+                                                        type="button"
+                                                        variant="destructive"
+                                                        size="icon"
+                                                        onClick={() => {
+                                                          const newImgs = imagesList.filter((_: any, i: number) => i !== idx);
+                                                          updateElementConfig(activeSegment.id, el.id, {
+                                                            images: newImgs,
+                                                            image: newImgs[0] || "",
+                                                          });
+                                                        }}
+                                                        className="h-7 w-7 p-0 border-2 border-ink bg-red-500 text-white cursor-pointer hover:bg-red-600"
+                                                        title="Hapus"
+                                                      >
+                                                        <Trash2 className="w-3.5 h-3.5" />
+                                                      </Button>
+                                                    </div>
+                                                    <span className="absolute top-1 left-1 bg-ink text-cream text-[8px] font-mono px-1.5 py-0.5 rounded font-black">
+                                                      {idx + 1}
+                                                    </span>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+                                            
+                                            <div className="space-y-1.5 mt-2">
+                                              <Label className="text-[10px] font-black uppercase text-muted-foreground">Tambah Slide Foto Lookbook (Min. 1 Foto)</Label>
+                                              <Input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={(e) => handleFileChange(e, activeSegment.id, el.id, "images_append", el.type)}
+                                                className="cursor-pointer text-xs"
+                                              />
+                                              <p className="text-[9px] text-muted-foreground font-medium">Saran aspek rasio adalah 5:6 (Potret/Lookbook) atau 1:1 (Persegi).</p>
+                                            </div>
+                                          </div>
+                                        );
+                                      })()}
                                     </div>
                                   </div>
                                 )}
@@ -1128,7 +1365,7 @@ function AdminHomepageEditorPage() {
                                           <Input
                                             type="file"
                                             accept="image/*"
-                                            onChange={(e) => handleUploadImage(e, activeSegment.id, el.id, "image")}
+                                            onChange={(e) => handleFileChange(e, activeSegment.id, el.id, "image", el.type)}
                                             className="cursor-pointer text-xs"
                                           />
                                         </div>
@@ -1413,7 +1650,7 @@ function AdminHomepageEditorPage() {
                                           <Input
                                             type="file"
                                             accept="image/*"
-                                            onChange={(e) => handleUploadImage(e, activeSegment.id, el.id, "image")}
+                                            onChange={(e) => handleFileChange(e, activeSegment.id, el.id, "image", el.type)}
                                             className="cursor-pointer text-xs"
                                           />
                                         </div>
@@ -1436,7 +1673,7 @@ function AdminHomepageEditorPage() {
                       )}
                     </div>
                   </div>
-                </div>
+                </fieldset>
               )}
             </CardContent>
           </Card>
@@ -1527,12 +1764,28 @@ function AdminHomepageEditorPage() {
                                         {el.config.btnText || "SHOP NOW"}
                                       </button>
                                     </div>
-                                    <div className="col-span-4 bg-brand-blue/15 aspect-[4/5] rounded border border-ink/10 flex items-center justify-center overflow-hidden h-full">
-                                      {el.config.image ? (
-                                        <img src={el.config.image} className="w-full h-full object-cover opacity-80" alt="" />
-                                      ) : (
-                                        <span className="text-[6px] text-muted-foreground font-mono">Lookbook</span>
-                                      )}
+                                    <div className="col-span-4 bg-brand-blue/15 aspect-[5/6] rounded border border-ink/10 flex flex-col justify-center items-center overflow-hidden h-full relative group">
+                                      {(() => {
+                                        const previewImages = el.config.images || (el.config.image ? [el.config.image] : []);
+                                        if (previewImages.length > 0) {
+                                          return (
+                                            <>
+                                              <img src={previewImages[0]} className="w-full h-full object-cover opacity-80" alt="" />
+                                              {previewImages.length > 1 && (
+                                                <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-0.5 z-10">
+                                                  {previewImages.map((_: any, pIdx: number) => (
+                                                    <div
+                                                      key={pIdx}
+                                                      className={`w-1 h-1 rounded-full ${pIdx === 0 ? "bg-brand-orange" : "bg-white/60"}`}
+                                                    />
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </>
+                                          );
+                                        }
+                                        return <span className="text-[6px] text-muted-foreground font-mono">Lookbook</span>;
+                                      })()}
                                     </div>
                                   </div>
                                 )}
@@ -1715,6 +1968,27 @@ function AdminHomepageEditorPage() {
           </div>
         </div>
       </div>
+
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageSrc={cropperImageSrc}
+        elementType={cropperContext?.elementType || ""}
+        onClose={() => {
+          if (cropperImageSrc) {
+            URL.revokeObjectURL(cropperImageSrc);
+          }
+          setCropperImageSrc("");
+          setOriginalFile(null);
+          setCropperContext(null);
+          setCropperOpen(false);
+        }}
+        onCropComplete={(croppedFile) => void executeUpload(croppedFile)}
+        onUploadOriginal={() => {
+          if (originalFile) {
+            void executeUpload(originalFile);
+          }
+        }}
+      />
     </div>
   );
 }
