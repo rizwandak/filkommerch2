@@ -11,6 +11,9 @@ const API_URL =
 const getAuthHeaders = () => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
+    "Bypass-Tunnel-Reminder": "true",
+    "User-Agent": "PostmanRuntime/7.32.3"
   };
 
   try {
