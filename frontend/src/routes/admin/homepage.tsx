@@ -137,6 +137,44 @@ const getElementTemplate = (type: SegmentType): any => {
         stockMax: 100,
         stockCurrent: 80,
       };
+    case "bundle_recommendation":
+      return {
+        title: "Exclusive Bundles",
+        subtitle: "SPECIAL SAVINGS PACKS",
+        items: [
+          {
+            name: "Freshman Starter Pack",
+            price: "Rp 120.000",
+            originalPrice: "Rp 145.000",
+            image: "",
+            description: "Paket lengkap maba untuk tampil keren di kampus baru.",
+            itemsList: "Kaos Premium, Totebag Canvas, Sticker Pack",
+            link: "/products"
+          }
+        ]
+      };
+    case "gallery":
+      return {
+        title: "Campus Lookbook",
+        subtitle: "@FILKOMMERCH",
+        items: [
+          { id: `gal-${Date.now()}-1`, image: "", caption: "Varsity jacket di gazebo" },
+          { id: `gal-${Date.now()}-2`, image: "", caption: "Ngoding pake hoodie premium" }
+        ]
+      };
+    case "testimonial":
+      return {
+        title: "Campus Voices",
+        subtitle: "TESTIMONIALS",
+        items: [
+          {
+            id: `test-${Date.now()}-1`,
+            name: "Rizwan Dak",
+            role: "Informatika 2024",
+            content: "Varsity-nya tebal banget, bordirannya rapi pol. Nyaman buat dipake kuliah."
+          }
+        ]
+      };
   }
 };
 
@@ -152,6 +190,9 @@ const getIcon = (type: SegmentType) => {
     case "value_props": return "🛡️";
     case "faq": return "❓";
     case "limited_drop": return "🔥";
+    case "bundle_recommendation": return "🎁";
+    case "gallery": return "📸";
+    case "testimonial": return "💬";
   }
 };
 
@@ -894,6 +935,9 @@ function AdminHomepageEditorPage() {
                               { type: "value_props", name: "🛡️ Value Props" },
                               { type: "faq", name: "❓ FAQ Section" },
                               { type: "limited_drop", name: "🔥 Limited Drop" },
+                              { type: "bundle_recommendation", name: "🎁 Bundle Promo" },
+                              { type: "gallery", name: "📸 Lifestyle Gallery" },
+                              { type: "testimonial", name: "💬 Testimonials" },
                             ].map((item) => (
                               <button
                                 key={item.type}
@@ -1660,6 +1704,376 @@ function AdminHomepageEditorPage() {
                                           />
                                         </div>
                                       )}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* BUNDLE RECOMMENDATION CONFIG */}
+                                {el.type === "bundle_recommendation" && (
+                                  <div className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label>Judul Bagian</Label>
+                                      <Input
+                                        value={el.config.title || ""}
+                                        onChange={(e) => updateElementConfig(activeSegment.id, el.id, { title: e.target.value })}
+                                        placeholder="Exclusive Bundles"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Sub-judul / Tagline</Label>
+                                      <Input
+                                        value={el.config.subtitle || ""}
+                                        onChange={(e) => updateElementConfig(activeSegment.id, el.id, { subtitle: e.target.value })}
+                                        placeholder="SPECIAL SAVINGS PACKS"
+                                      />
+                                    </div>
+
+                                    <div className="space-y-3 pt-2 border-t border-ink/10">
+                                      <Label className="font-bold text-xs uppercase tracking-wider text-brand-orange">Daftar Bundle</Label>
+                                      {el.config.items?.map((item: any, idx: number) => (
+                                        <div key={idx} className="border border-ink/20 p-3 rounded space-y-2 bg-cream/10">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-bold">BUNDLE #{idx + 1}</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const newItems = [...(el.config.items || [])];
+                                                newItems.splice(idx, 1);
+                                                updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                              }}
+                                              className="text-[9px] font-bold text-red-500 hover:underline cursor-pointer"
+                                            >
+                                              Hapus
+                                            </button>
+                                          </div>
+                                          <div className="grid grid-cols-2 gap-2">
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px]">Nama Bundle</Label>
+                                              <Input
+                                                value={item.name || ""}
+                                                onChange={(e) => {
+                                                  const newItems = [...(el.config.items || [])];
+                                                  newItems[idx] = { ...newItems[idx], name: e.target.value };
+                                                  updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                                }}
+                                                placeholder="Freshman Starter Pack"
+                                                className="text-xs"
+                                              />
+                                            </div>
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px]">Tautan Tujuan</Label>
+                                              <Input
+                                                value={item.link || ""}
+                                                onChange={(e) => {
+                                                  const newItems = [...(el.config.items || [])];
+                                                  newItems[idx] = { ...newItems[idx], link: e.target.value };
+                                                  updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                                }}
+                                                placeholder="/products"
+                                                className="text-xs"
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="grid grid-cols-2 gap-2">
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px]">Harga Core (Promo)</Label>
+                                              <Input
+                                                value={item.price || ""}
+                                                onChange={(e) => {
+                                                  const newItems = [...(el.config.items || [])];
+                                                  newItems[idx] = { ...newItems[idx], price: e.target.value };
+                                                  updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                                }}
+                                                placeholder="Rp 120.000"
+                                                className="text-xs"
+                                              />
+                                            </div>
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px]">Harga Coret (Asli)</Label>
+                                              <Input
+                                                value={item.originalPrice || ""}
+                                                onChange={(e) => {
+                                                  const newItems = [...(el.config.items || [])];
+                                                  newItems[idx] = { ...newItems[idx], originalPrice: e.target.value };
+                                                  updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                                }}
+                                                placeholder="Rp 145.000"
+                                                className="text-xs"
+                                              />
+                                            </div>
+                                          </div>
+                                          <div className="space-y-1">
+                                            <Label className="text-[10px]">Deskripsi Singkat</Label>
+                                            <Input
+                                              value={item.description || ""}
+                                              onChange={(e) => {
+                                                const newItems = [...(el.config.items || [])];
+                                                newItems[idx] = { ...newItems[idx], description: e.target.value };
+                                                updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                              }}
+                                              placeholder="Deskripsi singkat isi paket..."
+                                              className="text-xs"
+                                            />
+                                          </div>
+                                          <div className="space-y-1">
+                                            <Label className="text-[10px]">Isi Bundle (Dipisah koma)</Label>
+                                            <Input
+                                              value={item.itemsList || ""}
+                                              onChange={(e) => {
+                                                const newItems = [...(el.config.items || [])];
+                                                newItems[idx] = { ...newItems[idx], itemsList: e.target.value };
+                                                updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                              }}
+                                              placeholder="Kaos, Totebag, Sticker"
+                                              className="text-xs"
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                          const items = el.config.items || [];
+                                          updateElementConfig(activeSegment.id, el.id, {
+                                            items: [
+                                              ...items,
+                                              { name: "", price: "", originalPrice: "", description: "", itemsList: "", link: "" }
+                                            ],
+                                          });
+                                        }}
+                                        className="w-full border border-ink text-ink font-bold text-xs uppercase py-2 hover:bg-neutral-100 cursor-pointer font-extrabold"
+                                      >
+                                        + Tambah Item Bundle
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* GALLERY CONFIG */}
+                                {el.type === "gallery" && (
+                                  <div className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label>Judul Bagian</Label>
+                                      <Input
+                                        value={el.config.title || ""}
+                                        onChange={(e) => updateElementConfig(activeSegment.id, el.id, { title: e.target.value })}
+                                        placeholder="Campus Lookbook"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Sub-judul / Tagline</Label>
+                                      <Input
+                                        value={el.config.subtitle || ""}
+                                        onChange={(e) => updateElementConfig(activeSegment.id, el.id, { subtitle: e.target.value })}
+                                        placeholder="@FILKOMMERCH"
+                                      />
+                                    </div>
+
+                                    <div className="space-y-3 pt-2 border-t border-ink/10">
+                                      <Label className="font-bold text-xs uppercase tracking-wider text-brand-orange">Foto Galeri</Label>
+                                      {el.config.items?.map((item: any, idx: number) => (
+                                        <div key={idx} className="border border-ink/20 p-3 rounded space-y-2 bg-cream/10">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-bold">FOTO #{idx + 1}</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const newItems = [...(el.config.items || [])];
+                                                newItems.splice(idx, 1);
+                                                updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                              }}
+                                              className="text-[9px] font-bold text-red-500 hover:underline cursor-pointer"
+                                            >
+                                              Hapus
+                                            </button>
+                                          </div>
+                                          
+                                          <div className="space-y-1">
+                                            <Label className="text-[10px]">Caption</Label>
+                                            <Input
+                                              value={item.caption || ""}
+                                              onChange={(e) => {
+                                                const newItems = [...(el.config.items || [])];
+                                                newItems[idx] = { ...newItems[idx], caption: e.target.value };
+                                                updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                              }}
+                                              placeholder="Caption foto..."
+                                              className="text-xs"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1">
+                                            <Label className="text-[10px]">Gambar</Label>
+                                            {item.image ? (
+                                              <div className="relative border border-ink/20 rounded p-1.5 bg-background flex items-center gap-2">
+                                                <img src={item.image} className="w-12 h-12 object-cover rounded" alt="" />
+                                                <Button
+                                                  type="button"
+                                                  variant="destructive"
+                                                  size="sm"
+                                                  onClick={() => {
+                                                    const newItems = [...(el.config.items || [])];
+                                                    newItems[idx] = { ...newItems[idx], image: "" };
+                                                    updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                                  }}
+                                                  className="h-6 text-[8px] uppercase font-bold cursor-pointer"
+                                                >
+                                                  Hapus Gambar
+                                                </Button>
+                                              </div>
+                                            ) : (
+                                              <Input
+                                                type="file"
+                                                accept="image/*"
+                                                onChange={async (e) => {
+                                                  const file = e.target.files?.[0];
+                                                  if (!file) return;
+                                                  const formData = new FormData();
+                                                  formData.append("file", file);
+                                                  try {
+                                                    toast.loading("Mengunggah gambar...");
+                                                    const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+                                                      method: "POST",
+                                                      body: formData,
+                                                      headers: { "ngrok-skip-browser-warning": "true" },
+                                                    });
+                                                    const data = await uploadRes.json();
+                                                    toast.dismiss();
+                                                    if (data.success && data.url) {
+                                                      const newItems = [...(el.config.items || [])];
+                                                      newItems[idx] = { ...newItems[idx], image: data.url };
+                                                      updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                                      toast.success("Gambar berhasil diunggah!");
+                                                    } else {
+                                                      toast.error("Gagal mengunggah gambar");
+                                                    }
+                                                  } catch (err) {
+                                                    toast.dismiss();
+                                                    console.error(err);
+                                                    toast.error("Gagal mengunggah");
+                                                  }
+                                                }}
+                                                className="cursor-pointer text-xs"
+                                              />
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                          const items = el.config.items || [];
+                                          updateElementConfig(activeSegment.id, el.id, {
+                                            items: [...items, { id: `gal-${Date.now()}`, image: "", caption: "" }],
+                                          });
+                                        }}
+                                        className="w-full border border-ink text-ink font-bold text-xs uppercase py-2 hover:bg-neutral-100 cursor-pointer font-extrabold"
+                                      >
+                                        + Tambah Foto Galeri
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* TESTIMONIAL CONFIG */}
+                                {el.type === "testimonial" && (
+                                  <div className="space-y-4">
+                                    <div className="space-y-2">
+                                      <Label>Judul Bagian</Label>
+                                      <Input
+                                        value={el.config.title || ""}
+                                        onChange={(e) => updateElementConfig(activeSegment.id, el.id, { title: e.target.value })}
+                                        placeholder="Campus Voices"
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Sub-judul / Tagline</Label>
+                                      <Input
+                                        value={el.config.subtitle || ""}
+                                        onChange={(e) => updateElementConfig(activeSegment.id, el.id, { subtitle: e.target.value })}
+                                        placeholder="TESTIMONIALS"
+                                      />
+                                    </div>
+
+                                    <div className="space-y-3 pt-2 border-t border-ink/10">
+                                      <Label className="font-bold text-xs uppercase tracking-wider text-brand-orange">Daftar Testimoni</Label>
+                                      {el.config.items?.map((item: any, idx: number) => (
+                                        <div key={idx} className="border border-ink/20 p-3 rounded space-y-2 bg-cream/10">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-bold">TESTIMONI #{idx + 1}</span>
+                                            <button
+                                              type="button"
+                                              onClick={() => {
+                                                const newItems = [...(el.config.items || [])];
+                                                newItems.splice(idx, 1);
+                                                updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                              }}
+                                              className="text-[9px] font-bold text-red-500 hover:underline cursor-pointer"
+                                            >
+                                              Hapus
+                                            </button>
+                                          </div>
+                                          
+                                          <div className="grid grid-cols-2 gap-2">
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px]">Nama Mahasiswa</Label>
+                                              <Input
+                                                value={item.name || ""}
+                                                onChange={(e) => {
+                                                  const newItems = [...(el.config.items || [])];
+                                                  newItems[idx] = { ...newItems[idx], name: e.target.value };
+                                                  updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                                }}
+                                                placeholder="Rizwan Dak"
+                                                className="text-xs"
+                                              />
+                                            </div>
+                                            <div className="space-y-1">
+                                              <Label className="text-[10px]">Prodi / Angkatan</Label>
+                                              <Input
+                                                value={item.role || ""}
+                                                onChange={(e) => {
+                                                  const newItems = [...(el.config.items || [])];
+                                                  newItems[idx] = { ...newItems[idx], role: e.target.value };
+                                                  updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                                }}
+                                                placeholder="Informatika 2024"
+                                                className="text-xs"
+                                              />
+                                            </div>
+                                          </div>
+
+                                          <div className="space-y-1">
+                                            <Label className="text-[10px]">Isi Testimoni</Label>
+                                            <Textarea
+                                              value={item.content || ""}
+                                              onChange={(e) => {
+                                                const newItems = [...(el.config.items || [])];
+                                                newItems[idx] = { ...newItems[idx], content: e.target.value };
+                                                updateElementConfig(activeSegment.id, el.id, { items: newItems });
+                                              }}
+                                              placeholder="Tulis ulasan..."
+                                              className="text-xs"
+                                              rows={2}
+                                            />
+                                          </div>
+                                        </div>
+                                      ))}
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                          const items = el.config.items || [];
+                                          updateElementConfig(activeSegment.id, el.id, {
+                                            items: [...items, { id: `test-${Date.now()}`, name: "", role: "", content: "" }],
+                                          });
+                                        }}
+                                        className="w-full border border-ink text-ink font-bold text-xs uppercase py-2 hover:bg-neutral-100 cursor-pointer font-extrabold"
+                                      >
+                                        + Tambah Ulasan
+                                      </Button>
                                     </div>
                                   </div>
                                 )}

@@ -8,7 +8,10 @@ export type ElementType =
   | "text_block"
   | "value_props"
   | "faq"
-  | "limited_drop";
+  | "limited_drop"
+  | "bundle_recommendation"
+  | "gallery"
+  | "testimonial";
 
 export type SegmentType = ElementType;
 
@@ -104,6 +107,9 @@ function getTypeName(type: ElementType): string {
     case "value_props": return "Value Props";
     case "faq": return "FAQ Section";
     case "limited_drop": return "Limited Drop";
+    case "bundle_recommendation": return "Bundle Recommendation";
+    case "gallery": return "Lifestyle Gallery";
+    case "testimonial": return "Testimonials";
     default: return type;
   }
 }
@@ -314,7 +320,7 @@ export function getDefaultSegments(): HomepageSegment[] {
           id: "default-el-marquee",
           type: "marquee",
           config: {
-            text: "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN | 100% PRODUK MAHASISWA | CASHBACK 5% MEMBER | DROP BARU TIAP BULAN"
+            text: "🚚 Free Pickup FILKOM UB • Official Merchandise FILKOM UB • PO Batch 2 Open Until 5 August • Limited Stock"
           }
         }
       ]
@@ -329,14 +335,45 @@ export function getDefaultSegments(): HomepageSegment[] {
           type: "hero_banner",
           config: {
             title: "Wear\nYour\nFaculty.",
-            subtitle: "Koleksi merchandise resmi mahasiswa Fakultas Ilmu Komputer UB. Dibuat oleh mahasiswa, untuk mahasiswa premium, eksklusif, dan limited stock.",
-            subLabel: "FILKOM MERCH 2026",
+            subtitle: "Koleksi merchandise resmi mahasiswa Fakultas Ilmu Komputer UB. Dibuat premium dan limited stock.",
+            subLabel: "FILKOM MERCHANDISE 2026",
             btnText: "SHOP THE DROP",
-            btnLink: "",
+            btnLink: "#shop",
             image: "",
             images: [],
             showCountdown: true,
-            countdownEnd: "2026-07-15T23:59:59+07:00"
+            countdownEnd: "2026-08-05T23:59:59+07:00"
+          }
+        }
+      ]
+    },
+    {
+      id: "default-valueprops",
+      title: "Trust Section",
+      enabled: true,
+      elements: [
+        {
+          id: "default-el-valueprops",
+          type: "value_props",
+          config: {
+            items: [
+              {
+                title: "Official Merchandise",
+                description: "Produk resmi berlisensi Fakultas Ilmu Komputer Universitas Brawijaya."
+              },
+              {
+                title: "Premium Quality",
+                description: "Material cotton combed & fleece pilihan dengan kualitas standar distro."
+              },
+              {
+                title: "Limited Collection",
+                description: "Hanya diproduksi terbatas di setiap batch. Tidak rilis ulang."
+              },
+              {
+                title: "Student Designed",
+                description: "Dirancang secara kolaboratif oleh talenta kreatif mahasiswa FILKOM."
+              }
+            ]
           }
         }
       ]
@@ -351,10 +388,10 @@ export function getDefaultSegments(): HomepageSegment[] {
           type: "product_grid",
           config: {
             title: "Featured Collection",
-            subtitle: "RECOMMENDED BY BEM",
+            subtitle: "CHOOSE YOUR LOOK",
             source: "slugs",
-            slugs: "varsity-filkom,hoodie-code-run,tshirt-debugging",
-            maxItems: 3
+            slugs: "work-jacket,varsity-filkom,half-zip,tumbler-stainless,boneka-bara,tshirt-debugging",
+            maxItems: 6
           }
         }
       ]
@@ -368,7 +405,24 @@ export function getDefaultSegments(): HomepageSegment[] {
           id: "default-el-categories",
           type: "category_showcase",
           config: {
-            title: "Pick your fit"
+            title: "Shop By Categories"
+          }
+        }
+      ]
+    },
+    {
+      id: "default-about",
+      title: "Tentang Kami (About FM)",
+      enabled: true,
+      elements: [
+        {
+          id: "default-el-about",
+          type: "text_block",
+          config: {
+            title: "More than Merchandise.",
+            subtitle: "ABOUT FILKOM MERCHANDISE",
+            body: "FILKOM Merchandise (FM) adalah unit resmi merchandise Fakultas Ilmu Komputer Universitas Brawijaya yang dikelola secara profesional oleh mahasiswa. Kami bertekad menjadi wadah kreativitas dan kebanggaan civitas akademika dengan menghadirkan produk eksklusif berkualitas premium, sekaligus mendukung inovasi mahasiswa di lingkungan kampus.",
+            alignment: "center"
           }
         }
       ]
@@ -382,42 +436,127 @@ export function getDefaultSegments(): HomepageSegment[] {
           id: "default-el-limited",
           type: "limited_drop",
           config: {
-            title: "Varsity FILKOM Edition",
+            title: "Varsity Jacket",
             subtitle: "Varsity premium dengan bordir logo FILKOM eksklusif, diproduksi terbatas hanya untuk batch ini.",
             productSlug: "varsity-filkom",
             image: "",
-            countdownEnd: "2026-07-10T23:59:59+07:00",
+            countdownEnd: "2026-08-05T23:59:59+07:00",
             stockMax: 100,
-            stockCurrent: 82
+            stockCurrent: 70
           }
         }
       ]
     },
     {
-      id: "default-valueprops",
-      title: "Pilar Nilai Kami",
+      id: "default-bundle",
+      title: "Rekomendasi Bundling",
       enabled: true,
       elements: [
         {
-          id: "default-el-valueprops",
+          id: "default-el-bundle",
+          type: "bundle_recommendation",
+          config: {
+            title: "Exclusive Bundles",
+            subtitle: "SPECIAL SAVINGS PACKS",
+            items: [
+              {
+                name: "Freshman Starter Pack",
+                price: "Rp 120.000",
+                originalPrice: "Rp 145.000",
+                image: "",
+                description: "Paket lengkap maba untuk tampil keren di kampus baru.",
+                itemsList: "Kaos Premium, Totebag Canvas, Sticker Pack",
+                link: "/products"
+              },
+              {
+                name: "Premium Varsity Bundle",
+                price: "Rp 320.000",
+                originalPrice: "Rp 370.000",
+                image: "",
+                description: "Kombinasi varsity eksklusif dan notebook untuk ngampus.",
+                itemsList: "Varsity Jacket, Notebook Exclusive, Tumbler Stainless",
+                link: "/products"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      id: "default-why",
+      title: "Value Proposition",
+      enabled: true,
+      elements: [
+        {
+          id: "default-el-why",
           type: "value_props",
           config: {
             items: [
               {
-                title: "Desain Orisinal",
-                description: "Setiap artikel dirancang eksklusif oleh mahasiswa FILKOM demi mewakili identitas kita."
+                title: "Designed by Students",
+                description: "Setiap detail dirancang untuk merepresentasikan kehidupan perkuliahan di FILKOM."
               },
               {
-                title: "Kualitas Premium",
-                description: "Bahan cotton fleece tebal, sablon presisi tinggi, dan jahitan standar distro internasional."
+                title: "Official Merchandise",
+                description: "Satu-satunya penyedia merchandise berlisensi resmi di bawah BEM & Fakultas."
               },
               {
-                title: "Bebas Ongkir Kampus",
-                description: "Pesan online, ambil langsung di Gazebo FILKOM UB tanpa biaya kirim sepeser pun."
+                title: "Premium Materials",
+                description: "Jaminan bahan nyaman, awet, dan nyaman dipakai harian."
               },
               {
-                title: "Pembayaran Instan",
-                description: "Mendukung pembayaran otomatis QRIS, ShopeePay, GoPay, dan transfer bank via Midtrans."
+                title: "Support Innovation",
+                description: "Seluruh hasil penjualan dialokasikan untuk mendukung kegiatan dan inovasi kemahasiswaan."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      id: "default-gallery",
+      title: "Lifestyle Gallery",
+      enabled: true,
+      elements: [
+        {
+          id: "default-el-gallery",
+          type: "gallery",
+          config: {
+            title: "Campus Lookbook",
+            subtitle: "@FILKOMMERCH",
+            items: [
+              { id: "g1", image: "", caption: "Varsity jacket di gazebo" },
+              { id: "g2", image: "", caption: "Ngoding pake hoodie premium" },
+              { id: "g3", image: "", caption: "Totebag praktis kuliah" },
+              { id: "g4", image: "", caption: "Lifestyle kaos debugging" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      id: "default-testimonial",
+      title: "Testimonial Pelanggan",
+      enabled: true,
+      elements: [
+        {
+          id: "default-el-testimonial",
+          type: "testimonial",
+          config: {
+            title: "Campus Voices",
+            subtitle: "TESTIMONIALS",
+            items: [
+              {
+                id: "t1",
+                name: "Rizwan Dak",
+                role: "Informatika 2024",
+                content: "Varsity-nya tebal banget, bordirannya rapi pol. Nyaman buat dipake kuliah seharian di ruangan AC FILKOM."
+              },
+              {
+                id: "t2",
+                name: "Ahmad Jauhari",
+                role: "Sistem Informasi 2023",
+                content: "Desain kaos debugging-nya relate banget sama kehidupan anak IT. Bahan katun combed-nya adem dan ga gampang melar."
               }
             ]
           }
@@ -436,23 +575,23 @@ export function getDefaultSegments(): HomepageSegment[] {
             items: [
               {
                 id: "size",
-                q: "Bara, kalau ukuranku kebesaran bisa ditukar nggak?",
-                a: "Waduh kalau kebesaran, tenang aja bro/sis! Penukaran ukuran boleh maksimal 2 hari setelah barang diterima kok. Syaratnya tag belum dilepas, belum dicuci, dan stok ukuran pengganti masih ada. Aman! 😎"
+                q: "Apakah barang pre-order bisa dikirim ke luar kota?",
+                a: "Bisa bro/sis! Kami menyediakan opsi pengiriman reguler J&T/JNE ke seluruh Indonesia selain opsi Ambil di Gazebo FILKOM UB."
               },
               {
                 id: "po",
-                q: "Barang pre-order selesainya kapan nih?",
-                a: "Proses produksi barang PO biasanya sekitar 14-21 hari kerja setelah sesi pemesanan ditutup yaa. Tergantung antrean vendor juga, tapi Bara bakal pastiin secepat mungkin! 🔥"
+                q: "Berapa lama proses produksi Pre-Order?",
+                a: "Proses produksi memakan waktu sekitar 14-21 hari kerja setelah sesi Pre-Order ditutup secara resmi."
               },
               {
                 id: "pickup",
-                q: "Ngambil pesanannya dimana Bar?",
-                a: "Pilih aja 'Pickup di Kampus' pas checkout! Nanti tim Bara bakal nungguin kamu di Gazebo FILKOM UB sesuai jadwal yang dikirim via WhatsApp. Jangan lupa bawa bukti pesanan ya! 🐯"
+                q: "Bagaimana cara memilih ukuran yang pas (sizing)?",
+                a: "Setiap halaman produk dilengkapi dengan Size Chart lengkap. Kami merekomendasikan mengukur kaos atau jaket Anda yang biasa dipakai lalu mencocokkannya."
               },
               {
-                id: "discount",
-                q: "Dapet diskon mahasiswa gimana caranya?",
-                a: "Gampang! Kamu tinggal login pake email student UB (@student.ub.ac.id) atau masukin NIM di menu Akun. Nanti otomatis dapet potongan harga civitas 5%! Lumayan kan buat beli es teh? 🥤"
+                id: "refund",
+                q: "Apakah bisa mengajukan pengembalian (refund)?",
+                a: "Refund hanya diperbolehkan apabila terdapat kesalahan pengiriman produk atau cacat produksi major dari vendor kami."
               }
             ]
           }

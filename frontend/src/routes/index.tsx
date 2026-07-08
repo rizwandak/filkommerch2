@@ -1451,6 +1451,180 @@ function Index() {
                   );
                 }
 
+                case "bundle_recommendation":
+                  return (
+                    <section key={el.id} className="bg-cream py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
+                      <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
+                        <div className="text-center mb-12">
+                          {el.config.subtitle && (
+                            <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
+                              {el.config.subtitle}
+                            </div>
+                          )}
+                          <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-ink font-bold uppercase">
+                            {el.config.title || "Rekomendasi Bundling"}
+                          </h2>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                          {(el.config.items || []).map((bundle: any, bIdx: number) => (
+                            <div
+                              key={bIdx}
+                              className="border-2 border-ink bg-background rounded-xl p-6 sm:p-8 flex flex-col justify-between shadow-[6px_6px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] transition-all duration-200"
+                            >
+                              <div>
+                                <div className="flex justify-between items-start gap-4 mb-4">
+                                  <div>
+                                    <span className="text-[9px] font-extrabold tracking-widest text-brand-orange bg-brand-orange/10 px-2.5 py-1 rounded-full uppercase">
+                                      Save up to 15%
+                                    </span>
+                                    <h3 className="font-extrabold text-xl sm:text-2xl text-ink mt-2 uppercase tracking-wide">
+                                      {bundle.name}
+                                    </h3>
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="text-xs text-muted-foreground line-through block font-bold">
+                                      {bundle.originalPrice}
+                                    </span>
+                                    <span className="text-lg sm:text-xl font-black text-brand-orange block">
+                                      {bundle.price}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                <p className="text-xs sm:text-sm text-muted-foreground font-medium mb-6">
+                                  {bundle.description}
+                                </p>
+
+                                <div className="space-y-2 mb-8">
+                                  <div className="text-[10px] font-bold text-ink uppercase tracking-wider mb-2">
+                                    ISI BUNDLE:
+                                  </div>
+                                  {(bundle.itemsList || "").split(",").map((it: string, itIdx: number) => (
+                                    <div key={itIdx} className="flex items-center gap-2 text-xs font-semibold text-ink">
+                                      <Check className="w-4 h-4 text-brand-orange shrink-0" />
+                                      <span>{it.trim()}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={() => {
+                                  if (bundle.link) {
+                                    navigate({ to: bundle.link });
+                                  } else {
+                                    scrollToId("shop");
+                                  }
+                                }}
+                                className="w-full text-center py-3 bg-ink hover:bg-brand-orange text-cream hover:text-ink font-bold text-xs tracking-widest uppercase transition-all duration-300 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none cursor-pointer font-extrabold"
+                              >
+                                ORDER BUNDLE NOW
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </section>
+                  );
+
+                case "gallery":
+                  return (
+                    <section key={el.id} className="bg-background py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
+                      <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
+                        <div className="text-center mb-12">
+                          {el.config.subtitle && (
+                            <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
+                              {el.config.subtitle}
+                            </div>
+                          )}
+                          <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-ink font-bold uppercase">
+                            {el.config.title || "Campus Lookbook"}
+                          </h2>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
+                          {(el.config.items || []).map((photo: any, gIdx: number) => {
+                            const defaultPhotos = [varsityEdutech, workJacket, pVarsity, pHoodie];
+                            const sourceImg = photo.image ? resolveImageUrl(photo.image) : defaultPhotos[gIdx % defaultPhotos.length];
+                            return (
+                              <div
+                                key={photo.id || gIdx}
+                                className="group relative aspect-[4/5] bg-cream border-2 border-ink rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-4px] transition-all duration-300"
+                              >
+                                <img
+                                  src={sourceImg}
+                                  alt={photo.caption || "Lifestyle Gallery"}
+                                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 sm:p-5 flex flex-col justify-end">
+                                  <p className="text-xs sm:text-sm font-bold text-cream leading-tight">
+                                    {photo.caption}
+                                  </p>
+                                  <span className="text-[10px] text-brand-orange font-mono mt-1.5 uppercase tracking-widest font-extrabold flex items-center gap-1">
+                                    <Instagram className="w-3.5 h-3.5" /> SHOP THE LOOK
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </section>
+                  );
+
+                case "testimonial":
+                  return (
+                    <section key={el.id} className="bg-cream py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
+                      <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
+                        <div className="text-center mb-12">
+                          {el.config.subtitle && (
+                            <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
+                              {el.config.subtitle}
+                            </div>
+                          )}
+                          <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-ink font-bold uppercase">
+                            {el.config.title || "Campus Voices"}
+                          </h2>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8 max-w-4xl mx-auto">
+                          {(el.config.items || []).map((t: any, tIdx: number) => (
+                            <div
+                              key={t.id || tIdx}
+                              className="bg-background border-2 border-ink rounded-xl p-6 sm:p-8 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] flex flex-col justify-between"
+                            >
+                              <div className="space-y-4">
+                                <div className="flex text-brand-orange">
+                                  {Array.from({ length: 5 }).map((_, starI) => (
+                                    <Star key={starI} className="w-4 h-4 fill-current" />
+                                  ))}
+                                </div>
+                                <blockquote className="text-sm sm:text-base text-ink font-semibold italic leading-relaxed">
+                                  &ldquo;{t.content}&rdquo;
+                                </blockquote>
+                              </div>
+
+                              <div className="flex items-center gap-3.5 mt-6 pt-5 border-t border-border">
+                                <div className="w-10 h-10 rounded-full bg-brand-orange text-ink border-2 border-ink flex items-center justify-center font-extrabold text-sm shadow-sm uppercase">
+                                  {t.name?.slice(0, 2) || "FM"}
+                                </div>
+                                <div>
+                                  <h4 className="font-extrabold text-sm text-ink leading-tight">
+                                    {t.name}
+                                  </h4>
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mt-0.5">
+                                    {t.role}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </section>
+                  );
+
                 default:
                   return null;
               }
