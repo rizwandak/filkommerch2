@@ -191,6 +191,9 @@ function AdminProductsPage() {
       const res = await fetch(`${API_BASE_URL}/api/upload-multiple`, {
         method: "POST",
         body: formData,
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
       });
       const data = await res.json();
       toast.dismiss();
@@ -224,6 +227,9 @@ function AdminProductsPage() {
       const res = await fetch(`${API_BASE_URL}/api/upload`, {
         method: "POST",
         body: formData,
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
       });
       const data = await res.json();
       toast.dismiss();

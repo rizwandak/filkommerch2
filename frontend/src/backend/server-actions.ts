@@ -13,6 +13,7 @@ const API_URL =
 const getAuthHeaders = () => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
   };
   
   try {

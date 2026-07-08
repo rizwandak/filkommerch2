@@ -171,6 +171,9 @@ function AdminHomepageEditorPage() {
       const res = await fetch(`${API_BASE_URL}/api/upload`, {
         method: "POST",
         body: formData,
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
       });
       const data = await res.json();
       toast.dismiss();
@@ -203,6 +206,9 @@ function AdminHomepageEditorPage() {
       const res = await fetch(`${API_BASE_URL}/api/upload`, {
         method: "POST",
         body: formData,
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
       });
       const data = await res.json();
       toast.dismiss();
