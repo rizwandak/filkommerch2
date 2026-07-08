@@ -32,6 +32,10 @@ import { useAuth } from "@/lib/auth";
 import { VerificationModal } from "@frontend/components/VerificationModal";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logo from "@/assets/logo-fm.jpg";
+import pVarsity from "@/assets/p-varsity.jpg";
+import pHoodie from "@/assets/p-hoodie.jpg";
+import pTshirt from "@/assets/p-tshirt.jpg";
+import pTee2 from "@/assets/p-tee2.jpg";
 
 const scrollToId = (id: string) => {
   const el = document.getElementById(id);
@@ -1288,10 +1292,10 @@ function ProductDetailPage() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?w=500&q=80",
-                "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500&q=80",
-                "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=500&q=80",
-                "https://images.unsplash.com/photo-1532453288672-3a27e9be9efd?w=500&q=80",
+                pVarsity,
+                pHoodie,
+                pTshirt,
+                pTee2,
               ].map((img, idx) => (
                 <div
                   key={idx}

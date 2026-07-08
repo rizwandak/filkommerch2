@@ -36,6 +36,9 @@ import {
   getDefaultSegments,
 } from "@/lib/homepage-types";
 import { ImageCropperModal } from "@frontend/components/admin/ImageCropperModal";
+import hero from "@/assets/hero.jpg";
+import pVarsity from "@/assets/p-varsity.jpg";
+import pHoodie from "@/assets/p-hoodie.jpg";
 
 
 // Drag and drop imports
@@ -1094,7 +1097,7 @@ function AdminHomepageEditorPage() {
                                                             image: newImgs[0] || "",
                                                           });
                                                         }}
-                                                        className="h-7 w-7 p-0 border-2 border-ink cursor-pointer hover:bg-neutral-100"
+                                                        className="h-7 w-7 p-0 border-2 border-ink cursor-pointer hover:bg-neutral-100 flex items-center justify-center"
                                                         title="Geser Kiri"
                                                       >
                                                         <ChevronUp className="-rotate-90 w-3.5 h-3.5" />
@@ -1114,7 +1117,7 @@ function AdminHomepageEditorPage() {
                                                             image: newImgs[0] || "",
                                                           });
                                                         }}
-                                                        className="h-7 w-7 p-0 border-2 border-ink cursor-pointer hover:bg-neutral-100"
+                                                        className="h-7 w-7 p-0 border-2 border-ink cursor-pointer hover:bg-neutral-100 flex items-center justify-center"
                                                         title="Geser Kanan"
                                                       >
                                                         <ChevronDown className="-rotate-90 w-3.5 h-3.5" />
@@ -1130,7 +1133,7 @@ function AdminHomepageEditorPage() {
                                                             image: newImgs[0] || "",
                                                           });
                                                         }}
-                                                        className="h-7 w-7 p-0 border-2 border-ink bg-red-500 text-white cursor-pointer hover:bg-red-600"
+                                                        className="h-7 w-7 p-0 border-2 border-ink bg-red-500 text-white cursor-pointer hover:bg-red-600 flex items-center justify-center"
                                                         title="Hapus"
                                                       >
                                                         <Trash2 className="w-3.5 h-3.5" />
@@ -1152,7 +1155,7 @@ function AdminHomepageEditorPage() {
                                                 onChange={(e) => handleFileChange(e, activeSegment.id, el.id, "images_append", el.type)}
                                                 className="cursor-pointer text-xs"
                                               />
-                                              <p className="text-[9px] text-muted-foreground font-medium">Saran aspek rasio adalah 5:6 (Potret/Lookbook) atau 1:1 (Persegi).</p>
+                                              <p className="text-[9px] text-muted-foreground font-medium">Foto yang diunggah akan dipotong ke rasio 5:6 dan disimpan secara lokal di folder backend/uploads.</p>
                                             </div>
                                           </div>
                                         );
@@ -1766,7 +1769,8 @@ function AdminHomepageEditorPage() {
                                     </div>
                                     <div className="col-span-4 bg-brand-blue/15 aspect-[5/6] rounded border border-ink/10 flex flex-col justify-center items-center overflow-hidden h-full relative group">
                                       {(() => {
-                                        const previewImages = el.config.images || (el.config.image ? [el.config.image] : []);
+                                        const uploadedImages = el.config.images || (el.config.image ? [el.config.image] : []);
+                                        const previewImages = uploadedImages.length > 0 ? uploadedImages : [hero, pVarsity, pHoodie];
                                         if (previewImages.length > 0) {
                                           return (
                                             <>

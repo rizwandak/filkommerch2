@@ -367,7 +367,7 @@ function HeroCarousel({ images }: HeroCarouselProps) {
     return () => clearInterval(interval);
   }, [api]);
 
-  const slideImages = images && images.length > 0 ? images : [hero];
+  const slideImages = images && images.length > 0 ? images : [hero, pVarsity, pHoodie];
 
   return (
     <div className="w-full h-full relative group">

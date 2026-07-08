@@ -31,6 +31,7 @@ import logoFilkom from "@/assets/logo_filkom.png";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import loginBgVideo from "@/assets/login-bg-video.mp4";
+import loginBgImage from "@/assets/hero.jpg";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -272,7 +273,7 @@ function LoginPage() {
           muted
           playsInline
           className="absolute inset-0 w-full h-full object-cover scale-105 pointer-events-none transition-transform duration-[15000ms] ease-out hover:scale-110"
-          poster="https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=1200&q=80"
+          poster={loginBgImage}
         >
           <source src={loginBgVideo} type="video/mp4" />
           Your browser does not support the video tag.
