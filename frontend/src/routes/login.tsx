@@ -1,6 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
-import { Mail, Lock, LogIn, User, ArrowRight, ShieldAlert, Sparkles, UserPlus, ShoppingBag } from "lucide-react";
+import {
+  Mail,
+  Lock,
+  LogIn,
+  User,
+  ArrowRight,
+  ShieldAlert,
+  Sparkles,
+  UserPlus,
+  ShoppingBag,
+  GraduationCap,
+} from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
@@ -18,6 +29,7 @@ import logo from "@/assets/logo-fm.jpg";
 import logoFilkom from "@/assets/logo_filkom.png";
 import { GoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
+import loginBgVideo from "@/assets/login-bg-video.mp4";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -229,23 +241,28 @@ function LoginPage() {
     <div className="min-h-screen bg-white text-ink flex flex-col lg:flex-row items-stretch overflow-hidden font-sans">
       {/* LEFT: Branding/Hero Section (visible on desktop) */}
       <div className="hidden lg:flex lg:w-[45%] relative flex-col justify-between p-12 text-white overflow-hidden border-r-2 border-ink">
-        {/* Background Image from Unsplash with Zoom Effect on Hover */}
-        <div 
-          className="absolute inset-0 bg-cover bg-center transition-transform duration-[15000ms] ease-out hover:scale-110"
-          style={{ 
-            backgroundImage: `url('https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=1200&q=80')` 
-          }}
-        />
+        {/* Background Video (Local Asset) with Zoom Effect and fallbacks */}
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover scale-105 pointer-events-none transition-transform duration-[15000ms] ease-out hover:scale-110"
+          poster="https://images.unsplash.com/photo-1556821840-3a63f95609a7?auto=format&fit=crop&w=1200&q=80"
+        >
+          <source src={loginBgVideo} type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
         {/* Gradient Overlays for High Contrast */}
         <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/85 via-indigo-900/80 to-brand-blue/70 mix-blend-multiply pointer-events-none" />
         <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-transparent to-ink/10 pointer-events-none" />
-        
+
         {/* Floating Animated Geometric Objects */}
         <div className="absolute top-[15%] left-[10%] w-24 h-24 rounded-full border border-white/10 bg-white/5 blur-[2px] animate-[spin_35s_linear_infinite] pointer-events-none" />
         <div className="absolute bottom-[25%] right-[15%] w-36 h-36 bg-brand-orange/15 rounded-full blur-3xl animate-pulse duration-[8s] pointer-events-none" />
         <div className="absolute top-[45%] right-[8%] w-16 h-16 bg-brand-blue/20 rounded-xl border border-white/10 rotate-12 animate-[bounce_10s_ease-in-out_infinite] pointer-events-none" />
         <div className="absolute bottom-[15%] left-[8%] w-20 h-20 bg-indigo-500/10 rounded-full blur-md animate-[pulse_6s_ease-in-out_infinite] pointer-events-none" />
-        
+
         {/* Top brand header */}
         <div className="flex items-center gap-3.5 z-10">
           <img
@@ -278,7 +295,8 @@ function LoginPage() {
             </p>
           </div>
           <p className="text-xs font-semibold text-white/80 max-w-sm leading-relaxed drop-shadow">
-            Temukan koleksi apparel, aksesoris, dan merchandise eksklusif resmi Fakultas Ilmu Komputer Universitas Brawijaya.
+            Temukan koleksi apparel, aksesoris, dan merchandise eksklusif resmi Fakultas Ilmu
+            Komputer Universitas Brawijaya.
           </p>
         </div>
 
@@ -298,9 +316,15 @@ function LoginPage() {
         <div className="absolute top-6 left-6 right-6 flex items-center justify-between z-10">
           {/* Mobile logo */}
           <div className="flex items-center gap-2 lg:hidden">
-            <img src={logo} alt="Logo" className="h-8 w-8 rounded-full object-cover border border-ink" />
+            <img
+              src={logo}
+              alt="Logo"
+              className="h-8 w-8 rounded-full object-cover border border-ink"
+            />
             <img src={logoFilkom} alt="Logo FILKOM" className="h-7 w-7 object-contain" />
-            <span className="font-extrabold text-xs uppercase tracking-wider text-ink">FILKOM MERCH</span>
+            <span className="font-extrabold text-xs uppercase tracking-wider text-ink">
+              FILKOM MERCH
+            </span>
           </div>
 
           {/* Back Link */}
@@ -322,9 +346,12 @@ function LoginPage() {
               {mode === "admin" && "Admin Access"}
             </h2>
             <p className="text-xs text-muted-foreground leading-normal">
-              {mode === "login" && "Masukkan akun Anda untuk melanjutkan belanja merchandise resmi."}
-              {mode === "register" && "Daftarkan akun pembeli baru untuk menikmati diskon khusus civitas."}
-              {mode === "admin" && "Sistem Administrasi Terproteksi untuk tim operasional Filkom Merch."}
+              {mode === "login" &&
+                "Masukkan akun Anda untuk melanjutkan belanja merchandise resmi."}
+              {mode === "register" &&
+                "Daftarkan akun pembeli baru untuk menikmati diskon khusus civitas."}
+              {mode === "admin" &&
+                "Sistem Administrasi Terproteksi untuk tim operasional Filkom Merch."}
             </p>
           </div>
 
@@ -343,7 +370,10 @@ function LoginPage() {
           {mode === "login" && (
             <form onSubmit={handleBuyerLogin} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="username" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                <Label
+                  htmlFor="username"
+                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
+                >
                   Username or Email
                 </Label>
                 <div className="relative">
@@ -360,7 +390,10 @@ function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="password" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                <Label
+                  htmlFor="password"
+                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
+                >
                   Password
                 </Label>
                 <div className="relative">
@@ -391,21 +424,39 @@ function LoginPage() {
                   <div className="w-full border-t border-muted-foreground/20"></div>
                 </div>
                 <div className="relative flex justify-center text-[10px]">
-                  <span className="px-3.5 bg-[#FCFAF7] text-muted-foreground font-black tracking-widest">OR</span>
+                  <span className="px-3.5 bg-[#FCFAF7] text-muted-foreground font-black tracking-widest">
+                    OR
+                  </span>
                 </div>
               </div>
 
-              {/* Google login option styled premium */}
-              <div className="flex justify-center w-full py-1">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={handleGoogleError}
-                  useOneTap
-                  shape="pill"
-                  theme="outline"
-                  size="large"
-                  text="signin_with"
-                />
+              {/* Google login option styled premium with education banner */}
+              <div className="space-y-4">
+                <div className="p-4 bg-brand-blue/5 border border-brand-blue/20 rounded-2xl flex items-start gap-3 shadow-sm">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue">
+                    <GraduationCap className="h-5 w-5 text-brand-blue" />
+                  </div>
+                  <div className="space-y-1 text-left">
+                    <h4 className="text-[11px] font-extrabold text-brand-blue uppercase tracking-wider">
+                      Mahasiswa FILKOM UB?
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed font-semibold">
+                      Login dengan <span className="font-extrabold text-brand-blue">akun Google UB Anda (@student.ub.ac.id)</span> & hubungkan NIM di profil untuk mengaktifkan diskon khusus civitas!
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex justify-center w-full py-1">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={handleGoogleError}
+                    useOneTap
+                    shape="pill"
+                    theme="outline"
+                    size="large"
+                    text="signin_with"
+                  />
+                </div>
               </div>
 
               <div className="text-center pt-4 text-xs font-semibold">
@@ -428,7 +479,10 @@ function LoginPage() {
           {mode === "register" && (
             <form onSubmit={handleRegister} className="space-y-4">
               <div className="space-y-1.5">
-                <Label htmlFor="reg-name" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                <Label
+                  htmlFor="reg-name"
+                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
+                >
                   Nama Lengkap
                 </Label>
                 <div className="relative">
@@ -445,7 +499,10 @@ function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="reg-username" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                <Label
+                  htmlFor="reg-username"
+                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
+                >
                   Username
                 </Label>
                 <div className="relative">
@@ -462,7 +519,10 @@ function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="reg-email" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                <Label
+                  htmlFor="reg-email"
+                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
+                >
                   Email
                 </Label>
                 <div className="relative">
@@ -480,7 +540,10 @@ function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="reg-password" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                <Label
+                  htmlFor="reg-password"
+                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
+                >
                   Password
                 </Label>
                 <div className="relative">
@@ -526,7 +589,10 @@ function LoginPage() {
           {mode === "admin" && (
             <form onSubmit={handleAdminLogin} className="space-y-4 animate-fade-in">
               <div className="space-y-1.5">
-                <Label htmlFor="admin-username" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                <Label
+                  htmlFor="admin-username"
+                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
+                >
                   Admin Username
                 </Label>
                 <div className="relative">
@@ -543,7 +609,10 @@ function LoginPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="admin-password" className="text-xs font-extrabold uppercase tracking-wider text-ink">
+                <Label
+                  htmlFor="admin-password"
+                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
+                >
                   Admin Password
                 </Label>
                 <div className="relative">

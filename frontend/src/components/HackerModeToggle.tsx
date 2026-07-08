@@ -9,7 +9,7 @@ export function HackerModeToggle() {
       setIsDark(document.documentElement.classList.contains("dark"));
     };
     checkTheme();
-    
+
     // Listen for class changes if toggled from elsewhere
     const observer = new MutationObserver(checkTheme);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
@@ -27,8 +27,8 @@ export function HackerModeToggle() {
   };
 
   return (
-    <button 
-      onClick={toggle} 
+    <button
+      onClick={toggle}
       aria-label="Toggle Dark Mode"
       className="hover:text-brand-orange transition-colors cursor-pointer"
       title="Toggle Theme"

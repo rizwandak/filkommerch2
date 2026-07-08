@@ -22,30 +22,30 @@ interface VerificationModalProps {
 
 export function VerificationModal({ isOpen, onClose, onSuccess }: VerificationModalProps) {
   const { user, setUser } = useAuth() as any; // Cast to update state if necessary
-  const [nimOrNidn, setNimOrNidn] = useState("");
+  const [nim, setNim] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!nimOrNidn.trim()) {
-      toast.error("NIM atau NIDN tidak boleh kosong");
+    if (!nim.trim()) {
+      toast.error("NIM tidak boleh kosong");
       return;
     }
 
     setLoading(true);
     try {
-      const result = await verifyFilkomUserAction({ data: { nimOrNidn: nimOrNidn.trim() } });
+      const result = await verifyFilkomUserAction({ data: { nimOrNidn: nim.trim() } });
 
       if (result.success && result.user) {
         toast.success(result.message || "Verifikasi berhasil!");
-        
+
         // Update local auth state with verified data
         if (user && setUser) {
           const updatedUser = {
             ...user,
             is_filkom_verified: 1,
-            nim: result.user.nim
+            nim: result.user.nim,
           };
           setUser(updatedUser);
           localStorage.setItem("user", JSON.stringify(updatedUser));
@@ -74,20 +74,24 @@ export function VerificationModal({ isOpen, onClose, onSuccess }: VerificationMo
             Verifikasi Civitas FILKOM UB
           </DialogTitle>
           <DialogDescription className="text-center text-xs text-muted-foreground leading-relaxed">
-            Gunakan NIM (Mahasiswa) atau NIDN (Dosen) Anda untuk mengaktifkan diskon khusus civitas FILKOM UB pada semua produk FILKOM Merch.
+            Gunakan NIM (Mahasiswa) Anda untuk mengaktifkan diskon khusus civitas
+            FILKOM UB pada semua produk FILKOM Merch.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleVerify} className="space-y-4 py-4">
           <div className="space-y-1.5">
-            <label htmlFor="identifier" className="text-xs font-bold text-ink uppercase tracking-wider">
-              NIM / NIDN Anda
+            <label
+              htmlFor="identifier"
+              className="text-xs font-bold text-ink uppercase tracking-wider"
+            >
+              NIM Anda
             </label>
             <Input
               id="identifier"
-              placeholder="Contoh NIM: 235150601111041"
-              value={nimOrNidn}
-              onChange={(e) => setNimOrNidn(e.target.value)}
+              placeholder="Masukkan NIM"
+              value={nim}
+              onChange={(e) => setNim(e.target.value)}
               disabled={loading}
               className="border-[#D6C7AE] focus-visible:ring-brand-blue h-11 text-sm bg-cream/10"
               autoFocus
@@ -97,15 +101,19 @@ export function VerificationModal({ isOpen, onClose, onSuccess }: VerificationMo
           <div className="bg-[#FAF7F0] border border-[#EBE3D5] rounded-xl p-3.5 space-y-2 text-[11px] text-muted-foreground leading-relaxed">
             <div className="flex items-start gap-2">
               <span className="text-brand-orange font-bold">•</span>
-              <span>Nama pada akun Google UB Anda harus sama dengan nama yang terdaftar di PDDIKTI.</span>
+              <span>
+                Nama pada akun Google UB Anda harus sama dengan nama yang terdaftar di PDDIKTI.
+              </span>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-brand-orange font-bold">•</span>
-              <span>Satu NIM/NIDN hanya dapat terikat dengan satu akun aktif FILKOM Merch.</span>
+              <span>Satu NIM hanya dapat terikat dengan satu akun aktif FILKOM Merch.</span>
             </div>
             <div className="flex items-start gap-2">
               <span className="text-brand-orange font-bold">•</span>
-              <span>Jika API PDDIKTI eksternal down, sistem akan beralih ke pengecekan pola nomor identitas secara otomatis.</span>
+              <span>
+                Jika API PDDIKTI eksternal down, sistem akan beralih ke pengecekan pola NIM secara otomatis.
+              </span>
             </div>
           </div>
 

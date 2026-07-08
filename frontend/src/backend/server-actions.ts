@@ -1,5 +1,3 @@
-
-
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 
@@ -14,19 +12,22 @@ const getAuthHeaders = () => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  
+
   try {
     const request = getRequest();
     if (request) {
       const cookieHeader = request.headers.get("cookie") || "";
-      const cookies = cookieHeader.split(";").reduce((acc: Record<string, string>, cookie: string) => {
-        const parts = cookie.split("=");
-        const key = parts[0]?.trim();
-        const value = parts.slice(1).join("=").trim();
-        if (key) acc[key] = decodeURIComponent(value);
-        return acc;
-      }, {} as Record<string, string>);
-      
+      const cookies = cookieHeader.split(";").reduce(
+        (acc: Record<string, string>, cookie: string) => {
+          const parts = cookie.split("=");
+          const key = parts[0]?.trim();
+          const value = parts.slice(1).join("=").trim();
+          if (key) acc[key] = decodeURIComponent(value);
+          return acc;
+        },
+        {} as Record<string, string>,
+      );
+
       if (cookies.user_role) {
         headers["x-user-role"] = cookies.user_role;
       }
@@ -40,8 +41,6 @@ const getAuthHeaders = () => {
   } catch (e) {
     console.warn("Could not retrieve web request context:", e);
   }
-  
-
 
   return headers;
 };
@@ -315,8 +314,6 @@ export interface StoreSettings {
   homepage_layout?: string | null;
 }
 
-
-
 export interface CreateProductInput {
   category_id: number;
   name: string;
@@ -342,7 +339,12 @@ export interface CreateProductInput {
   aplikasi?: string | null;
   size_chart_url?: string | null;
   images?: string[];
-  variants: Array<{ size: string; color?: string | null; stock: number; filkom_price?: number | null }>;
+  variants: Array<{
+    size: string;
+    color?: string | null;
+    stock: number;
+    filkom_price?: number | null;
+  }>;
   component_ids?: number[];
 }
 
@@ -798,7 +800,9 @@ export const getDailySalesSummary = createServerFn({ method: "GET" })
   .validator((date: string) => date)
   .handler(async ({ data: date }) => {
     try {
-      const res = await serverFetch(`${API_URL}/api/analytics/daily?date=${encodeURIComponent(date)}`);
+      const res = await serverFetch(
+        `${API_URL}/api/analytics/daily?date=${encodeURIComponent(date)}`,
+      );
       if (!res.ok) throw new Error("Failed to fetch daily summary");
       return res.json();
     } catch (error) {
@@ -814,7 +818,9 @@ export const getTopProducts = createServerFn({ method: "GET" })
     try {
       const limit = data?.limit ?? 10;
       const days = data?.days ?? 30;
-      const res = await serverFetch(`${API_URL}/api/analytics/top-products?limit=${limit}&days=${days}`);
+      const res = await serverFetch(
+        `${API_URL}/api/analytics/top-products?limit=${limit}&days=${days}`,
+      );
       if (!res.ok) throw new Error("Failed to fetch top products");
       return res.json();
     } catch (error) {
@@ -1134,5 +1140,5 @@ export const getActivityLogs = createServerFn({ method: "GET" }).handler(
       console.error("Error fetching activity logs:", error);
       return { logs: [], error: "Failed to fetch activity logs" };
     }
-  }
+  },
 );

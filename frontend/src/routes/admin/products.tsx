@@ -97,7 +97,7 @@ const formatDateForInput = (dateVal: any) => {
   try {
     const d = new Date(dateVal);
     if (isNaN(d.getTime())) return "";
-    const pad = (n: number) => String(n).padStart(2, '0');
+    const pad = (n: number) => String(n).padStart(2, "0");
     const year = d.getFullYear();
     const month = pad(d.getMonth() + 1);
     const day = pad(d.getDate());
@@ -152,9 +152,12 @@ function AdminProductsPage() {
       filkom_price: product.filkom_price ? String(product.filkom_price) : "",
       promo_price: product.promo_price ? String(product.promo_price) : "",
       sale_type: product.sale_type === "limited_drop" ? "limited_drop" : "ready_stock",
-      product_type: product.product_type === "bundle"
-        ? "bundle"
-        : (product.sale_type === "pre_order" ? "preorder" : "ready"),
+      product_type:
+        product.product_type === "bundle"
+          ? "bundle"
+          : product.sale_type === "pre_order"
+            ? "preorder"
+            : "ready",
       low_stock_threshold: product.low_stock_threshold ? String(product.low_stock_threshold) : "5",
       preorder_start_at: formatDateForInput(product.preorder_start_at),
       preorder_end_at: formatDateForInput(product.preorder_end_at),
@@ -260,9 +263,12 @@ function AdminProductsPage() {
       original_price: form.original_price ? parseFloat(form.original_price) : null,
       filkom_price: form.filkom_price ? parseFloat(form.filkom_price) : null,
       promo_price: form.promo_price ? parseFloat(form.promo_price) : null,
-      sale_type: form.product_type === "preorder"
-        ? "pre_order"
-        : (form.sale_type === "limited_drop" ? "limited_drop" : "ready_stock"),
+      sale_type:
+        form.product_type === "preorder"
+          ? "pre_order"
+          : form.sale_type === "limited_drop"
+            ? "limited_drop"
+            : "ready_stock",
       product_type: form.product_type === "bundle" ? "bundle" : "apparel",
       low_stock_threshold: form.low_stock_threshold ? parseInt(form.low_stock_threshold) : 5,
       preorder_start_at: form.preorder_start_at || null,
@@ -349,7 +355,12 @@ function AdminProductsPage() {
   };
 
   const handleDeleteCategory = async (id: number) => {
-    if (!window.confirm("Hapus kategori ini? Produk yang menggunakan kategori ini tidak akan dihapus.")) return;
+    if (
+      !window.confirm(
+        "Hapus kategori ini? Produk yang menggunakan kategori ini tidak akan dihapus.",
+      )
+    )
+      return;
     try {
       const result = await deleteCategory({ data: id });
       if (result.success) {
@@ -653,7 +664,9 @@ function AdminProductsPage() {
 
             {form.product_type === "preorder" && (
               <div className="border border-brand-orange/30 bg-orange-50/20 p-4 rounded-lg space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-orange">Parameter Pre-Order</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-orange">
+                  Parameter Pre-Order
+                </h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label className="text-xs">Mulai Pre-Order</Label>
@@ -696,14 +709,19 @@ function AdminProductsPage() {
             )}
             {form.product_type === "bundle" && (
               <div className="border border-brand-blue/30 bg-blue-50/5 p-4 rounded-lg space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-blue font-bold">Daftar Produk Komponen Paket</h4>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-blue font-bold">
+                  Daftar Produk Komponen Paket
+                </h4>
                 <div className="max-h-48 overflow-y-auto space-y-2 border border-border rounded p-2 bg-background">
                   {products
                     .filter((p) => p.id !== form.id && p.product_type !== "bundle")
                     .map((p) => {
                       const isChecked = form.component_ids?.includes(p.id) || false;
                       return (
-                        <label key={p.id} className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted p-1.5 rounded">
+                        <label
+                          key={p.id}
+                          className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted p-1.5 rounded"
+                        >
                           <input
                             type="checkbox"
                             checked={isChecked}
@@ -716,12 +734,17 @@ function AdminProductsPage() {
                             }}
                             className="h-3.5 w-3.5 rounded border-border"
                           />
-                          <span>{p.name} (Rp {p.price.toLocaleString("id-ID")})</span>
+                          <span>
+                            {p.name} (Rp {p.price.toLocaleString("id-ID")})
+                          </span>
                         </label>
                       );
                     })}
-                  {products.filter((p) => p.id !== form.id && p.product_type !== "bundle").length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-4">Tidak ada produk lain tersedia</p>
+                  {products.filter((p) => p.id !== form.id && p.product_type !== "bundle")
+                    .length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4">
+                      Tidak ada produk lain tersedia
+                    </p>
                   )}
                 </div>
               </div>
@@ -863,7 +886,10 @@ function AdminProductsPage() {
                   onClick={() =>
                     setForm({
                       ...form,
-                      variants: [...form.variants, { size: "", color: "", stock: "0", filkom_price: "" }],
+                      variants: [
+                        ...form.variants,
+                        { size: "", color: "", stock: "0", filkom_price: "" },
+                      ],
                     })
                   }
                   className="h-8 text-xs font-bold"
@@ -983,9 +1009,7 @@ function AdminProductsPage() {
                 Daftar Kategori Terdaftar
               </Label>
               {categories.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-4">
-                  Belum ada kategori
-                </p>
+                <p className="text-sm text-muted-foreground text-center py-4">Belum ada kategori</p>
               ) : (
                 <div className="divide-y divide-border border rounded-lg p-2 bg-cream/10 max-h-[40vh] overflow-y-auto">
                   {categories.map((c) => (

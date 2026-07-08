@@ -124,8 +124,11 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
   const [dialogSelectedColor, setDialogSelectedColor] = useState<string | null>(null);
 
   // States for bundle variant selection dialog
-  const [activeBundleForSelection, setActiveBundleForSelection] = useState<ProductWithVariants | null>(null);
-  const [selectedBundleVariants, setSelectedBundleVariants] = useState<Record<number, ProductVariant>>({});
+  const [activeBundleForSelection, setActiveBundleForSelection] =
+    useState<ProductWithVariants | null>(null);
+  const [selectedBundleVariants, setSelectedBundleVariants] = useState<
+    Record<number, ProductVariant>
+  >({});
 
   const [currentReceiptData, setCurrentReceiptData] = useState<ReceiptData | null>(null);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
@@ -137,7 +140,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       return;
     }
 
-    const itemsHtml = data.items.map(item => `
+    const itemsHtml = data.items
+      .map(
+        (item) => `
       <div style="margin-bottom: 6px;">
         <div style="font-weight: bold; word-break: break-word;">${item.name}</div>
         <div style="display: flex; justify-content: space-between; font-size: 9px;">
@@ -145,18 +150,25 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
           <span>Rp ${item.subtotal.toLocaleString("id-ID")}</span>
         </div>
       </div>
-    `).join("");
+    `,
+      )
+      .join("");
 
-    const discountHtml = data.discount > 0 ? `
+    const discountHtml =
+      data.discount > 0
+        ? `
       <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
         <span>Diskon:</span>
         <span>-Rp ${data.discount.toLocaleString("id-ID")}</span>
       </div>
-    ` : "";
+    `
+        : "";
 
-    const customerHtml = data.customer_name ? `
+    const customerHtml = data.customer_name
+      ? `
       <div>Pelanggan: ${data.customer_name}</div>
-    ` : "";
+    `
+      : "";
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -416,7 +428,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     product: ProductWithVariants,
     parentVariant: ProductVariant,
     selections: Record<number, ProductVariant>,
-    customQty = 1
+    customQty = 1,
   ) => {
     // Validate stock for all component variants
     for (const comp of product.bundle_components || []) {
@@ -539,12 +551,12 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     const item = cart.find((i) => i.id === itemId);
     if (item) {
       const product = products.find((p) => p.id === item.product_id);
-      
+
       if (product?.product_type === "bundle" && item.bundle_selections) {
         for (const sel of item.bundle_selections) {
           const compProduct = products.find((p) => p.id === sel.product_id);
           const compVar = compProduct?.variants.find((v) => v.id === sel.variant_id);
-          if (compVar) {
+          if (compProduct && compVar) {
             const otherCartQuantity = cart.reduce((sum, c) => {
               if (c.id === itemId) return sum;
               if (c.bundle_selections) {
@@ -762,9 +774,11 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
 
       <div className="flex flex-1 overflow-hidden relative">
         {/* Left: Products column */}
-        <div className={`flex-col border-r border-border h-full w-full lg:w-[65%] xl:w-[70%] ${
-          activeTab === "products" ? "flex" : "hidden lg:flex"
-        }`}>
+        <div
+          className={`flex-col border-r border-border h-full w-full lg:w-[65%] xl:w-[70%] ${
+            activeTab === "products" ? "flex" : "hidden lg:flex"
+          }`}
+        >
           <div className="shrink-0 space-y-3 border-b border-border p-4 bg-card shadow-sm">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -777,7 +791,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               />
             </div>
             {/* Horizontal scrollable categories */}
-            <div 
+            <div
               className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-none -mx-4 px-4 mask-gradient lg:flex-wrap lg:overflow-x-visible lg:pb-0 lg:mx-0 lg:px-0"
               style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
             >
@@ -812,12 +826,16 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               {filteredProducts.map((product) => {
                 const stock = getTotalStock(product);
                 const sizes = product.variants.filter((v) => v.stock > 0).map((v) => v.size);
-                
+
                 const hasPromo = product.promo_price && Number(product.promo_price) > 0;
                 const displayPrice = hasPromo ? Number(product.promo_price) : Number(product.price);
-                const strikePrice = hasPromo 
-                  ? (product.original_price ? Number(product.original_price) : Number(product.price)) 
-                  : (product.original_price ? Number(product.original_price) : null);
+                const strikePrice = hasPromo
+                  ? product.original_price
+                    ? Number(product.original_price)
+                    : Number(product.price)
+                  : product.original_price
+                    ? Number(product.original_price)
+                    : null;
 
                 return (
                   <button
@@ -827,7 +845,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   >
                     {/* Catalog Badges Overlay */}
                     <div className="absolute left-2 top-2 flex flex-col gap-1 z-10 pointer-events-none">
-                      {product.product_type === 'bundle' && (
+                      {product.product_type === "bundle" && (
                         <Badge className="bg-indigo-600 hover:bg-indigo-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded shadow-sm uppercase border-0">
                           Paket
                         </Badge>
@@ -876,7 +894,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                           Ukuran: {sizes.join(", ")}
                         </p>
                       )}
-                      
+
                       <div className="mt-auto pt-2 flex items-baseline gap-1.5 flex-wrap">
                         <span className="text-xs sm:text-sm font-extrabold text-brand-orange">
                           Rp {displayPrice.toLocaleString("id-ID")}
@@ -904,19 +922,25 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               })}
             </div>
             {filteredProducts.length === 0 && (
-              <p className="py-12 text-center text-muted-foreground text-sm font-medium">Produk tidak ditemukan</p>
+              <p className="py-12 text-center text-muted-foreground text-sm font-medium">
+                Produk tidak ditemukan
+              </p>
             )}
           </ScrollArea>
         </div>
 
         {/* Right: Cart column */}
-        <div className={`flex-col bg-card border-l border-border h-full w-full lg:w-[35%] xl:w-[30%] ${
-          activeTab === "cart" ? "flex" : "hidden lg:flex"
-        }`}>
+        <div
+          className={`flex-col bg-card border-l border-border h-full w-full lg:w-[35%] xl:w-[30%] ${
+            activeTab === "cart" ? "flex" : "hidden lg:flex"
+          }`}
+        >
           <div className="flex items-center justify-between border-b border-border px-4 py-3 bg-cream/40">
             <div className="flex items-center gap-2 font-semibold text-ink">
               <ShoppingCart className="h-4 w-4 text-brand-orange" />
-              <span className="display text-xs sm:text-sm tracking-wider uppercase font-bold">Keranjang Belanja</span>
+              <span className="display text-xs sm:text-sm tracking-wider uppercase font-bold">
+                Keranjang Belanja
+              </span>
               {cart.length > 0 && (
                 <Badge className="bg-brand-blue text-white hover:bg-brand-blue/90 h-5 px-1.5 py-0 rounded-full text-[10px] font-bold">
                   {cart.reduce((sum, item) => sum + item.quantity, 0)}
@@ -924,8 +948,8 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               )}
             </div>
             {cart.length > 0 && (
-              <button 
-                onClick={clearCart} 
+              <button
+                onClick={clearCart}
                 className="text-[10px] font-bold text-red-600 hover:text-red-700 transition flex items-center gap-1 bg-red-50 hover:bg-red-100/80 px-2.5 py-1 rounded-md active:scale-95"
               >
                 <Trash2 className="h-3 w-3" />
@@ -943,7 +967,10 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
             ) : (
               <div className="space-y-2.5 py-3">
                 {cart.map((item) => (
-                  <div key={item.id} className="rounded-xl bg-background border border-border/80 p-3 sm:p-3.5 hover:shadow-sm transition-all duration-200">
+                  <div
+                    key={item.id}
+                    className="rounded-xl bg-background border border-border/80 p-3 sm:p-3.5 hover:shadow-sm transition-all duration-200"
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <p className="text-xs sm:text-sm font-bold text-ink leading-snug">
                         {item.product_name}
@@ -990,7 +1017,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
             {/* Customer form fields structured inside grids for better spacing */}
             <div className="space-y-2">
               <div className="relative flex items-center">
-                <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">Pelanggan</span>
+                <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">
+                  Pelanggan
+                </span>
                 <Input
                   placeholder="Nama Pembeli (opsional)"
                   value={customerName}
@@ -1000,7 +1029,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="relative flex items-center">
-                  <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">Diskon</span>
+                  <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">
+                    Diskon
+                  </span>
                   <Input
                     type="number"
                     placeholder="Rp"
@@ -1010,7 +1041,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   />
                 </div>
                 <div className="relative flex items-center">
-                  <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">Catatan</span>
+                  <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">
+                    Catatan
+                  </span>
                   <Input
                     placeholder="Keterangan..."
                     value={notes}
@@ -1062,8 +1095,12 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 </div>
               )}
               <div className="flex justify-between text-sm sm:text-base font-extrabold text-ink pt-2 border-t border-dashed border-border mt-1.5">
-                <span className="display tracking-wider text-xs uppercase text-muted-foreground">TOTAL AKHIR</span>
-                <span className="text-brand-orange text-md sm:text-lg">Rp {total.toLocaleString("id-ID")}</span>
+                <span className="display tracking-wider text-xs uppercase text-muted-foreground">
+                  TOTAL AKHIR
+                </span>
+                <span className="text-brand-orange text-md sm:text-lg">
+                  Rp {total.toLocaleString("id-ID")}
+                </span>
               </div>
             </div>
 
@@ -1251,7 +1288,10 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       )}
 
       {showReceiptDialog && currentReceiptData && (
-        <Dialog open={showReceiptDialog} onOpenChange={(open) => !open && handleCloseReceiptDialog()}>
+        <Dialog
+          open={showReceiptDialog}
+          onOpenChange={(open) => !open && handleCloseReceiptDialog()}
+        >
           <DialogContent className="max-w-md bg-white border-2 border-ink">
             <DialogHeader>
               <DialogTitle className="display text-lg tracking-wider text-ink uppercase text-center">
@@ -1278,35 +1318,39 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   <div className="text-[10px]">FILKOM MERCH</div>
                   <div className="text-[9px] font-normal">Universitas Brawijaya</div>
                 </div>
-                
+
                 <div className="border-t border-dashed border-black my-2"></div>
-                
+
                 <div className="space-y-0.5 text-[9px]">
                   <div>No: {currentReceiptData.sale_id}</div>
-                  <div>Tgl: {currentReceiptData.date} {currentReceiptData.time}</div>
+                  <div>
+                    Tgl: {currentReceiptData.date} {currentReceiptData.time}
+                  </div>
                   <div>Kasir: {currentReceiptData.cashier_name}</div>
                   {currentReceiptData.customer_name && (
                     <div>Pelanggan: {currentReceiptData.customer_name}</div>
                   )}
                   <div>Bayar: {currentReceiptData.payment_method}</div>
                 </div>
-                
+
                 <div className="border-t border-dashed border-black my-2"></div>
-                
+
                 <div className="space-y-1.5">
                   {currentReceiptData.items.map((item, idx) => (
                     <div key={idx} className="text-[9px]">
                       <div className="font-bold">{item.name}</div>
                       <div className="flex justify-between text-[8px]">
-                        <span>{item.qty} x Rp {item.price.toLocaleString("id-ID")}</span>
+                        <span>
+                          {item.qty} x Rp {item.price.toLocaleString("id-ID")}
+                        </span>
                         <span>Rp {item.subtotal.toLocaleString("id-ID")}</span>
                       </div>
                     </div>
                   ))}
                 </div>
-                
+
                 <div className="border-t border-dashed border-black my-2"></div>
-                
+
                 <div className="space-y-0.5 text-[9px] font-bold">
                   <div className="flex justify-between">
                     <span>Subtotal:</span>
@@ -1323,12 +1367,14 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     <span>Rp {currentReceiptData.total.toLocaleString("id-ID")}</span>
                   </div>
                 </div>
-                
+
                 <div className="border-t border-dashed border-black my-2"></div>
-                
+
                 <div className="text-center text-[9px] space-y-0.5">
                   <div>Terima kasih telah membeli!</div>
-                  <div className="text-[8px] italic font-normal text-gray-500">Wear Your Faculty.</div>
+                  <div className="text-[8px] italic font-normal text-gray-500">
+                    Wear Your Faculty.
+                  </div>
                 </div>
               </div>
             </div>
@@ -1396,23 +1442,32 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 {/* Component Products Selectors */}
                 {activeBundleForSelection.bundle_components?.map((comp) => {
                   const selectedVar = selectedBundleVariants[comp.id];
-                  
+
                   // Extract unique colors and sizes for this component product
-                  const compColors = Array.from(new Set(comp.variants.map((v) => v.color).filter(Boolean))) as string[];
-                  const compSizes = Array.from(new Set(comp.variants.map((v) => v.size).filter(Boolean))) as string[];
+                  const compColors = Array.from(
+                    new Set(comp.variants.map((v) => v.color).filter(Boolean)),
+                  ) as string[];
+                  const compSizes = Array.from(
+                    new Set(comp.variants.map((v) => v.size).filter(Boolean)),
+                  ) as string[];
 
                   // Find matched variant based on current selections for size/color
                   const currentSize = selectedVar?.size || "";
                   const currentColor = selectedVar?.color || null;
 
                   return (
-                    <div key={comp.id} className="space-y-3.5 border-b border-dashed border-border pb-4 last:border-0 last:pb-0">
+                    <div
+                      key={comp.id}
+                      className="space-y-3.5 border-b border-dashed border-border pb-4 last:border-0 last:pb-0"
+                    >
                       <div className="flex items-center justify-between">
                         <h4 className="font-bold text-ink text-xs uppercase tracking-tight">
                           {comp.name}
                         </h4>
                         {selectedVar && (
-                          <span className={`text-[10px] font-bold ${selectedVar.stock <= 3 ? "text-red-600 bg-red-50" : "text-emerald-700 bg-emerald-50"} px-2 py-0.5 rounded border border-current/25`}>
+                          <span
+                            className={`text-[10px] font-bold ${selectedVar.stock <= 3 ? "text-red-600 bg-red-50" : "text-emerald-700 bg-emerald-50"} px-2 py-0.5 rounded border border-current/25`}
+                          >
                             Stok: {selectedVar.stock} pcs
                           </span>
                         )}
@@ -1430,13 +1485,16 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                                 key={color}
                                 type="button"
                                 onClick={() => {
-                                  const matched = comp.variants.find(v => v.color === color && v.size === currentSize) 
-                                    || comp.variants.find(v => v.color === color)
-                                    || comp.variants[0];
+                                  const matched =
+                                    comp.variants.find(
+                                      (v) => v.color === color && v.size === currentSize,
+                                    ) ||
+                                    comp.variants.find((v) => v.color === color) ||
+                                    comp.variants[0];
                                   if (matched) {
-                                    setSelectedBundleVariants(prev => ({
+                                    setSelectedBundleVariants((prev) => ({
                                       ...prev,
-                                      [comp.id]: matched
+                                      [comp.id]: matched,
                                     }));
                                   }
                                 }}
@@ -1465,13 +1523,16 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                                 key={size}
                                 type="button"
                                 onClick={() => {
-                                  const matched = comp.variants.find(v => v.size === size && v.color === currentColor)
-                                    || comp.variants.find(v => v.size === size)
-                                    || comp.variants[0];
+                                  const matched =
+                                    comp.variants.find(
+                                      (v) => v.size === size && v.color === currentColor,
+                                    ) ||
+                                    comp.variants.find((v) => v.size === size) ||
+                                    comp.variants[0];
                                   if (matched) {
-                                    setSelectedBundleVariants(prev => ({
+                                    setSelectedBundleVariants((prev) => ({
                                       ...prev,
-                                      [comp.id]: matched
+                                      [comp.id]: matched,
                                     }));
                                   }
                                 }}
@@ -1510,7 +1571,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     toast.error("Varian utama bundel tidak ditemukan");
                     return;
                   }
-                  
+
                   for (const comp of activeBundleForSelection.bundle_components || []) {
                     if (!selectedBundleVariants[comp.id]) {
                       toast.error(`Pilih varian untuk komponen: ${comp.name}`);

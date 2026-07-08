@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate   } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -24,6 +24,7 @@ import { getProducts, getStoreSettings, type ProductWithVariants } from "@backen
 import { useAuth } from "@/lib/auth";
 import { VerificationModal } from "@frontend/components/VerificationModal";
 import { toast } from "sonner";
+import { extractLegacyConfigFromSegments } from "@/lib/homepage-types";
 
 import logo from "@/assets/logo-fm.jpg";
 import logoFilkom from "@/assets/logo_filkom.png";
@@ -44,7 +45,11 @@ export const Route = createFileRoute("/pre-order")({
   head: () => ({
     meta: [
       { title: "Pre-Order Terkini — FILKOM Merch UB" },
-      { name: "description", content: "Koleksi merchandise pre-order mahasiswa FILKOM UB. Jangan lewatkan drop terbatas ini." },
+      {
+        name: "description",
+        content:
+          "Koleksi merchandise pre-order mahasiswa FILKOM UB. Jangan lewatkan drop terbatas ini.",
+      },
     ],
   }),
   component: PreOrderPage,
@@ -72,7 +77,12 @@ type CartItem = {
 
 // Reusable Countdown Timer Component
 function CountdownTimer({ targetDate }: { targetDate: string }) {
-  const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+  const [timeLeft, setTimeLeft] = useState<{
+    days: number;
+    hours: number;
+    minutes: number;
+    seconds: number;
+  } | null>(null);
 
   useEffect(() => {
     const calculateTime = () => {
@@ -101,23 +111,39 @@ function CountdownTimer({ targetDate }: { targetDate: string }) {
   return (
     <div className="flex gap-2 sm:gap-3 text-center font-mono select-none">
       <div className="bg-cream text-ink p-2 sm:p-3 rounded border border-ink shadow-md">
-        <span className="display text-base sm:text-3xl block leading-none font-bold">{String(timeLeft.days).padStart(2, "0")}</span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">Hari</span>
+        <span className="display text-base sm:text-3xl block leading-none font-bold">
+          {String(timeLeft.days).padStart(2, "0")}
+        </span>
+        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">
+          Hari
+        </span>
       </div>
       <div className="display text-lg sm:text-3xl text-cream flex items-center">:</div>
       <div className="bg-cream text-ink p-2 sm:p-3 rounded border border-ink shadow-md">
-        <span className="display text-base sm:text-3xl block leading-none font-bold">{String(timeLeft.hours).padStart(2, "0")}</span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">Jam</span>
+        <span className="display text-base sm:text-3xl block leading-none font-bold">
+          {String(timeLeft.hours).padStart(2, "0")}
+        </span>
+        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">
+          Jam
+        </span>
       </div>
       <div className="display text-lg sm:text-3xl text-cream flex items-center">:</div>
       <div className="bg-cream text-ink p-2 sm:p-3 rounded border border-ink shadow-md">
-        <span className="display text-base sm:text-3xl block leading-none font-bold">{String(timeLeft.minutes).padStart(2, "0")}</span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">Min</span>
+        <span className="display text-base sm:text-3xl block leading-none font-bold">
+          {String(timeLeft.minutes).padStart(2, "0")}
+        </span>
+        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">
+          Min
+        </span>
       </div>
       <div className="display text-lg sm:text-3xl text-cream flex items-center">:</div>
       <div className="bg-cream text-ink p-2 sm:p-3 rounded border border-ink shadow-md">
-        <span className="display text-base sm:text-3xl block leading-none font-bold">{String(timeLeft.seconds).padStart(2, "0")}</span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">Det</span>
+        <span className="display text-base sm:text-3xl block leading-none font-bold">
+          {String(timeLeft.seconds).padStart(2, "0")}
+        </span>
+        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">
+          Det
+        </span>
       </div>
     </div>
   );
@@ -141,7 +167,7 @@ function PreOrderPage() {
 
   const [pathname, setPathname] = useState("");
   useEffect(() => setPathname(window.location.pathname), []);
-  const search = location.search.originalString || "";
+  const search = typeof window !== "undefined" ? window.location.search : "";
 
   // Load wishlist & cart from localStorage
   useEffect(() => {
@@ -169,9 +195,11 @@ function PreOrderPage() {
   // Layout configurations defaults
   const layout = useMemo(() => {
     const defaults = {
-      marqueeText: "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN | 100% PRODUK MAHASISWA",
+      marqueeText:
+        "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN | 100% PRODUK MAHASISWA",
       limitedTitle: "Varsity FILKOM Edition",
-      limitedSubtitle: "Varsity premium dengan bordir logo FILKOM eksklusif, diproduksi terbatas hanya untuk batch ini.",
+      limitedSubtitle:
+        "Varsity premium dengan bordir logo FILKOM eksklusif, diproduksi terbatas hanya untuk batch ini.",
       limitedProductSlug: "varsity-filkom",
       limitedCountdownEnd: "2026-07-10T23:59:59+07:00",
       limitedStockMax: 100,
@@ -181,7 +209,8 @@ function PreOrderPage() {
     if (!settings?.homepage_layout) return defaults;
     try {
       const parsed = JSON.parse(settings.homepage_layout);
-      return { ...defaults, ...parsed };
+      const extracted = extractLegacyConfigFromSegments(parsed);
+      return { ...defaults, ...extracted };
     } catch {
       return defaults;
     }
@@ -208,7 +237,9 @@ function PreOrderPage() {
         img: product.image_url || pVarsity,
         name: product.name,
         price: `Rp ${product.price.toLocaleString("id-ID")}`,
-        was: product.original_price ? `Rp ${product.original_price.toLocaleString("id-ID")}` : undefined,
+        was: product.original_price
+          ? `Rp ${product.original_price.toLocaleString("id-ID")}`
+          : undefined,
         tag: product.is_best_seller
           ? "BEST SELLER"
           : product.is_limited
@@ -227,7 +258,7 @@ function PreOrderPage() {
   // Filter only PRE-ORDER items
   const preOrderProducts = useMemo(() => {
     const list = products.filter((p) => p.sale_type === "pre_order");
-    
+
     // Fallback if db has no pre-orders
     if (list.length === 0) {
       return [
@@ -245,7 +276,7 @@ function PreOrderPage() {
             { id: 103, size: "L", stock: 40 },
             { id: 104, size: "XL", stock: 15 },
           ],
-        }
+        },
       ];
     }
     return list;
@@ -256,7 +287,7 @@ function PreOrderPage() {
     if (!query.trim()) return preOrderProducts;
     const q = query.toLowerCase();
     return preOrderProducts.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.cat.toLowerCase().includes(q)
+      (p) => p.name.toLowerCase().includes(q) || p.cat.toLowerCase().includes(q),
     );
   }, [query, preOrderProducts]);
 
@@ -278,7 +309,11 @@ function PreOrderPage() {
 
   const getProductAvailableSizes = (p: any) => {
     if (!p.variants || p.variants.length === 0) return [];
-    if (p.variants.length === 1 && (p.variants[0].size.toLowerCase() === "all size" || p.variants[0].size.toLowerCase() === "one size")) {
+    if (
+      p.variants.length === 1 &&
+      (p.variants[0].size.toLowerCase() === "all size" ||
+        p.variants[0].size.toLowerCase() === "one size")
+    ) {
       return [];
     }
     return p.variants.filter((v: any) => (v.stock || 0) > 0).map((v: any) => v.size);
@@ -286,7 +321,7 @@ function PreOrderPage() {
 
   const addToCart = useCallback((p: any, selectedSize?: string) => {
     const variants = p.variants || [];
-    const sizeToUse = selectedSize || (variants[0]?.size || "One Size");
+    const sizeToUse = selectedSize || variants[0]?.size || "One Size";
     const matchingVariant = variants.find((v: any) => v.size === sizeToUse) || variants[0];
 
     const itemId = selectedSize ? `${p.id}-${selectedSize}` : p.id;
@@ -299,15 +334,18 @@ function PreOrderPage() {
         ...c,
         {
           id: itemId,
-          name: itemId.includes('varsity-filkom') || itemId.includes('varsity-jacket') ? `${itemName} — Default` : itemName,
+          name:
+            itemId.includes("varsity-filkom") || itemId.includes("varsity-jacket")
+              ? `${itemName} — Default`
+              : itemName,
           price: p.price,
           img: p.img,
           qty: 1,
           product_id: p.product_id,
           variant_id: matchingVariant ? matchingVariant.id : undefined,
           size: sizeToUse,
-          color: "Default"
-        }
+          color: "Default",
+        },
       ];
     });
     setCartOpen(true);
@@ -383,14 +421,22 @@ function PreOrderPage() {
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 flex items-center justify-between h-16 sm:h-20">
           <Link to="/" className="flex items-center gap-2 sm:gap-3 text-left hover:opacity-90">
-            <img src={logo} alt="" className="h-9 w-9 sm:h-12 sm:w-12 rounded-full object-cover ring-2 ring-ink shadow-sm" />
+            <img
+              src={logo}
+              alt=""
+              className="h-9 w-9 sm:h-12 sm:w-12 rounded-full object-cover ring-2 ring-ink shadow-sm"
+            />
             <img src={logoFilkom} alt="" className="h-8 w-8 sm:h-11 sm:w-11 object-contain" />
             <div className="leading-tight hidden sm:block">
               <div className="display text-lg text-ink flex items-center gap-1.5 font-extrabold uppercase">
                 Filkom Merch
-                <span className="text-[8px] bg-blue-100 text-blue-800 font-extrabold px-1.5 py-0.5 rounded tracking-widest uppercase">OFFICIAL</span>
+                <span className="text-[8px] bg-blue-100 text-blue-800 font-extrabold px-1.5 py-0.5 rounded tracking-widest uppercase">
+                  OFFICIAL
+                </span>
               </div>
-              <div className="text-[9px] tracking-[0.32em] text-muted-foreground font-black">UNIVERSITAS BRAWIJAYA</div>
+              <div className="text-[9px] tracking-[0.32em] text-muted-foreground font-black">
+                UNIVERSITAS BRAWIJAYA
+              </div>
             </div>
           </Link>
 
@@ -400,7 +446,9 @@ function PreOrderPage() {
                 key={n.label}
                 to={n.href as any}
                 className={`text-[11px] font-bold tracking-[0.2em] transition-colors uppercase ${
-                  pathname === n.href ? "text-brand-orange border-b-2 border-brand-orange" : "text-ink hover:text-brand-orange"
+                  pathname === n.href
+                    ? "text-brand-orange border-b-2 border-brand-orange"
+                    : "text-ink hover:text-brand-orange"
                 }`}
               >
                 {n.label}
@@ -410,31 +458,59 @@ function PreOrderPage() {
 
           <div className="flex items-center gap-4 text-ink">
             <HackerModeToggle />
-            <button aria-label="Search" onClick={() => setSearchOpen((v) => !v)} className="hover:text-brand-orange">
+            <button
+              aria-label="Search"
+              onClick={() => setSearchOpen((v) => !v)}
+              className="hover:text-brand-orange"
+            >
               <Search className="w-5 h-5" />
             </button>
             <div className="relative">
-              <button aria-label="Account" onClick={() => setUserMenuOpen((v) => !v)} className="hover:text-brand-orange">
+              <button
+                aria-label="Account"
+                onClick={() => setUserMenuOpen((v) => !v)}
+                className="hover:text-brand-orange"
+              >
                 <User className="w-5 h-5" />
               </button>
               {userMenuOpen && (
                 <div className="absolute right-0 mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] z-50 animate-scale-in">
                   {user ? (
                     <div className="p-3 border-b border-border text-xs space-y-1.5">
-                      <p className="font-bold">{user.name}</p>
-                      <button onClick={logout} className="w-full text-left text-brand-orange font-bold mt-2">Logout</button>
+                      <p className="font-bold">{user.type === "admin" ? user.username : user.name}</p>
+                      <button
+                        onClick={logout}
+                        className="w-full text-left text-brand-orange font-bold mt-2"
+                      >
+                        Logout
+                      </button>
                     </div>
                   ) : (
-                    <Link to="/login" className="block px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary">Sign In</Link>
+                    <Link
+                      to="/login"
+                      className="block px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary"
+                    >
+                      Sign In
+                    </Link>
                   )}
                 </div>
               )}
             </div>
-            <button aria-label="Cart" className="relative hover:text-brand-orange" onClick={() => setCartOpen(true)}>
+            <button
+              aria-label="Cart"
+              className="relative hover:text-brand-orange"
+              onClick={() => setCartOpen(true)}
+            >
               <ShoppingBag className="w-5 h-5" />
-              {cartCount > 0 && <span className="absolute -top-2 -right-2 bg-brand-orange text-cream text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">{cartCount}</span>}
+              {cartCount > 0 && (
+                <span className="absolute -top-2 -right-2 bg-brand-orange text-cream text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">
+                  {cartCount}
+                </span>
+              )}
             </button>
-            <button aria-label="Menu" className="lg:hidden" onClick={() => setMenuOpen(true)}><Menu className="w-5 h-5" /></button>
+            <button aria-label="Menu" className="lg:hidden" onClick={() => setMenuOpen(true)}>
+              <Menu className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </header>
@@ -450,9 +526,10 @@ function PreOrderPage() {
             Pre-Order Terkini.
           </h1>
           <p className="text-cream/70 text-xs sm:text-sm max-w-md mx-auto leading-relaxed">
-            Dapatkan katalog premium limited edition dengan masa produksi eksklusif. Sisa waktu penutupan batch pre-order:
+            Dapatkan katalog premium limited edition dengan masa produksi eksklusif. Sisa waktu
+            penutupan batch pre-order:
           </p>
-          
+
           <div className="flex justify-center pt-2">
             <CountdownTimer targetDate={layout.limitedCountdownEnd} />
           </div>
@@ -463,8 +540,12 @@ function PreOrderPage() {
       <section className="max-w-[1400px] mx-auto px-5 lg:px-10 py-16 sm:py-24">
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 sm:mb-12 gap-4">
           <div>
-            <div className="text-xs tracking-[0.3em] text-brand-orange font-bold mb-2 uppercase">PRE-ORDER BATCH CATALOG</div>
-            <h2 className="display text-2xl sm:text-4xl text-ink font-bold uppercase">Pre-order items.</h2>
+            <div className="text-xs tracking-[0.3em] text-brand-orange font-bold mb-2 uppercase">
+              PRE-ORDER BATCH CATALOG
+            </div>
+            <h2 className="display text-2xl sm:text-4xl text-ink font-bold uppercase">
+              Pre-order items.
+            </h2>
           </div>
           <div className="flex border-2 border-ink rounded px-3 py-2 bg-cream max-w-xs items-center gap-2">
             <Search className="w-4 h-4 text-muted-foreground" />
@@ -488,9 +569,12 @@ function PreOrderPage() {
           {filteredPreOrders.map((p) => {
             const hasWishlisted = wishlist.includes(p.id);
             const sizes = getProductAvailableSizes(p);
-            
+
             return (
-              <article key={p.id} className="group relative flex flex-col bg-background border-2 border-ink p-2 rounded-lg hover:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] transition-all duration-300">
+              <article
+                key={p.id}
+                className="group relative flex flex-col bg-background border-2 border-ink p-2 rounded-lg hover:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] transition-all duration-300"
+              >
                 <div className="relative aspect-[4/5] bg-secondary overflow-hidden rounded border border-ink/10">
                   <Link to="/product/$slug" params={{ slug: p.id }} className="block h-full">
                     <img src={p.img} alt={p.name} className="w-full h-full object-cover" />
@@ -504,7 +588,9 @@ function PreOrderPage() {
                     onClick={() => toggleWishlist(p.id)}
                     className="absolute top-3 right-3 p-1.5 rounded-full bg-cream border border-ink shadow-sm text-ink hover:text-red-500 hover:scale-105 transition-all z-20 cursor-pointer"
                   >
-                    <Heart className={`w-3.5 h-3.5 ${hasWishlisted ? "fill-red-500 text-red-500" : ""}`} />
+                    <Heart
+                      className={`w-3.5 h-3.5 ${hasWishlisted ? "fill-red-500 text-red-500" : ""}`}
+                    />
                   </button>
 
                   {/* Desktop Hover Actions */}
@@ -517,7 +603,9 @@ function PreOrderPage() {
                     </button>
                     {sizes.length > 0 ? (
                       <div className="w-full bg-cream/90 p-2 rounded text-center border border-ink/20">
-                        <div className="text-[8px] tracking-wider font-extrabold text-ink uppercase mb-1">Quick Select:</div>
+                        <div className="text-[8px] tracking-wider font-extrabold text-ink uppercase mb-1">
+                          Quick Select:
+                        </div>
                         <div className="flex flex-wrap justify-center gap-1">
                           {sizes.map((size: any) => (
                             <button
@@ -542,13 +630,21 @@ function PreOrderPage() {
                 </div>
 
                 <div className="pt-4 flex flex-col flex-1">
-                  <div className="text-[9px] sm:text-[10px] tracking-[0.2em] font-extrabold text-muted-foreground mb-0.5 uppercase">{p.cat}</div>
+                  <div className="text-[9px] sm:text-[10px] tracking-[0.2em] font-extrabold text-muted-foreground mb-0.5 uppercase">
+                    {p.cat}
+                  </div>
                   <Link to="/product/$slug" params={{ slug: p.id }}>
-                    <h3 className="text-xs sm:text-sm font-bold text-ink hover:text-brand-orange transition-colors leading-snug line-clamp-1">{p.name}</h3>
+                    <h3 className="text-xs sm:text-sm font-bold text-ink hover:text-brand-orange transition-colors leading-snug line-clamp-1">
+                      {p.name}
+                    </h3>
                   </Link>
                   <div className="mt-auto pt-2 flex items-baseline gap-2">
                     <span className="text-xs sm:text-sm font-black text-ink">{p.price}</span>
-                    {p.was && <span className="text-[10px] sm:text-xs text-muted-foreground line-through font-bold">{p.was}</span>}
+                    {p.was && (
+                      <span className="text-[10px] sm:text-xs text-muted-foreground line-through font-bold">
+                        {p.was}
+                      </span>
+                    )}
                   </div>
                 </div>
               </article>
@@ -568,11 +664,16 @@ function PreOrderPage() {
       {/* Cart Drawer */}
       {cartOpen && (
         <div className="fixed inset-0 z-50 flex animate-fade-in">
-          <div className="hidden sm:block flex-1 bg-ink/50 backdrop-blur-sm" onClick={() => setCartOpen(false)} />
+          <div
+            className="hidden sm:block flex-1 bg-ink/50 backdrop-blur-sm"
+            onClick={() => setCartOpen(false)}
+          />
           <aside className="w-full sm:max-w-md bg-background text-foreground flex flex-col shadow-2xl border-l border-ink">
             <div className="flex items-center justify-between h-20 px-6 border-b border-border">
               <div className="display text-2xl text-ink font-bold">Your Bag</div>
-              <button onClick={() => setCartOpen(false)}><X className="w-5 h-5 text-ink" /></button>
+              <button onClick={() => setCartOpen(false)}>
+                <X className="w-5 h-5 text-ink" />
+              </button>
             </div>
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {cart.map((i) => (
@@ -581,14 +682,20 @@ function PreOrderPage() {
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="flex justify-between">
                       <span className="font-bold text-xs">{i.name}</span>
-                      <button onClick={() => removeItem(i.id)}><Trash2 className="w-4 h-4 text-muted-foreground hover:text-brand-orange" /></button>
+                      <button onClick={() => removeItem(i.id)}>
+                        <Trash2 className="w-4 h-4 text-muted-foreground hover:text-brand-orange" />
+                      </button>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-xs font-black">{i.price}</span>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => updateQty(i.id, -1)} className="p-1 border rounded"><Minus className="w-3 h-3" /></button>
+                        <button onClick={() => updateQty(i.id, -1)} className="p-1 border rounded">
+                          <Minus className="w-3 h-3" />
+                        </button>
                         <span className="text-xs font-bold">{i.qty}</span>
-                        <button onClick={() => updateQty(i.id, 1)} className="p-1 border rounded"><Plus className="w-3 h-3" /></button>
+                        <button onClick={() => updateQty(i.id, 1)} className="p-1 border rounded">
+                          <Plus className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -597,8 +704,16 @@ function PreOrderPage() {
             </div>
             {cart.length > 0 && (
               <div className="border-t-2 border-ink px-6 py-5 bg-cream">
-                <div className="flex justify-between text-sm mb-4 font-bold"><span>Subtotal</span><span>{formatRp(cartTotal)}</span></div>
-                <button onClick={handleCheckout} className="w-full bg-ink text-cream py-4 text-xs font-bold tracking-widest hover:bg-brand-orange uppercase">CHECKOUT NOW →</button>
+                <div className="flex justify-between text-sm mb-4 font-bold">
+                  <span>Subtotal</span>
+                  <span>{formatRp(cartTotal)}</span>
+                </div>
+                <button
+                  onClick={handleCheckout}
+                  className="w-full bg-ink text-cream py-4 text-xs font-bold tracking-widest hover:bg-brand-orange uppercase"
+                >
+                  CHECKOUT NOW →
+                </button>
               </div>
             )}
           </aside>
@@ -610,18 +725,38 @@ function PreOrderPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-sm animate-fade-in">
           <div className="absolute inset-0" onClick={() => setQuickViewProduct(null)} />
           <div className="relative bg-background border-4 border-ink rounded-lg w-full max-w-2xl p-6 sm:p-8 flex flex-col md:flex-row gap-6 z-10 animate-scale-in">
-            <button onClick={() => setQuickViewProduct(null)} className="absolute top-4 right-4 p-2 rounded border-2 border-ink bg-cream text-ink"><X className="w-4 h-4" /></button>
+            <button
+              onClick={() => setQuickViewProduct(null)}
+              className="absolute top-4 right-4 p-2 rounded border-2 border-ink bg-cream text-ink"
+            >
+              <X className="w-4 h-4" />
+            </button>
             <div className="w-full md:w-1/2 aspect-[4/5] bg-secondary border border-ink/20 rounded overflow-hidden">
               <img src={quickViewProduct.img} className="w-full h-full object-cover" alt="" />
             </div>
             <div className="w-full md:w-1/2 flex flex-col justify-between">
               <div>
-                <span className="text-[10px] font-bold tracking-widest text-brand-orange uppercase">{quickViewProduct.cat}</span>
-                <h3 className="display text-xl sm:text-2xl text-ink font-bold uppercase mt-1">{quickViewProduct.name}</h3>
+                <span className="text-[10px] font-bold tracking-widest text-brand-orange uppercase">
+                  {quickViewProduct.cat}
+                </span>
+                <h3 className="display text-xl sm:text-2xl text-ink font-bold uppercase mt-1">
+                  {quickViewProduct.name}
+                </h3>
                 <p className="text-sm font-bold text-ink mt-2">{quickViewProduct.price}</p>
-                <p className="text-xs text-muted-foreground leading-relaxed mt-4">Koleksi merchandise pre-order resmi dengan material cotton fleece pilihan, tebal, adem, jahitan kokoh.</p>
+                <p className="text-xs text-muted-foreground leading-relaxed mt-4">
+                  Koleksi merchandise pre-order resmi dengan material cotton fleece pilihan, tebal,
+                  adem, jahitan kokoh.
+                </p>
               </div>
-              <button onClick={() => { addToCart(quickViewProduct); setQuickViewProduct(null); }} className="w-full bg-ink text-cream py-3.5 text-xs font-bold tracking-widest hover:bg-brand-orange uppercase mt-6">ADD TO BAG</button>
+              <button
+                onClick={() => {
+                  addToCart(quickViewProduct);
+                  setQuickViewProduct(null);
+                }}
+                className="w-full bg-ink text-cream py-3.5 text-xs font-bold tracking-widest hover:bg-brand-orange uppercase mt-6"
+              >
+                ADD TO BAG
+              </button>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link   } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useMemo, useEffect } from "react";
 import {
@@ -100,8 +100,6 @@ const MOCK_REVIEWS = [
   },
 ];
 
-
-
 function ProductDetailPage() {
   const { product, error } = Route.useLoaderData();
   const navigate = useNavigate();
@@ -133,22 +131,36 @@ function ProductDetailPage() {
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
   const [userHeight, setUserHeight] = useState("");
   const [userWeight, setUserWeight] = useState("");
-  const [sizeRecommendation, setSizeRecommendation] = useState<{size: string, desc: string} | null>(null);
+  const [sizeRecommendation, setSizeRecommendation] = useState<{
+    size: string;
+    desc: string;
+  } | null>(null);
 
   const calculateSize = () => {
     const h = parseInt(userHeight);
     const w = parseInt(userWeight);
     if (!h || !w) return;
-    
+
     let recommended = "L";
     let desc = "Nyaman";
-    
-    if (h < 160 && w < 55) { recommended = "S"; desc = "Pas badan"; }
-    else if (h < 165 && w < 65) { recommended = "M"; desc = "Fit ideal"; }
-    else if (h < 175 && w < 75) { recommended = "L"; desc = "Nyaman"; }
-    else if (h < 185 && w < 85) { recommended = "XL"; desc = "Sedikit longgar"; }
-    else { recommended = "XXL"; desc = "Oversized"; }
-    
+
+    if (h < 160 && w < 55) {
+      recommended = "S";
+      desc = "Pas badan";
+    } else if (h < 165 && w < 65) {
+      recommended = "M";
+      desc = "Fit ideal";
+    } else if (h < 175 && w < 75) {
+      recommended = "L";
+      desc = "Nyaman";
+    } else if (h < 185 && w < 85) {
+      recommended = "XL";
+      desc = "Sedikit longgar";
+    } else {
+      recommended = "XXL";
+      desc = "Oversized";
+    }
+
     setSizeRecommendation({ size: recommended, desc });
   };
 
@@ -186,7 +198,7 @@ function ProductDetailPage() {
     setCart((prev) =>
       prev
         .map((item) => (item.id === id ? { ...item, qty: item.qty + delta } : item))
-        .filter((item) => item.qty > 0)
+        .filter((item) => item.qty > 0),
     );
   };
 
@@ -320,18 +332,18 @@ function ProductDetailPage() {
   const currentPrice = useMemo(() => {
     if (!product) return 0;
     const isUb = user?.type === "buyer" && user.is_filkom_verified === 1;
-    
+
     if (product.promo_price && Number(product.promo_price) > 0) {
       return Number(product.promo_price);
     }
-    
+
     if (isUb) {
       if (selectedSize || selectedColor) {
         const matchingVariant = product.variants?.find(
-          (v: any) => 
-            v.is_active && 
-            (!selectedSize || v.size === selectedSize) && 
-            (!selectedColor || v.color === selectedColor)
+          (v: any) =>
+            v.is_active &&
+            (!selectedSize || v.size === selectedSize) &&
+            (!selectedColor || v.color === selectedColor),
         );
         if (matchingVariant?.filkom_price && Number(matchingVariant.filkom_price) > 0) {
           return Number(matchingVariant.filkom_price);
@@ -341,19 +353,19 @@ function ProductDetailPage() {
         return Number(product.filkom_price);
       }
     }
-    
+
     if (selectedSize || selectedColor) {
       const matchingVariant = product.variants?.find(
-        (v: any) => 
-          v.is_active && 
-          (!selectedSize || v.size === selectedSize) && 
-          (!selectedColor || v.color === selectedColor)
+        (v: any) =>
+          v.is_active &&
+          (!selectedSize || v.size === selectedSize) &&
+          (!selectedColor || v.color === selectedColor),
       );
       if (matchingVariant?.price_override && Number(matchingVariant.price_override) > 0) {
         return Number(matchingVariant.price_override);
       }
     }
-    
+
     return Number(product.price);
   }, [product, user, selectedSize, selectedColor]);
 
@@ -427,7 +439,7 @@ function ProductDetailPage() {
         })
         .join(", ");
       cartItemName = `${product.name} (${selectionDetails})`;
-      
+
       selectionsPayload = (product.bundle_components || []).map((comp) => {
         const variant = selectedBundleVariants[comp.id];
         return {
@@ -436,15 +448,19 @@ function ProductDetailPage() {
           quantity: 1,
         };
       });
-      uniqueSelectionsStr = selectionsPayload.map((s) => `${s.product_id}-${s.variant_id}`).sort().join("-");
+      uniqueSelectionsStr = selectionsPayload
+        .map((s) => `${s.product_id}-${s.variant_id}`)
+        .sort()
+        .join("-");
     } else {
       const variantStr = [selectedColor, selectedSize].filter(Boolean).join(" — ");
       cartItemName = `${product.name}${variantStr ? ` (${variantStr})` : ""}`;
     }
 
-    const cartItemId = product.product_type === "bundle"
-      ? `online-bundle-${product.id}-${uniqueSelectionsStr}`
-      : `online-${product.id}-${selectedColor || ""}-${selectedSize || ""}`;
+    const cartItemId =
+      product.product_type === "bundle"
+        ? `online-bundle-${product.id}-${uniqueSelectionsStr}`
+        : `online-${product.id}-${selectedColor || ""}-${selectedSize || ""}`;
 
     // Read indexCart
     let indexCart: any[] = [];
@@ -587,8 +603,6 @@ function ProductDetailPage() {
                 );
               }
 
-              
-
               return (
                 <Link
                   key={n.label}
@@ -679,7 +693,11 @@ function ProductDetailPage() {
                 </div>
               )}
             </div>
-            <button aria-label="Cart" className="relative cursor-pointer" onClick={() => setCartOpen(true)}>
+            <button
+              aria-label="Cart"
+              className="relative cursor-pointer"
+              onClick={() => setCartOpen(true)}
+            >
               <ShoppingBag className="w-5 h-5" />
               {cartCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-brand-orange text-cream text-[10px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">
@@ -687,7 +705,11 @@ function ProductDetailPage() {
                 </span>
               )}
             </button>
-            <button aria-label="Menu" className="lg:hidden cursor-pointer" onClick={() => setMenuOpen(true)}>
+            <button
+              aria-label="Menu"
+              className="lg:hidden cursor-pointer"
+              onClick={() => setMenuOpen(true)}
+            >
               <Menu className="w-5 h-5" />
             </button>
           </div>
@@ -703,7 +725,11 @@ function ProductDetailPage() {
               onClick={() => setIsZoomOpen(true)}
               className="aspect-[4/5] bg-cream border-2 border-ink rounded-lg overflow-hidden relative cursor-zoom-in group/img"
             >
-              <img src={activeImage} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-[1.02]" />
+              <img
+                src={activeImage}
+                alt={product.name}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-[1.02]"
+              />
               <button
                 onClick={(e) => {
                   e.stopPropagation();
@@ -781,55 +807,62 @@ function ProductDetailPage() {
                   <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
                   🎉 Harga Khusus Civitas FILKOM Aktif!
                 </div>
-              ) : (
-                product.filkom_price && Number(product.filkom_price) > 0 ? (
-                  <div className="mt-2 text-xs font-medium text-muted-foreground bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 w-fit">
-                    {user?.type === "buyer" ? (
-                      <span>
-                        💡{" "}
-                        <button
-                          onClick={() => setIsVerifyOpen(true)}
-                          className="font-bold text-brand-orange hover:underline cursor-pointer"
-                        >
-                          Verifikasi NIM/NIDN Anda
-                        </button>{" "}
-                        untuk mendapatkan harga khusus FILKOM Rp {Number(product.filkom_price).toLocaleString("id-ID")}
-                      </span>
-                    ) : (
-                      <span>💡 Login & verifikasi NIM/NIDN untuk mendapatkan harga khusus FILKOM Rp {Number(product.filkom_price).toLocaleString("id-ID")}</span>
-                    )}
-                  </div>
-                ) : null
-              )}
-
-              {product.product_type === "bundle" && product.bundle_components && product.bundle_components.length > 0 && (
-                <div className="p-4 bg-brand-blue/5 border-2 border-brand-blue/30 rounded-xl space-y-2 mt-4">
-                  <h4 className="font-extrabold text-brand-blue text-xs uppercase tracking-wider flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-brand-blue animate-pulse" />
-                    Isi Paket Bundling (Komponen Produk):
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {product.bundle_components.map((comp) => (
-                      <div key={comp.id} className="flex gap-2 p-2 bg-white border border-border rounded-lg shadow-sm items-center">
-                        {comp.image_url ? (
-                          <img
-                            src={comp.image_url}
-                            alt={comp.name}
-                            className="w-10 h-10 object-cover rounded border border-border shrink-0"
-                          />
-                        ) : (
-                          <div className="w-10 h-10 bg-cream rounded border border-border flex items-center justify-center text-[9px] text-muted-foreground shrink-0 font-bold">
-                            No Image
-                          </div>
-                        )}
-                        <p className="font-bold text-ink uppercase tracking-tight text-[11px] truncate">
-                          {comp.name}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
+              ) : product.filkom_price && Number(product.filkom_price) > 0 ? (
+                <div className="mt-2 text-xs font-medium text-muted-foreground bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 w-fit">
+                  {user?.type === "buyer" && user.is_google && user.email.endsWith("ub.ac.id") ? (
+                    <span>
+                      💡{" "}
+                      <button
+                        onClick={() => setIsVerifyOpen(true)}
+                        className="font-bold text-brand-orange hover:underline cursor-pointer"
+                      >
+                        Verifikasi NIM Anda
+                      </button>{" "}
+                      untuk mendapatkan harga khusus FILKOM Rp{" "}
+                      {Number(product.filkom_price).toLocaleString("id-ID")}
+                    </span>
+                  ) : (
+                    <span>
+                      💡 Login dengan akun Google UB & verifikasi NIM untuk mendapatkan harga khusus FILKOM Rp{" "}
+                      {Number(product.filkom_price).toLocaleString("id-ID")}
+                    </span>
+                  )}
                 </div>
-              )}
+              ) : null}
+
+              {product.product_type === "bundle" &&
+                product.bundle_components &&
+                product.bundle_components.length > 0 && (
+                  <div className="p-4 bg-brand-blue/5 border-2 border-brand-blue/30 rounded-xl space-y-2 mt-4">
+                    <h4 className="font-extrabold text-brand-blue text-xs uppercase tracking-wider flex items-center gap-2">
+                      <span className="h-2 w-2 rounded-full bg-brand-blue animate-pulse" />
+                      Isi Paket Bundling (Komponen Produk):
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {product.bundle_components.map((comp) => (
+                        <div
+                          key={comp.id}
+                          className="flex gap-2 p-2 bg-white border border-border rounded-lg shadow-sm items-center"
+                        >
+                          {comp.image_url ? (
+                            <img
+                              src={comp.image_url}
+                              alt={comp.name}
+                              className="w-10 h-10 object-cover rounded border border-border shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 bg-cream rounded border border-border flex items-center justify-center text-[9px] text-muted-foreground shrink-0 font-bold">
+                              No Image
+                            </div>
+                          )}
+                          <p className="font-bold text-ink uppercase tracking-tight text-[11px] truncate">
+                            {comp.name}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
               {product.product_type === "preorder" && (
                 <div className="mt-4 p-4 bg-orange-50 border-2 border-brand-orange rounded-lg text-xs space-y-2 text-ink shadow-[2px_2px_0px_0px_rgba(242,87,33,0.15)]">
@@ -841,13 +874,25 @@ function ProductDetailPage() {
                     <div>
                       <span className="text-muted-foreground">Mulai PO:</span>{" "}
                       <span className="font-bold">
-                        {product.preorder_start_at ? new Date(product.preorder_start_at).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }) : "-"}
+                        {product.preorder_start_at
+                          ? new Date(product.preorder_start_at).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "-"}
                       </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground">Akhir PO:</span>{" "}
                       <span className="font-bold">
-                        {product.preorder_end_at ? new Date(product.preorder_end_at).toLocaleDateString("id-ID", { day: 'numeric', month: 'short', year: 'numeric' }) : "-"}
+                        {product.preorder_end_at
+                          ? new Date(product.preorder_end_at).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "-"}
                       </span>
                     </div>
                     {product.preorder_moq && (
@@ -874,20 +919,29 @@ function ProductDetailPage() {
                   </p>
                   {product.bundle_components?.map((comp) => {
                     const selectedVar = selectedBundleVariants[comp.id];
-                    const compColors = Array.from(new Set(comp.variants?.map((v) => v.color).filter(Boolean))) as string[];
-                    const compSizes = Array.from(new Set(comp.variants?.map((v) => v.size).filter(Boolean))) as string[];
+                    const compColors = Array.from(
+                      new Set(comp.variants?.map((v) => v.color).filter(Boolean)),
+                    ) as string[];
+                    const compSizes = Array.from(
+                      new Set(comp.variants?.map((v) => v.size).filter(Boolean)),
+                    ) as string[];
 
                     const currentSize = selectedVar?.size || "";
                     const currentColor = selectedVar?.color || null;
 
                     return (
-                      <div key={comp.id} className="p-4 bg-cream/20 border-2 border-ink rounded-lg space-y-3.5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
+                      <div
+                        key={comp.id}
+                        className="p-4 bg-cream/20 border-2 border-ink rounded-lg space-y-3.5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                      >
                         <div className="flex items-center justify-between">
                           <h4 className="font-extrabold text-ink text-xs uppercase tracking-tight">
                             {comp.name}
                           </h4>
                           {selectedVar && (
-                            <span className={`text-[9px] font-bold ${selectedVar.stock <= 3 ? "text-red-600 bg-red-50 border-red-200" : "text-emerald-700 bg-emerald-50 border-emerald-200"} px-2 py-0.5 border rounded`}>
+                            <span
+                              className={`text-[9px] font-bold ${selectedVar.stock <= 3 ? "text-red-600 bg-red-50 border-red-200" : "text-emerald-700 bg-emerald-50 border-emerald-200"} px-2 py-0.5 border rounded`}
+                            >
                               Stok: {selectedVar.stock} pcs
                             </span>
                           )}
@@ -905,11 +959,17 @@ function ProductDetailPage() {
                                   key={color}
                                   type="button"
                                   onClick={() => {
-                                    const matched = comp.variants.find(v => v.color === color && v.size === currentSize)
-                                      || comp.variants.find(v => v.color === color)
-                                      || comp.variants[0];
+                                    const matched =
+                                      comp.variants.find(
+                                        (v) => v.color === color && v.size === currentSize,
+                                      ) ||
+                                      comp.variants.find((v) => v.color === color) ||
+                                      comp.variants[0];
                                     if (matched) {
-                                      setSelectedBundleVariants(prev => ({ ...prev, [comp.id]: matched }));
+                                      setSelectedBundleVariants((prev) => ({
+                                        ...prev,
+                                        [comp.id]: matched,
+                                      }));
                                     }
                                   }}
                                   className={`px-3 py-1 text-[11px] font-semibold border-2 transition rounded ${
@@ -937,11 +997,17 @@ function ProductDetailPage() {
                                   key={size}
                                   type="button"
                                   onClick={() => {
-                                    const matched = comp.variants.find(v => v.size === size && v.color === currentColor)
-                                      || comp.variants.find(v => v.size === size)
-                                      || comp.variants[0];
+                                    const matched =
+                                      comp.variants.find(
+                                        (v) => v.size === size && v.color === currentColor,
+                                      ) ||
+                                      comp.variants.find((v) => v.size === size) ||
+                                      comp.variants[0];
                                     if (matched) {
-                                      setSelectedBundleVariants(prev => ({ ...prev, [comp.id]: matched }));
+                                      setSelectedBundleVariants((prev) => ({
+                                        ...prev,
+                                        [comp.id]: matched,
+                                      }));
                                     }
                                   }}
                                   className={`w-9 h-8 flex items-center justify-center text-[11px] font-bold border-2 transition rounded ${
@@ -995,11 +1061,22 @@ function ProductDetailPage() {
                           Pilih Ukuran:{" "}
                           <span className="text-ink font-extrabold">{selectedSize || "-"}</span>
                         </p>
-                        <button 
+                        <button
                           onClick={() => setIsSizeGuideOpen(true)}
                           className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
                         >
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                          >
+                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                            <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                          </svg>
                           Cari Ukuranmu
                         </button>
                       </div>
@@ -1058,14 +1135,29 @@ function ProductDetailPage() {
             </div>
 
             {/* FOMO Stock Indicator */}
-              {currentStock > 0 && currentStock <= 5 && (
-                <div className="mt-6 p-3 bg-red-50 border-2 border-red-500 rounded flex items-center gap-2 animate-pulse">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-                  <p className="text-sm font-extrabold text-red-600 tracking-tight">Hurry up! Sisa stok tinggal {currentStock} pcs lagi di ukuran ini!</p>
-                </div>
-              )}
+            {currentStock > 0 && currentStock <= 5 && (
+              <div className="mt-6 p-3 bg-red-50 border-2 border-red-500 rounded flex items-center gap-2 animate-pulse">
+                <svg
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#ef4444"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+                <p className="text-sm font-extrabold text-red-600 tracking-tight">
+                  Hurry up! Sisa stok tinggal {currentStock} pcs lagi di ukuran ini!
+                </p>
+              </div>
+            )}
 
-              {/* Action Buttons */}
+            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-4">
               <Button
                 variant="outline"
@@ -1123,8 +1215,6 @@ function ProductDetailPage() {
                 </div>
               </div>
 
-
-
               <div className="pt-2 border-t border-border mt-4">
                 <p className="font-bold text-ink uppercase text-xs mb-2 tracking-wider">
                   Ukuran Chart:
@@ -1154,25 +1244,42 @@ function ProductDetailPage() {
           <div className="mt-8 bg-white border-2 border-ink rounded-xl p-6 sm:p-8 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
             <div className="flex items-center justify-between border-b border-border pb-3 mb-6">
               <h2 className="text-lg font-bold text-ink uppercase tracking-wider flex items-center gap-2">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                  <circle cx="12" cy="13" r="4"></circle>
+                </svg>
                 Dipakai Sama Siapa?
               </h2>
               <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest hidden sm:inline-block">
                 On-Model Gallery
               </span>
             </div>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 "https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?w=500&q=80",
                 "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=500&q=80",
                 "https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=500&q=80",
-                "https://images.unsplash.com/photo-1532453288672-3a27e9be9efd?w=500&q=80"
+                "https://images.unsplash.com/photo-1532453288672-3a27e9be9efd?w=500&q=80",
               ].map((img, idx) => (
-                <div key={idx} className="group relative aspect-[4/5] bg-cream border-2 border-ink rounded-lg overflow-hidden cursor-pointer" onClick={() => { setActiveImage(img); setIsZoomOpen(true); }}>
-                  <img 
-                    src={img} 
-                    alt={`Lookbook ${idx + 1}`} 
+                <div
+                  key={idx}
+                  className="group relative aspect-[4/5] bg-cream border-2 border-ink rounded-lg overflow-hidden cursor-pointer"
+                  onClick={() => {
+                    setActiveImage(img);
+                    setIsZoomOpen(true);
+                  }}
+                >
+                  <img
+                    src={img}
+                    alt={`Lookbook ${idx + 1}`}
                     className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-300 group-hover:scale-105"
                   />
                   <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/10 transition-colors" />
@@ -1183,7 +1290,8 @@ function ProductDetailPage() {
               ))}
             </div>
             <p className="text-xs font-medium text-muted-foreground mt-4 text-center">
-              *Foto ini adalah contoh (dummy). Nantinya akan diisi dengan foto asli mahasiswa FILKOM yang memakai merch ini.
+              *Foto ini adalah contoh (dummy). Nantinya akan diisi dengan foto asli mahasiswa FILKOM
+              yang memakai merch ini.
             </p>
           </div>
         </div>
@@ -1207,8 +1315,6 @@ function ProductDetailPage() {
           </div>
           <nav className="flex-1 flex flex-col px-5 py-6 sm:py-8 gap-1">
             {NAV.map((n, idx) => {
-              
-
               return (
                 <Link
                   key={n.label}
@@ -1263,7 +1369,9 @@ function ProductDetailPage() {
                 <div className="text-center py-20">
                   <ShoppingBag className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
                   <p className="display text-2xl text-ink font-bold">Bag is empty.</p>
-                  <p className="text-sm text-muted-foreground mt-2 font-medium">Tambahkan produk favoritmu.</p>
+                  <p className="text-sm text-muted-foreground mt-2 font-medium">
+                    Tambahkan produk favoritmu.
+                  </p>
                   <button
                     onClick={() => {
                       setCartOpen(false);
@@ -1277,11 +1385,19 @@ function ProductDetailPage() {
                 <ul className="divide-y divide-border">
                   {cart.map((i) => (
                     <li key={i.id} className="py-4 flex gap-4">
-                      <img src={i.img} alt="" className="w-20 h-24 object-cover border border-ink" />
+                      <img
+                        src={i.img}
+                        alt=""
+                        className="w-20 h-24 object-cover border border-ink"
+                      />
                       <div className="flex-1 flex flex-col">
                         <div className="flex justify-between gap-2">
                           <h4 className="text-sm font-semibold text-ink leading-snug">{i.name}</h4>
-                          <button onClick={() => removeItem(i.id)} aria-label="Remove" className="cursor-pointer">
+                          <button
+                            onClick={() => removeItem(i.id)}
+                            aria-label="Remove"
+                            className="cursor-pointer"
+                          >
                             <Trash2 className="w-4 h-4 text-muted-foreground hover:text-brand-orange" />
                           </button>
                         </div>
@@ -1353,10 +1469,7 @@ function ProductDetailPage() {
         </div>
       )}
       {user?.type === "buyer" && (
-        <VerificationModal
-          isOpen={isVerifyOpen}
-          onClose={() => setIsVerifyOpen(false)}
-        />
+        <VerificationModal isOpen={isVerifyOpen} onClose={() => setIsVerifyOpen(false)} />
       )}
 
       {/* Size Fit Guide Modal */}
@@ -1365,37 +1478,55 @@ function ProductDetailPage() {
           <div className="bg-white border-2 border-ink rounded-xl shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="bg-cream border-b-2 border-ink p-4 flex justify-between items-center">
               <h3 className="font-extrabold text-ink uppercase tracking-tight flex items-center gap-2">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
                 Kalkulator Ukuran
               </h3>
-              <button onClick={() => setIsSizeGuideOpen(false)} className="hover:bg-black/10 p-1.5 rounded-full transition-colors">
+              <button
+                onClick={() => setIsSizeGuideOpen(false)}
+                className="hover:bg-black/10 p-1.5 rounded-full transition-colors"
+              >
                 <X className="w-5 h-5 text-ink" />
               </button>
             </div>
             <div className="p-6 space-y-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-ink uppercase tracking-wider">Tinggi Badan (cm)</label>
-                  <input 
-                    type="number" 
+                  <label className="text-xs font-bold text-ink uppercase tracking-wider">
+                    Tinggi Badan (cm)
+                  </label>
+                  <input
+                    type="number"
                     value={userHeight}
                     onChange={(e) => setUserHeight(e.target.value)}
-                    placeholder="Contoh: 170" 
+                    placeholder="Contoh: 170"
                     className="w-full border-2 border-ink rounded p-2.5 outline-none focus:ring-2 focus:ring-primary font-medium"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-ink uppercase tracking-wider">Berat Badan (kg)</label>
-                  <input 
-                    type="number" 
+                  <label className="text-xs font-bold text-ink uppercase tracking-wider">
+                    Berat Badan (kg)
+                  </label>
+                  <input
+                    type="number"
                     value={userWeight}
                     onChange={(e) => setUserWeight(e.target.value)}
-                    placeholder="Contoh: 65" 
+                    placeholder="Contoh: 65"
                     className="w-full border-2 border-ink rounded p-2.5 outline-none focus:ring-2 focus:ring-primary font-medium"
                   />
                 </div>
               </div>
-              <button 
+              <button
                 onClick={calculateSize}
                 className="w-full bg-ink text-white font-bold uppercase tracking-widest py-3 border-2 border-ink hover:bg-brand-orange transition-colors active:scale-95"
               >
@@ -1404,9 +1535,15 @@ function ProductDetailPage() {
 
               {sizeRecommendation && (
                 <div className="mt-6 bg-green-50 border-2 border-green-500 rounded p-4 text-center animate-in slide-in-from-bottom-2 fade-in duration-300">
-                  <p className="text-sm font-semibold text-green-800 mb-1">Ukuran Terbaik Untukmu:</p>
-                  <div className="text-4xl font-extrabold text-green-600 tracking-tight my-2">{sizeRecommendation.size}</div>
-                  <p className="text-xs font-bold uppercase tracking-wider text-green-700 bg-green-100 px-3 py-1 w-fit mx-auto rounded-full">{sizeRecommendation.desc}</p>
+                  <p className="text-sm font-semibold text-green-800 mb-1">
+                    Ukuran Terbaik Untukmu:
+                  </p>
+                  <div className="text-4xl font-extrabold text-green-600 tracking-tight my-2">
+                    {sizeRecommendation.size}
+                  </div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-green-700 bg-green-100 px-3 py-1 w-fit mx-auto rounded-full">
+                    {sizeRecommendation.desc}
+                  </p>
                 </div>
               )}
             </div>

@@ -45,7 +45,11 @@ function PosLayout() {
             </Button>
           )}
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <img src={logoFilkom} alt="Logo FILKOM" className="h-7 w-7 sm:h-8 sm:w-8 object-contain" />
+            <img
+              src={logoFilkom}
+              alt="Logo FILKOM"
+              className="h-7 w-7 sm:h-8 sm:w-8 object-contain"
+            />
             <div>
               <p className="display text-brand-blue text-xs sm:text-sm font-bold tracking-wide flex items-center gap-1.5">
                 <span className="hidden sm:inline">KASIR / POS OFFLINE</span>
@@ -54,7 +58,9 @@ function PosLayout() {
                   OFFICIAL
                 </span>
               </p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground leading-none sm:leading-normal">{user.username}</p>
+              <p className="text-[10px] sm:text-xs text-muted-foreground leading-none sm:leading-normal">
+                {user.username}
+              </p>
             </div>
           </div>
         </div>

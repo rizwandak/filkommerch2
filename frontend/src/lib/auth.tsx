@@ -19,6 +19,7 @@ export interface BuyerUser {
   picture?: string;
   is_filkom_verified?: number;
   nim?: string;
+  is_google?: boolean;
 }
 
 export type User = AdminUser | BuyerUser;
@@ -59,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const role = user.type === "admin" ? user.role : "buyer";
       const name = user.type === "admin" ? user.username : user.name;
       const id = String(user.id || "");
-      
+
       document.cookie = `user_role=${role}; path=/; max-age=604800; SameSite=Lax`;
       document.cookie = `user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
       document.cookie = `user_id=${id}; path=/; max-age=604800; SameSite=Lax`;
@@ -87,14 +88,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const fallbackUser: BuyerUser = {
         type: "buyer",
         ...userInfo,
+        is_google: true,
       };
       setUser(fallbackUser);
       localStorage.setItem("user", JSON.stringify(fallbackUser));
       return;
     }
 
-    setUser(result.user);
-    localStorage.setItem("user", JSON.stringify(result.user));
+    const updatedUser = {
+      ...result.user,
+      is_google: true,
+    };
+    setUser(updatedUser);
+    localStorage.setItem("user", JSON.stringify(updatedUser));
   };
 
   const logout = () => {

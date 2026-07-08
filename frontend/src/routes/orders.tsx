@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate, Link   } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useEffect, useMemo } from "react";
 import {
@@ -117,7 +117,7 @@ function UserOrdersPage() {
     setCart((prev) =>
       prev
         .map((item) => (item.id === id ? { ...item, qty: item.qty + delta } : item))
-        .filter((item) => item.qty > 0)
+        .filter((item) => item.qty > 0),
     );
   };
 
@@ -173,7 +173,9 @@ function UserOrdersPage() {
     const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
     const clientKey = "Mid-client-xBEPEMQRGEXHq99n";
 
-    let script = document.querySelector(`script[src="${snapScriptUrl}"]`) as HTMLScriptElement | null;
+    let script = document.querySelector(
+      `script[src="${snapScriptUrl}"]`,
+    ) as HTMLScriptElement | null;
     if (!script) {
       script = document.createElement("script");
       script.src = snapScriptUrl;
@@ -230,7 +232,7 @@ function UserOrdersPage() {
         snapToken = res.token;
         // Update local order snap_token
         setOrders((prev) =>
-          prev.map((o) => (o.order_id === order.order_id ? { ...o, snap_token: res.token } : o))
+          prev.map((o) => (o.order_id === order.order_id ? { ...o, snap_token: res.token } : o)),
         );
       }
 
@@ -419,8 +421,6 @@ function UserOrdersPage() {
                 );
               }
 
-              
-
               return (
                 <Link
                   key={n.label}
@@ -438,7 +438,7 @@ function UserOrdersPage() {
 
           <div className="flex items-center gap-4 text-ink">
             <HackerModeToggle />
-              <button aria-label="Search" onClick={() => navigate({ to: "/products" })}>
+            <button aria-label="Search" onClick={() => navigate({ to: "/products" })}>
               <Search className="w-5 h-5" />
             </button>
             <div className="relative">
@@ -511,7 +511,11 @@ function UserOrdersPage() {
                 </div>
               )}
             </div>
-            <button aria-label="Cart" className="relative cursor-pointer" onClick={() => setCartOpen(true)}>
+            <button
+              aria-label="Cart"
+              className="relative cursor-pointer"
+              onClick={() => setCartOpen(true)}
+            >
               <ShoppingBag className="w-5 h-5" />
               {cartCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-brand-orange text-cream text-[10px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">
@@ -519,7 +523,11 @@ function UserOrdersPage() {
                 </span>
               )}
             </button>
-            <button aria-label="Menu" className="lg:hidden cursor-pointer" onClick={() => setMenuOpen(true)}>
+            <button
+              aria-label="Menu"
+              className="lg:hidden cursor-pointer"
+              onClick={() => setMenuOpen(true)}
+            >
               <Menu className="w-5 h-5" />
             </button>
           </div>
@@ -531,8 +539,13 @@ function UserOrdersPage() {
         {/* Profile Info Summary */}
         <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <h2 className="font-extrabold text-md uppercase text-ink">Halo, {user?.type === "buyer" ? user.name : (user?.type === "admin" ? user.username : "")}!</h2>
-            <p className="text-xs text-muted-foreground mt-0.5">{user?.email} • Peran: {user?.type === "buyer" ? "Pembeli" : "Admin"}</p>
+            <h2 className="font-extrabold text-md uppercase text-ink">
+              Halo,{" "}
+              {user?.type === "buyer" ? user.name : user?.type === "admin" ? user.username : ""}!
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {user?.email} • Peran: {user?.type === "buyer" ? "Pembeli" : "Admin"}
+            </p>
           </div>
           <div className="flex gap-3 text-xs">
             <div className="bg-cream border border-ink px-4 py-2 rounded text-center">
@@ -799,7 +812,11 @@ function UserOrdersPage() {
                               ) : (
                                 <CreditCard className="w-3.5 h-3.5" />
                               )}
-                              {payingOrderId === order.order_id ? "Memproses..." : (order.snap_token ? "Ubah Metode" : "Bayar Sekarang")}
+                              {payingOrderId === order.order_id
+                                ? "Memproses..."
+                                : order.snap_token
+                                  ? "Ubah Metode"
+                                  : "Bayar Sekarang"}
                             </button>
                           </div>
                         )}
@@ -830,8 +847,6 @@ function UserOrdersPage() {
           </div>
           <nav className="flex-1 flex flex-col px-5 py-6 sm:py-8 gap-1">
             {NAV.map((n, idx) => {
-              
-
               return (
                 <Link
                   key={n.label}
@@ -886,7 +901,9 @@ function UserOrdersPage() {
                 <div className="text-center py-20">
                   <ShoppingBag className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
                   <p className="display text-2xl text-ink font-bold">Bag is empty.</p>
-                  <p className="text-sm text-muted-foreground mt-2 font-medium">Tambahkan produk favoritmu.</p>
+                  <p className="text-sm text-muted-foreground mt-2 font-medium">
+                    Tambahkan produk favoritmu.
+                  </p>
                   <button
                     onClick={() => {
                       setCartOpen(false);
@@ -900,11 +917,19 @@ function UserOrdersPage() {
                 <ul className="divide-y divide-border">
                   {cart.map((i) => (
                     <li key={i.id} className="py-4 flex gap-4">
-                      <img src={i.img} alt="" className="w-20 h-24 object-cover border border-ink" />
+                      <img
+                        src={i.img}
+                        alt=""
+                        className="w-20 h-24 object-cover border border-ink"
+                      />
                       <div className="flex-1 flex flex-col">
                         <div className="flex justify-between gap-2">
                           <h4 className="text-sm font-semibold text-ink leading-snug">{i.name}</h4>
-                          <button onClick={() => removeItem(i.id)} aria-label="Remove" className="cursor-pointer">
+                          <button
+                            onClick={() => removeItem(i.id)}
+                            aria-label="Remove"
+                            className="cursor-pointer"
+                          >
                             <Trash2 className="w-4 h-4 text-muted-foreground hover:text-brand-orange" />
                           </button>
                         </div>
@@ -953,11 +978,8 @@ function UserOrdersPage() {
           </aside>
         </div>
       )}
-      {user?.type === "buyer" && (
-        <VerificationModal
-          isOpen={isVerifyOpen}
-          onClose={() => setIsVerifyOpen(false)}
-        />
+      {user?.type === "buyer" && user.is_google && user.email.endsWith("ub.ac.id") && (
+        <VerificationModal isOpen={isVerifyOpen} onClose={() => setIsVerifyOpen(false)} />
       )}
     </div>
   );

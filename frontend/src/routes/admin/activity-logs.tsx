@@ -53,18 +53,20 @@ function AdminActivityLogsPage() {
   // Filtering
   const filteredLogs = logs.filter((log) => {
     const matchesSearch =
-      (log.actor_name_snapshot?.toLowerCase().includes(search.toLowerCase()) || false) ||
-      (log.action?.toLowerCase().includes(search.toLowerCase()) || false) ||
-      (log.description?.toLowerCase().includes(search.toLowerCase()) || false) ||
-      (log.entity_id?.toLowerCase().includes(search.toLowerCase()) || false);
+      log.actor_name_snapshot?.toLowerCase().includes(search.toLowerCase()) ||
+      false ||
+      log.action?.toLowerCase().includes(search.toLowerCase()) ||
+      false ||
+      log.description?.toLowerCase().includes(search.toLowerCase()) ||
+      false ||
+      log.entity_id?.toLowerCase().includes(search.toLowerCase()) ||
+      false;
 
     const matchesRole =
-      roleFilter === "all" ||
-      log.actor_role?.toLowerCase() === roleFilter.toLowerCase();
+      roleFilter === "all" || log.actor_role?.toLowerCase() === roleFilter.toLowerCase();
 
     const matchesEntity =
-      entityFilter === "all" ||
-      log.entity_type?.toLowerCase() === entityFilter.toLowerCase();
+      entityFilter === "all" || log.entity_type?.toLowerCase() === entityFilter.toLowerCase();
 
     return matchesSearch && matchesRole && matchesEntity;
   });
@@ -74,10 +76,20 @@ function AdminActivityLogsPage() {
     if (act.includes("create") || act.includes("tambah") || act.includes("insert")) {
       return "bg-green-50 text-green-700 border-green-200";
     }
-    if (act.includes("update") || act.includes("edit") || act.includes("ubah") || act.includes("simpan")) {
+    if (
+      act.includes("update") ||
+      act.includes("edit") ||
+      act.includes("ubah") ||
+      act.includes("simpan")
+    ) {
       return "bg-amber-50 text-amber-700 border-amber-200";
     }
-    if (act.includes("delete") || act.includes("hapus") || act.includes("remove") || act.includes("nonaktif")) {
+    if (
+      act.includes("delete") ||
+      act.includes("hapus") ||
+      act.includes("remove") ||
+      act.includes("nonaktif")
+    ) {
       return "bg-red-50 text-red-700 border-red-200";
     }
     return "bg-blue-50 text-blue-700 border-blue-200";
@@ -233,7 +245,7 @@ function AdminActivityLogsPage() {
                               </span>
                               <span
                                 className={`px-1.5 py-0.5 rounded text-[9px] w-fit font-bold border uppercase tracking-wider ${getRoleColor(
-                                  log.actor_role
+                                  log.actor_role,
                                 )}`}
                               >
                                 {log.actor_role || "system"}
@@ -243,7 +255,7 @@ function AdminActivityLogsPage() {
                           <td className="p-3">
                             <span
                               className={`px-2 py-0.5 rounded-full font-bold border text-[10px] ${getActionColor(
-                                log.action
+                                log.action,
                               )}`}
                             >
                               {log.action}
@@ -268,9 +280,7 @@ function AdminActivityLogsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() =>
-                                setExpandedLogId(isExpanded ? null : log.id)
-                              }
+                              onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
                               className="h-7 w-7"
                               title={isExpanded ? "Sembunyikan metadata" : "Tampilkan metadata"}
                             >
@@ -311,7 +321,7 @@ function AdminActivityLogsPage() {
                                             ? JSON.parse(log.metadata)
                                             : log.metadata,
                                           null,
-                                          2
+                                          2,
                                         )
                                       : "// Tidak ada metadata tambahan"}
                                   </pre>

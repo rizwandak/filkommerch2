@@ -96,7 +96,9 @@ function CheckoutPage() {
     const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
     const clientKey = "Mid-client-xBEPEMQRGEXHq99n";
 
-    let script = document.querySelector(`script[src="${snapScriptUrl}"]`) as HTMLScriptElement | null;
+    let script = document.querySelector(
+      `script[src="${snapScriptUrl}"]`,
+    ) as HTMLScriptElement | null;
     if (!script) {
       script = document.createElement("script");
       script.src = snapScriptUrl;

@@ -1,16 +1,16 @@
-import { createFileRoute, Link, useSearch, useNavigate   } from "@tanstack/react-router";
+import { createFileRoute, Link, useSearch, useNavigate } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useState, useEffect, useMemo, useCallback } from "react";
 import React from "react";
-import { 
-  Search, 
-  SlidersHorizontal, 
-  ShoppingBag, 
-  ArrowUpDown, 
-  Check, 
-  X, 
-  TrendingUp, 
-  Sparkles, 
+import {
+  Search,
+  SlidersHorizontal,
+  ShoppingBag,
+  ArrowUpDown,
+  Check,
+  X,
+  TrendingUp,
+  Sparkles,
   Calendar,
   Layers,
   Heart,
@@ -20,7 +20,7 @@ import {
   Trash2,
   LogOut,
   ArrowRight,
-  User
+  User,
 } from "lucide-react";
 import { getProducts, getCategories, type ProductWithVariants } from "@backend/server-actions";
 import { useAuth } from "@/lib/auth";
@@ -62,7 +62,10 @@ export const Route = createFileRoute("/products")({
   head: () => ({
     meta: [
       { title: "Katalog Produk — FILKOM Merch UB" },
-      { name: "description", content: "Katalog merchandise resmi Fakultas Ilmu Komputer Universitas Brawijaya" },
+      {
+        name: "description",
+        content: "Katalog merchandise resmi Fakultas Ilmu Komputer Universitas Brawijaya",
+      },
     ],
   }),
   component: ProductsCatalogPage,
@@ -94,7 +97,7 @@ function ProductsCatalogPage() {
     setSearch(window.location.search);
     setHash(window.location.hash);
   }, []);
-  
+
   // Cart state & handlers
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartLoaded, setCartLoaded] = useState(false);
@@ -132,7 +135,7 @@ function ProductsCatalogPage() {
     setCart((prev) =>
       prev
         .map((item) => (item.id === id ? { ...item, qty: item.qty + delta } : item))
-        .filter((item) => item.qty > 0)
+        .filter((item) => item.qty > 0),
     );
   };
 
@@ -243,15 +246,17 @@ function ProductsCatalogPage() {
     if (searchTerm.trim() !== "") {
       const q = searchTerm.toLowerCase();
       result = result.filter(
-        (p) => 
-          p.name.toLowerCase().includes(q) || 
-          (p.description && p.description.toLowerCase().includes(q))
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.description && p.description.toLowerCase().includes(q)),
       );
     }
 
     // Category
     if (selectedCategory !== "ALL") {
-      result = result.filter((p) => String(p.category_id) === selectedCategory || p.category_slug === selectedCategory);
+      result = result.filter(
+        (p) => String(p.category_id) === selectedCategory || p.category_slug === selectedCategory,
+      );
     }
 
     // Sale Type (ready_stock, pre_order, limited_drop)
@@ -266,15 +271,15 @@ function ProductsCatalogPage() {
 
     // Size filter
     if (selectedSize !== "ALL") {
-      result = result.filter((p) => 
-        p.variants?.some((v) => v.size === selectedSize && v.is_active && v.stock > 0)
+      result = result.filter((p) =>
+        p.variants?.some((v) => v.size === selectedSize && v.is_active && v.stock > 0),
       );
     }
 
     // Color filter
     if (selectedColor !== "ALL") {
-      result = result.filter((p) => 
-        p.variants?.some((v) => v.color === selectedColor && v.is_active && v.stock > 0)
+      result = result.filter((p) =>
+        p.variants?.some((v) => v.color === selectedColor && v.is_active && v.stock > 0),
       );
     }
 
@@ -301,17 +306,17 @@ function ProductsCatalogPage() {
 
     return result;
   }, [
-    products, 
-    searchTerm, 
-    selectedCategory, 
-    selectedSaleType, 
-    selectedProductType, 
-    selectedSize, 
-    selectedColor, 
-    minPrice, 
-    maxPrice, 
-    sortBy, 
-    user
+    products,
+    searchTerm,
+    selectedCategory,
+    selectedSaleType,
+    selectedProductType,
+    selectedSize,
+    selectedColor,
+    minPrice,
+    maxPrice,
+    sortBy,
+    user,
   ]);
 
   const clearFilters = () => {
@@ -409,8 +414,6 @@ function ProductsCatalogPage() {
                 );
               }
 
-              
-
               return (
                 <Link
                   key={n.label}
@@ -433,7 +436,7 @@ function ProductsCatalogPage() {
 
           <div className="flex items-center gap-4 text-ink">
             <HackerModeToggle />
-              <button aria-label="Search" onClick={() => setSearchOpen((v) => !v)}>
+            <button aria-label="Search" onClick={() => setSearchOpen((v) => !v)}>
               <Search className="w-5 h-5" />
             </button>
             <div className="relative">
@@ -506,7 +509,11 @@ function ProductsCatalogPage() {
                 </div>
               )}
             </div>
-            <button aria-label="Cart" className="relative cursor-pointer" onClick={() => setCartOpen(true)}>
+            <button
+              aria-label="Cart"
+              className="relative cursor-pointer"
+              onClick={() => setCartOpen(true)}
+            >
               <ShoppingBag className="w-5 h-5" />
               {cartCount > 0 && (
                 <span className="absolute -top-2 -right-2 bg-brand-orange text-cream text-[10px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">
@@ -514,7 +521,11 @@ function ProductsCatalogPage() {
                 </span>
               )}
             </button>
-            <button aria-label="Menu" className="lg:hidden cursor-pointer" onClick={() => setMenuOpen(true)}>
+            <button
+              aria-label="Menu"
+              className="lg:hidden cursor-pointer"
+              onClick={() => setMenuOpen(true)}
+            >
               <Menu className="w-5 h-5" />
             </button>
           </div>
@@ -552,35 +563,66 @@ function ProductsCatalogPage() {
               <Sparkles className="w-3.5 h-3.5 animate-pulse" />
               Civitas FILKOM UB Discount Active
             </div>
-            <h1 className="display text-3xl sm:text-5xl text-ink uppercase tracking-tight">Katalog Resmi FILKOM Merch</h1>
+            <h1 className="display text-3xl sm:text-5xl text-ink uppercase tracking-tight">
+              Katalog Resmi FILKOM Merch
+            </h1>
             <p className="mt-3 text-sm text-muted-foreground max-w-xl font-medium leading-relaxed">
-              Temukan koleksi eksklusif, apparel premium, lanyard, gantungan kunci, dan drop limited pre-order Fakultas Ilmu Komputer.
+              Temukan koleksi eksklusif, apparel premium, lanyard, gantungan kunci, dan drop limited
+              pre-order Fakultas Ilmu Komputer.
             </p>
           </div>
           {user?.type === "buyer" ? (
             user.is_filkom_verified === 1 ? (
               <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Status Akun:</p>
-                <p className="text-lg font-extrabold text-brand-orange uppercase mt-1">Spesial Civitas FILKOM UB 🔥</p>
-                <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">Diskon otomatis aktif karena akun FILKOM Anda terverifikasi.</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                  Status Akun:
+                </p>
+                <p className="text-lg font-extrabold text-brand-orange uppercase mt-1">
+                  Spesial Civitas FILKOM UB 🔥
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">
+                  Diskon otomatis aktif karena akun FILKOM Anda terverifikasi.
+                </p>
               </div>
-            ) : (
+            ) : user.is_google && user.email.endsWith("ub.ac.id") ? (
               <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Diskon Civitas:</p>
-                <p className="text-lg font-extrabold text-amber-600 uppercase mt-1">Belum Terverifikasi ⚠️</p>
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                  Diskon Civitas:
+                </p>
+                <p className="text-lg font-extrabold text-amber-600 uppercase mt-1">
+                  Belum Terverifikasi ⚠️
+                </p>
                 <button
                   onClick={() => setIsVerifyOpen(true)}
                   className="mt-2 w-full bg-brand-orange text-cream text-[10px] font-bold py-2 rounded-lg border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none transition-all cursor-pointer block"
                 >
-                  Verifikasi NIM/NIDN
+                  Verifikasi NIM
                 </button>
+              </div>
+            ) : (
+              <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
+                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                  Diskon Khusus:
+                </p>
+                <p className="text-sm font-extrabold text-ink uppercase mt-1">
+                  Gunakan Akun Google UB 🎓
+                </p>
+                <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">
+                  Verifikasi NIM mahasiswa FILKOM hanya tersedia jika Anda login menggunakan akun Google UB (@student.ub.ac.id).
+                </p>
               </div>
             )
           ) : (
             <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
-              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Punya NIM FILKOM?</p>
-              <p className="text-lg font-extrabold text-ink uppercase mt-1">Login & Verifikasi 🎓</p>
-              <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">Gunakan email UB & hubungkan NIM/NIDN Anda untuk mendapatkan diskon khusus FILKOM.</p>
+              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
+                Punya NIM FILKOM?
+              </p>
+              <p className="text-lg font-extrabold text-ink uppercase mt-1">
+                Login & Verifikasi 🎓
+              </p>
+              <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">
+                Gunakan akun Google UB & hubungkan NIM Anda untuk mendapatkan diskon khusus FILKOM.
+              </p>
             </div>
           )}
         </div>
@@ -596,7 +638,7 @@ function ProductsCatalogPage() {
                 <SlidersHorizontal className="w-4 h-4 text-brand-orange" />
                 FILTER
               </h2>
-              <button 
+              <button
                 onClick={clearFilters}
                 className="text-xs font-bold text-muted-foreground hover:text-brand-orange transition cursor-pointer"
               >
@@ -606,7 +648,9 @@ function ProductsCatalogPage() {
 
             {/* Search */}
             <div className="mb-6">
-              <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">Pencarian</label>
+              <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">
+                Pencarian
+              </label>
               <div className="relative">
                 <input
                   type="text"
@@ -621,13 +665,15 @@ function ProductsCatalogPage() {
 
             {/* Category */}
             <div className="mb-6">
-              <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">Kategori</label>
+              <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">
+                Kategori
+              </label>
               <div className="space-y-1.5">
                 <button
                   onClick={() => setSelectedCategory("ALL")}
                   className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${
-                    selectedCategory === "ALL" 
-                      ? "bg-brand-orange text-cream" 
+                    selectedCategory === "ALL"
+                      ? "bg-brand-orange text-cream"
                       : "bg-card text-ink hover:bg-cream"
                   }`}
                 >
@@ -639,8 +685,8 @@ function ProductsCatalogPage() {
                     key={cat.id}
                     onClick={() => setSelectedCategory(String(cat.id))}
                     className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${
-                      selectedCategory === String(cat.id) 
-                        ? "bg-brand-orange text-cream" 
+                      selectedCategory === String(cat.id)
+                        ? "bg-brand-orange text-cream"
                         : "bg-card text-ink hover:bg-cream"
                     }`}
                   >
@@ -653,20 +699,22 @@ function ProductsCatalogPage() {
 
             {/* Status Penjualan (Ready vs PO) */}
             <div className="mb-6">
-              <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">Status Drop</label>
+              <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">
+                Status Drop
+              </label>
               <div className="space-y-1.5">
                 {[
                   { id: "ALL", name: "Semua Status" },
                   { id: "ready_stock", name: "Ready Stock" },
                   { id: "pre_order", name: "Pre-Order" },
-                  { id: "limited_drop", name: "Limited Drop" }
+                  { id: "limited_drop", name: "Limited Drop" },
                 ].map((type) => (
                   <button
                     key={type.id}
                     onClick={() => setSelectedSaleType(type.id)}
                     className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${
-                      selectedSaleType === type.id 
-                        ? "bg-brand-orange text-cream" 
+                      selectedSaleType === type.id
+                        ? "bg-brand-orange text-cream"
                         : "bg-card text-ink hover:bg-cream"
                     }`}
                   >
@@ -679,7 +727,9 @@ function ProductsCatalogPage() {
 
             {/* Price Range */}
             <div className="mb-6">
-              <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">Rentang Harga (Rp)</label>
+              <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">
+                Rentang Harga (Rp)
+              </label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
@@ -702,13 +752,15 @@ function ProductsCatalogPage() {
             {/* Sizes */}
             {allSizes.length > 0 && (
               <div className="mb-6">
-                <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">Ukuran</label>
+                <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">
+                  Ukuran
+                </label>
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     onClick={() => setSelectedSize("ALL")}
                     className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
-                      selectedSize === "ALL" 
-                        ? "bg-ink text-cream" 
+                      selectedSize === "ALL"
+                        ? "bg-ink text-cream"
                         : "bg-card text-ink hover:bg-cream"
                     }`}
                   >
@@ -719,8 +771,8 @@ function ProductsCatalogPage() {
                       key={size}
                       onClick={() => setSelectedSize(size)}
                       className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
-                        selectedSize === size 
-                          ? "bg-ink text-cream" 
+                        selectedSize === size
+                          ? "bg-ink text-cream"
                           : "bg-card text-ink hover:bg-cream"
                       }`}
                     >
@@ -734,13 +786,15 @@ function ProductsCatalogPage() {
             {/* Colors */}
             {allColors.length > 0 && (
               <div className="mb-4">
-                <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">Warna</label>
+                <label className="block text-xs font-bold text-ink mb-2 uppercase tracking-wider">
+                  Warna
+                </label>
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     onClick={() => setSelectedColor("ALL")}
                     className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
-                      selectedColor === "ALL" 
-                        ? "bg-ink text-cream" 
+                      selectedColor === "ALL"
+                        ? "bg-ink text-cream"
                         : "bg-card text-ink hover:bg-cream"
                     }`}
                   >
@@ -751,8 +805,8 @@ function ProductsCatalogPage() {
                       key={col}
                       onClick={() => setSelectedColor(col)}
                       className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
-                        selectedColor === col 
-                          ? "bg-ink text-cream" 
+                        selectedColor === col
+                          ? "bg-ink text-cream"
                           : "bg-card text-ink hover:bg-cream"
                       }`}
                     >
@@ -768,9 +822,10 @@ function ProductsCatalogPage() {
             {/* Sorting & Result Count Bar */}
             <div className="bg-card p-4 rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] flex flex-col sm:flex-row items-center justify-between gap-4 mb-6 text-ink">
               <p className="text-xs text-ink font-bold">
-                Menampilkan <span className="text-brand-orange">{filteredProducts.length}</span> produk
+                Menampilkan <span className="text-brand-orange">{filteredProducts.length}</span>{" "}
+                produk
               </p>
-              
+
               <div className="flex items-center gap-3 w-full sm:w-auto">
                 <button
                   onClick={() => setShowMobileFilters(true)}
@@ -802,13 +857,17 @@ function ProductsCatalogPage() {
                 {filteredProducts.map((p) => {
                   const currentPrice = getActivePrice(p);
                   const showDiscount = p.original_price && p.original_price > currentPrice;
-                  
+
                   return (
                     <article
                       key={p.id}
                       className="group flex flex-col bg-card border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 overflow-hidden relative h-full text-ink"
                     >
-                      <Link to="/product/$slug" params={{ slug: p.slug }} className="block relative aspect-square overflow-hidden bg-cream border-b-2 border-ink select-none">
+                      <Link
+                        to="/product/$slug"
+                        params={{ slug: p.slug }}
+                        className="block relative aspect-square overflow-hidden bg-cream border-b-2 border-ink select-none"
+                      >
                         {p.image_url ? (
                           <img
                             src={p.image_url}
@@ -874,7 +933,11 @@ function ProductsCatalogPage() {
                               </span>
                               {showDiscount && (
                                 <span className="bg-red-100 text-red-800 border border-red-200 font-extrabold text-[9px] px-1 rounded">
-                                  -{Math.round(((p.original_price! - currentPrice) / p.original_price!) * 100)}%
+                                  -
+                                  {Math.round(
+                                    ((p.original_price! - currentPrice) / p.original_price!) * 100,
+                                  )}
+                                  %
                                 </span>
                               )}
                             </div>
@@ -884,9 +947,9 @@ function ProductsCatalogPage() {
                               </p>
                             )}
                           </div>
-                          
-                          <Link 
-                            to="/product/$slug" 
+
+                          <Link
+                            to="/product/$slug"
                             params={{ slug: p.slug }}
                             className="bg-brand-orange hover:bg-ink text-cream hover:text-cream p-2 rounded-lg transition border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none"
                           >
@@ -902,8 +965,13 @@ function ProductsCatalogPage() {
               <div className="bg-card rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-12 text-center text-ink">
                 <X className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
                 <h3 className="font-bold text-lg text-ink">Tidak ada produk yang cocok</h3>
-                <p className="text-xs text-muted-foreground mt-1">Coba sesuaikan kata kunci pencarian atau bersihkan filter Anda.</p>
-                <Button onClick={clearFilters} className="mt-6 bg-ink text-cream border-2 border-ink font-bold hover:bg-brand-orange hover:text-cream cursor-pointer transition shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none">
+                <p className="text-xs text-muted-foreground mt-1">
+                  Coba sesuaikan kata kunci pencarian atau bersihkan filter Anda.
+                </p>
+                <Button
+                  onClick={clearFilters}
+                  className="mt-6 bg-ink text-cream border-2 border-ink font-bold hover:bg-brand-orange hover:text-cream cursor-pointer transition shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none"
+                >
                   Reset Semua Filter
                 </Button>
               </div>
@@ -917,23 +985,48 @@ function ProductsCatalogPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <img src={logo} alt="Logo" className="w-8 h-8 rounded-full object-cover border border-ink" />
+              <img
+                src={logo}
+                alt="Logo"
+                className="w-8 h-8 rounded-full object-cover border border-ink"
+              />
               <span className="font-extrabold text-sm text-ink uppercase">FILKOM Merch Store</span>
             </div>
             <p className="text-muted-foreground font-normal leading-relaxed mb-4 max-w-sm">
-              Official store merchandise Fakultas Ilmu Komputer Universitas Brawijaya. Menyediakan produk kreatif berkualitas tinggi untuk civitas akademika dan masyarakat umum.
+              Official store merchandise Fakultas Ilmu Komputer Universitas Brawijaya. Menyediakan
+              produk kreatif berkualitas tinggi untuk civitas akademika dan masyarakat umum.
             </p>
           </div>
           <div>
-            <h4 className="font-extrabold text-ink uppercase tracking-widest mb-3 border-b-2 border-ink pb-1 inline-block">Layanan Kami</h4>
+            <h4 className="font-extrabold text-ink uppercase tracking-widest mb-3 border-b-2 border-ink pb-1 inline-block">
+              Layanan Kami
+            </h4>
             <ul className="space-y-2 font-normal text-muted-foreground mt-2">
-              <li><Link to="/products" className="hover:text-brand-orange transition">Katalog Drop Utama</Link></li>
-              <li><Link to="/products" search={{ sale_type: "pre_order" }} className="hover:text-brand-orange transition">Pre-Order BATCH Aktif</Link></li>
-              <li><a href="/#about" className="hover:text-brand-orange transition">Tentang Toko Resmi</a></li>
+              <li>
+                <Link to="/products" className="hover:text-brand-orange transition">
+                  Katalog Drop Utama
+                </Link>
+              </li>
+              <li>
+                <Link
+                  to="/products"
+                  search={{ sale_type: "pre_order" }}
+                  className="hover:text-brand-orange transition"
+                >
+                  Pre-Order BATCH Aktif
+                </Link>
+              </li>
+              <li>
+                <a href="/#about" className="hover:text-brand-orange transition">
+                  Tentang Toko Resmi
+                </a>
+              </li>
             </ul>
           </div>
           <div id="contact">
-            <h4 className="font-extrabold text-ink uppercase tracking-widest mb-3 border-b-2 border-ink pb-1 inline-block">Hubungi Admin (WhatsApp)</h4>
+            <h4 className="font-extrabold text-ink uppercase tracking-widest mb-3 border-b-2 border-ink pb-1 inline-block">
+              Hubungi Admin (WhatsApp)
+            </h4>
             <div className="space-y-3 mt-2">
               <a
                 href="https://wa.me/6282235526105?text=Halo%20Admin%20Aliya,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
@@ -957,7 +1050,8 @@ function ProductsCatalogPage() {
           </div>
         </div>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-border pt-8 mt-8 text-center text-muted-foreground font-normal">
-          &copy; 2026 FILKOM Merchandise UB Store. Developed in alignment with Technical Brief revisions.
+          &copy; 2026 FILKOM Merchandise UB Store. Developed in alignment with Technical Brief
+          revisions.
         </div>
       </footer>
 
@@ -998,14 +1092,18 @@ function ProductsCatalogPage() {
                 >
                   <option value="ALL">Semua Kategori</option>
                   {categories.map((c) => (
-                    <option key={c.id} value={String(c.id)}>{c.name}</option>
+                    <option key={c.id} value={String(c.id)}>
+                      {c.name}
+                    </option>
                   ))}
                 </select>
               </div>
 
               {/* Status Sale */}
               <div className="mb-5">
-                <label className="block text-xs font-bold text-ink mb-2 uppercase">Status Drop</label>
+                <label className="block text-xs font-bold text-ink mb-2 uppercase">
+                  Status Drop
+                </label>
                 <select
                   value={selectedSaleType}
                   onChange={(e) => setSelectedSaleType(e.target.value)}
@@ -1020,7 +1118,9 @@ function ProductsCatalogPage() {
 
               {/* Price Range */}
               <div className="mb-5">
-                <label className="block text-xs font-bold text-ink mb-2 uppercase">Rentang Harga (Rp)</label>
+                <label className="block text-xs font-bold text-ink mb-2 uppercase">
+                  Rentang Harga (Rp)
+                </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
@@ -1041,14 +1141,14 @@ function ProductsCatalogPage() {
             </div>
 
             <div className="pt-6 border-t-2 border-ink flex gap-3">
-              <button 
-                onClick={clearFilters} 
+              <button
+                onClick={clearFilters}
                 className="flex-1 text-xs font-bold border-2 border-ink bg-card hover:bg-cream text-ink py-2 rounded transition cursor-pointer"
               >
                 Reset
               </button>
-              <button 
-                onClick={() => setShowMobileFilters(false)} 
+              <button
+                onClick={() => setShowMobileFilters(false)}
                 className="flex-1 bg-brand-orange border-2 border-ink text-cream hover:bg-ink text-xs font-bold py-2 rounded transition cursor-pointer"
               >
                 Terapkan
@@ -1076,8 +1176,6 @@ function ProductsCatalogPage() {
           </div>
           <nav className="flex-1 flex flex-col px-5 py-6 sm:py-8 gap-1">
             {NAV.map((n, idx) => {
-              
-
               return (
                 <Link
                   key={n.label}
@@ -1135,7 +1233,9 @@ function ProductsCatalogPage() {
                 <div className="text-center py-20">
                   <ShoppingBag className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
                   <p className="display text-2xl text-ink font-bold">Bag is empty.</p>
-                  <p className="text-sm text-muted-foreground mt-2 font-medium">Tambahkan produk favoritmu.</p>
+                  <p className="text-sm text-muted-foreground mt-2 font-medium">
+                    Tambahkan produk favoritmu.
+                  </p>
                   <button
                     onClick={() => {
                       setCartOpen(false);
@@ -1149,11 +1249,19 @@ function ProductsCatalogPage() {
                 <ul className="divide-y divide-border">
                   {cart.map((i) => (
                     <li key={i.id} className="py-4 flex gap-4">
-                      <img src={i.img} alt="" className="w-20 h-24 object-cover border border-ink" />
+                      <img
+                        src={i.img}
+                        alt=""
+                        className="w-20 h-24 object-cover border border-ink"
+                      />
                       <div className="flex-1 flex flex-col">
                         <div className="flex justify-between gap-2">
                           <h4 className="text-sm font-semibold text-ink leading-snug">{i.name}</h4>
-                          <button onClick={() => removeItem(i.id)} aria-label="Remove" className="cursor-pointer">
+                          <button
+                            onClick={() => removeItem(i.id)}
+                            aria-label="Remove"
+                            className="cursor-pointer"
+                          >
                             <Trash2 className="w-4 h-4 text-muted-foreground hover:text-brand-orange" />
                           </button>
                         </div>
@@ -1203,10 +1311,7 @@ function ProductsCatalogPage() {
         </div>
       )}
       {user?.type === "buyer" && (
-        <VerificationModal
-          isOpen={isVerifyOpen}
-          onClose={() => setIsVerifyOpen(false)}
-        />
+        <VerificationModal isOpen={isVerifyOpen} onClose={() => setIsVerifyOpen(false)} />
       )}
     </div>
   );

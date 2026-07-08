@@ -43,7 +43,7 @@ function AdminSettingsPage() {
                 ...prev,
                 qris_static_url: data.url,
               }
-            : null
+            : null,
         );
         toast.success("Foto QRIS berhasil diunggah");
       } else {
@@ -165,7 +165,8 @@ function AdminSettingsPage() {
                   className="cursor-pointer"
                 />
                 <p className="text-xs text-muted-foreground">
-                  Unggah file gambar QRIS Statis Anda (PNG, JPG, WEBP). Digunakan saat kasir memilih pembayaran QRIS Statis di POS.
+                  Unggah file gambar QRIS Statis Anda (PNG, JPG, WEBP). Digunakan saat kasir memilih
+                  pembayaran QRIS Statis di POS.
                 </p>
               </div>
             )}

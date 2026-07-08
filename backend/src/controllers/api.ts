@@ -382,12 +382,12 @@ export const createUser = async (req: Request, res: Response) => {
     const actorRole = req.header("x-user-role") || null;
 
     if (!name || !email || !password || !role) {
-      return res.status(400).json({ success: false, error: "Nama, email, password, dan peran wajib diisi" });
+      return res.status(400).json({ success: false, error: "Nama, username/email, password, dan peran wajib diisi" });
     }
 
     const existingEmail = await queryOne<any>("SELECT id FROM users WHERE email = ?", [email]);
     if (existingEmail) {
-      return res.status(400).json({ success: false, error: "Email sudah terdaftar" });
+      return res.status(400).json({ success: false, error: "Username atau Email sudah terdaftar" });
     }
 
     const hash = await bcrypt.hash(password, 10);
@@ -423,12 +423,12 @@ export const updateUser = async (req: Request, res: Response) => {
     const actorRole = req.header("x-user-role") || null;
 
     if (!id || !name || !email || !role) {
-      return res.status(400).json({ success: false, error: "ID, nama, email, dan peran wajib diisi" });
+      return res.status(400).json({ success: false, error: "ID, nama, username/email, dan peran wajib diisi" });
     }
 
     const existing = await queryOne<any>("SELECT id FROM users WHERE email = ? AND id != ?", [email, id]);
     if (existing) {
-      return res.status(400).json({ success: false, error: "Email sudah digunakan pengguna lain" });
+      return res.status(400).json({ success: false, error: "Username atau Email sudah digunakan pengguna lain" });
     }
 
     if (password) {
@@ -472,6 +472,24 @@ export const deleteUser = async (req: Request, res: Response) => {
     if (Number(id) === 1) {
       return res.status(400).json({ success: false, error: "Admin utama tidak dapat dihapus" });
     }
+
+    // 1. Delete associated user addresses (NOT NULL foreign key)
+    await execute("DELETE FROM user_addresses WHERE user_id = ?", [id]);
+
+    // 2. Set nullable user_id to NULL in activity_logs
+    await execute("UPDATE activity_logs SET user_id = NULL WHERE user_id = ?", [id]);
+
+    // 3. Set nullable created_by to NULL in stock_movements
+    await execute("UPDATE stock_movements SET created_by = NULL WHERE created_by = ?", [id]);
+
+    // 4. Set nullable user_id/cashier_id to NULL in orders
+    await execute("UPDATE orders SET user_id = NULL WHERE user_id = ?", [id]);
+    await execute("UPDATE orders SET cashier_id = NULL WHERE cashier_id = ?", [id]);
+
+    // 5. Delete shifts associated with cashiers (NOT NULL cashier_id)
+    await execute("DELETE FROM cashier_shifts WHERE cashier_id = ?", [id]);
+
+    // 6. Finally delete the user
     await execute("DELETE FROM users WHERE id = ?", [id]);
 
     await logActivity(

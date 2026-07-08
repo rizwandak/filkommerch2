@@ -61,10 +61,13 @@ function AdminUsersPage() {
   const [users, setUsers] = useState<DbUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [roleFilters, setRoleFilters] = useState<string[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<UserForm>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [userNameToDelete, setUserNameToDelete] = useState("");
 
   const loadUsers = async () => {
     setLoading(true);
@@ -108,7 +111,7 @@ function AdminUsersPage() {
 
   const handleSave = async () => {
     if (!form.name || !form.email || !form.role) {
-      toast.error("Nama, email, dan peran wajib diisi!");
+      toast.error("Nama, username, dan peran wajib diisi!");
       return;
     }
     if (!form.id && !form.password) {
@@ -150,28 +153,44 @@ function AdminUsersPage() {
     }
   };
 
-  const handleDelete = async (id: number) => {
-    if (id === 1) {
+  const openDeleteConfirm = (user: DbUser) => {
+    if (user.id === 1) {
       toast.error("Admin utama tidak dapat dihapus!");
       return;
     }
-    if (!window.confirm("Apakah Anda yakin ingin menghapus pengguna ini secara permanen?")) return;
+    setUserToDelete(user.id);
+    setUserNameToDelete(user.name);
+    setDeleteConfirmOpen(true);
+  };
 
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+    setSaving(true);
     try {
-      const result = await deleteUserAdmin({ data: id });
+      const result = await deleteUserAdmin({ data: userToDelete });
       if (result.success) {
         toast.success("Pengguna berhasil dihapus");
+        setDeleteConfirmOpen(false);
         await loadUsers();
       } else {
         toast.error(result.error || "Gagal menghapus pengguna");
       }
     } catch {
       toast.error("Gagal melakukan penghapusan");
+    } finally {
+      setSaving(false);
+      setUserToDelete(null);
     }
   };
 
+  const toggleRoleFilter = (role: string) => {
+    setRoleFilters((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
+    );
+  };
+
   const filteredUsers = users.filter((u) => {
-    const matchRole = roleFilter === "all" || u.role === roleFilter;
+    const matchRole = roleFilters.length === 0 || roleFilters.includes(u.role);
     const q = searchQuery.toLowerCase().trim();
     const matchSearch =
       !q ||
@@ -210,28 +229,44 @@ function AdminUsersPage() {
       </div>
 
       {/* Filters & Search */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-card border border-border p-4 rounded-lg">
+      <div className="flex flex-col gap-4 bg-card border border-border p-4 rounded-lg">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Cari berdasarkan nama, email, NIM..."
+            placeholder="Cari berdasarkan nama, username, NIM..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
         </div>
-        <div className="w-full sm:w-48">
-          <Select value={roleFilter} onValueChange={setRoleFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Filter Peran" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Semua Peran</SelectItem>
-              <SelectItem value="customer">Customer (Mahasiswa)</SelectItem>
-              <SelectItem value="cashier">Kasir POS</SelectItem>
-              <SelectItem value="admin">Administrator</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Peran:</span>
+          {[
+            { value: "admin", label: "Administrator" },
+            { value: "cashier", label: "Kasir POS" },
+            { value: "customer", label: "Customer" },
+          ].map((role) => (
+            <label
+              key={role.value}
+              className={`flex items-center gap-1.5 cursor-pointer select-none rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition-all duration-200 ${
+                roleFilters.includes(role.value)
+                  ? role.value === "admin"
+                    ? "bg-red-50 text-red-700 border-red-300"
+                    : role.value === "cashier"
+                      ? "bg-amber-50 text-amber-700 border-amber-300"
+                      : "bg-blue-50 text-blue-700 border-blue-300"
+                  : "bg-white text-muted-foreground border-border hover:border-slate-400"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={roleFilters.includes(role.value)}
+                onChange={() => toggleRoleFilter(role.value)}
+                className="sr-only"
+              />
+              {role.label}
+            </label>
+          ))}
         </div>
       </div>
 
@@ -248,7 +283,7 @@ function AdminUsersPage() {
                     Nama / NIM
                   </th>
                   <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                    Email
+                    Username
                   </th>
                   <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
                     Telepon
@@ -318,7 +353,7 @@ function AdminUsersPage() {
                             size="icon"
                             disabled={user.id === 1}
                             className="text-destructive hover:bg-red-50 disabled:opacity-30"
-                            onClick={() => void handleDelete(user.id)}
+                            onClick={() => openDeleteConfirm(user)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -351,12 +386,12 @@ function AdminUsersPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Email *</Label>
+              <Label>Username *</Label>
               <Input
-                type="email"
+                type="text"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="john@student.ub.ac.id"
+                placeholder="Masukkan username"
               />
             </div>
 
@@ -419,7 +454,10 @@ function AdminUsersPage() {
                 onChange={(e) => setForm({ ...form, is_filkom_verified: e.target.checked })}
                 className="h-4.5 w-4.5 rounded border-gray-300 text-brand-orange focus:ring-brand-orange cursor-pointer"
               />
-              <Label htmlFor="is_filkom_verified" className="cursor-pointer font-bold text-xs uppercase text-ink">
+              <Label
+                htmlFor="is_filkom_verified"
+                className="cursor-pointer font-bold text-xs uppercase text-ink"
+              >
                 Verifikasi Civitas FILKOM UB (Aktifkan Diskon)
               </Label>
             </div>
@@ -431,6 +469,26 @@ function AdminUsersPage() {
             </Button>
             <Button onClick={() => void handleSave()} disabled={saving}>
               {saving ? "Menyimpan..." : "Simpan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="display text-lg text-ink">Konfirmasi Hapus Pengguna</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 text-sm text-muted-foreground">
+            Apakah Anda yakin ingin menghapus pengguna <span className="font-bold text-ink uppercase">{userNameToDelete}</span> secara permanen? Tindakan ini tidak dapat dibatalkan.
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setDeleteConfirmOpen(false)}>
+              Batal
+            </Button>
+            <Button variant="destructive" onClick={() => void confirmDelete()} disabled={saving}>
+              {saving ? "Menghapus..." : "Hapus Permanen"}
             </Button>
           </DialogFooter>
         </DialogContent>

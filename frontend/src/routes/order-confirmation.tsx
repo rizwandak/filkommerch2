@@ -43,7 +43,9 @@ function OrderConfirmationPage() {
     const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
     const clientKey = "Mid-client-xBEPEMQRGEXHq99n";
 
-    let script = document.querySelector(`script[src="${snapScriptUrl}"]`) as HTMLScriptElement | null;
+    let script = document.querySelector(
+      `script[src="${snapScriptUrl}"]`,
+    ) as HTMLScriptElement | null;
     if (!script) {
       script = document.createElement("script");
       script.src = snapScriptUrl;
@@ -312,7 +314,11 @@ function OrderConfirmationPage() {
                   ) : (
                     <CreditCard className="w-4 h-4" />
                   )}
-                  {isRegenerating ? "Memproses..." : (order.snap_token ? "Ubah Metode Pembayaran" : "Lanjutkan Pembayaran Sekarang")}
+                  {isRegenerating
+                    ? "Memproses..."
+                    : order.snap_token
+                      ? "Ubah Metode Pembayaran"
+                      : "Lanjutkan Pembayaran Sekarang"}
                 </Button>
               </div>
             )}

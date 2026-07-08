@@ -2,10 +2,8 @@ import { query } from "./config/database";
 
 async function main() {
   try {
-    const columns = await query("DESCRIBE products");
-    console.log("PRODUCTS COLUMNS:", columns);
-    const tables = await query("SHOW TABLES");
-    console.log("TABLES:", tables);
+    const users = await query("SELECT id, name, email, role FROM users");
+    console.log("USERS:", users);
   } catch (err) {
     console.error("Error:", err);
   }
