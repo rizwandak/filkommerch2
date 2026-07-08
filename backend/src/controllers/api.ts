@@ -294,6 +294,8 @@ export const loginUser = async (req: Request, res: Response) => {
           username: dbUser.name,
           email: dbUser.email,
           id: dbUser.id,
+          nim: dbUser.nim,
+          is_filkom_verified: dbUser.is_filkom_verified || 0,
         }
       });
     } else {
@@ -346,6 +348,8 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
           username: dbUser.name,
           email: dbUser.email,
           id: dbUser.id,
+          nim: dbUser.nim,
+          is_filkom_verified: dbUser.is_filkom_verified || 0,
         }
       });
     } else {

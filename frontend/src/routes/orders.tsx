@@ -460,7 +460,7 @@ function UserOrdersPage() {
                         <span className="inline-block mt-1 px-2 py-1 text-[10px] font-bold bg-blue-100 text-blue-900 rounded">
                           {user.type === "admin" ? "ADMIN" : "BUYER"}
                         </span>
-                        {user.type === "buyer" && (
+                        {user && (
                           <div className="mt-1.5">
                             {user.is_filkom_verified === 1 ? (
                               <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-green-100 text-green-800 rounded">
@@ -500,7 +500,7 @@ function UserOrdersPage() {
                           Kasir / POS
                         </Link>
                       )}
-                      {user.type === "buyer" && (
+                      {user && (
                         <Link
                           to="/orders"
                           className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold animate-fade-in"

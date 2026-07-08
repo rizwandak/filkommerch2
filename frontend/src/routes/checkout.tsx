@@ -58,7 +58,7 @@ function CheckoutPage() {
   const [customerEmail, setCustomerEmail] = useState(user ? user.email : "");
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerNim, setCustomerNim] = useState(
-    user && user.type === "buyer" ? (user.nim || "") : ""
+    user ? (user.nim || "") : ""
   );
   const [streetAddress, setStreetAddress] = useState("");
   const [rtRw, setRtRw] = useState("");
@@ -86,7 +86,7 @@ function CheckoutPage() {
     if (user) {
       if (!customerName) setCustomerName(user.type === "buyer" ? user.name : user.username);
       if (!customerEmail) setCustomerEmail(user.email || "");
-      if (user.type === "buyer" && user.nim && !customerNim) setCustomerNim(user.nim);
+      if (user.nim && !customerNim) setCustomerNim(user.nim);
     }
   }, [user]);
 
@@ -229,7 +229,6 @@ function CheckoutPage() {
     try {
       const parsedId = Number(user?.id);
       const buyerUserId =
-        user?.type === "buyer" &&
         Number.isInteger(parsedId) &&
         parsedId > 0 &&
         parsedId <= 2147483647
@@ -238,7 +237,7 @@ function CheckoutPage() {
 
       const finalName = customerName.trim() || (user ? (user.type === "buyer" ? user.name : user.username) : "");
       const finalEmail = customerEmail.trim() || user?.email || "";
-      const finalNim = customerNim.trim() || (user && user.type === "buyer" ? user.nim : "") || "";
+      const finalNim = customerNim.trim() || (user ? user.nim : "") || "";
 
       const transactionDetails = {
         orderId: newOrderId,
@@ -813,7 +812,7 @@ function CustomerDetailsStep({
                 <span className="text-muted-foreground font-bold block text-[10px] uppercase">Email Anda</span>
                 <span className="font-semibold">{user.email}</span>
               </div>
-              {user.type === "buyer" && user.nim && (
+              {user.nim && (
                 <div>
                   <span className="text-muted-foreground font-bold block text-[10px] uppercase">NIM Anda</span>
                   <span className="font-mono font-semibold text-brand-orange">{user.nim}</span>

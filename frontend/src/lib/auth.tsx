@@ -10,6 +10,8 @@ export interface AdminUser {
   email: string;
   id?: number;
   is_google?: boolean;
+  is_filkom_verified?: number;
+  nim?: string;
 }
 
 export interface BuyerUser {

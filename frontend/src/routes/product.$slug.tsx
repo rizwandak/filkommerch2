@@ -339,7 +339,7 @@ function ProductDetailPage() {
   // Dynamic Price computation
   const currentPrice = useMemo(() => {
     if (!product) return 0;
-    const isUb = user?.type === "buyer" && user.is_filkom_verified === 1;
+    const isUb = user?.is_filkom_verified === 1;
 
     if (product.promo_price && Number(product.promo_price) > 0) {
       return Number(product.promo_price);
@@ -648,7 +648,7 @@ function ProductDetailPage() {
                         <span className="inline-block mt-1 px-2 py-1 text-[10px] font-bold bg-blue-100 text-blue-900 rounded">
                           {user.type === "admin" ? "ADMIN" : "BUYER"}
                         </span>
-                        {user.type === "buyer" && (
+                        {user && (
                           <div className="mt-1.5">
                             {user.is_filkom_verified === 1 ? (
                               <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-green-100 text-green-800 rounded">
@@ -688,7 +688,7 @@ function ProductDetailPage() {
                           Kasir / POS
                         </Link>
                       )}
-                      {user.type === "buyer" && (
+                      {user && (
                         <Link
                           to="/orders"
                           className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold animate-fade-in"
@@ -831,14 +831,14 @@ function ProductDetailPage() {
                 )}
               </div>
 
-              {user?.type === "buyer" && user.is_filkom_verified === 1 ? (
+              {user?.is_filkom_verified === 1 ? (
                 <div className="mt-2 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded px-2.5 py-1.5 w-fit flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
                   🎉 Harga Khusus Civitas FILKOM Aktif!
                 </div>
               ) : product.filkom_price && Number(product.filkom_price) > 0 ? (
                 <div className="mt-2 text-xs font-medium text-muted-foreground bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 w-fit">
-                  {user?.type === "buyer" && user.is_google && user.email.endsWith("ub.ac.id") ? (
+                  {user ? (
                     <span>
                       💡{" "}
                       <button
@@ -852,7 +852,7 @@ function ProductDetailPage() {
                     </span>
                   ) : (
                     <span>
-                      💡 Login dengan akun Google UB & verifikasi NIM untuk mendapatkan harga khusus FILKOM Rp{" "}
+                      💡 Login & verifikasi NIM untuk mendapatkan harga khusus FILKOM Rp{" "}
                       {Number(product.filkom_price).toLocaleString("id-ID")}
                     </span>
                   )}

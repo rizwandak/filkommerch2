@@ -6,6 +6,18 @@ const API_URL =
 export function resolveImageUrl(url: string | undefined): string {
   if (!url) return "";
 
+  // If we are currently running locally in the browser, keep using localhost directly.
+  // This ensures local desktop development works without ngrok browser warning pages.
+  if (typeof window !== "undefined") {
+    const currentHost = window.location.hostname;
+    if (currentHost === "localhost" || currentHost === "127.0.0.1") {
+      if (url.startsWith("/uploads")) {
+        return `http://localhost:8080${url}`;
+      }
+      return url;
+    }
+  }
+
   // If it is a local asset import or browser-generated URL (blob/data URL)
   if (
     url.startsWith("data:") ||
