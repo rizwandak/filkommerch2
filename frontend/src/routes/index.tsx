@@ -52,6 +52,8 @@ import pTote from "@/assets/p-tote.jpg";
 import pCap from "@/assets/p-cap.jpg";
 import pTee2 from "@/assets/p-tee2.jpg";
 import about from "@/assets/about.jpg";
+import varsityEdutech from "@/assets/varsityedutech.png";
+import workJacket from "@/assets/workjacket.png";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
@@ -368,7 +370,7 @@ function HeroCarousel({ images }: HeroCarouselProps) {
     return () => clearInterval(interval);
   }, [api]);
 
-  const slideImages = images && images.length > 0 ? images : [hero, pVarsity, pHoodie];
+  const slideImages = images && images.length > 0 ? images : [varsityEdutech, workJacket];
 
   return (
     <div className="w-full h-full relative group">

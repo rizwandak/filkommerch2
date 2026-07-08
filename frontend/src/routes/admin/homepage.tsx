@@ -39,6 +39,8 @@ import { ImageCropperModal } from "@frontend/components/admin/ImageCropperModal"
 import hero from "@/assets/hero.jpg";
 import pVarsity from "@/assets/p-varsity.jpg";
 import pHoodie from "@/assets/p-hoodie.jpg";
+import varsityEdutech from "@/assets/varsityedutech.png";
+import workJacket from "@/assets/workjacket.png";
 
 
 // Drag and drop imports
@@ -1770,7 +1772,7 @@ function AdminHomepageEditorPage() {
                                     <div className="col-span-4 bg-brand-blue/15 aspect-[5/6] rounded border border-ink/10 flex flex-col justify-center items-center overflow-hidden h-full relative group">
                                       {(() => {
                                         const uploadedImages = el.config.images || (el.config.image ? [el.config.image] : []);
-                                        const previewImages = uploadedImages.length > 0 ? uploadedImages : [hero, pVarsity, pHoodie];
+                                        const previewImages = uploadedImages.length > 0 ? uploadedImages : [varsityEdutech, workJacket];
                                         if (previewImages.length > 0) {
                                           return (
                                             <>
