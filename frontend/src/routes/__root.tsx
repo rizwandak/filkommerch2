@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 import {
   Outlet,
   Link,
@@ -6,8 +6,10 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  useLocation,
 } from "@tanstack/react-router";
 import { useEffect, type ReactNode } from "react";
+import { getStoreSettings } from "../backend/server-actions";
 
 import appCss from "../styles.css?url";
 import logoFm from "../assets/logo-fm.jpg";
@@ -126,6 +128,78 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+const getMarqueeText = (settings: any) => {
+  const defaultText = "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN | 100% PRODUK MAHASISWA | CASHBACK 5% MEMBER | DROP BARU TIAP BULAN";
+  if (!settings || !settings.homepage_layout) return defaultText;
+  try {
+    const parsed = JSON.parse(settings.homepage_layout);
+    if (Array.isArray(parsed)) {
+      // segment-based layout
+      for (const segment of parsed) {
+        if (segment.elements) {
+          const marqueeEl = segment.elements.find((e: any) => e.type === "marquee");
+          if (marqueeEl && marqueeEl.config?.text) {
+            return marqueeEl.config.text;
+          }
+        }
+      }
+    } else if (parsed.marqueeText) {
+      return parsed.marqueeText;
+    }
+  } catch (e) {
+    console.error("Error parsing homepage layout in root:", e);
+  }
+  return defaultText;
+};
+
+function GlobalLayout() {
+  const { data } = useQuery({
+    queryKey: ["storeSettings"],
+    queryFn: () => getStoreSettings(),
+  });
+
+  const location = useLocation();
+  const isAdminOrCashier = location.pathname.startsWith("/admin") || location.pathname.startsWith("/pos");
+
+  const settings = data?.settings || null;
+  const marqueeText = getMarqueeText(settings);
+
+  if (isAdminOrCashier) {
+    return (
+      <div className="min-h-screen flex flex-col bg-background text-foreground">
+        <div className="flex-1 flex flex-col min-w-0">
+          <Outlet />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen flex flex-col pt-10 sm:pt-11 bg-background text-foreground selection:bg-brand-orange selection:text-cream has-global-marquee">
+      {/* Announcement marquee fixed at the top */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-ink text-cream overflow-hidden border-b border-ink h-10 sm:h-11 flex items-center shadow-sm">
+        <div className="flex marquee-track whitespace-nowrap text-[10px] sm:text-xs tracking-[0.2em] font-bold h-full items-center">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="flex shrink-0 items-center gap-10 px-5">
+              {marqueeText.split("|").map((t: string, idx: number) => (
+                <span key={idx} className="flex items-center gap-10">
+                  {t.trim().toUpperCase()}
+                  <span className="text-brand-orange">✦</span>
+                </span>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Nested routes render here */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <Outlet />
+      </div>
+    </div>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
@@ -141,7 +215,7 @@ function RootComponent() {
         <QueryClientProvider client={queryClient}>
           <SplashScreen />
           {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-          <Outlet />
+          <GlobalLayout />
           <Toaster position="top-center" />
         </QueryClientProvider>
       </AuthProvider>

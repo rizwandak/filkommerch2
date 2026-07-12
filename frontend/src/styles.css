@@ -275,3 +275,12 @@
 .animate-splash-fade-up {
   animation: fade-up 1s ease-out 0.8s both;
 }
+
+.has-global-marquee header.sticky {
+  top: 40px !important;
+}
+@media (min-width: 640px) {
+  .has-global-marquee header.sticky {
+    top: 44px !important;
+  }
+}

@@ -192,6 +192,7 @@ export interface Order {
   transaction_status: string;
   midtrans_transaction_id: string | null;
   snap_token: string | null;
+  payment_proof_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -315,6 +316,7 @@ export interface StoreSettings {
   tax_rate: number;
   qris_static_url: string | null;
   homepage_layout?: string | null;
+  payment_mode?: "midtrans" | "manual_qris" | null;
 }
 
 export interface CreateProductInput {
@@ -773,6 +775,7 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
       tax_rate?: number;
       qris_static_url?: string;
       homepage_layout?: string;
+      payment_mode?: "midtrans" | "manual_qris";
     }) => d,
   )
   .handler(async ({ data: input }) => {
@@ -1145,3 +1148,25 @@ export const getActivityLogs = createServerFn({ method: "GET" }).handler(
     }
   },
 );
+
+// Submit payment proof
+export const submitPaymentProof = createServerFn({ method: "POST" })
+  .validator((d: { orderId: string; paymentProofUrl: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/orders/${input.orderId}/payment-proof`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paymentProofUrl: input.paymentProofUrl }),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error submitting payment proof:", error);
+      return { success: false, error: error.message || "Failed to submit payment proof" };
+    }
+  });
+

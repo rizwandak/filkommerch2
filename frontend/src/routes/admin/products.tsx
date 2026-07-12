@@ -112,7 +112,7 @@ const formatDateForInput = (dateVal: any) => {
 
 function AdminProductsPage() {
   const { user } = useAuth();
-  const isCashier = user?.role === "cashier";
+  const isCashier = user?.type === "admin" && user.role === "cashier";
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);

@@ -317,7 +317,7 @@ function SortableSegmentItem({
 
 function AdminHomepageEditorPage() {
   const { user } = useAuth();
-  const isCashier = user?.role === "cashier";
+  const isCashier = (user as any)?.role === "cashier";
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [segments, setSegments] = useState<HomepageSegment[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
@@ -2326,39 +2326,112 @@ function AdminHomepageEditorPage() {
                                 )}
 
                                 {/* LIMITED DROP PREVIEW */}
-                                {el.type === "limited_drop" && (
-                                  <div className="p-3 bg-ink text-cream grid grid-cols-12 gap-2 items-center">
-                                    <div className="col-span-8 space-y-1">
-                                      <div className="bg-brand-orange text-ink font-mono font-bold text-[4.5px] px-1 py-0.2 rounded w-fit uppercase">
-                                        LIMITED PRE-ORDER
-                                      </div>
-                                      <h4 className="display text-[9px] text-cream font-bold truncate leading-tight mt-0.5">
-                                        {el.config.title}
-                                      </h4>
-                                      <p className="text-[5.5px] text-cream/70 line-clamp-1 leading-tight">
-                                        {el.config.subtitle}
-                                      </p>
-                                      <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden mt-1">
-                                        <div
-                                          className="bg-brand-orange h-full"
-                                          style={{
-                                            width: `${(el.config.stockCurrent / el.config.stockMax) * 100}%`,
-                                          }}
-                                        />
-                                      </div>
-                                      <div className="text-[5px] text-cream/40 font-mono">
-                                        Stok: {el.config.stockCurrent}/{el.config.stockMax} pcs
-                                      </div>
-                                    </div>
-                                    <div className="col-span-4 bg-white/5 aspect-[4/5] rounded border border-white/10 flex items-center justify-center overflow-hidden h-full">
-                                      {el.config.image ? (
-                                        <img src={el.config.image} className="w-full h-full object-cover" alt="" />
-                                      ) : (
-                                        <span className="text-[5px] text-cream/40 font-mono">Product</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
+                                 {el.type === "limited_drop" && (
+                                   <div className="p-3 bg-ink text-cream grid grid-cols-12 gap-2 items-center">
+                                     <div className="col-span-8 space-y-1">
+                                       <div className="bg-brand-orange text-ink font-mono font-bold text-[4.5px] px-1 py-0.2 rounded w-fit uppercase">
+                                         LIMITED PRE-ORDER
+                                       </div>
+                                       <h4 className="display text-[9px] text-cream font-bold truncate leading-tight mt-0.5">
+                                         {el.config.title}
+                                       </h4>
+                                       <p className="text-[5.5px] text-cream/70 line-clamp-1 leading-tight">
+                                         {el.config.subtitle}
+                                       </p>
+                                       <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden mt-1">
+                                         <div
+                                           className="bg-brand-orange h-full"
+                                           style={{
+                                             width: `${(el.config.stockCurrent / el.config.stockMax) * 100}%`,
+                                           }}
+                                         />
+                                       </div>
+                                       <div className="text-[5px] text-cream/40 font-mono">
+                                         Stok: {el.config.stockCurrent}/{el.config.stockMax} pcs
+                                       </div>
+                                     </div>
+                                     <div className="col-span-4 bg-white/5 aspect-[4/5] rounded border border-white/10 flex items-center justify-center overflow-hidden h-full">
+                                       {el.config.image ? (
+                                         <img src={el.config.image} className="w-full h-full object-cover" alt="" />
+                                       ) : (
+                                         <span className="text-[5px] text-cream/40 font-mono">Product</span>
+                                       )}
+                                     </div>
+                                   </div>
+                                 )}
+
+                                 {/* BUNDLE RECOMMENDATION PREVIEW */}
+                                 {el.type === "bundle_recommendation" && (
+                                   <div className="p-3 bg-cream border border-ink/20 rounded space-y-1">
+                                     <div className="text-[5px] tracking-[0.2em] text-brand-orange font-bold uppercase">
+                                       {el.config.subtitle || "PROMO BUNDLE"}
+                                     </div>
+                                     <h4 className="display text-[9px] text-ink font-bold uppercase truncate">
+                                       {el.config.title || "Rekomendasi Bundling"}
+                                     </h4>
+                                     <div className="grid grid-cols-2 gap-1.5 mt-2">
+                                       {(el.config.items || []).slice(0, 2).map((bundle: any, bIdx: number) => (
+                                         <div key={bIdx} className="bg-background border border-ink p-1.5 rounded space-y-1">
+                                           <div className="flex justify-between items-center text-[5.5px]">
+                                             <span className="font-bold truncate max-w-[70%]">{bundle.name}</span>
+                                             <span className="text-brand-orange font-mono font-bold">{bundle.price}</span>
+                                           </div>
+                                           <p className="text-[4.5px] text-muted-foreground line-clamp-1">{bundle.description}</p>
+                                         </div>
+                                       ))}
+                                     </div>
+                                   </div>
+                                 )}
+
+                                 {/* GALLERY PREVIEW */}
+                                 {el.type === "gallery" && (
+                                   <div className="p-3 bg-background border border-ink/20 rounded space-y-1">
+                                     <div className="text-[5px] tracking-[0.2em] text-brand-orange font-bold uppercase">
+                                       {el.config.subtitle || "CAMPUS LOGBOOK"}
+                                     </div>
+                                     <h4 className="display text-[9px] text-ink font-bold uppercase truncate">
+                                       {el.config.title || "Lifestyle Gallery"}
+                                     </h4>
+                                     <div className="grid grid-cols-4 gap-1 mt-2">
+                                       {(el.config.items || []).slice(0, 4).map((photo: any, gIdx: number) => (
+                                         <div key={gIdx} className="aspect-[4/5] bg-cream border border-ink rounded overflow-hidden relative">
+                                           {photo.image ? (
+                                             <img src={photo.image} className="w-full h-full object-cover" alt="" />
+                                           ) : (
+                                             <div className="w-full h-full bg-neutral-200 flex items-center justify-center text-[4px] text-muted-foreground font-mono truncate">Look</div>
+                                           )}
+                                         </div>
+                                       ))}
+                                     </div>
+                                   </div>
+                                 )}
+
+                                 {/* TESTIMONIAL PREVIEW */}
+                                 {el.type === "testimonial" && (
+                                   <div className="p-3 bg-cream border border-ink/20 rounded space-y-1">
+                                     <div className="text-[5px] tracking-[0.2em] text-brand-orange font-bold uppercase">
+                                       {el.config.subtitle || "CAMPUS VOICES"}
+                                     </div>
+                                     <h4 className="display text-[9px] text-ink font-bold uppercase truncate">
+                                       {el.config.title || "Testimonials"}
+                                     </h4>
+                                     <div className="grid grid-cols-2 gap-1.5 mt-2">
+                                       {(el.config.items || []).slice(0, 2).map((t: any, tIdx: number) => (
+                                         <div key={tIdx} className="bg-background border border-ink p-1.5 rounded space-y-1">
+                                           <div className="flex text-brand-orange text-[3px] gap-0.5">
+                                             <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
+                                           </div>
+                                           <p className="text-[5px] italic text-ink line-clamp-2 leading-tight">
+                                             "{t.content}"
+                                           </p>
+                                           <div className="text-[4px] font-mono text-muted-foreground pt-1 border-t border-neutral-100 truncate">
+                                             {t.name} ({t.role})
+                                           </div>
+                                         </div>
+                                       ))}
+                                     </div>
+                                   </div>
+                                 )}
                               </div>
                             );
                           })}

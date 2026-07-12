@@ -25,6 +25,9 @@ import {
   ChevronDown,
   LayoutDashboard,
   MonitorSmartphone,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn,
 } from "lucide-react";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useMemo, useState, useEffect, useCallback } from "react";
@@ -57,8 +60,12 @@ import workJacket from "@/assets/workjacket.png";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const { getProducts, getStoreSettings } = await import("@backend/server-actions");
-    const [productsRes, settingsRes] = await Promise.all([getProducts(), getStoreSettings()]);
+    const { getProducts, getStoreSettings, getCategories } = await import("@backend/server-actions");
+    const [productsRes, settingsRes, categoriesRes] = await Promise.all([
+      getProducts(),
+      getStoreSettings(),
+      getCategories(),
+    ]);
 
     const dbProducts = productsRes.products || [];
     const settings = settingsRes.settings || null;
@@ -98,10 +105,13 @@ export const Route = createFileRoute("/")({
         is_featured: product.is_featured,
         sale_type: product.sale_type,
         variants: product.variants || [],
+        description: product.description,
+        category_id: product.category_id,
+        category_slug: product.category_slug,
       };
     });
 
-    return { products: formattedProducts, settings };
+    return { products: formattedProducts, settings, categories: categoriesRes.categories || [] };
   },
   head: () => ({
     meta: [
@@ -152,6 +162,9 @@ type ProductCard = {
   is_featured?: boolean;
   sale_type?: string | null;
   variants?: any[];
+  description?: string | null;
+  category_id?: number;
+  category_slug?: string | null;
 };
 
 const FALLBACK_PRODUCTS: ProductCard[] = [
@@ -247,6 +260,7 @@ type CartItem = {
   variant_id?: number;
   size?: string;
   color?: string;
+  image_url?: string;
 };
 
 function parsePrice(p: string) {
@@ -344,6 +358,7 @@ function HeroCarousel({ images }: HeroCarouselProps) {
   const [api, setApi] = useState<CarouselApi>();
   const [current, setCurrent] = useState(0);
   const [count, setCount] = useState(0);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   useEffect(() => {
     if (!api) return;
@@ -356,7 +371,7 @@ function HeroCarousel({ images }: HeroCarouselProps) {
     });
   }, [api]);
 
-  // Autoplay
+  // Autoplay (Changed from 4000ms to 7000ms for 7 seconds slide intervals)
   useEffect(() => {
     if (!api) return;
     const interval = setInterval(() => {
@@ -365,12 +380,30 @@ function HeroCarousel({ images }: HeroCarouselProps) {
       } else {
         api.scrollTo(0);
       }
-    }, 4000);
+    }, 7000);
 
     return () => clearInterval(interval);
   }, [api]);
 
   const slideImages = images && images.length > 0 ? images : [varsityEdutech, workJacket];
+
+  // Keyboard navigation for image preview lightbox
+  useEffect(() => {
+    if (previewIndex === null) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setPreviewIndex(null);
+      } else if (e.key === "ArrowLeft") {
+        setPreviewIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : slideImages.length - 1));
+      } else if (e.key === "ArrowRight") {
+        setPreviewIndex((prev) => (prev !== null && prev < slideImages.length - 1 ? prev + 1 : 0));
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [previewIndex, slideImages.length]);
 
   return (
     <div className="w-full h-full relative group">
@@ -378,11 +411,22 @@ function HeroCarousel({ images }: HeroCarouselProps) {
         <CarouselContent className="h-full -ml-0">
           {slideImages.map((imgUrl, index) => (
             <CarouselItem key={index} className="h-full pl-0 relative">
-              <img
-                src={resolveImageUrl(imgUrl)}
-                alt={`Filkom Merch Hero Lookbook Slide ${index + 1}`}
-                className="w-full h-full object-cover transition-transform duration-[15000ms] ease-out hover:scale-105"
-              />
+              <div 
+                className="w-full h-full relative overflow-hidden group/slide cursor-zoom-in"
+                onClick={() => setPreviewIndex(index)}
+              >
+                <img
+                  src={resolveImageUrl(imgUrl)}
+                  alt={`Filkom Merch Hero Lookbook Slide ${index + 1}`}
+                  className="w-full h-full object-cover transition-transform duration-[15000ms] ease-out hover:scale-105"
+                />
+                {/* Subtle Hover Zoom-in overlay */}
+                <div className="absolute inset-0 bg-ink/10 opacity-0 group-hover/slide:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                  <div className="bg-background/90 text-ink p-3 rounded-full shadow-lg transform scale-90 group-hover/slide:scale-100 transition-all duration-300 border-2 border-ink">
+                    <ZoomIn className="w-5 h-5" />
+                  </div>
+                </div>
+              </div>
             </CarouselItem>
           ))}
         </CarouselContent>
@@ -403,6 +447,67 @@ function HeroCarousel({ images }: HeroCarouselProps) {
               aria-label={`Buka slide ${index + 1}`}
             />
           ))}
+        </div>
+      )}
+
+      {/* Fullscreen Lightbox Preview Modal */}
+      {previewIndex !== null && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/90 backdrop-blur-md transition-opacity duration-300 animate-fade-in"
+          onClick={() => setPreviewIndex(null)}
+        >
+          {/* Close button */}
+          <button 
+            onClick={() => setPreviewIndex(null)}
+            className="absolute top-6 right-6 text-cream/70 hover:text-cream transition-colors p-2 hover:bg-cream/10 rounded-full cursor-pointer z-[101]"
+            aria-label="Close preview"
+          >
+            <X className="w-8 h-8" />
+          </button>
+
+          {/* Left Arrow Navigation */}
+          {slideImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreviewIndex((prev) => (prev !== null && prev > 0 ? prev - 1 : slideImages.length - 1));
+              }}
+              className="absolute left-4 sm:left-8 top-1/2 -translate-y-1/2 bg-cream/10 hover:bg-cream/20 text-cream p-3 rounded-full transition-all cursor-pointer z-[101]"
+              aria-label="Previous image"
+            >
+              <ChevronLeft className="w-6 h-6 sm:w-8 sm:h-8" />
+            </button>
+          )}
+
+          {/* Right Arrow Navigation */}
+          {slideImages.length > 1 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setPreviewIndex((prev) => (prev !== null && prev < slideImages.length - 1 ? prev + 1 : 0));
+              }}
+              className="absolute right-4 sm:right-8 top-1/2 -translate-y-1/2 bg-cream/10 hover:bg-cream/20 text-cream p-3 rounded-full transition-all cursor-pointer z-[101]"
+              aria-label="Next image"
+            >
+              <ChevronRight className="w-6 h-6 sm:w-8 sm:h-8" />
+            </button>
+          )}
+
+          {/* Main preview container */}
+          <div 
+            className="relative max-w-[90vw] max-h-[80vh] sm:max-h-[85vh] flex flex-col items-center justify-center animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={resolveImageUrl(slideImages[previewIndex])}
+              alt={`Filkom Merch Lookbook Slide Preview ${previewIndex + 1}`}
+              className="max-w-full max-h-[80vh] sm:max-h-[85vh] object-contain rounded-lg border-2 border-cream/20 shadow-2xl"
+            />
+            {/* Slide Index indicator */}
+            <div className="mt-4 text-center text-cream/70 text-xs font-semibold font-mono uppercase tracking-widest bg-ink/50 px-3 py-1 rounded-full border border-cream/10">
+              Slide {previewIndex + 1} / {slideImages.length}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -478,7 +583,7 @@ function Index() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [email, setEmail] = useState("");
-  const { products: loaderProducts, settings } = Route.useLoaderData();
+  const { products: loaderProducts, settings, categories } = Route.useLoaderData();
   const dbProducts = loaderProducts;
 
   // Merge database layout configuration with default segments list
@@ -556,12 +661,34 @@ function Index() {
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
   const cartTotal = cart.reduce((s, i) => s + parsePrice(i.price) * i.qty, 0);
 
+  const getCategoryImages = (catId: number, products: any[]): string[] => {
+    const imgs: string[] = [];
+    products.forEach((p) => {
+      if (p.category_id === catId && p.img) {
+        if (!imgs.includes(p.img)) {
+          imgs.push(p.img);
+        }
+      }
+    });
+    return imgs.slice(0, 3);
+  };
+
+  const getCategoryDesc = (slug: string) => {
+    const descs: Record<string, string> = {
+      jacket: "Varsity & Coach Jackets",
+      hoodie: "Premium Ngoding Sweaters",
+      tee: "Oversized Cotton Combed",
+      accessories: "Caps, Totebags, & More",
+    };
+    return descs[slug.toLowerCase()] || "Premium merchandise collection";
+  };
+
   // Dynamic products count for categories
   const categoryCounts = useMemo(() => {
-    const counts = { JACKET: 0, HOODIE: 0, TEE: 0, ACCESSORIES: 0 };
+    const counts: Record<number, number> = {};
     products.forEach((p) => {
-      if (p.cat in counts) {
-        counts[p.cat as keyof typeof counts] += 1;
+      if (p.category_id) {
+        counts[p.category_id] = (counts[p.category_id] || 0) + 1;
       }
     });
     return counts;
@@ -735,22 +862,6 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-brand-orange selection:text-cream">
-      {/* Announcement marquee */}
-      <div className="bg-ink text-cream py-2.5 overflow-hidden border-b border-ink">
-        <div className="flex marquee-track whitespace-nowrap text-[10px] sm:text-xs tracking-[0.2em] font-bold">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="flex shrink-0 items-center gap-10 px-5">
-              {layout.marqueeText.split("|").map((t: string) => (
-                <span key={t} className="flex items-center gap-10">
-                  {t.trim().toUpperCase()}
-                  <span className="text-brand-orange">✦</span>
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 flex items-center justify-between h-16 sm:h-20">
@@ -995,19 +1106,8 @@ function Index() {
                           {/* Social Proof Star Ratings & Badge */}
                           <div className="flex flex-wrap items-center gap-3 mb-4 sm:mb-6">
                             <span className="text-[9px] bg-ink text-cream font-extrabold px-2.5 py-1 rounded tracking-wider uppercase flex items-center gap-1.5 shadow-sm">
-                              <Check className="w-3 h-3 text-brand-orange" /> Official Merchandise
+                              <Check className="w-3 h-3 text-brand-orange" /> Official Merchandise FILKOM
                             </span>
-
-                            <div className="flex items-center gap-2">
-                              <div className="flex text-amber-500">
-                                {Array.from({ length: 5 }).map((_, i) => (
-                                  <Star key={i} className="w-3 h-3 fill-current" />
-                                ))}
-                              </div>
-                              <span className="text-[10px] tracking-widest text-ink font-bold">
-                                4.9 ★ (1,200+ Mahasiswa)
-                              </span>
-                            </div>
                           </div>
 
                           {/* Sub label */}
@@ -1036,7 +1136,7 @@ function Index() {
                             <div className="mt-6 sm:mt-8 bg-secondary border-2 border-ink p-4 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] w-fit flex flex-col gap-2">
                               <div className="text-[9px] sm:text-[10px] font-extrabold tracking-widest text-brand-orange uppercase flex items-center gap-1.5 animate-pulse">
                                 <span className="w-2 h-2 rounded-full bg-red-500" />
-                                PRE-ORDER BATCH BERAKHIR DALAM:
+                                {el.config.countdownLabel || "PRE-ORDER BATCH BERAKHIR DALAM:"}
                               </div>
                               <CountdownTimer targetDate={el.config.countdownEnd} />
                             </div>
@@ -1060,12 +1160,21 @@ function Index() {
                             >
                               {el.config.btnText} <ArrowRight className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => scrollToId("shop")}
-                              className="inline-flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] border-2 border-ink text-ink hover:bg-ink hover:text-cream transition-all duration-300 active:translate-y-0.5 cursor-pointer uppercase"
-                            >
-                              LOOKBOOK
-                            </button>
+                            {el.config.showLookbookBtn !== false && (
+                              <button
+                                onClick={() => {
+                                  const link = el.config.lookbookBtnLink || "#shop";
+                                  if (link.startsWith("/#") || link.startsWith("#")) {
+                                    scrollToId(link.replace("/#", "").replace("#", ""));
+                                  } else {
+                                    navigate({ to: link });
+                                  }
+                                }}
+                                className="inline-flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] border-2 border-ink text-ink hover:bg-ink hover:text-cream transition-all duration-300 active:translate-y-0.5 cursor-pointer uppercase"
+                              >
+                                {el.config.lookbookBtnText || "LOOKBOOK"}
+                              </button>
+                            )}
                           </div>
                         </div>
 
@@ -1115,17 +1224,15 @@ function Index() {
                   return (
                     <section key={el.id} className="bg-background py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
                       <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
-                        <div className="flex flex-col md:flex-row md:items-end justify-between mb-10 sm:mb-12 gap-4">
-                          <div>
-                            {el.config.subtitle && (
-                              <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
-                                {el.config.subtitle}
-                              </div>
-                            )}
-                            <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-ink font-bold uppercase">
-                              {el.config.title}
-                            </h2>
-                          </div>
+                        <div className="flex flex-col items-center text-center mb-10 sm:mb-12 gap-2">
+                          {el.config.subtitle && (
+                            <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
+                              {el.config.subtitle}
+                            </div>
+                          )}
+                          <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-ink font-bold uppercase">
+                            {el.config.title}
+                          </h2>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
@@ -1159,10 +1266,15 @@ function Index() {
                                   params={{ slug: p.id }}
                                   className="hover:text-brand-orange transition-colors"
                                 >
-                                  <h3 className="text-base font-bold text-ink leading-snug tracking-wide line-clamp-1 mb-2">
+                                  <h3 className="text-base font-bold text-ink leading-snug tracking-wide line-clamp-1 mb-1">
                                     {p.name}
                                   </h3>
                                 </Link>
+                                {p.description && (
+                                  <p className="text-xs text-muted-foreground line-clamp-2 mb-3 leading-relaxed">
+                                    {p.description}
+                                  </p>
+                                )}
                                 <div className="flex items-baseline gap-2 mt-auto">
                                   <span className="text-base font-extrabold text-ink">{p.price}</span>
                                   {p.was && (
@@ -1196,66 +1308,83 @@ function Index() {
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          {[
-                            {
-                              name: "JACKETS",
-                              desc: "Varsity & Coach Jackets",
-                              count: `${categoryCounts.JACKET} items`,
-                              img: pVarsity,
-                              filterVal: "JACKET" as const,
-                            },
-                            {
-                              name: "HOODIES",
-                              desc: "Premium Fleece Sweaters",
-                              count: `${categoryCounts.HOODIE} items`,
-                              img: pHoodie,
-                              filterVal: "HOODIE" as const,
-                            },
-                            {
-                              name: "TEES",
-                              desc: "Oversized Cotton Combed",
-                              count: `${categoryCounts.TEE} items`,
-                              img: pTee2,
-                              filterVal: "TEE" as const,
-                            },
-                            {
-                              name: "ACCESSORIES",
-                              desc: "Caps, Totebags, & More",
-                              count: `${categoryCounts.ACCESSORIES} items`,
-                              img: pCap,
-                              filterVal: "ACCESSORIES" as const,
-                            },
-                          ].map((cat) => (
-                            <button
-                              key={cat.name}
-                              onClick={() => {
-                                setFilter(cat.filterVal);
-                                scrollToId("shop");
-                              }}
-                              className="group text-left border-2 border-ink rounded-lg bg-background p-4 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-4px] transition-all duration-300 flex flex-col h-full cursor-pointer"
-                            >
-                              <div className="aspect-square bg-muted rounded overflow-hidden mb-4 border border-ink/10 shrink-0">
-                                <img
-                                  src={cat.img}
-                                  alt={cat.name}
-                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-102"
-                                />
-                              </div>
-                              <div className="flex-1 flex flex-col justify-between">
-                                <div>
-                                  <h3 className="font-extrabold text-base tracking-wide text-ink mb-1 group-hover:text-brand-orange transition-colors">
-                                    {cat.name}
-                                  </h3>
-                                  <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
-                                    {cat.desc}
-                                  </p>
+                          {(categories || []).map((cat) => {
+                            const count = categoryCounts[cat.id] || 0;
+                            const desc = getCategoryDesc(cat.slug);
+                            const imgs = getCategoryImages(cat.id, products);
+                            return (
+                              <Link
+                                key={cat.id}
+                                to="/products"
+                                search={{ category: String(cat.id) }}
+                                className="group text-left border-2 border-ink rounded-lg bg-background p-4 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-4px] transition-all duration-300 flex flex-col h-full cursor-pointer overflow-visible"
+                              >
+                                <div className="relative aspect-square w-full mb-6 shrink-0 overflow-visible flex items-center justify-center pt-2">
+                                  {imgs.length === 0 ? (
+                                    <div className="w-[90%] h-[90%] bg-muted rounded overflow-hidden border border-ink/10 shadow-sm">
+                                      <img
+                                        src={resolveImageUrl(pVarsity)}
+                                        alt={cat.name}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                  ) : imgs.length === 1 ? (
+                                    <div className="w-[90%] h-[90%] bg-muted rounded overflow-hidden border-2 border-ink shadow-sm transition-transform duration-500 group-hover:scale-105">
+                                      <img
+                                        src={resolveImageUrl(imgs[0])}
+                                        alt={cat.name}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                  ) : (
+                                    <div className="relative w-[82%] h-[82%]">
+                                      {/* Third Image (Backmost) */}
+                                      {imgs[2] && (
+                                        <div className="absolute inset-0 bg-muted rounded overflow-hidden border border-ink/20 shadow-sm rotate-[8deg] translate-x-3.5 translate-y-0.5 transition-all duration-500 group-hover:rotate-[15deg] group-hover:translate-x-5 group-hover:translate-y-1 origin-bottom">
+                                          <img
+                                            src={resolveImageUrl(imgs[2])}
+                                            alt=""
+                                            className="w-full h-full object-cover"
+                                          />
+                                        </div>
+                                      )}
+                                      {/* Second Image (Middle) */}
+                                      {imgs[1] && (
+                                        <div className="absolute inset-0 bg-muted rounded overflow-hidden border border-ink/20 shadow-sm -rotate-[6deg] -translate-x-2.5 translate-y-0.5 transition-all duration-500 group-hover:-rotate-[12deg] group-hover:-translate-x-4 group-hover:translate-y-1 origin-bottom">
+                                          <img
+                                            src={resolveImageUrl(imgs[1])}
+                                            alt=""
+                                            className="w-full h-full object-cover"
+                                          />
+                                        </div>
+                                      )}
+                                      {/* First Image (Frontmost) */}
+                                      <div className="absolute inset-0 bg-muted rounded overflow-hidden border-2 border-ink shadow-md transition-all duration-500 group-hover:scale-102 origin-bottom">
+                                        <img
+                                          src={resolveImageUrl(imgs[0])}
+                                          alt={cat.name}
+                                          className="w-full h-full object-cover"
+                                        />
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                                <span className="text-[10px] font-mono tracking-widest text-brand-orange font-bold mt-4 block uppercase">
-                                  {cat.count}
-                                </span>
-                              </div>
-                            </button>
-                          ))}
+                                <div className="flex-1 flex flex-col justify-between">
+                                  <div>
+                                    <h3 className="font-extrabold text-base tracking-wide text-ink mb-1 group-hover:text-brand-orange transition-colors uppercase">
+                                      {cat.name}
+                                    </h3>
+                                    <p className="text-[11px] text-muted-foreground leading-snug line-clamp-2">
+                                      {desc}
+                                    </p>
+                                  </div>
+                                  <span className="text-[10px] font-mono tracking-widest text-brand-orange font-bold mt-4 block uppercase">
+                                    {count} items
+                                  </span>
+                                </div>
+                              </Link>
+                            );
+                          })}
                         </div>
                       </div>
                     </section>
@@ -1631,41 +1760,6 @@ function Index() {
             })}
           </div>
         ))}
-
-      {/* 9. Newsletter Section */}
-      <section className="bg-ink text-cream border-b-2 border-ink">
-        <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-16 sm:py-20 grid lg:grid-cols-2 gap-10 items-center">
-          <h2 className="display text-2xl sm:text-4xl lg:text-5xl leading-none font-bold uppercase">
-            Jangan ketinggalan
-            <br />
-            <span className="text-brand-orange">drop berikutnya.</span>
-          </h2>
-          <form className="flex flex-col gap-3" onSubmit={handleSubscribe}>
-            <label className="text-xs tracking-[0.3em] text-cream/70 font-bold">
-              EMAIL MAHASISWA
-            </label>
-            <div className="flex border-b border-cream/40 pb-3">
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@student.ub.ac.id"
-                className="flex-1 bg-transparent outline-none placeholder:text-cream/45 text-cream text-sm"
-              />
-              <button
-                type="submit"
-                className="text-xs font-bold tracking-[0.2em] text-brand-orange hover:text-cream transition-colors cursor-pointer"
-              >
-                SUBSCRIBE →
-              </button>
-            </div>
-            <p className="text-[11px] text-cream/50 mt-1">
-              Dapatkan info drop pertama di WhatsApp + kupon diskon 5% Verified Member.
-            </p>
-          </form>
-        </div>
-      </section>
 
       {/* Trust Indicators Row before Footer */}
       <section className="bg-cream py-6 border-b-2 border-ink shadow-sm">

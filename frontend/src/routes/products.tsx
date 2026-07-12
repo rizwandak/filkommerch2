@@ -84,6 +84,7 @@ type CartItem = {
   variant_id?: number;
   size?: string;
   color?: string;
+  image_url?: string;
 };
 
 function ProductsCatalogPage() {
@@ -338,29 +339,6 @@ function ProductsCatalogPage() {
 
   return (
     <div className="min-h-screen bg-[#FCFAF7] text-ink font-sans">
-      {/* Announcement marquee */}
-      <div className="bg-ink text-cream py-2 overflow-hidden border-b border-ink">
-        <div className="flex marquee-track whitespace-nowrap text-xs tracking-[0.2em] font-medium">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="flex shrink-0 items-center gap-10 px-5">
-              {[
-                "OFFICIAL FILKOM UB MERCHANDISE",
-                "FREE ONGKIR KE FILKOM ★",
-                "PRE-ORDER VARSITY '25 OPEN",
-                "100% PRODUK MAHASISWA",
-                "CASHBACK 5% MEMBER",
-                "DROP BARU TIAP BULAN",
-              ].map((t: string) => (
-                <span key={t} className="flex items-center gap-10">
-                  {t}
-                  <span className="text-brand-orange">●</span>
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 flex items-center justify-between h-16 sm:h-20">

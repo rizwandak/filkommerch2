@@ -26,6 +26,7 @@ export interface CartItem {
   size?: string;
   variant_id?: number;
   category?: string;
+  image_url?: string;
   bundle_selections?: Array<{
     product_id: number;
     variant_id: number;
@@ -256,7 +257,7 @@ function CheckoutPage() {
       // Call server function untuk create order di database dan generate QRIS
       const result = await createOrderAndPayment({ data: transactionDetails });
 
-      if (!result.success || !result.token) {
+      if (!result.success) {
         throw new Error(result.error || "Failed to create payment");
       }
 
@@ -264,31 +265,37 @@ function CheckoutPage() {
       localStorage.removeItem("cart");
 
       // Trigger Midtrans Snap popup
-      if ((window as any).snap) {
-        (window as any).snap.pay(result.token, {
-          onSuccess: (snapResult: any) => {
-            toast.success("Pembayaran berhasil!");
-            void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
-          },
-          onPending: (snapResult: any) => {
-            toast.info("Pembayaran tertunda. Silakan selesaikan pembayaran Anda.");
-            void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
-          },
-          onError: (snapResult: any) => {
-            toast.error("Pembayaran gagal!");
-            setIsProcessing(false);
-          },
-          onClose: () => {
-            toast.warning("Anda menutup popup pembayaran sebelum menyelesaikan transaksi.");
-            void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
-          },
-        });
+      if (result.token) {
+        if ((window as any).snap) {
+          (window as any).snap.pay(result.token, {
+            onSuccess: (snapResult: any) => {
+              toast.success("Pembayaran berhasil!");
+              void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
+            },
+            onPending: (snapResult: any) => {
+              toast.info("Pembayaran tertunda. Silakan selesaikan pembayaran Anda.");
+              void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
+            },
+            onError: (snapResult: any) => {
+              toast.error("Pembayaran gagal!");
+              setIsProcessing(false);
+            },
+            onClose: () => {
+              toast.warning("Anda menutup popup pembayaran sebelum menyelesaikan transaksi.");
+              void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
+            },
+          });
+        } else {
+          // Fallback to QRIS screen if Snap fails to load
+          setQrUrl(result.qrUrl);
+          setCurrentStep(4);
+          toast.success("Pesanan berhasil dibuat! Silakan scan QRIS untuk membayar.");
+          setIsProcessing(false);
+        }
       } else {
-        // Fallback to QRIS screen if Snap fails to load
-        setQrUrl(result.qrUrl);
-        setCurrentStep(4);
-        toast.success("Pesanan berhasil dibuat! Silakan scan QRIS untuk membayar.");
-        setIsProcessing(false);
+        // Manual QRIS mode
+        toast.success("Pesanan berhasil dibuat! Silakan selesaikan pembayaran Anda.");
+        void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
       }
     } catch (error) {
       console.error("Payment error:", error);
@@ -554,6 +561,12 @@ function CheckoutPage() {
     </div>
     </div>
   );
+}
+
+interface CartReviewStepProps {
+  items: CartItem[];
+  onQuantityChange: (itemId: string, delta: number) => void;
+  onRemoveItem: (itemId: string) => void;
 }
 
 function CartReviewStep({ items, onQuantityChange, onRemoveItem }: CartReviewStepProps) {

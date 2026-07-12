@@ -38,6 +38,10 @@ export interface HeroBannerConfig {
   images?: string[];
   showCountdown: boolean;
   countdownEnd: string;
+  countdownLabel?: string;
+  showLookbookBtn?: boolean;
+  lookbookBtnText?: string;
+  lookbookBtnLink?: string;
 }
 
 export interface MarqueeConfig {
@@ -186,7 +190,11 @@ export function convertLegacyToSegments(legacy: any): HomepageSegment[] {
           image: legacyFlat.heroImage || "",
           images: legacyFlat.heroImages || (legacyFlat.heroImage ? [legacyFlat.heroImage] : []),
           showCountdown: legacyFlat.showHeroCountdown !== undefined ? legacyFlat.showHeroCountdown : true,
-          countdownEnd: legacyFlat.heroCountdownEnd || "2026-07-15T23:59:59+07:00"
+          countdownEnd: legacyFlat.heroCountdownEnd || "2026-07-15T23:59:59+07:00",
+          countdownLabel: legacyFlat.heroCountdownLabel || "PRE-ORDER BATCH BERAKHIR DALAM:",
+          showLookbookBtn: legacyFlat.showLookbookBtn !== undefined ? legacyFlat.showLookbookBtn : true,
+          lookbookBtnText: legacyFlat.lookbookBtnText || "LOOKBOOK",
+          lookbookBtnLink: legacyFlat.lookbookBtnLink || "#shop"
         }
       }
     ]
@@ -342,7 +350,11 @@ export function getDefaultSegments(): HomepageSegment[] {
             image: "",
             images: [],
             showCountdown: true,
-            countdownEnd: "2026-08-05T23:59:59+07:00"
+            countdownEnd: "2026-08-05T23:59:59+07:00",
+            countdownLabel: "PRE-ORDER BATCH BERAKHIR DALAM:",
+            showLookbookBtn: true,
+            lookbookBtnText: "LOOKBOOK",
+            lookbookBtnLink: "#shop"
           }
         }
       ]
@@ -644,6 +656,10 @@ export function extractLegacyConfigFromSegments(input: any): any {
     legacy.heroImages = hero.config?.images || [];
     legacy.showHeroCountdown = hero.config?.showCountdown;
     legacy.heroCountdownEnd = hero.config?.countdownEnd;
+    legacy.heroCountdownLabel = hero.config?.countdownLabel;
+    legacy.showLookbookBtn = hero.config?.showLookbookBtn;
+    legacy.lookbookBtnText = hero.config?.lookbookBtnText;
+    legacy.lookbookBtnLink = hero.config?.lookbookBtnLink;
   }
 
   const grid = allElements.find(e => e.type === "product_grid");

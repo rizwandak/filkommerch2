@@ -64,6 +64,7 @@ type CartItem = {
   variant_id?: number;
   size?: string;
   color?: string;
+  image_url?: string;
 };
 
 type ChatMessage = {
@@ -261,22 +262,6 @@ function FAQPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-brand-orange selection:text-cream flex flex-col">
-      {/* Announcement marquee */}
-      <div className="bg-ink text-cream py-2.5 overflow-hidden border-b border-ink shrink-0">
-        <div className="flex marquee-track whitespace-nowrap text-[10px] sm:text-xs tracking-[0.2em] font-bold">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="flex shrink-0 items-center gap-10 px-5">
-              {layout.marqueeText.split("|").map((t: string) => (
-                <span key={t} className="flex items-center gap-10">
-                  {t.trim().toUpperCase()}
-                  <span className="text-brand-orange">✦</span>
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-
       {/* Header */}
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink shrink-0">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 flex items-center justify-between h-16 sm:h-20">

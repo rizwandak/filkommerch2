@@ -12,7 +12,7 @@ import {
   ShoppingBag,
   GraduationCap,
 } from "lucide-react";
-import { useAuth } from "@/lib/auth";
+import { useAuth, type BuyerUser } from "@/lib/auth";
 import { authLogin, authGoogleLogin } from "@backend/server-actions";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";

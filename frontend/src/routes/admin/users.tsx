@@ -60,7 +60,7 @@ const emptyForm = (): UserForm => ({
 
 function AdminUsersPage() {
   const { user } = useAuth();
-  const isCashier = user?.role === "cashier";
+  const isCashier = user?.type === "admin" && user.role === "cashier";
   const [users, setUsers] = useState<DbUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");

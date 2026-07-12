@@ -7,6 +7,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/u
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
 import { Textarea } from "@frontend/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@frontend/components/ui/select";
 import { getStoreSettings, updateStoreSettings, type StoreSettings } from "@backend/server-actions";
 
 export const Route = createFileRoute("/admin/settings")({
@@ -16,7 +23,7 @@ export const Route = createFileRoute("/admin/settings")({
 
 function AdminSettingsPage() {
   const { user } = useAuth();
-  const isCashier = user?.role === "cashier";
+  const isCashier = user?.type === "admin" && user.role === "cashier";
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -86,6 +93,7 @@ function AdminSettingsPage() {
         phone: settings.phone || undefined,
         tax_rate: settings.tax_rate,
         qris_static_url: settings.qris_static_url || undefined,
+        payment_mode: settings.payment_mode || "midtrans",
       },
     });
     setSaving(false);
@@ -156,6 +164,25 @@ function AdminSettingsPage() {
                 setSettings({ ...settings, tax_rate: parseFloat(e.target.value) || 0 })
               }
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Metode Pembayaran Online Default</Label>
+            <Select
+              value={settings.payment_mode || "midtrans"}
+              onValueChange={(val) => setSettings({ ...settings, payment_mode: val as any })}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Pilih Metode Pembayaran" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="midtrans">Midtrans (Otomatis)</SelectItem>
+                <SelectItem value="manual_qris">QRIS Statis & Upload Bukti (Manual)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Tentukan apakah pembeli online melakukan transaksi otomatis via Midtrans atau transfer manual dengan scan QRIS statis lalu mengunggah bukti pembayaran.
+            </p>
           </div>
 
           <div className="space-y-2">

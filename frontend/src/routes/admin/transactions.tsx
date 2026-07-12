@@ -51,7 +51,7 @@ const statusColor: Record<string, string> = {
 
 function AdminTransactionsPage() {
   const { user } = useAuth();
-  const isCashier = user?.role === "cashier";
+  const isCashier = user?.type === "admin" && user.role === "cashier";
   const [onlineOrders, setOnlineOrders] = useState<Order[]>([]);
   const [offlineSales, setOfflineSales] = useState<OfflineSale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -504,6 +504,31 @@ function AdminTransactionsPage() {
                       ALAMAT PENGIRIMAN
                     </p>
                     <p className="text-ink">{activeTransaction.shipping_address}</p>
+                  </div>
+                )}
+                {activeTransaction.payment_proof_url && (
+                  <div className="col-span-2 border-t border-dashed border-border pt-2 mt-1">
+                    <p className="font-bold uppercase tracking-wider text-muted-foreground mb-1">
+                      BUKTI PEMBAYARAN
+                    </p>
+                    <div className="mt-1 flex flex-col gap-2">
+                      <div className="w-40 h-40 border border-border rounded overflow-hidden flex items-center justify-center bg-white shadow-sm">
+                        <img
+                          src={activeTransaction.payment_proof_url}
+                          alt="Bukti Pembayaran"
+                          className="w-full h-full object-contain cursor-zoom-in"
+                          onClick={() => window.open(activeTransaction.payment_proof_url, "_blank")}
+                        />
+                      </div>
+                      <a
+                        href={activeTransaction.payment_proof_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-brand-blue font-semibold hover:underline block text-[11px]"
+                      >
+                        Buka Bukti Pembayaran di Tab Baru ↗
+                      </a>
+                    </div>
                   </div>
                 )}
               </div>

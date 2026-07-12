@@ -13,7 +13,12 @@ import {
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { useState, useEffect } from "react";
-import { getOrderById, regeneratePaymentToken } from "@backend/server-actions";
+import {
+  getOrderById,
+  regeneratePaymentToken,
+  getStoreSettings,
+  submitPaymentProof
+} from "@backend/server-actions";
 import { toast } from "sonner";
 
 interface OrderConfirmationSearch {
@@ -39,6 +44,11 @@ function OrderConfirmationPage() {
   const [orderItems, setOrderItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [storeSettings, setStoreSettings] = useState<any>(null);
+  const [uploadingProof, setUploadingProof] = useState(false);
+  const [submittingProof, setSubmittingProof] = useState(false);
+  const [proofUrl, setProofUrl] = useState<string>("");
+  const [proofUrlTemp, setProofUrlTemp] = useState<string>("");
 
   // Load Midtrans Snap script dynamically
   useEffect(() => {
@@ -63,18 +73,94 @@ function OrderConfirmationPage() {
     }
     try {
       setLoading(true);
-      const result = await getOrderById({ data: search.orderId });
+      const [result, settingsRes] = await Promise.all([
+        getOrderById({ data: search.orderId }),
+        getStoreSettings(),
+      ]);
+
       if (result.success && result.order) {
         setOrder(result.order);
         setOrderItems(result.items || []);
+        if (result.order.payment_proof_url) {
+          setProofUrl(result.order.payment_proof_url);
+        }
       } else {
         toast.error(result.error || "Gagal mengambil data status pesanan");
+      }
+
+      if (settingsRes.settings) {
+        setStoreSettings(settingsRes.settings);
       }
     } catch (e) {
       console.error("Error fetching order confirmation details:", e);
       toast.error("Gagal memeriksa status terbaru pesanan");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUploadProof = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+
+    try {
+      setUploadingProof(true);
+      toast.loading("Mengunggah bukti transfer...");
+      const res = await fetch(`${API_BASE_URL}/api/upload`, {
+        method: "POST",
+        body: formData,
+        headers: {
+          "ngrok-skip-browser-warning": "true"
+        }
+      });
+      const data = await res.json();
+      toast.dismiss();
+
+      if (data.success && data.url) {
+        setProofUrlTemp(data.url);
+        toast.success("Foto bukti transfer berhasil diunggah");
+      } else {
+        toast.error(data.error || "Gagal mengunggah foto");
+      }
+    } catch (err) {
+      toast.dismiss();
+      console.error(err);
+      toast.error("Gagal mengunggah bukti transfer");
+    } finally {
+      setUploadingProof(false);
+    }
+  };
+
+  const handleSubmitProof = async () => {
+    if (!order?.order_id || !proofUrlTemp) return;
+
+    try {
+      setSubmittingProof(true);
+      const res = await submitPaymentProof({
+        data: {
+          orderId: order.order_id,
+          paymentProofUrl: proofUrlTemp,
+        },
+      });
+
+      if (res.success) {
+        setProofUrl(proofUrlTemp);
+        setProofUrlTemp("");
+        toast.success("Bukti transfer berhasil dikirim. Menunggu verifikasi admin.");
+        void fetchOrderDetails();
+      } else {
+        toast.error(res.error || "Gagal mengirim bukti transfer");
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error("Terjadi kesalahan mengirim bukti transfer");
+    } finally {
+      setSubmittingProof(false);
     }
   };
 
@@ -333,8 +419,101 @@ function OrderConfirmationPage() {
               </div>
             </div>
 
+            {/* Manual QRIS Payment Section */}
+            {order?.payment_type === "manual_qris" && (pStatus === "unpaid" || pStatus === "pending") && oStatus !== "cancelled" && (
+              <div className="border-t-2 border-ink pt-6 mt-6 space-y-4">
+                <div className="bg-cream/40 border-2 border-ink rounded-lg p-4 space-y-3">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-ink">
+                    Pembayaran QRIS Statis
+                  </h3>
+                  <p className="text-xs text-muted-foreground leading-relaxed font-medium">
+                    Silakan scan kode QRIS di bawah ini melalui aplikasi e-wallet Anda (GoPay, OVO, Dana, LinkAja, atau Mobile Banking) dan transfer sebesar <strong>Rp {order.gross_amount.toLocaleString("id-ID")}</strong>.
+                  </p>
+                  
+                  {storeSettings?.qris_static_url ? (
+                    <div className="flex flex-col items-center justify-center p-3 bg-white border-2 border-ink rounded-lg shadow-sm">
+                      <img
+                        src={storeSettings.qris_static_url}
+                        alt="QRIS Statis"
+                        className="max-h-64 object-contain"
+                      />
+                    </div>
+                  ) : (
+                    <div className="p-4 border-2 border-dashed border-ink/20 rounded bg-muted/20 text-center text-xs text-muted-foreground font-semibold">
+                      QRIS Statis belum diset oleh Admin. Silakan hubungi admin untuk nomor rekening/QRIS.
+                    </div>
+                  )}
+                </div>
+
+                {/* Upload Bukti Pembayaran */}
+                <div className="border-2 border-ink rounded-lg p-4 space-y-3 bg-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
+                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-ink">
+                    Unggah Bukti Pembayaran
+                  </h3>
+
+                  {proofUrl ? (
+                    <div className="space-y-3">
+                      <div className="relative border border-emerald-200 rounded p-3 bg-emerald-50/50 flex flex-col items-center gap-3">
+                        <img
+                          src={proofUrl}
+                          alt="Bukti Transfer"
+                          className="max-h-40 rounded object-contain border border-emerald-100 bg-white"
+                        />
+                        <span className="text-[10px] uppercase font-black text-emerald-800 tracking-wider">
+                          Bukti Pembayaran Terunggah ✓
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground text-center font-semibold uppercase tracking-wide">
+                        BEM FILKOM sedang memverifikasi pembayaran Anda.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="grid w-full items-center gap-1.5">
+                        <input
+                          id="payment-proof-upload"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleUploadProof}
+                          disabled={uploadingProof || submittingProof}
+                          className="flex h-10 w-full rounded-md border-2 border-ink bg-background px-3 py-2 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-xs file:font-semibold cursor-pointer disabled:opacity-50"
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                          Unggah file bukti transfer Anda (format PNG, JPG, atau WEBP, max 5MB).
+                        </p>
+                      </div>
+
+                      {proofUrlTemp && (
+                        <div className="relative border-2 border-dashed border-ink/20 rounded-lg p-3 bg-muted/10 flex flex-col items-center gap-2">
+                          <img
+                            src={proofUrlTemp}
+                            alt="Preview Bukti"
+                            className="max-h-36 rounded object-contain border border-ink/10 bg-white"
+                          />
+                          <Button
+                            onClick={handleSubmitProof}
+                            disabled={submittingProof}
+                            className="w-full bg-ink text-white hover:bg-brand-orange text-xs font-bold uppercase tracking-wider h-10"
+                          >
+                            {submittingProof ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                                Mengirim...
+                              </>
+                            ) : (
+                              "Kirim Bukti Pembayaran"
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Pay Now Button directly if order is pending */}
-            {(pStatus === "unpaid" || pStatus === "pending") && oStatus !== "cancelled" && (
+            {order?.payment_type !== "manual_qris" && (pStatus === "unpaid" || pStatus === "pending") && oStatus !== "cancelled" && (
               <div className="border-t border-dashed border-border pt-4 mt-2 space-y-2">
                 {order.snap_token && (
                   <Button
