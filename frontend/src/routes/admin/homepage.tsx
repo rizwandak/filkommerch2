@@ -28,7 +28,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@fron
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
 import { Textarea } from "@frontend/components/ui/textarea";
-import { getStoreSettings, updateStoreSettings, type StoreSettings } from "@backend/server-actions";
+import { getStoreSettings, updateStoreSettings, getProducts, type StoreSettings } from "@backend/server-actions";
 import {
   type HomepageSegment,
   type SegmentType,
@@ -320,6 +320,7 @@ function AdminHomepageEditorPage() {
   const isCashier = (user as any)?.role === "cashier";
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [segments, setSegments] = useState<HomepageSegment[]>([]);
+  const [dbProducts, setDbProducts] = useState<any[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [expandedElementId, setExpandedElementId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -358,10 +359,14 @@ function AdminHomepageEditorPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const result = await getStoreSettings();
-      if (result.settings) {
-        setSettings(result.settings);
-        const layoutRaw = result.settings.homepage_layout;
+      const [settingsResult, productsResult] = await Promise.all([
+        getStoreSettings(),
+        getProducts(),
+      ]);
+
+      if (settingsResult.settings) {
+        setSettings(settingsResult.settings);
+        const layoutRaw = settingsResult.settings.homepage_layout;
         let parsed = [];
         if (layoutRaw) {
           try {
@@ -377,6 +382,10 @@ function AdminHomepageEditorPage() {
         if (parsed.length > 0) {
           setSelectedSegmentId(parsed[0].id);
         }
+      }
+
+      if (productsResult.products) {
+        setDbProducts(productsResult.products);
       }
     } catch {
       toast.error("Gagal memuat pengaturan tata letak");
@@ -1331,12 +1340,44 @@ function AdminHomepageEditorPage() {
 
                                     {el.config.source === "slugs" && (
                                       <div className="space-y-2 animate-slide-up">
-                                        <Label>Slug Produk (Pisahkan dengan koma)</Label>
-                                        <Input
-                                          value={el.config.slugs || ""}
-                                          onChange={(e) => updateElementConfig(activeSegment.id, el.id, { slugs: e.target.value })}
-                                          placeholder="varsity-filkom, hoodie-code-run"
-                                        />
+                                        <Label>Pilih Produk Yang Ingin Ditampilkan</Label>
+                                        <div className="border-2 border-ink rounded-md p-3 bg-cream/10 max-h-60 overflow-y-auto space-y-2">
+                                          {dbProducts.length === 0 ? (
+                                            <p className="text-xs text-muted-foreground italic p-2">Tidak ada produk tersedia.</p>
+                                          ) : (
+                                            dbProducts.map((prod) => {
+                                              const selectedSlugs = (el.config.slugs || "")
+                                                .split(",")
+                                                .map((s: string) => s.trim())
+                                                .filter(Boolean);
+                                              const isChecked = selectedSlugs.includes(prod.slug);
+                                              return (
+                                                <label key={prod.id} className="flex items-center gap-2.5 p-1.5 hover:bg-ink/5 rounded cursor-pointer text-xs">
+                                                  <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    className="accent-brand-orange w-4 h-4 cursor-pointer"
+                                                    onChange={(e) => {
+                                                      let newSlugs = [...selectedSlugs];
+                                                      if (e.target.checked) {
+                                                        if (!newSlugs.includes(prod.slug)) {
+                                                          newSlugs.push(prod.slug);
+                                                        }
+                                                      } else {
+                                                        newSlugs = newSlugs.filter((s) => s !== prod.slug);
+                                                      }
+                                                      updateElementConfig(activeSegment.id, el.id, { slugs: newSlugs.join(",") });
+                                                    }}
+                                                  />
+                                                  {prod.image_url && (
+                                                    <img src={prod.image_url} alt={prod.name} className="w-8 h-8 object-cover rounded border border-ink/10" />
+                                                  )}
+                                                  <span className="font-bold text-ink">{prod.name}</span>
+                                                </label>
+                                              );
+                                            })
+                                          )}
+                                        </div>
                                       </div>
                                     )}
                                   </div>
@@ -1623,12 +1664,19 @@ function AdminHomepageEditorPage() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                       <div className="space-y-2">
-                                        <Label>Slug Produk Target</Label>
-                                        <Input
+                                        <Label>Produk Target</Label>
+                                        <select
                                           value={el.config.productSlug || ""}
                                           onChange={(e) => updateElementConfig(activeSegment.id, el.id, { productSlug: e.target.value })}
-                                          placeholder="varsity-filkom"
-                                        />
+                                          className="w-full bg-cream border-2 border-ink rounded p-2.5 text-xs font-bold focus:outline-none"
+                                        >
+                                          <option value="">-- Pilih Produk --</option>
+                                          {dbProducts.map((prod) => (
+                                            <option key={prod.id} value={prod.slug}>
+                                              {prod.name}
+                                            </option>
+                                          ))}
+                                        </select>
                                       </div>
                                       <div className="space-y-2">
                                         <Label>Tanggal Berakhir</Label>
