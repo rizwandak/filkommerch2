@@ -73,15 +73,17 @@ export const Route = createFileRoute("/")({
     const formattedProducts = dbProducts.map((product: ProductWithVariants) => {
       const productName = product.name.toLowerCase();
       const cat: Filter =
-        product.category_id === 2
-          ? "ACCESSORIES"
-          : productName.includes("hood")
-            ? "HOODIE"
-            : productName.includes("varsity") || productName.includes("jacket")
-              ? "JACKET"
-              : productName.includes("tee") || productName.includes("shirt")
-                ? "TEE"
-                : "ACCESSORIES";
+        product.category_slug === "bundle" || product.category_slug === "bundles" || product.product_type === "bundle"
+          ? "BUNDLE"
+          : product.category_id === 2
+            ? "ACCESSORIES"
+            : productName.includes("hood")
+              ? "HOODIE"
+              : productName.includes("varsity") || productName.includes("jacket")
+                ? "JACKET"
+                : productName.includes("tee") || productName.includes("shirt")
+                  ? "TEE"
+                  : "ACCESSORIES";
 
       return {
         id: product.slug || `product-${product.id}`,
@@ -108,6 +110,10 @@ export const Route = createFileRoute("/")({
         description: product.description,
         category_id: product.category_id,
         category_slug: product.category_slug,
+        product_type: product.product_type,
+        bundle_components: product.bundle_components,
+        rawPrice: product.price,
+        rawOriginalPrice: product.original_price,
       };
     });
 
@@ -145,7 +151,7 @@ const NAV = [
   { label: "FAQ", href: "/faq" },
 ];
 
-const FILTERS = ["ALL", "JACKET", "HOODIE", "TEE", "ACCESSORIES"] as const;
+const FILTERS = ["ALL", "JACKET", "HOODIE", "TEE", "ACCESSORIES", "BUNDLE"] as const;
 type Filter = (typeof FILTERS)[number];
 
 type ProductCard = {
@@ -248,6 +254,7 @@ const CATEGORIES: { name: string; img: string; filter: Filter }[] = [
   { name: "Hoodie", img: pHoodie, filter: "HOODIE" },
   { name: "T-Shirt", img: pTshirt, filter: "TEE" },
   { name: "Accessories", img: pCap, filter: "ACCESSORIES" },
+  { name: "Exclusive Bundle", img: pTote, filter: "BUNDLE" },
 ];
 
 type CartItem = {
@@ -594,8 +601,20 @@ function Index() {
     try {
       const parsed = JSON.parse(settings.homepage_layout);
       return convertLegacyToSegments(parsed);
-    } catch {
-      return getDefaultSegments();
+    } catch (e) {
+      console.warn("Standard JSON.parse failed for homepage_layout, trying robust cleanup:", e);
+      try {
+        // Clean carriage returns and escape raw newlines/tabs inside the minified JSON string
+        const cleaned = settings.homepage_layout
+          .replace(/\r/g, "")
+          .replace(/\n/g, "\\n")
+          .replace(/\t/g, "\\t");
+        const parsed = JSON.parse(cleaned);
+        return convertLegacyToSegments(parsed);
+      } catch (err) {
+        console.error("Failed parsing homepage_layout even with robust cleanup:", err);
+        return getDefaultSegments();
+      }
     }
   }, [settings]);
 
@@ -1220,75 +1239,194 @@ function Index() {
                   };
 
                   const gridProducts = getSegmentProducts(el.config);
+                  const isMainHero = el.config.title?.toLowerCase().includes("hero");
 
                   return (
-                    <section key={el.id} className="bg-background py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
-                      <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
-                        <div className="flex flex-col items-center text-center mb-10 sm:mb-12 gap-2">
-                          {el.config.subtitle && (
-                            <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
-                              {el.config.subtitle}
-                            </div>
-                          )}
-                          <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-ink font-bold uppercase">
-                            {el.config.title}
-                          </h2>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-                          {gridProducts.map((p) => (
-                            <div
-                              key={p.id}
-                              className="group flex flex-col border-2 border-ink bg-cream rounded-lg overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-4px] transition-all duration-300"
-                            >
-                              <Link
-                                to="/product/$slug"
-                                params={{ slug: p.id }}
-                                className="relative aspect-[4/5] overflow-hidden block border-b-2 border-ink bg-secondary animate-fade-in"
-                              >
-                                <img
-                                  src={resolveImageUrl(p.img)}
-                                  alt={p.name}
-                                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                />
-                                {p.tag && (
-                                  <span className="absolute top-3 left-3 text-[9px] font-bold tracking-widest px-2.5 py-1 bg-ink text-cream rounded-full uppercase">
-                                    {p.tag}
-                                  </span>
-                                )}
-                              </Link>
-                              <div className="p-5 flex flex-col flex-1">
-                                <div className="text-[10px] font-bold tracking-widest text-brand-orange uppercase mb-1">
-                                  {p.cat}
-                                </div>
-                                <Link
-                                  to="/product/$slug"
-                                  params={{ slug: p.id }}
-                                  className="hover:text-brand-orange transition-colors"
-                                >
-                                  <h3 className="text-base font-bold text-ink leading-snug tracking-wide line-clamp-1 mb-1">
-                                    {p.name}
-                                  </h3>
-                                </Link>
-                                {p.description && (
-                                  <p className="text-xs text-muted-foreground line-clamp-2 mb-3 leading-relaxed">
-                                    {p.description}
-                                  </p>
-                                )}
-                                <div className="flex items-baseline gap-2 mt-auto">
-                                  <span className="text-base font-extrabold text-ink">{p.price}</span>
-                                  {p.was && (
-                                    <span className="text-xs text-muted-foreground line-through font-bold">
-                                      {p.was}
-                                    </span>
-                                  )}
-                                </div>
+                    isMainHero ? (
+                      <section key={el.id} className="bg-neutral-950 text-neutral-100 py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
+                        <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
+                          <div className="flex flex-col items-center text-center mb-10 sm:mb-12 gap-2">
+                            {el.config.subtitle && (
+                              <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
+                                {el.config.subtitle}
                               </div>
-                            </div>
-                          ))}
+                            )}
+                            <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-white font-bold uppercase">
+                              {el.config.title}
+                            </h2>
+                          </div>
+
+                          <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
+                            {gridProducts.map((p) => {
+                              let discountText = null;
+                              if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
+                                const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
+                                discountText = `Save ${pct}%`;
+                              } else if (p.was && p.price) {
+                                const rawPrice = Number(p.price.replace(/[^0-9]/g, ""));
+                                const rawOriginalPrice = Number(p.was.replace(/[^0-9]/g, ""));
+                                if (rawOriginalPrice > rawPrice) {
+                                  const pct = Math.round(((rawOriginalPrice - rawPrice) / rawOriginalPrice) * 100);
+                                  discountText = `Save ${pct}%`;
+                                }
+                              }
+
+                              return (
+                                <div
+                                  key={p.id}
+                                  className="group flex flex-col border-2 border-neutral-950 bg-white text-neutral-900 rounded-lg overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[-4px] transition-all duration-300 w-full max-w-[280px]"
+                                >
+                                  <Link
+                                    to="/product/$slug"
+                                    params={{ slug: p.id }}
+                                    className="relative aspect-[4/5] overflow-hidden block border-b-2 border-neutral-950 bg-neutral-100 animate-fade-in"
+                                  >
+                                    <img
+                                      src={resolveImageUrl(p.img)}
+                                      alt={p.name}
+                                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                    />
+                                    {p.tag && (
+                                      <span className="absolute top-3 left-3 text-[9px] font-bold tracking-widest px-2.5 py-1 bg-neutral-950 text-white rounded-full uppercase">
+                                        {p.tag}
+                                      </span>
+                                    )}
+                                  </Link>
+                                  <div className="p-4 flex flex-col flex-1">
+                                    <div className="text-[10px] font-bold tracking-widest text-brand-orange uppercase mb-1">
+                                      {p.cat}
+                                    </div>
+                                    <Link
+                                      to="/product/$slug"
+                                      params={{ slug: p.id }}
+                                      className="hover:text-brand-orange transition-colors"
+                                    >
+                                      <h3 className="text-sm sm:text-base font-extrabold text-neutral-950 leading-snug tracking-wide line-clamp-1 mb-1">
+                                        {p.name}
+                                      </h3>
+                                    </Link>
+                                    {p.description && (
+                                      <p className="text-xs text-neutral-600 line-clamp-2 mb-3 leading-relaxed">
+                                        {p.description}
+                                      </p>
+                                    )}
+                                    <div className="flex flex-col gap-1 mt-auto">
+                                      {p.was && (
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <span className="text-xs text-neutral-400 line-through font-bold">
+                                            {p.was}
+                                          </span>
+                                          {discountText && (
+                                            <span className="text-[9px] font-extrabold tracking-widest px-1.5 py-0.5 bg-brand-orange/10 text-brand-orange border border-brand-orange/20 rounded">
+                                              {discountText}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      <span className="text-base sm:text-lg font-black text-neutral-950">
+                                        {p.price}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    </section>
+                      </section>
+                    ) : (
+                      <section key={el.id} className="bg-background py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
+                        <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
+                          <div className="flex flex-col items-center text-center mb-10 sm:mb-12 gap-2">
+                            {el.config.subtitle && (
+                              <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
+                                {el.config.subtitle}
+                              </div>
+                            )}
+                            <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-ink font-bold uppercase">
+                              {el.config.title}
+                            </h2>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+                            {gridProducts.map((p) => {
+                              let discountText = null;
+                              if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
+                                const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
+                                discountText = `Save ${pct}%`;
+                              } else if (p.was && p.price) {
+                                const rawPrice = Number(p.price.replace(/[^0-9]/g, ""));
+                                const rawOriginalPrice = Number(p.was.replace(/[^0-9]/g, ""));
+                                if (rawOriginalPrice > rawPrice) {
+                                  const pct = Math.round(((rawOriginalPrice - rawPrice) / rawOriginalPrice) * 100);
+                                  discountText = `Save ${pct}%`;
+                                }
+                              }
+
+                              return (
+                                <div
+                                  key={p.id}
+                                  className="group flex flex-col border-2 border-ink bg-cream rounded-lg overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-4px] transition-all duration-300"
+                                >
+                                  <Link
+                                    to="/product/$slug"
+                                    params={{ slug: p.id }}
+                                    className="relative aspect-[4/5] overflow-hidden block border-b-2 border-ink bg-secondary animate-fade-in"
+                                  >
+                                    <img
+                                      src={resolveImageUrl(p.img)}
+                                      alt={p.name}
+                                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                    />
+                                    {p.tag && (
+                                      <span className="absolute top-3 left-3 text-[9px] font-bold tracking-widest px-2.5 py-1 bg-ink text-cream rounded-full uppercase">
+                                        {p.tag}
+                                      </span>
+                                    )}
+                                  </Link>
+                                  <div className="p-5 flex flex-col flex-1">
+                                    <div className="text-[10px] font-bold tracking-widest text-brand-orange uppercase mb-1">
+                                      {p.cat}
+                                    </div>
+                                    <Link
+                                      to="/product/$slug"
+                                      params={{ slug: p.id }}
+                                      className="hover:text-brand-orange transition-colors"
+                                    >
+                                      <h3 className="text-base font-bold text-ink leading-snug tracking-wide line-clamp-1 mb-1">
+                                        {p.name}
+                                      </h3>
+                                    </Link>
+                                    {p.description && (
+                                      <p className="text-xs text-muted-foreground line-clamp-2 mb-3 leading-relaxed">
+                                        {p.description}
+                                      </p>
+                                    )}
+                                    <div className="flex flex-col gap-1 mt-auto">
+                                      {p.was && (
+                                        <div className="flex flex-wrap items-center gap-1.5">
+                                          <span className="text-xs text-muted-foreground line-through font-bold">
+                                            {p.was}
+                                          </span>
+                                          {discountText && (
+                                            <span className="text-[9px] font-extrabold tracking-widest px-1.5 py-0.5 bg-brand-orange/10 text-brand-orange border border-brand-orange/20 rounded">
+                                              {discountText}
+                                            </span>
+                                          )}
+                                        </div>
+                                      )}
+                                      <span className="text-base sm:text-lg font-black text-ink">
+                                        {p.price}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </section>
+                    )
                   );
                 }
 
@@ -1415,32 +1553,82 @@ function Index() {
                     </div>
                   );
 
-                case "text_block":
+                case "text_block": {
+                  const hasImages = el.config.leftImage || el.config.rightImage;
                   return (
                     <section
                       key={el.id}
                       className="bg-background py-16 sm:py-24 border-b-2 border-ink animate-slide-up"
                     >
-                      <div className="max-w-[800px] mx-auto px-5 text-center">
-                        <div
-                          className="space-y-4 sm:space-y-6"
-                          style={{ textAlign: el.config.alignment || "center" }}
-                        >
-                          {el.config.subtitle && (
-                            <div className="text-xs tracking-[0.3em] text-brand-orange font-bold uppercase">
-                              {el.config.subtitle}
+                      <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
+                        <div className={`flex flex-col ${hasImages ? "lg:flex-row" : ""} items-center justify-center gap-8 lg:gap-12`}>
+                          
+                          {/* Left Photo (Desktop only) */}
+                          {el.config.leftImage && (
+                            <div className="w-full lg:w-1/4 max-w-[280px] aspect-[3/4] shrink-0 border-2 border-ink rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] order-2 lg:order-1 lg:block hidden">
+                              <img
+                                src={resolveImageUrl(el.config.leftImage)}
+                                alt="About Left Visual"
+                                className="w-full h-full object-cover"
+                              />
                             </div>
                           )}
-                          <h2 className="display text-3xl sm:text-5xl text-ink font-bold uppercase leading-none">
-                            {el.config.title}
-                          </h2>
-                          <p className="text-sm sm:text-base text-muted-foreground leading-relaxed font-medium max-w-2xl mx-auto whitespace-pre-line">
-                            {el.config.body}
-                          </p>
+
+                          {/* Centered Text Content */}
+                          <div className="flex-1 max-w-[700px] text-center order-1 lg:order-2 space-y-4 sm:space-y-6" style={{ textAlign: el.config.alignment || "center" }}>
+                            {el.config.subtitle && (
+                              <div className="text-xs tracking-[0.3em] text-brand-orange font-bold uppercase">
+                                {el.config.subtitle}
+                              </div>
+                            )}
+                            <h2 className="display text-3xl sm:text-5xl text-ink font-bold uppercase leading-none">
+                              {el.config.title}
+                            </h2>
+                            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed font-medium max-w-2xl mx-auto whitespace-pre-line">
+                              {el.config.body}
+                            </p>
+                          </div>
+
+                          {/* Right Photo (Desktop only) */}
+                          {el.config.rightImage && (
+                            <div className="w-full lg:w-1/4 max-w-[280px] aspect-[3/4] shrink-0 border-2 border-ink rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] order-3 lg:block hidden">
+                              <img
+                                src={resolveImageUrl(el.config.rightImage)}
+                                alt="About Right Visual"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          )}
+
+                          {/* Mobile Photos Grid (shown only on mobile/tablet) */}
+                          {hasImages && (
+                            <div className="grid grid-cols-2 gap-4 w-full max-w-[500px] lg:hidden order-3 pt-4">
+                              {el.config.leftImage ? (
+                                <div className="aspect-[3/4] border-2 border-ink rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+                                  <img
+                                    src={resolveImageUrl(el.config.leftImage)}
+                                    alt="About Left Visual"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : <div />}
+                              {el.config.rightImage ? (
+                                <div className="aspect-[3/4] border-2 border-ink rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+                                  <img
+                                    src={resolveImageUrl(el.config.rightImage)}
+                                    alt="About Right Visual"
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ) : <div />}
+                            </div>
+                          )}
+
                         </div>
                       </div>
                     </section>
                   );
+                }
 
                 case "value_props":
                   return (
@@ -1580,7 +1768,41 @@ function Index() {
                   );
                 }
 
-                case "bundle_recommendation":
+                case "bundle_recommendation": {
+                  const dbBundles = dbProducts.filter(
+                    (p) =>
+                      p.category_slug === "bundle" ||
+                      p.category_slug === "bundles" ||
+                      p.product_type === "bundle"
+                  );
+                  const bundlesToRender =
+                    dbBundles.length > 0
+                      ? dbBundles.map((p) => {
+                          const itemsList = p.bundle_components
+                            ? p.bundle_components.map((c: any) => c.name).join(", ")
+                            : "";
+                          let saveText = "Save up to 15%";
+                          if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
+                            const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
+                            saveText = `Save ${pct}%`;
+                          }
+                          return {
+                            id: p.id,
+                            name: p.name,
+                            price: p.price,
+                            originalPrice: p.was,
+                            description: p.description || "",
+                            itemsList,
+                            saveText,
+                            isReal: true,
+                          };
+                        })
+                      : (el.config.items || []).map((bundle: any) => ({
+                          ...bundle,
+                          saveText: "Save up to 15%",
+                          isReal: false,
+                        }));
+
                   return (
                     <section key={el.id} className="bg-cream py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
                       <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
@@ -1596,7 +1818,7 @@ function Index() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-                          {(el.config.items || []).map((bundle: any, bIdx: number) => (
+                          {bundlesToRender.map((bundle: any, bIdx: number) => (
                             <div
                               key={bIdx}
                               className="border-2 border-ink bg-background rounded-xl p-6 sm:p-8 flex flex-col justify-between shadow-[6px_6px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] transition-all duration-200"
@@ -1605,16 +1827,18 @@ function Index() {
                                 <div className="flex justify-between items-start gap-4 mb-4">
                                   <div>
                                     <span className="text-[9px] font-extrabold tracking-widest text-brand-orange bg-brand-orange/10 px-2.5 py-1 rounded-full uppercase">
-                                      Save up to 15%
+                                      {bundle.saveText}
                                     </span>
                                     <h3 className="font-extrabold text-xl sm:text-2xl text-ink mt-2 uppercase tracking-wide">
                                       {bundle.name}
                                     </h3>
                                   </div>
                                   <div className="text-right">
-                                    <span className="text-xs text-muted-foreground line-through block font-bold">
-                                      {bundle.originalPrice}
-                                    </span>
+                                    {bundle.originalPrice && (
+                                      <span className="text-xs text-muted-foreground line-through block font-bold">
+                                        {bundle.originalPrice}
+                                      </span>
+                                    )}
                                     <span className="text-lg sm:text-xl font-black text-brand-orange block">
                                       {bundle.price}
                                     </span>
@@ -1625,37 +1849,50 @@ function Index() {
                                   {bundle.description}
                                 </p>
 
-                                <div className="space-y-2 mb-8">
-                                  <div className="text-[10px] font-bold text-ink uppercase tracking-wider mb-2">
-                                    ISI BUNDLE:
-                                  </div>
-                                  {(bundle.itemsList || "").split(",").map((it: string, itIdx: number) => (
-                                    <div key={itIdx} className="flex items-center gap-2 text-xs font-semibold text-ink">
-                                      <Check className="w-4 h-4 text-brand-orange shrink-0" />
-                                      <span>{it.trim()}</span>
+                                {bundle.itemsList && (
+                                  <div className="space-y-2 mb-8">
+                                    <div className="text-[10px] font-bold text-ink uppercase tracking-wider mb-2">
+                                      ISI BUNDLE:
                                     </div>
-                                  ))}
-                                </div>
+                                    {bundle.itemsList.split(",").map((it: string, itIdx: number) => (
+                                      <div key={itIdx} className="flex items-center gap-2 text-xs font-semibold text-ink">
+                                        <Check className="w-4 h-4 text-brand-orange shrink-0" />
+                                        <span>{it.trim()}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
 
-                              <button
-                                onClick={() => {
-                                  if (bundle.link) {
-                                    navigate({ to: bundle.link });
-                                  } else {
-                                    scrollToId("shop");
-                                  }
-                                }}
-                                className="w-full text-center py-3 bg-ink hover:bg-brand-orange text-cream hover:text-ink font-bold text-xs tracking-widest uppercase transition-all duration-300 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none cursor-pointer font-extrabold"
-                              >
-                                ORDER BUNDLE NOW
-                              </button>
+                              {bundle.isReal ? (
+                                <Link
+                                  to="/product/$slug"
+                                  params={{ slug: bundle.id }}
+                                  className="w-full text-center py-3 bg-ink hover:bg-brand-orange text-cream hover:text-ink font-bold text-xs tracking-widest uppercase transition-all duration-300 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none cursor-pointer font-extrabold block"
+                                >
+                                  ORDER BUNDLE NOW
+                                </Link>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    if (bundle.link) {
+                                      navigate({ to: bundle.link });
+                                    } else {
+                                      scrollToId("shop");
+                                    }
+                                  }}
+                                  className="w-full text-center py-3 bg-ink hover:bg-brand-orange text-cream hover:text-ink font-bold text-xs tracking-widest uppercase transition-all duration-300 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none cursor-pointer font-extrabold"
+                                >
+                                  ORDER BUNDLE NOW
+                                </button>
+                              )}
                             </div>
                           ))}
                         </div>
                       </div>
                     </section>
                   );
+                }
 
                 case "gallery":
                   return (

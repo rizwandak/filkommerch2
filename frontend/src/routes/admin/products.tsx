@@ -65,6 +65,7 @@ interface ProductForm {
   images: string[];
   variants: Array<{ size: string; color: string; stock: string; filkom_price: string }>;
   component_ids: number[];
+  is_active: boolean;
 }
 
 const emptyForm = (): ProductForm => ({
@@ -91,6 +92,7 @@ const emptyForm = (): ProductForm => ({
   images: [],
   variants: [{ size: "One Size", color: "", stock: "0", filkom_price: "" }],
   component_ids: [],
+  is_active: true,
 });
 
 const formatDateForInput = (dateVal: any) => {
@@ -179,6 +181,7 @@ function AdminProductsPage() {
         filkom_price: v.filkom_price ? String(v.filkom_price) : "",
       })),
       component_ids: product.bundle_components ? product.bundle_components.map((c) => c.id) : [],
+      is_active: product.is_active !== false,
     });
     setDialogOpen(true);
   };
@@ -301,6 +304,7 @@ function AdminProductsPage() {
         filkom_price: v.filkom_price ? parseFloat(v.filkom_price) : null,
       })),
       component_ids: form.product_type === "bundle" ? form.component_ids : [],
+      is_active: form.is_active,
     };
 
     const result = form.id
@@ -315,6 +319,62 @@ function AdminProductsPage() {
       await loadProducts();
     } else {
       toast.error(result.error || "Gagal menyimpan produk");
+    }
+  };
+
+  const toggleProductActive = async (product: ProductWithVariants) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah status produk.");
+      return;
+    }
+    const newStatus = !product.is_active;
+    const tid = toast.loading(newStatus ? "Mengaktifkan produk..." : "Menyembunyikan produk...");
+
+    try {
+      const result = await updateProduct({
+        data: {
+          id: product.id,
+          category_id: product.category_id,
+          name: product.name,
+          slug: product.slug,
+          description: product.description || "",
+          price: product.price,
+          original_price: product.original_price,
+          filkom_price: product.filkom_price,
+          promo_price: product.promo_price,
+          sale_type: product.sale_type,
+          product_type: product.product_type,
+          low_stock_threshold: product.low_stock_threshold,
+          preorder_start_at: product.preorder_start_at,
+          preorder_end_at: product.preorder_end_at,
+          preorder_moq: product.preorder_moq,
+          production_eta_days: product.production_eta_days,
+          image_url: product.image_url || undefined,
+          bahan: product.bahan || undefined,
+          asal: product.asal || undefined,
+          aplikasi: product.aplikasi || undefined,
+          size_chart_url: product.size_chart_url || undefined,
+          images: product.images || [],
+          is_active: newStatus,
+          variants: product.variants.map((v) => ({
+            size: v.size,
+            color: v.color || null,
+            stock: v.stock,
+            filkom_price: v.filkom_price,
+          })),
+          component_ids: product.bundle_components ? product.bundle_components.map((c) => c.id) : [],
+        }
+      });
+      toast.dismiss(tid);
+      if (result.success) {
+        toast.success(newStatus ? "Produk diaktifkan" : "Produk disembunyikan");
+        await loadProducts();
+      } else {
+        toast.error(result.error || "Gagal mengubah status produk");
+      }
+    } catch (err: any) {
+      toast.dismiss(tid);
+      toast.error(err.message || "Gagal mengubah status produk");
     }
   };
 
@@ -510,15 +570,18 @@ function AdminProductsPage() {
                       {totalStock(product)}
                     </td>
                     <td className="p-3 text-center">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
+                      <button
+                        onClick={() => void toggleProductActive(product)}
+                        disabled={isCashier}
+                        className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-100 disabled:cursor-default disabled:hover:scale-100 cursor-pointer ${
                           product.is_active
-                            ? "bg-green-50 text-green-700 border border-green-200"
-                            : "bg-gray-50 text-gray-600 border border-gray-200"
+                            ? "bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
+                            : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
                         }`}
+                        title={isCashier ? undefined : (product.is_active ? "Klik untuk sembunyikan produk" : "Klik untuk tampilkan produk")}
                       >
                         {product.is_active ? "Aktif" : "Nonaktif"}
-                      </span>
+                      </button>
                     </td>
                     {!isCashier && (
                       <td className="p-3 text-right">
@@ -900,6 +963,24 @@ function AdminProductsPage() {
                     </button>
                   </div>
                 )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 border-2 border-ink p-3.5 rounded-xl bg-cream/10 my-2">
+              <input
+                id="is_active_toggle"
+                type="checkbox"
+                checked={form.is_active}
+                onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                className="h-4 w-4 rounded border-2 border-ink bg-background cursor-pointer"
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label htmlFor="is_active_toggle" className="text-xs font-bold text-ink cursor-pointer uppercase tracking-wider">
+                  Tampilkan Produk (Status Aktif)
+                </Label>
+                <p className="text-[10px] text-muted-foreground font-medium">
+                  Jika dinonaktifkan, produk disembunyikan dari beranda, katalog, dan POS.
+                </p>
               </div>
             </div>
 

@@ -1521,6 +1521,63 @@ function AdminHomepageEditorPage() {
                                         })}
                                       </div>
                                     </div>
+                                    <div className="grid grid-cols-2 gap-4 pt-2">
+                                      <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase">Foto Kiri (Left Image)</Label>
+                                        {el.config.leftImage ? (
+                                          <div className="space-y-1.5">
+                                            <div className="relative aspect-[3/4] rounded-lg border-2 border-ink overflow-hidden bg-neutral-900 shadow-sm w-32">
+                                              <img src={el.config.leftImage} className="w-full h-full object-cover" alt="" />
+                                            </div>
+                                            <Button
+                                              variant="destructive"
+                                              size="sm"
+                                              onClick={() => updateElementConfig(activeSegment.id, el.id, { leftImage: "" })}
+                                              className="w-full text-xs py-1 h-auto cursor-pointer"
+                                            >
+                                              Hapus
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          <div className="space-y-1.5">
+                                            <Input
+                                              type="file"
+                                              accept="image/*"
+                                              onChange={(e) => handleFileChange(e, activeSegment.id, el.id, "leftImage", el.type)}
+                                              className="cursor-pointer text-xs"
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className="space-y-2">
+                                        <Label className="text-xs font-bold uppercase">Foto Kanan (Right Image)</Label>
+                                        {el.config.rightImage ? (
+                                          <div className="space-y-1.5">
+                                            <div className="relative aspect-[3/4] rounded-lg border-2 border-ink overflow-hidden bg-neutral-900 shadow-sm w-32">
+                                              <img src={el.config.rightImage} className="w-full h-full object-cover" alt="" />
+                                            </div>
+                                            <Button
+                                              variant="destructive"
+                                              size="sm"
+                                              onClick={() => updateElementConfig(activeSegment.id, el.id, { rightImage: "" })}
+                                              className="w-full text-xs py-1 h-auto cursor-pointer"
+                                            >
+                                              Hapus
+                                            </Button>
+                                          </div>
+                                        ) : (
+                                          <div className="space-y-1.5">
+                                            <Input
+                                              type="file"
+                                              accept="image/*"
+                                              onChange={(e) => handleFileChange(e, activeSegment.id, el.id, "rightImage", el.type)}
+                                              className="cursor-pointer text-xs"
+                                            />
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
                                 )}
 
@@ -2339,10 +2396,22 @@ function AdminHomepageEditorPage() {
 
                                 {/* TEXT BLOCK PREVIEW */}
                                 {el.type === "text_block" && (
-                                  <div className="p-3 bg-background space-y-0.5" style={{ textAlign: el.config.alignment || "center" }}>
-                                    {el.config.subtitle && <span className="text-[5.5px] tracking-wider text-brand-orange font-bold font-mono">{el.config.subtitle}</span>}
-                                    <h4 className="display text-xs text-ink font-bold uppercase leading-none mt-0.5">{el.config.title}</h4>
-                                    <p className="text-[6.5px] text-muted-foreground leading-relaxed font-medium mt-1 max-w-xs mx-auto">{el.config.body}</p>
+                                  <div className="p-3 bg-background flex items-center justify-center gap-1.5" style={{ textAlign: el.config.alignment || "center" }}>
+                                    {el.config.leftImage && (
+                                      <div className="w-4 h-5 border border-ink/10 rounded shrink-0 bg-neutral-200 overflow-hidden">
+                                        <img src={el.config.leftImage} className="w-full h-full object-cover" alt="" />
+                                      </div>
+                                    )}
+                                    <div className="flex-1 space-y-0.5">
+                                      {el.config.subtitle && <span className="text-[5.5px] tracking-wider text-brand-orange font-bold font-mono">{el.config.subtitle}</span>}
+                                      <h4 className="display text-xs text-ink font-bold uppercase leading-none mt-0.5">{el.config.title}</h4>
+                                      <p className="text-[6.5px] text-muted-foreground leading-relaxed font-medium mt-1 max-w-xs mx-auto">{el.config.body}</p>
+                                    </div>
+                                    {el.config.rightImage && (
+                                      <div className="w-4 h-5 border border-ink/10 rounded shrink-0 bg-neutral-200 overflow-hidden">
+                                        <img src={el.config.rightImage} className="w-full h-full object-cover" alt="" />
+                                      </div>
+                                    )}
                                   </div>
                                 )}
 
