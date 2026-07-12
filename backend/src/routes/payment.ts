@@ -328,6 +328,14 @@ router.post("/regenerate-token", paymentCheckoutLimiter, async (req, res) => {
       return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
     }
 
+    if (order.payment_type === "manual_qris") {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        error: "Metode pembayaran untuk pesanan ini adalah manual QRIS. Silakan unggah bukti pembayaran Anda."
+      });
+    }
+
     // 2. Pastikan pesanan masih pending / unpaid
     if (order.payment_status !== "unpaid" && order.payment_status !== "pending") {
       await connection.rollback();

@@ -9,6 +9,7 @@ import * as apiControllers from "./controllers/api";
 import { validateBody, createOrderSchema } from "./middleware/validation";
 import { checkRole } from "./middleware/auth";
 import { verifyFilkomUser } from "./controllers/verification";
+import { runMigration } from "./migrate";
 
 // Initialize environment variables
 dotenv.config();
@@ -224,6 +225,7 @@ app.delete("/api/categories/:id", checkRole(["admin"]), apiControllers.deleteCat
 app.post("/api/orders", checkoutLimiter, validateBody(createOrderSchema), apiControllers.createOrderAndPayment);
 app.get("/api/orders/:id", apiControllers.getOrderById);
 app.get("/api/orders/user/:userId", apiControllers.getUserOrders);
+app.post("/api/orders/:id/payment-proof", apiControllers.submitPaymentProof);
 
 // Offline POS Sales API Routes
 app.post("/api/sales", apiControllers.createSale);
@@ -266,11 +268,21 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 });
 
 // Start server
-app.listen(port, () => {
-  console.log(`====================================================`);
-  console.log(`🚀 Server backend berjalan di http://localhost:${port}`);
-  console.log(`🔒 Helmet: HTTP security headers aktif`);
-  console.log(`🌐 CORS: Hanya menerima dari ${allowedOrigins.join(", ")}`);
-  console.log(`⏱️  Rate Limiting: Aktif pada auth & checkout endpoints`);
-  console.log(`====================================================`);
-});
+const startServer = async () => {
+  try {
+    await runMigration();
+  } catch (err) {
+    console.error("Migration failed on startup:", err);
+  }
+
+  app.listen(port, () => {
+    console.log(`====================================================`);
+    console.log(`🚀 Server backend berjalan di http://localhost:${port}`);
+    console.log(`🔒 Helmet: HTTP security headers aktif`);
+    console.log(`🌐 CORS: Hanya menerima dari ${allowedOrigins.join(", ")}`);
+    console.log(`⏱️  Rate Limiting: Aktif pada auth & checkout endpoints`);
+    console.log(`====================================================`);
+  });
+};
+
+startServer();

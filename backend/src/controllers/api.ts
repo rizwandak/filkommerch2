@@ -855,54 +855,74 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       }
     }
 
-    // 3. Generate QRIS payment via Midtrans Snap Client
-    console.log("🔐 Generating QRIS snap transaction for:", details.orderId);
-    const parameter = {
-      transaction_details: {
-        order_id: details.orderId,
-        gross_amount: grossAmount
-      },
-      credit_card: {
-        secure: true
-      },
-      customer_details: {
-        first_name: details.customerName,
-        email: details.customerEmail,
-        phone: details.customerPhone
-      },
-      item_details: resolvedItems.map((item: any) => ({
-        id: String(item.variant_id),
-        price: Number(item.price),
-        quantity: Number(item.quantity),
-        name: item.product_name.substring(0, 50)
-      }))
-    };
+    // 3. Check payment mode from store settings
+    const [storeSettingsRows] = await connection.execute("SELECT payment_mode, qris_static_url FROM store_settings LIMIT 1");
+    const storeSettings = (storeSettingsRows as any[])[0];
+    const paymentMode = storeSettings?.payment_mode ?? "midtrans";
 
-    if (shippingCost > 0) {
-      parameter.item_details.push({
-        id: "shipping-cost",
-        price: shippingCost,
-        quantity: 1,
-        name: "Shipping Cost"
-      });
+    let snapToken: string | null = null;
+    let qrUrl: string | null = null;
+
+    if (paymentMode === "manual_qris") {
+      console.log("ℹ️ Manual QRIS mode active, skipping Midtrans transaction generation");
+      qrUrl = storeSettings?.qris_static_url || "";
+      
+      // Update order to set payment_type
+      await connection.execute(
+        "UPDATE orders SET payment_type = ? WHERE order_id = ?",
+        ["manual_qris", details.orderId]
+      );
+    } else {
+      console.log("🔐 Generating QRIS snap transaction for:", details.orderId);
+      const parameter = {
+        transaction_details: {
+          order_id: details.orderId,
+          gross_amount: grossAmount
+        },
+        credit_card: {
+          secure: true
+        },
+        customer_details: {
+          first_name: details.customerName,
+          email: details.customerEmail,
+          phone: details.customerPhone
+        },
+        item_details: resolvedItems.map((item: any) => ({
+          id: String(item.variant_id),
+          price: Number(item.price),
+          quantity: Number(item.quantity),
+          name: item.product_name.substring(0, 50)
+        }))
+      };
+
+      if (shippingCost > 0) {
+        parameter.item_details.push({
+          id: "shipping-cost",
+          price: shippingCost,
+          quantity: 1,
+          name: "Shipping Cost"
+        });
+      }
+      if (serviceFee > 0) {
+        parameter.item_details.push({
+          id: "service-fee",
+          price: serviceFee,
+          quantity: 1,
+          name: "Service Fee"
+        });
+      }
+
+      const transaction = await snap.createTransaction(parameter);
+      console.log("✅ QRIS token generated successfully");
+      snapToken = transaction.token;
+      qrUrl = `https://app.sandbox.midtrans.com/qris/${transaction.token}.png`;
+
+      // 4. Update order dengan snap token
+      await connection.execute(
+        "UPDATE orders SET snap_token = ?, payment_type = ? WHERE order_id = ?",
+        [snapToken, "qris", details.orderId]
+      );
     }
-    if (serviceFee > 0) {
-      parameter.item_details.push({
-        id: "service-fee",
-        price: serviceFee,
-        quantity: 1,
-        name: "Service Fee"
-      });
-    }
-
-    const transaction = await snap.createTransaction(parameter);
-    console.log("✅ QRIS token generated successfully");
-
-    // 4. Update order dengan snap token
-    await connection.execute(
-      "UPDATE orders SET snap_token = ?, payment_type = ? WHERE order_id = ?",
-      [transaction.token, "qris", details.orderId]
-    );
 
     // Record activity log
     await logActivity(
@@ -920,8 +940,9 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
     return res.json({
       success: true,
       orderId: details.orderId,
-      token: transaction.token,
-      qrUrl: `https://app.sandbox.midtrans.com/qris/${transaction.token}.png`
+      token: snapToken,
+      qrUrl: qrUrl,
+      paymentMode: paymentMode
     });
   } catch (error: any) {
     await connection.rollback();
@@ -2009,6 +2030,7 @@ export const getStoreSettings = async (req: Request, res: Response) => {
         tax_rate: 0,
         qris_static_url: null,
         homepage_layout: null,
+        payment_mode: "midtrans",
       },
     });
   } catch (error: any) {
@@ -2031,7 +2053,7 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
     if (existing) {
       await execute(
         `UPDATE store_settings SET store_name = ?, address = ?, phone = ?,
-         tax_rate = ?, qris_static_url = ?, homepage_layout = ? WHERE id = ?`,
+         tax_rate = ?, qris_static_url = ?, homepage_layout = ?, payment_mode = ? WHERE id = ?`,
         [
           input.store_name,
           input.address || null,
@@ -2039,13 +2061,14 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
           input.tax_rate ?? 0,
           input.qris_static_url || null,
           input.homepage_layout || null,
+          input.payment_mode || "midtrans",
           existing.id,
         ]
       );
     } else {
       await execute(
-        `INSERT INTO store_settings (store_name, address, phone, tax_rate, qris_static_url, homepage_layout)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO store_settings (store_name, address, phone, tax_rate, qris_static_url, homepage_layout, payment_mode)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           input.store_name,
           input.address || null,
@@ -2053,6 +2076,7 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
           input.tax_rate ?? 0,
           input.qris_static_url || null,
           input.homepage_layout || null,
+          input.payment_mode || "midtrans",
         ]
       );
     }
@@ -2216,3 +2240,26 @@ export const getUserOrders = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, error: "Failed to fetch user orders" });
   }
 };
+
+// Submit payment proof
+export const submitPaymentProof = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { paymentProofUrl } = req.body;
+
+    if (!paymentProofUrl) {
+      return res.status(400).json({ success: false, error: "Bukti pembayaran wajib diunggah" });
+    }
+
+    await execute(
+      "UPDATE orders SET payment_proof_url = ?, transaction_status = 'pending' WHERE order_id = ?",
+      [paymentProofUrl, id]
+    );
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error submitting payment proof:", error);
+    return res.status(500).json({ success: false, error: error.message || "Failed to submit payment proof" });
+  }
+};
+

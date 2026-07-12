@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS orders (
     transaction_status VARCHAR(20) DEFAULT 'pending', -- pending, settlement, expire, cancel
     midtrans_transaction_id VARCHAR(100) NULL, -- ID Asli dari Midtrans
     snap_token VARCHAR(255) NULL, -- Disimpan agar user bisa lanjut bayar kalau web terclose
+    payment_proof_url VARCHAR(255) DEFAULT NULL,
     stock_reduced BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -154,6 +155,7 @@ CREATE TABLE IF NOT EXISTS store_settings (
   tax_rate DECIMAL(5, 2) DEFAULT 0,
   qris_static_url VARCHAR(255),
   homepage_layout TEXT DEFAULT NULL,
+  payment_mode VARCHAR(20) DEFAULT 'midtrans',
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 

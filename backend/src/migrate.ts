@@ -13,9 +13,8 @@ const dbConfig = {
   port: parseInt(process.env.DB_PORT || "3306"),
 };
 
-console.log("Connecting to database:", dbConfig.database, "on", dbConfig.host);
-
-async function run() {
+export async function runMigration() {
+  console.log("Connecting to database:", dbConfig.database, "on", dbConfig.host);
   let connection;
   try {
     connection = await mysql.createConnection(dbConfig);
@@ -72,6 +71,14 @@ async function run() {
       {
         name: "users.is_filkom_verified",
         sql: "ALTER TABLE users ADD COLUMN is_filkom_verified TINYINT(1) DEFAULT 0"
+      },
+      {
+        name: "store_settings.payment_mode",
+        sql: "ALTER TABLE store_settings ADD COLUMN payment_mode VARCHAR(20) DEFAULT 'midtrans'"
+      },
+      {
+        name: "orders.payment_proof_url",
+        sql: "ALTER TABLE orders ADD COLUMN payment_proof_url VARCHAR(255) DEFAULT NULL"
       }
     ];
 
@@ -99,4 +106,9 @@ async function run() {
   }
 }
 
-run();
+if (require.main === module) {
+  runMigration().catch(err => {
+    console.error("Migration failed:", err);
+    process.exit(1);
+  });
+}
