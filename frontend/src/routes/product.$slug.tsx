@@ -1415,7 +1415,7 @@ function ProductDetailPage() {
                   {cart.map((i) => (
                     <li key={i.id} className="py-4 flex gap-4">
                       <img
-                        src={i.img}
+                        src={resolveImageUrl(i.img)}
                         alt=""
                         className="w-20 h-24 object-cover border border-ink"
                       />

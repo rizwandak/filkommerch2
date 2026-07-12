@@ -179,7 +179,7 @@ function AdminDashboardPage() {
                       <Bar dataKey="total_quantity_sold" fill="var(--brand-blue)" name="Qty" />
                     </BarChart>
                   </ResponsiveContainer>
-                  <div className="border rounded-lg overflow-hidden mt-4">
+                  <div className="border rounded-lg overflow-x-auto mt-4">
                     <table className="w-full text-sm">
                       <thead className="bg-cream">
                         <tr>
@@ -223,7 +223,7 @@ function AdminDashboardPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-lg overflow-hidden">
+              <div className="border rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-cream">
                     <tr>

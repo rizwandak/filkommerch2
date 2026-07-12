@@ -31,6 +31,7 @@ import { getUserOrders, regeneratePaymentToken } from "@backend/server-actions";
 import { VerificationModal } from "@frontend/components/VerificationModal";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logo from "@/assets/logo-fm.jpg";
+import { resolveImageUrl } from "@/lib/image-resolver";
 
 const scrollToId = (id: string) => {
   const el = document.getElementById(id);
@@ -700,7 +701,7 @@ function UserOrdersPage() {
                       <div key={item.id} className="py-4 flex gap-4 items-start">
                         <div className="w-16 h-20 bg-cream border border-ink rounded overflow-hidden flex items-center justify-center shrink-0">
                           {item.image_url ? (
-                            <img src={item.image_url} alt={item.product_name} className="w-full h-full object-cover" />
+                            <img src={resolveImageUrl(item.image_url)} alt={item.product_name} className="w-full h-full object-cover" />
                           ) : (
                             <ShoppingBag className="w-5 h-5 text-muted-foreground" />
                           )}
@@ -927,7 +928,7 @@ function UserOrdersPage() {
                   {cart.map((i) => (
                     <li key={i.id} className="py-4 flex gap-4">
                       <img
-                        src={i.img}
+                        src={resolveImageUrl(i.img)}
                         alt=""
                         className="w-20 h-24 object-cover border border-ink"
                       />

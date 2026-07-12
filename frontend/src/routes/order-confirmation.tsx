@@ -20,6 +20,7 @@ import {
   submitPaymentProof
 } from "@backend/server-actions";
 import { toast } from "sonner";
+import { resolveImageUrl } from "@/lib/image-resolver";
 
 interface OrderConfirmationSearch {
   orderId?: string;
@@ -297,7 +298,7 @@ function OrderConfirmationPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 pt-6">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="rounded-lg border border-border p-3">
                 <p className="text-[10px] uppercase font-bold text-muted-foreground">ID Pesanan</p>
                 <p className="break-all font-mono text-sm font-bold text-ink mt-0.5">
@@ -358,7 +359,7 @@ function OrderConfirmationPage() {
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <div className="w-12 h-16 bg-cream border border-ink rounded overflow-hidden flex items-center justify-center shrink-0 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]">
                           {item.image_url ? (
-                            <img src={item.image_url} alt={item.product_name} className="w-full h-full object-cover" />
+                            <img src={resolveImageUrl(item.image_url)} alt={item.product_name} className="w-full h-full object-cover" />
                           ) : (
                             <ShoppingBag className="w-5 h-5 text-muted-foreground" />
                           )}

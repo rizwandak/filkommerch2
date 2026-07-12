@@ -34,6 +34,7 @@ import {
   type ProductWithVariants,
   type Category,
 } from "@backend/server-actions";
+import { resolveImageUrl } from "@/lib/image-resolver";
 
 export const Route = createFileRoute("/admin/products")({
   component: AdminProductsPage,
@@ -532,7 +533,7 @@ function AdminProductsPage() {
                       <div className="flex items-center gap-3">
                         {product.image_url ? (
                           <img
-                            src={product.image_url}
+                            src={resolveImageUrl(product.image_url)}
                             alt={product.name}
                             className="h-10 w-10 rounded object-cover border border-border shrink-0"
                           />
@@ -870,7 +871,7 @@ function AdminProductsPage() {
                         key={idx}
                         className="relative w-16 h-16 rounded overflow-hidden border border-ink/40 group"
                       >
-                        <img src={img} alt="preview" className="w-full h-full object-cover" />
+                        <img src={resolveImageUrl(img)} alt="preview" className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={() => {

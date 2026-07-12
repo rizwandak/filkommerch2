@@ -36,6 +36,7 @@ import {
   getDefaultSegments,
 } from "@/lib/homepage-types";
 import { ImageCropperModal } from "@frontend/components/admin/ImageCropperModal";
+import { resolveImageUrl } from "@/lib/image-resolver";
 import hero from "@/assets/hero.jpg";
 import pVarsity from "@/assets/p-varsity.jpg";
 import pHoodie from "@/assets/p-hoodie.jpg";
@@ -1370,7 +1371,7 @@ function AdminHomepageEditorPage() {
                                                     }}
                                                   />
                                                   {prod.image_url && (
-                                                    <img src={prod.image_url} alt={prod.name} className="w-8 h-8 object-cover rounded border border-ink/10" />
+                                                    <img src={resolveImageUrl(prod.image_url)} alt={prod.name} className="w-8 h-8 object-cover rounded border border-ink/10" />
                                                   )}
                                                   <span className="font-bold text-ink">{prod.name}</span>
                                                 </label>
@@ -1436,7 +1437,7 @@ function AdminHomepageEditorPage() {
                                       {el.config.image ? (
                                         <div className="relative border-2 border-dashed border-ink/30 rounded p-3 bg-muted/20 flex flex-col items-center gap-2">
                                           <img
-                                            src={el.config.image}
+                                            src={resolveImageUrl(el.config.image)}
                                             alt="Banner"
                                             className="max-h-36 rounded object-cover border border-ink/10"
                                           />
@@ -1527,7 +1528,7 @@ function AdminHomepageEditorPage() {
                                         {el.config.leftImage ? (
                                           <div className="space-y-1.5">
                                             <div className="relative aspect-[3/4] rounded-lg border-2 border-ink overflow-hidden bg-neutral-900 shadow-sm w-32">
-                                              <img src={el.config.leftImage} className="w-full h-full object-cover" alt="" />
+                                              <img src={resolveImageUrl(el.config.leftImage)} className="w-full h-full object-cover" alt="" />
                                             </div>
                                             <Button
                                               variant="destructive"
@@ -1555,7 +1556,7 @@ function AdminHomepageEditorPage() {
                                         {el.config.rightImage ? (
                                           <div className="space-y-1.5">
                                             <div className="relative aspect-[3/4] rounded-lg border-2 border-ink overflow-hidden bg-neutral-900 shadow-sm w-32">
-                                              <img src={el.config.rightImage} className="w-full h-full object-cover" alt="" />
+                                              <img src={resolveImageUrl(el.config.rightImage)} className="w-full h-full object-cover" alt="" />
                                             </div>
                                             <Button
                                               variant="destructive"
@@ -1785,7 +1786,7 @@ function AdminHomepageEditorPage() {
                                       {el.config.image ? (
                                         <div className="relative border-2 border-dashed border-ink/30 rounded p-3 bg-muted/20 flex flex-col items-center gap-2">
                                           <img
-                                            src={el.config.image}
+                                            src={resolveImageUrl(el.config.image)}
                                             alt="Limited"
                                             className="max-h-36 rounded object-cover border border-ink/10"
                                           />
@@ -2012,7 +2013,7 @@ function AdminHomepageEditorPage() {
                                             <Label className="text-[10px]">Gambar</Label>
                                             {item.image ? (
                                               <div className="relative border border-ink/20 rounded p-1.5 bg-background flex items-center gap-2">
-                                                <img src={item.image} className="w-12 h-12 object-cover rounded" alt="" />
+                                                <img src={resolveImageUrl(item.image)} className="w-12 h-12 object-cover rounded" alt="" />
                                                 <Button
                                                   type="button"
                                                   variant="destructive"
@@ -2295,7 +2296,7 @@ function AdminHomepageEditorPage() {
                                         if (previewImages.length > 0) {
                                           return (
                                             <>
-                                              <img src={previewImages[0]} className="w-full h-full object-cover opacity-80" alt="" />
+                                              <img src={resolveImageUrl(previewImages[0])} className="w-full h-full object-cover opacity-80" alt="" />
                                               {previewImages.length > 1 && (
                                                 <div className="absolute bottom-1 left-0 right-0 flex justify-center gap-0.5 z-10">
                                                   {previewImages.map((_: any, pIdx: number) => (
@@ -2384,7 +2385,7 @@ function AdminHomepageEditorPage() {
                                 {el.type === "image_banner" && (
                                   <div className="relative bg-neutral-900 overflow-hidden flex items-center justify-center" style={{ height: el.config.height === "sm" ? "40px" : el.config.height === "lg" ? "100px" : "70px" }}>
                                     {el.config.image ? (
-                                      <img src={el.config.image} className="w-full h-full object-cover opacity-90" alt="" />
+                                      <img src={resolveImageUrl(el.config.image)} className="w-full h-full object-cover opacity-90" alt="" />
                                     ) : (
                                       <div className="text-cream/50 text-[6.5px] font-mono flex flex-col items-center">
                                         <ImageIcon className="w-3.5 h-3.5 mb-1" />
@@ -2469,7 +2470,7 @@ function AdminHomepageEditorPage() {
                                      </div>
                                      <div className="col-span-4 bg-white/5 aspect-[4/5] rounded border border-white/10 flex items-center justify-center overflow-hidden h-full">
                                        {el.config.image ? (
-                                         <img src={el.config.image} className="w-full h-full object-cover" alt="" />
+                                         <img src={resolveImageUrl(el.config.image)} className="w-full h-full object-cover" alt="" />
                                        ) : (
                                          <span className="text-[5px] text-cream/40 font-mono">Product</span>
                                        )}
@@ -2513,7 +2514,7 @@ function AdminHomepageEditorPage() {
                                        {(el.config.items || []).slice(0, 4).map((photo: any, gIdx: number) => (
                                          <div key={gIdx} className="aspect-[4/5] bg-cream border border-ink rounded overflow-hidden relative">
                                            {photo.image ? (
-                                             <img src={photo.image} className="w-full h-full object-cover" alt="" />
+                                             <img src={resolveImageUrl(photo.image)} className="w-full h-full object-cover" alt="" />
                                            ) : (
                                              <div className="w-full h-full bg-neutral-200 flex items-center justify-center text-[4px] text-muted-foreground font-mono truncate">Look</div>
                                            )}

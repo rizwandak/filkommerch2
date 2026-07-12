@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { createOrderAndPayment } from "@backend/server-actions";
 import { Button } from "@frontend/components/ui/button";
+import { resolveImageUrl } from "@/lib/image-resolver";
 import { Input } from "@frontend/components/ui/input";
 import { Label } from "@frontend/components/ui/label";
 import {
@@ -491,10 +492,10 @@ function CheckoutPage() {
                 <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
                   <CardTitle className="display text-xs tracking-wider uppercase text-ink">Ringkasan Pesanan</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4 pt-6">
+                <CardContent className="p-4 sm:p-6 space-y-4">
                   {cartItems.map((item) => (
-                    <div key={item.id} className="flex justify-between text-xs font-bold border-b border-muted pb-2 last:border-0 last:pb-0 text-ink">
-                      <span className="truncate max-w-[180px]">
+                    <div key={item.id} className="flex justify-between text-xs font-bold border-b border-muted pb-2 last:border-0 last:pb-0 text-ink gap-2">
+                      <span className="truncate flex-1 min-w-0 mr-2 text-left">
                         {item.name} <span className="text-muted-foreground font-normal">× {item.quantity}</span>
                       </span>
                       <span className="shrink-0 font-extrabold text-brand-orange">
@@ -576,7 +577,7 @@ function CartReviewStep({ items, onQuantityChange, onRemoveItem }: CartReviewSte
         <CardTitle className="display text-sm tracking-wider uppercase text-ink">Keranjang Belanja</CardTitle>
         <CardDescription className="text-xs">Periksa kembali item belanjaan Anda sebelum melanjutkan</CardDescription>
       </CardHeader>
-      <CardContent className="pt-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="space-y-4">
           {items.map((item) => (
             <div
@@ -586,7 +587,7 @@ function CartReviewStep({ items, onQuantityChange, onRemoveItem }: CartReviewSte
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <div className="w-16 h-20 bg-cream border-2 border-ink rounded overflow-hidden flex items-center justify-center shrink-0 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]">
                   {item.image_url || (item as any).img ? (
-                    <img src={item.image_url || (item as any).img} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={resolveImageUrl(item.image_url || (item as any).img)} alt={item.name} className="w-full h-full object-cover" />
                   ) : (
                     <ShoppingBag className="w-6 h-6 text-muted-foreground" />
                   )}
@@ -810,7 +811,7 @@ function CustomerDetailsStep({
           Lengkapi informasi untuk pengambilan dan pembayaran
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6 pt-6 text-ink">
+      <CardContent className="p-4 sm:p-6 space-y-6 text-ink">
         {/* User Auth Session Info Card */}
         {user && (
           <div className="bg-[#FCFAF7] border-2 border-ink p-4 rounded-xl text-ink text-xs space-y-2 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
@@ -926,7 +927,7 @@ function CustomerDetailsStep({
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="rtRw" className="font-bold text-[10px] uppercase text-ink">
                   RT / RW (Opsional)
@@ -954,7 +955,7 @@ function CustomerDetailsStep({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="province" className="font-bold text-[10px] uppercase text-ink">
                   Provinsi *
@@ -1031,7 +1032,7 @@ function CustomerDetailsStep({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="kecamatan" className="font-bold text-[10px] uppercase text-ink">
                   Kecamatan *
@@ -1128,13 +1129,13 @@ function PaymentReviewStep({ items, customer }: PaymentReviewStepProps) {
         <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
           <CardTitle className="display text-sm tracking-wider uppercase text-ink">Detail Pesanan Anda</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4 pt-6">
+        <CardContent className="p-4 sm:p-6 space-y-4">
           {items.map((item) => (
-            <div key={item.id} className="flex gap-4 items-center justify-between border-b border-muted pb-3 last:border-0 last:pb-0">
+            <div key={item.id} className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-center justify-between border-b border-muted pb-3 last:border-0 last:pb-0">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <div className="w-12 h-16 bg-cream border-2 border-ink rounded overflow-hidden flex items-center justify-center shrink-0">
                   {item.image_url || (item as any).img ? (
-                    <img src={item.image_url || (item as any).img} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={resolveImageUrl(item.image_url || (item as any).img)} alt={item.name} className="w-full h-full object-cover" />
                   ) : (
                     <ShoppingBag className="w-5 h-5 text-muted-foreground" />
                   )}
@@ -1151,7 +1152,7 @@ function PaymentReviewStep({ items, customer }: PaymentReviewStepProps) {
                   )}
                 </div>
               </div>
-              <span className="font-extrabold text-sm text-ink shrink-0">
+              <span className="font-extrabold text-sm text-brand-orange self-end sm:self-center shrink-0 mt-1 sm:mt-0">
                 Rp {(item.price * item.quantity).toLocaleString("id-ID")}
               </span>
             </div>
@@ -1163,8 +1164,8 @@ function PaymentReviewStep({ items, customer }: PaymentReviewStepProps) {
         <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
           <CardTitle className="display text-sm tracking-wider uppercase text-ink">Informasi Pengiriman</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 pt-6 text-xs text-ink font-medium">
-          <div className="grid grid-cols-2 gap-3 border-b border-ink/10 pb-3">
+        <CardContent className="p-4 sm:p-6 space-y-3 text-xs text-ink font-medium">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-ink/10 pb-3">
             <div>
               <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">Penerima</span>
               <span className="font-bold text-sm">{customer.name}</span>
@@ -1176,7 +1177,7 @@ function PaymentReviewStep({ items, customer }: PaymentReviewStepProps) {
               </div>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-3 border-b border-ink/10 pb-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-ink/10 pb-3">
             <div>
               <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">Email</span>
               <span className="font-semibold">{customer.email}</span>

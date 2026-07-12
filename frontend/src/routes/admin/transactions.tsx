@@ -538,7 +538,7 @@ function AdminTransactionsPage() {
                 <p className="text-xs font-bold text-ink uppercase tracking-wider">
                   Item Yang Dibeli
                 </p>
-                <div className="border border-border rounded overflow-hidden text-xs">
+                <div className="border border-border rounded overflow-x-auto text-xs">
                   <table className="w-full">
                     <thead className="bg-cream">
                       <tr>

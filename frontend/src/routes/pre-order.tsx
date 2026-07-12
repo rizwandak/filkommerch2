@@ -27,6 +27,7 @@ import { useAuth } from "@/lib/auth";
 import { VerificationModal } from "@frontend/components/VerificationModal";
 import { toast } from "sonner";
 import { extractLegacyConfigFromSegments } from "@/lib/homepage-types";
+import { resolveImageUrl } from "@/lib/image-resolver";
 
 import logo from "@/assets/logo-fm.jpg";
 import logoFilkom from "@/assets/logo_filkom.png";
@@ -586,7 +587,7 @@ function PreOrderPage() {
               >
                 <div className="relative aspect-[4/5] bg-secondary overflow-hidden rounded border border-ink/10">
                   <Link to="/product/$slug" params={{ slug: p.id }} className="block h-full">
-                    <img src={p.img} alt={p.name} className="w-full h-full object-cover" />
+                    <img src={resolveImageUrl(p.img)} alt={p.name} className="w-full h-full object-cover" />
                   </Link>
 
                   <span className="absolute top-2 left-2 text-[8px] sm:text-[9px] font-bold tracking-[0.18em] px-2.5 py-1 rounded bg-brand-orange text-cream uppercase">
@@ -687,7 +688,7 @@ function PreOrderPage() {
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {cart.map((i) => (
                 <div key={i.id} className="py-4 flex gap-4 border-b border-border">
-                  <img src={i.img} alt="" className="w-16 h-20 object-cover rounded border" />
+                  <img src={resolveImageUrl(i.img)} alt="" className="w-16 h-20 object-cover rounded border" />
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="flex justify-between">
                       <span className="font-bold text-xs">{i.name}</span>

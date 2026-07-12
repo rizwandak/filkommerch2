@@ -22,6 +22,7 @@ import { getStoreSettings } from "@backend/server-actions";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { extractLegacyConfigFromSegments } from "@/lib/homepage-types";
+import { resolveImageUrl } from "@/lib/image-resolver";
 
 import logo from "@/assets/logo-fm.jpg";
 import logoFilkom from "@/assets/logo_filkom.png";
@@ -384,7 +385,7 @@ function FAQPage() {
       {/* Main Chat Interface */}
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-5 lg:px-10 py-6 sm:py-8 lg:py-10 grid lg:grid-cols-12 gap-8 h-full">
         {/* Chat Window (8 cols) */}
-        <div className="lg:col-span-8 flex flex-col bg-card border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden animate-slide-up h-[600px] lg:h-[700px]">
+        <div className="lg:col-span-8 flex flex-col bg-card border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden animate-slide-up h-[400px] sm:h-[500px] lg:h-[700px]">
           {/* Chat Header */}
           <div className="bg-ink text-cream p-4 flex items-center gap-3 shrink-0">
             <div className="relative">
@@ -451,7 +452,7 @@ function FAQPage() {
           {/* Bottom Chat Input (Decorative) */}
           <div className="p-4 bg-background border-t-2 border-ink flex gap-2 shrink-0">
             <div className="flex-1 bg-muted border-2 border-ink/20 rounded-full px-4 py-3 text-sm text-muted-foreground flex items-center cursor-not-allowed">
-              Pilih pertanyaan di sebelah kanan ya...
+              Pilih pertanyaan yang tersedia ya...
             </div>
             <button
               disabled
@@ -562,7 +563,7 @@ function FAQPage() {
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {cart.map((i) => (
                 <div key={i.id} className="py-4 flex gap-4 border-b border-border">
-                  <img src={i.img} alt="" className="w-16 h-20 object-cover rounded border" />
+                  <img src={resolveImageUrl(i.img)} alt="" className="w-16 h-20 object-cover rounded border" />
                   <div className="flex-1 flex flex-col justify-between">
                     <div className="flex justify-between">
                       <span className="font-bold text-xs">{i.name}</span>
