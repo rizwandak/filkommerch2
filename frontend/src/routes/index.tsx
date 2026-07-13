@@ -34,7 +34,7 @@ import { useMemo, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import type { ProductWithVariants } from "@backend/server-actions";
-import { VerificationModal } from "@frontend/components/VerificationModal";
+import { Navbar } from "@/components/Navbar";
 import {
   type HomepageSegment,
   convertLegacyToSegments,
@@ -525,9 +525,6 @@ function Index() {
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [filter, setFilter] = useState<Filter>("ALL");
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [cartLoaded, setCartLoaded] = useState(false);
-  const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [quickViewProduct, setQuickViewProduct] = useState<ProductCard | null>(null);
   const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({});
@@ -541,32 +538,17 @@ function Index() {
     setHash(window.location.hash);
   }, []);
 
-  // Load wishlist & cart from localStorage
+  // Load wishlist from localStorage
   useEffect(() => {
     try {
       const savedWishlist = localStorage.getItem("wishlist");
       if (savedWishlist) {
         setWishlist(JSON.parse(savedWishlist));
       }
-      const savedCart = localStorage.getItem("indexCart");
-      if (savedCart) {
-        const parsed = JSON.parse(savedCart) as CartItem[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCart(parsed);
-        }
-      }
     } catch (e) {
       // ignore
     }
-    setCartLoaded(true);
   }, []);
-
-  // Sync cart to localStorage
-  useEffect(() => {
-    if (cartLoaded) {
-      localStorage.setItem("indexCart", JSON.stringify(cart));
-    }
-  }, [cart, cartLoaded]);
 
   // Handle hash scroll
   useEffect(() => {
@@ -584,10 +566,7 @@ function Index() {
     return () => window.removeEventListener("hashchange", handleHashScroll);
   }, []);
 
-  const [cartOpen, setCartOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
   const [query, setQuery] = useState("");
   const [email, setEmail] = useState("");
   const { products: loaderProducts, settings, categories } = Route.useLoaderData();
@@ -777,6 +756,7 @@ function Index() {
   };
 
   // Add to cart with support for custom sizes
+  // Add to cart with support for custom sizes
   const addToCart = useCallback((p: ProductCard, selectedSize?: string) => {
     const variants = p.variants || [];
     const sizeToUse = selectedSize || variants[0]?.size || "One Size";
@@ -785,85 +765,37 @@ function Index() {
     const itemId = selectedSize ? `${p.id}-${selectedSize}` : p.id;
     const itemName = selectedSize ? `${p.name} — ${selectedSize}` : p.name;
 
-    setCart((c) => {
-      const existing = c.find((i) => i.id === itemId);
-      if (existing) return c.map((i) => (i.id === itemId ? { ...i, qty: i.qty + 1 } : i));
-      return [
-        ...c,
-        {
-          id: itemId,
-          name:
-            itemId.includes("varsity-filkom") || itemId.includes("varsity-jacket")
-              ? `${itemName} — Default`
-              : itemName,
-          price: p.price,
-          img: p.img,
-          qty: 1,
-          product_id: p.product_id,
-          variant_id: matchingVariant ? matchingVariant.id : undefined,
-          size: sizeToUse,
-          color: "Default",
-        },
-      ];
-    });
-    setCartOpen(true);
+    let currentCart: any[] = [];
+    try {
+      const saved = localStorage.getItem("indexCart");
+      if (saved) currentCart = JSON.parse(saved);
+    } catch (e) {}
+
+    const existingIdx = currentCart.findIndex((i) => i.id === itemId);
+    if (existingIdx !== -1) {
+      currentCart[existingIdx].qty += 1;
+    } else {
+      currentCart.push({
+        id: itemId,
+        name:
+          itemId.includes("varsity-filkom") || itemId.includes("varsity-jacket")
+            ? `${itemName} — Default`
+            : itemName,
+        price: p.price,
+        img: p.img,
+        qty: 1,
+        product_id: p.product_id,
+        variant_id: matchingVariant ? matchingVariant.id : undefined,
+        size: sizeToUse,
+        color: "Default",
+      });
+    }
+
+    localStorage.setItem("indexCart", JSON.stringify(currentCart));
+    window.dispatchEvent(new Event("cart-updated"));
+    window.dispatchEvent(new Event("open-cart"));
     toast.success("Added to bag", { description: itemName });
   }, []);
-
-  const updateQty = useCallback((id: string, delta: number) => {
-    setCart((c) =>
-      c.map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i)).filter((i) => i.qty > 0),
-    );
-  }, []);
-
-  const removeItem = useCallback((id: string) => {
-    setCart((c) => c.filter((i) => i.id !== id));
-  }, []);
-
-  const handleNav = (item: (typeof NAV)[number]) => {
-    setMenuOpen(false);
-    if (item.isScroll) {
-      scrollToId(item.target);
-    } else {
-      navigate({ to: item.href as any });
-    }
-  };
-
-  const handleCheckout = () => {
-    if (!cart.length) {
-      toast.error("Your cart is empty");
-      return;
-    }
-
-    if (!user) {
-      toast.error("Please sign in to checkout");
-      navigate({ to: "/login" });
-      return;
-    }
-
-    const checkoutCart = cart.map((item) => ({
-      id: item.id,
-      name: item.name,
-      price: parsePrice(item.price),
-      quantity: item.qty,
-      product_id: item.product_id,
-      variant_id: item.variant_id,
-      size: item.size,
-      color: item.color,
-      image_url: item.img || item.image_url || "",
-      category: item.name.includes("Varsity")
-        ? "JACKET"
-        : item.name.includes("Hoodie")
-          ? "HOODIE"
-          : item.name.includes("Tee")
-            ? "TEE"
-            : "ACCESSORIES",
-    }));
-
-    localStorage.setItem("cart", JSON.stringify(checkoutCart));
-    navigate({ to: "/checkout" });
-    setCartOpen(false);
-  };
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -882,228 +814,7 @@ function Index() {
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-brand-orange selection:text-cream">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 flex items-center justify-between h-16 sm:h-20">
-          <Link
-            to="/"
-            onClick={(e) => {
-              if (window.location.pathname === "/") {
-                e.preventDefault();
-                scrollToId("top");
-              }
-            }}
-            className="flex items-center gap-2 sm:gap-3 text-left hover:opacity-90 transition-opacity"
-          >
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <img
-                src={logo}
-                alt="Filkom Merch UB"
-                className="h-9 w-9 sm:h-12 sm:w-12 rounded-full object-cover ring-2 ring-ink shadow-sm"
-              />
-              <img
-                src={logoFilkom}
-                alt="Logo FILKOM UB"
-                className="h-8 w-8 sm:h-11 sm:w-11 object-contain"
-              />
-            </div>
-            <div className="leading-tight hidden sm:block">
-              <div className="display text-lg text-ink flex items-center gap-1.5 font-extrabold uppercase tracking-wide">
-                Filkom Merch
-                <span className="text-[8px] bg-blue-100 text-blue-800 font-extrabold px-1.5 py-0.5 rounded tracking-widest uppercase">
-                  OFFICIAL
-                </span>
-              </div>
-              <div className="text-[9px] tracking-[0.32em] text-muted-foreground font-black">
-                UNIVERSITAS BRAWIJAYA
-              </div>
-            </div>
-          </Link>
-
-          <nav className="hidden lg:flex items-center gap-8">
-            {NAV.map((n) => {
-              const isActive = pathname === n.href || (n.href === "/" && pathname === "/" && !hash);
-              const isScrollOnHome = n.isScroll && pathname === "/";
-
-              if (isScrollOnHome) {
-                return (
-                  <button
-                    key={n.label}
-                    onClick={() => scrollToId(n.target!)}
-                    className={`text-[11px] font-bold tracking-[0.2em] transition-colors cursor-pointer uppercase ${
-                      isActive
-                        ? "text-brand-orange border-b-2 border-brand-orange"
-                        : "text-ink hover:text-brand-orange"
-                    }`}
-                  >
-                    {n.label}
-                  </button>
-                );
-              }
-
-              return (
-                <Link
-                  key={n.label}
-                  to={n.href.startsWith("/#") ? "/" : (n.href as any)}
-                  hash={n.isScroll ? n.target : undefined}
-                  className={`text-[11px] font-bold tracking-[0.2em] transition-colors uppercase ${
-                    isActive
-                      ? "text-brand-orange border-b-2 border-brand-orange"
-                      : "text-ink hover:text-brand-orange"
-                  }`}
-                >
-                  {n.label}
-                </Link>
-              );
-            })}
-          </nav>
-
-          <div className="flex items-center gap-4 text-ink">
-            <HackerModeToggle />
-            <button
-              aria-label="Search"
-              onClick={() => setSearchOpen((v) => !v)}
-              className="hover:text-brand-orange transition-colors"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <div className="relative">
-              <button
-                aria-label="Account"
-                onClick={() => setUserMenuOpen((v) => !v)}
-                className="hover:text-brand-orange transition-colors"
-              >
-                <User className="w-5 h-5" />
-              </button>
-              {userMenuOpen && (
-                <div className="absolute right-0 mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] z-50 animate-scale-in">
-                  {user ? (
-                    <>
-                      <div className="px-5 py-3 border-b border-border">
-                        <p className="text-sm font-bold text-foreground break-words">
-                          {user.type === "admin" ? user.username : user.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground break-all">{user.email}</p>
-                        <span className="inline-block mt-1 px-2 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-900 rounded">
-                          {user.type === "admin" ? "ADMIN" : "BUYER"}
-                        </span>
-                        {user && (
-                          <div className="mt-1.5">
-                            {user.is_filkom_verified === 1 ? (
-                              <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-800 rounded">
-                                ✓ FILKOM VERIFIED
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setIsVerifyOpen(true);
-                                  setUserMenuOpen(false);
-                                }}
-                                className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/20 border border-brand-orange/30 px-2 py-1 rounded w-full text-center transition-all cursor-pointer block"
-                              >
-                                Verifikasi NIM
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      {user.type === "admin" && (
-                        <Link
-                          to="/admin/dashboard"
-                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-blue"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <LayoutDashboard className="w-4 h-4" />
-                          Panel Admin
-                        </Link>
-                      )}
-                      {user.type === "admin" && (
-                        <Link
-                          to="/pos"
-                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-orange"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <MonitorSmartphone className="w-4 h-4" />
-                          Kasir / POS
-                        </Link>
-                      )}
-                      {user && (
-                        <Link
-                          to="/orders"
-                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <ShoppingBag className="w-4 h-4" />
-                          Pesanan Saya
-                        </Link>
-                      )}
-                      <button
-                        onClick={() => {
-                          logout();
-                          setUserMenuOpen(false);
-                          toast.success("Logged out");
-                        }}
-                        className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2"
-                      >
-                        <LogOut className="w-4 h-4" />
-                        Logout
-                      </button>
-                    </>
-                  ) : (
-                    <Link
-                      to="/login"
-                      className="block px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary"
-                      onClick={() => setUserMenuOpen(false)}
-                    >
-                      Sign In
-                    </Link>
-                  )}
-                </div>
-              )}
-            </div>
-            <button
-              aria-label="Cart"
-              className="relative hover:text-brand-orange transition-colors"
-              onClick={() => setCartOpen(true)}
-            >
-              <ShoppingBag className="w-5 h-5" />
-              {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-brand-orange text-cream text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-            <button aria-label="Menu" className="lg:hidden" onClick={() => setMenuOpen(true)}>
-              <Menu className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-        {searchOpen && (
-          <div className="border-t border-border bg-background animate-slide-down">
-            <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-4 flex items-center gap-3">
-              <Search className="w-4 h-4 text-muted-foreground" />
-              <input
-                autoFocus
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  if (e.target.value) scrollToId("shop");
-                }}
-                placeholder="Cari produk…"
-                className="flex-1 bg-transparent outline-none text-sm text-ink placeholder:text-muted-foreground"
-              />
-              <button
-                onClick={() => {
-                  setSearchOpen(false);
-                  setQuery("");
-                }}
-                aria-label="Close search"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        )}
-      </header>
+      <Navbar searchQuery={query} onSearchQueryChange={setQuery} />
 
       <div id="top" />
 
@@ -2111,151 +1822,7 @@ function Index() {
         </div>
       </footer>
 
-      {/* Mobile menu */}
-      {menuOpen && (
-        <div className="fixed inset-0 z-50 bg-ink text-cream flex flex-col animate-fade-in">
-          <div className="flex items-center justify-between px-4 sm:px-5 h-16 sm:h-20 border-b border-cream/20">
-            <span className="display text-lg font-bold">Filkom Merch</span>
-            <button
-              onClick={() => {
-                setMenuOpen(false);
-                setUserMenuOpen(false);
-              }}
-              aria-label="Close menu"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-          <nav className="flex-1 flex flex-col px-5 py-6 sm:py-8 gap-1">
-            {NAV.map((n, idx) => (
-              <Link
-                key={n.label}
-                to={n.href.startsWith("/#") ? "/" : (n.href as any)}
-                hash={n.isScroll ? n.target : undefined}
-                onClick={() => {
-                  setMenuOpen(false);
-                  setUserMenuOpen(false);
-                }}
-                className="display text-3xl sm:text-4xl text-left py-2.5 sm:py-3 hover:text-brand-orange transition-colors animate-slide-up"
-                style={{ animationDelay: `${idx * 50}ms` }}
-              >
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-        </div>
-      )}
 
-      {/* Cart drawer */}
-      {cartOpen && (
-        <div className="fixed inset-0 z-50 flex animate-fade-in">
-          <div
-            className="hidden sm:block flex-1 bg-ink/50 backdrop-blur-sm"
-            onClick={() => {
-              setCartOpen(false);
-              setUserMenuOpen(false);
-            }}
-          />
-          <aside className="w-full sm:max-w-md bg-background text-foreground flex flex-col shadow-2xl border-l border-ink">
-            <div className="flex items-center justify-between h-20 px-6 border-b border-border">
-              <div>
-                <div className="display text-2xl text-ink font-bold">Your Bag</div>
-                <div className="text-[10px] tracking-[0.3em] text-muted-foreground font-bold">
-                  {cartCount} ITEMS
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setCartOpen(false);
-                  setUserMenuOpen(false);
-                }}
-                aria-label="Close cart"
-              >
-                <X className="w-5 h-5 text-ink" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {cart.length === 0 ? (
-                <div className="text-center py-20">
-                  <ShoppingBag className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
-                  <p className="display text-2xl text-ink font-bold">Bag is empty.</p>
-                  <p className="text-sm text-muted-foreground mt-2">Tambahkan produk favoritmu.</p>
-                  <button
-                    onClick={() => {
-                      setCartOpen(false);
-                      scrollToId("shop");
-                    }}
-                    className="mt-6 inline-flex items-center gap-2 bg-ink text-cream px-6 py-3 text-xs font-bold tracking-[0.2em] hover:bg-brand-orange uppercase"
-                  >
-                    BROWSE PRODUCTS <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <ul className="divide-y divide-border">
-                  {cart.map((i) => (
-                    <li key={i.id} className="py-4 flex gap-4">
-                      <img
-                        src={resolveImageUrl(i.img)}
-                        alt=""
-                        className="w-20 h-24 object-cover border border-ink/10 rounded"
-                      />
-                      <div className="flex-1 flex flex-col">
-                        <div className="flex justify-between gap-2">
-                          <h4 className="text-sm font-bold text-ink leading-snug">{i.name}</h4>
-                          <button onClick={() => removeItem(i.id)} aria-label="Remove">
-                            <Trash2 className="w-4 h-4 text-muted-foreground hover:text-brand-orange transition-colors" />
-                          </button>
-                        </div>
-                        {i.size && (
-                          <span className="text-[10px] bg-secondary text-ink font-bold px-1.5 py-0.5 rounded w-fit mt-1 border border-ink/10">
-                            Size: {i.size}
-                          </span>
-                        )}
-                        <div className="mt-auto flex items-center justify-between">
-                          <div className="inline-flex items-center border-2 border-ink rounded">
-                            <button
-                              onClick={() => updateQty(i.id, -1)}
-                              className="px-2 py-1 hover:bg-secondary cursor-pointer"
-                              aria-label="Decrease"
-                            >
-                              <Minus className="w-3 h-3" />
-                            </button>
-                            <span className="px-3 text-sm font-bold">{i.qty}</span>
-                            <button
-                              onClick={() => updateQty(i.id, 1)}
-                              className="px-2 py-1 hover:bg-secondary cursor-pointer"
-                              aria-label="Increase"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </button>
-                          </div>
-                          <span className="text-sm font-black text-ink">
-                            {formatRp(parsePrice(i.price) * i.qty)}
-                          </span>
-                        </div>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            {cart.length > 0 && (
-              <div className="border-t-2 border-ink px-6 py-5 space-y-4 bg-cream">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground font-semibold">Subtotal</span>
-                  <span className="font-black text-ink">{formatRp(cartTotal)}</span>
-                </div>
-                <button
-                  onClick={handleCheckout}
-                  className="w-full bg-ink text-cream py-4 text-xs font-bold tracking-[0.2em] hover:bg-brand-orange transition-colors inline-flex items-center justify-center gap-2 cursor-pointer shadow uppercase"
-                >
-                  CHECKOUT NOW <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </aside>
-        </div>
-      )}
 
       {/* Quick View Dialog / Modal overlay */}
       {quickViewProduct && (
@@ -2364,9 +1931,7 @@ function Index() {
         </div>
       )}
 
-      {user?.type === "buyer" && user.is_google && user.email.endsWith("ub.ac.id") && (
-        <VerificationModal isOpen={isVerifyOpen} onClose={() => setIsVerifyOpen(false)} />
-      )}
+
     </div>
   );
 }

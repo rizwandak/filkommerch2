@@ -23,9 +23,7 @@ import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { extractLegacyConfigFromSegments } from "@/lib/homepage-types";
 import { resolveImageUrl } from "@/lib/image-resolver";
-
-import logo from "@/assets/logo-fm.jpg";
-import logoFilkom from "@/assets/logo_filkom.png";
+import { Navbar } from "@/components/Navbar";
 import baraSmile from "@/assets/bara-smile.png";
 
 export const Route = createFileRoute("/faq")({
@@ -117,12 +115,7 @@ function FAQPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [cartLoaded, setCartLoaded] = useState(false);
-  const [cartOpen, setCartOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
 
   const [pathname, setPathname] = useState("");
   useEffect(() => setPathname(window.location.pathname), []);
@@ -189,198 +182,12 @@ function FAQPage() {
     }, 1500);
   };
 
-  // Load cart from localStorage
-  useEffect(() => {
-    try {
-      const savedCart = localStorage.getItem("indexCart");
-      if (savedCart) {
-        const parsed = JSON.parse(savedCart) as CartItem[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setCart(parsed);
-        }
-      }
-    } catch (e) {}
-    setCartLoaded(true);
-  }, []);
 
-  // Sync cart to localStorage
-  useEffect(() => {
-    if (cartLoaded) {
-      localStorage.setItem("indexCart", JSON.stringify(cart));
-    }
-  }, [cart, cartLoaded]);
-
-  const cartCount = cart.reduce((s, i) => s + i.qty, 0);
-  const cartTotal = cart.reduce((s, i) => s + parsePrice(i.price) * i.qty, 0);
-
-  const updateQty = useCallback((id: string, delta: number) => {
-    setCart((c) =>
-      c.map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i)).filter((i) => i.qty > 0),
-    );
-  }, []);
-
-  const removeItem = useCallback((id: string) => {
-    setCart((c) => c.filter((i) => i.id !== id));
-  }, []);
-
-  const handleCheckout = () => {
-    if (!cart.length) {
-      toast.error("Your cart is empty");
-      return;
-    }
-
-    if (!user) {
-      toast.error("Please sign in to checkout");
-      navigate({ to: "/login" });
-      return;
-    }
-
-    const checkoutCart = cart.map((item) => ({
-      id: item.id,
-      name: item.name,
-      price: parsePrice(item.price),
-      quantity: item.qty,
-      product_id: item.product_id,
-      variant_id: item.variant_id,
-      size: item.size,
-      color: item.color,
-      image_url: item.img || item.image_url || "",
-      category: "TEE",
-    }));
-
-    localStorage.setItem("cart", JSON.stringify(checkoutCart));
-    navigate({ to: "/checkout" });
-    setCartOpen(false);
-  };
-
-  function parsePrice(p: string) {
-    return Number(p.replace(/[^0-9]/g, ""));
-  }
-
-  function formatRp(n: number) {
-    return "Rp " + n.toLocaleString("id-ID");
-  }
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-brand-orange selection:text-cream flex flex-col">
       {/* Header */}
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink shrink-0">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 flex items-center justify-between h-16 sm:h-20">
-          <Link to="/" className="flex items-center gap-2 sm:gap-3 text-left hover:opacity-90">
-            <img
-              src={logo}
-              alt=""
-              className="h-9 w-9 sm:h-12 sm:w-12 rounded-full object-cover ring-2 ring-ink shadow-sm"
-            />
-            <img src={logoFilkom} alt="" className="h-8 w-8 sm:h-11 sm:w-11 object-contain" />
-            <div className="leading-tight hidden sm:block">
-              <div className="display text-lg text-ink flex items-center gap-1.5 font-extrabold uppercase">
-                Filkom Merch
-                <span className="text-[8px] bg-blue-100 text-blue-800 font-extrabold px-1.5 py-0.5 rounded tracking-widest uppercase">
-                  OFFICIAL
-                </span>
-              </div>
-              <div className="text-[9px] tracking-[0.32em] text-muted-foreground font-black">
-                UNIVERSITAS BRAWIJAYA
-              </div>
-            </div>
-          </Link>
-
-          <nav className="hidden lg:flex items-center gap-8">
-            {NAV.map((n) => (
-              <Link
-                key={n.label}
-                to={n.href as any}
-                className={`text-[11px] font-bold tracking-[0.2em] transition-colors uppercase ${
-                  pathname === n.href
-                    ? "text-brand-orange border-b-2 border-brand-orange"
-                    : "text-ink hover:text-brand-orange"
-                }`}
-              >
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-4 text-ink">
-            <HackerModeToggle />
-            <button
-              aria-label="Search"
-              onClick={() => setSearchOpen((v) => !v)}
-              className="hover:text-brand-orange"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <div className="relative">
-              <button
-                aria-label="Account"
-                onClick={() => setUserMenuOpen((v) => !v)}
-                className="hover:text-brand-orange"
-              >
-                <User className="w-5 h-5" />
-              </button>
-              {userMenuOpen && (
-                <div className="absolute right-0 mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] z-50 animate-scale-in">
-                  {user ? (
-                    <div className="p-3 border-b border-border text-xs space-y-1.5">
-                      <p className="font-bold">{user.type === "admin" ? user.username : user.name}</p>
-                      <p className="text-[10px] text-muted-foreground">{user.email}</p>
-                      {user.type === "admin" && (
-                        <div className="space-y-1.5 pt-1.5 border-t border-border mt-1.5">
-                          <Link
-                            to="/admin/dashboard"
-                            className="flex items-center gap-1.5 font-bold text-brand-blue hover:underline"
-                            onClick={() => setUserMenuOpen(false)}
-                          >
-                            <LayoutDashboard className="w-3.5 h-3.5" />
-                            Panel Admin
-                          </Link>
-                          <Link
-                            to="/pos"
-                            className="flex items-center gap-1.5 font-bold text-brand-orange hover:underline"
-                            onClick={() => setUserMenuOpen(false)}
-                          >
-                            <MonitorSmartphone className="w-3.5 h-3.5" />
-                            Kasir / POS
-                          </Link>
-                        </div>
-                      )}
-                      <button
-                        onClick={logout}
-                        className="w-full text-left text-red-600 font-bold mt-2 pt-1.5 border-t border-border"
-                      >
-                        Logout
-                      </button>
-                    </div>
-                  ) : (
-                    <Link
-                      to="/login"
-                      className="block px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary"
-                    >
-                      Sign In
-                    </Link>
-                  )}
-                </div>
-              )}
-            </div>
-            <button
-              aria-label="Cart"
-              className="relative hover:text-brand-orange"
-              onClick={() => setCartOpen(true)}
-            >
-              <ShoppingBag className="w-5 h-5" />
-              {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-brand-orange text-cream text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-            <button aria-label="Menu" className="lg:hidden" onClick={() => setMenuOpen(true)}>
-              <Menu className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       {/* Main Chat Interface */}
       <main className="flex-1 max-w-[1400px] w-full mx-auto px-4 sm:px-5 lg:px-10 py-6 sm:py-8 lg:py-10 grid lg:grid-cols-12 gap-8 h-full">
@@ -546,64 +353,7 @@ function FAQPage() {
         </div>
       </footer>
 
-      {/* Cart Drawer */}
-      {cartOpen && (
-        <div className="fixed inset-0 z-50 flex animate-fade-in">
-          <div
-            className="hidden sm:block flex-1 bg-ink/50 backdrop-blur-sm"
-            onClick={() => setCartOpen(false)}
-          />
-          <aside className="w-full sm:max-w-md bg-background text-foreground flex flex-col shadow-2xl border-l border-ink">
-            <div className="flex items-center justify-between h-20 px-6 border-b border-border">
-              <div className="display text-2xl text-ink font-bold">Your Bag</div>
-              <button onClick={() => setCartOpen(false)}>
-                <X className="w-5 h-5 text-ink" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-6 py-4">
-              {cart.map((i) => (
-                <div key={i.id} className="py-4 flex gap-4 border-b border-border">
-                  <img src={resolveImageUrl(i.img)} alt="" className="w-16 h-20 object-cover rounded border" />
-                  <div className="flex-1 flex flex-col justify-between">
-                    <div className="flex justify-between">
-                      <span className="font-bold text-xs">{i.name}</span>
-                      <button onClick={() => removeItem(i.id)}>
-                        <Trash2 className="w-4 h-4 text-muted-foreground hover:text-brand-orange" />
-                      </button>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-black">{i.price}</span>
-                      <div className="flex items-center gap-2">
-                        <button onClick={() => updateQty(i.id, -1)} className="p-1 border rounded">
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="text-xs font-bold">{i.qty}</span>
-                        <button onClick={() => updateQty(i.id, 1)} className="p-1 border rounded">
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            {cart.length > 0 && (
-              <div className="border-t-2 border-ink px-6 py-5 bg-cream">
-                <div className="flex justify-between text-sm mb-4 font-bold">
-                  <span>Subtotal</span>
-                  <span>{formatRp(cartTotal)}</span>
-                </div>
-                <button
-                  onClick={handleCheckout}
-                  className="w-full bg-ink text-cream py-4 text-xs font-bold tracking-widest hover:bg-brand-orange uppercase"
-                >
-                  CHECKOUT NOW →
-                </button>
-              </div>
-            )}
-          </aside>
-        </div>
-      )}
+
     </div>
   );
 }

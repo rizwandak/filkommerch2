@@ -2049,19 +2049,24 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
     const actorName = req.header("x-user-name") || null;
     const actorRole = req.header("x-user-role") || null;
 
-    const existing = await queryOne<{ id: number }>("SELECT id FROM store_settings LIMIT 1");
+    const existing = await queryOne<any>("SELECT * FROM store_settings LIMIT 1");
+    const homepageLayoutToSave =
+      input.homepage_layout !== undefined
+        ? input.homepage_layout
+        : existing?.homepage_layout ?? null;
+
     if (existing) {
       await execute(
         `UPDATE store_settings SET store_name = ?, address = ?, phone = ?,
          tax_rate = ?, qris_static_url = ?, homepage_layout = ?, payment_mode = ? WHERE id = ?`,
         [
-          input.store_name,
-          input.address || null,
-          input.phone || null,
-          input.tax_rate ?? 0,
-          input.qris_static_url || null,
-          input.homepage_layout || null,
-          input.payment_mode || "midtrans",
+          input.store_name !== undefined ? input.store_name : existing.store_name,
+          input.address !== undefined ? (input.address || null) : existing.address,
+          input.phone !== undefined ? (input.phone || null) : existing.phone,
+          input.tax_rate !== undefined ? input.tax_rate : existing.tax_rate,
+          input.qris_static_url !== undefined ? (input.qris_static_url || null) : existing.qris_static_url,
+          homepageLayoutToSave,
+          input.payment_mode !== undefined ? (input.payment_mode || "midtrans") : existing.payment_mode,
           existing.id,
         ]
       );
@@ -2070,12 +2075,12 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
         `INSERT INTO store_settings (store_name, address, phone, tax_rate, qris_static_url, homepage_layout, payment_mode)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
-          input.store_name,
+          input.store_name || "FILKOM Merch",
           input.address || null,
           input.phone || null,
           input.tax_rate ?? 0,
           input.qris_static_url || null,
-          input.homepage_layout || null,
+          homepageLayoutToSave,
           input.payment_mode || "midtrans",
         ]
       );

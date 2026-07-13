@@ -94,6 +94,7 @@ function AdminSettingsPage() {
         tax_rate: settings.tax_rate,
         qris_static_url: settings.qris_static_url || undefined,
         payment_mode: settings.payment_mode || "midtrans",
+        homepage_layout: settings.homepage_layout || undefined,
       },
     });
     setSaving(false);
