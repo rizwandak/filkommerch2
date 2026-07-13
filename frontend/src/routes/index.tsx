@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useMemo, useState, useEffect, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { getProducts, getStoreSettings, getCategories, type ProductWithVariants } from "@backend/server-actions";
@@ -612,31 +613,51 @@ function Index() {
   const [email, setEmail] = useState("");
   const loaderData = Route.useLoaderData() || {};
   const dbProducts = loaderData.products || [];
-  const settings = loaderData.settings || null;
+  const initialSettings = loaderData.settings || null;
   const categories = loaderData.categories || [];
+
+  // Fetch store settings via React Query with initialData from loader to ensure background refetch on client
+  const { data: settingsData } = useQuery({
+    queryKey: ["storeSettings"],
+    queryFn: () => getStoreSettings(),
+    initialData: initialSettings ? { settings: initialSettings } : undefined,
+    staleTime: 1000 * 30, // 30 seconds stale time
+    refetchOnMount: true,
+  });
+
+  const settings = settingsData?.settings ?? initialSettings;
 
   // Merge database layout configuration with default segments list
   const segments = useMemo((): HomepageSegment[] => {
-    if (!settings?.homepage_layout) {
+    const rawLayout = settings?.homepage_layout;
+    if (!rawLayout) {
       return getDefaultSegments();
     }
+
+    // If MySQL driver or API response already returned parsed Object/Array
+    if (typeof rawLayout === "object") {
+      return convertLegacyToSegments(rawLayout as any);
+    }
+
     try {
-      const parsed = JSON.parse(settings.homepage_layout);
+      const parsed = JSON.parse(rawLayout);
       return convertLegacyToSegments(parsed);
     } catch (e) {
       console.warn("Standard JSON.parse failed for homepage_layout, trying robust cleanup:", e);
       try {
-        // Clean carriage returns and escape raw newlines/tabs inside the minified JSON string
-        const cleaned = settings.homepage_layout
-          .replace(/\r/g, "")
-          .replace(/\n/g, "\\n")
-          .replace(/\t/g, "\\t");
-        const parsed = JSON.parse(cleaned);
-        return convertLegacyToSegments(parsed);
+        if (typeof rawLayout === "string") {
+          // Clean carriage returns and escape raw newlines/tabs inside the minified JSON string
+          const cleaned = rawLayout
+            .replace(/\r/g, "")
+            .replace(/\n/g, "\\n")
+            .replace(/\t/g, "\\t");
+          const parsed = JSON.parse(cleaned);
+          return convertLegacyToSegments(parsed);
+        }
       } catch (err) {
         console.error("Failed parsing homepage_layout even with robust cleanup:", err);
-        return getDefaultSegments();
       }
+      return getDefaultSegments();
     }
   }, [settings]);
 

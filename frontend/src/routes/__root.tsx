@@ -116,11 +116,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
-      <body>
+      <body suppressHydrationWarning>
         {children}
         <Scripts />
       </body>
@@ -132,7 +132,9 @@ const getMarqueeText = (settings: any) => {
   const defaultText = "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN | 100% PRODUK MAHASISWA | CASHBACK 5% MEMBER | DROP BARU TIAP BULAN";
   if (!settings || !settings.homepage_layout) return defaultText;
   try {
-    const parsed = JSON.parse(settings.homepage_layout);
+    const parsed = typeof settings.homepage_layout === "object"
+      ? settings.homepage_layout
+      : JSON.parse(settings.homepage_layout);
     if (Array.isArray(parsed)) {
       // segment-based layout
       for (const segment of parsed) {
@@ -143,7 +145,7 @@ const getMarqueeText = (settings: any) => {
           }
         }
       }
-    } else if (parsed.marqueeText) {
+    } else if (parsed?.marqueeText) {
       return parsed.marqueeText;
     }
   } catch (e) {

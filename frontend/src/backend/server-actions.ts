@@ -1,11 +1,19 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 
-// Check environment variables at runtime
-const API_URL =
-  (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
-  import.meta.env.VITE_API_URL ||
-  "http://127.0.0.1:8080";
+// Helper to resolve API base URL across SSR, client, and fallback envs
+export const getApiUrl = (): string => {
+  const envUrl =
+    (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
+    (typeof import.meta !== "undefined" ? import.meta.env?.VITE_API_URL : undefined);
+  if (envUrl) return envUrl;
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin;
+  }
+  return "http://127.0.0.1:8080";
+};
+
+const API_URL = getApiUrl();
 
 // Helper to get auth headers from incoming request cookies
 const getAuthHeaders = () => {
