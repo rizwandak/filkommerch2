@@ -3,13 +3,14 @@ import { getRequest } from "@tanstack/react-start/server";
 
 // Helper to resolve API base URL across SSR, client, and fallback envs
 export const getApiUrl = (): string => {
+  if (typeof window !== "undefined") {
+    // In client browser, use relative paths or explicit env
+    return (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) || "";
+  }
   const envUrl =
     (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
     (typeof import.meta !== "undefined" ? import.meta.env?.VITE_API_URL : undefined);
   if (envUrl) return envUrl;
-  if (typeof window !== "undefined" && window.location?.origin) {
-    return window.location.origin;
-  }
   return "http://127.0.0.1:8080";
 };
 
@@ -59,7 +60,13 @@ const getAuthHeaders = () => {
 // Wrapper around fetch to automatically include auth headers when executed on server
 const serverFetch = async (url: string, init?: RequestInit) => {
   const authHeaders = getAuthHeaders();
-  return fetch(url, {
+  let finalUrl = url;
+  if (url.startsWith("http://127.0.0.1:8080") || url.startsWith("http://localhost:8080")) {
+    const baseUrl = getApiUrl();
+    const path = url.replace(/^http:\/\/(127\.0\.0\.1|localhost):8080/, "");
+    finalUrl = baseUrl ? `${baseUrl}${path}` : path;
+  }
+  return fetch(finalUrl, {
     ...init,
     headers: {
       ...authHeaders,

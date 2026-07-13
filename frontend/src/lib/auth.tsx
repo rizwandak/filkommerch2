@@ -56,9 +56,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  // Sync cookies whenever user changes
+  // Sync cookies whenever user changes (only after auth initialization completes)
   useEffect(() => {
-    if (typeof document === "undefined") return;
+    if (typeof document === "undefined" || loading) return;
     if (user) {
       const role = user.type === "admin" ? user.role : "buyer";
       const name = user.type === "admin" ? user.username : user.name;
@@ -72,7 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       document.cookie = "user_name=; path=/; max-age=0; SameSite=Lax";
       document.cookie = "user_id=; path=/; max-age=0; SameSite=Lax";
     }
-  }, [user]);
+  }, [user, loading]);
 
   const loginAsAdmin = async (username: string, password: string) => {
     const result = await authLogin({ data: { username, password } });

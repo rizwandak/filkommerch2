@@ -52,7 +52,7 @@ export const Route = createFileRoute("/checkout")({
 
 function CheckoutPage() {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState(
     user ? (user.type === "buyer" ? user.name : user.username) : ""
@@ -95,6 +95,7 @@ function CheckoutPage() {
 
   // Check auth and load cart
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate({ to: "/login" });
       return;
@@ -111,7 +112,7 @@ function CheckoutPage() {
     } else {
       toast.error("Your cart is empty");
     }
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   // Load Midtrans Snap script dynamically
   useEffect(() => {
@@ -128,6 +129,14 @@ function CheckoutPage() {
       document.body.appendChild(script);
     }
   }, []);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-ink" />
+      </div>
+    );
+  }
 
   const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
 

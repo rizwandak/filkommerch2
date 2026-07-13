@@ -61,7 +61,7 @@ type TabStatus = "all" | "unpaid" | "processing" | "completed" | "cancelled";
 
 function UserOrdersPage() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, loading: authLoading, logout } = useAuth();
 
   const [pathname, setPathname] = useState("");
   const [search, setSearch] = useState("");
@@ -119,12 +119,13 @@ function UserOrdersPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     if (!user) {
       navigate({ to: "/login" });
       return;
     }
     void fetchOrders();
-  }, [user, navigate]);
+  }, [user, authLoading, navigate]);
 
   const handleCopyOrderId = (id: string) => {
     void navigator.clipboard.writeText(id);
