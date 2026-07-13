@@ -394,6 +394,7 @@ function LoginPage() {
                     placeholder="Masukkan username atau email"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
+                    autoComplete="username"
                     className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
                     required
                   />
@@ -415,6 +416,7 @@ function LoginPage() {
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
                     className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
                     required
                   />

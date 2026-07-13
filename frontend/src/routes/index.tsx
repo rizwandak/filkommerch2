@@ -69,7 +69,7 @@ export const Route = createFileRoute("/")({
     const dbProducts = productsRes.products || [];
     const settings = settingsRes.settings || null;
 
-    const formattedProducts = dbProducts.map((product: ProductWithVariants) => {
+    const formattedProducts: ProductCard[] = dbProducts.map((product: ProductWithVariants) => {
       const productName = product.name.toLowerCase();
       const cat: Filter =
         product.category_slug === "bundle" || product.category_slug === "bundles" || product.product_type === "bundle"
@@ -91,7 +91,7 @@ export const Route = createFileRoute("/")({
         price: `Rp ${product.price.toLocaleString("id-ID")}`,
         was: product.original_price
           ? `Rp ${product.original_price.toLocaleString("id-ID")}`
-          : undefined,
+          : null,
         tag: product.is_best_seller
           ? "BEST SELLER"
           : product.is_limited
@@ -101,18 +101,18 @@ export const Route = createFileRoute("/")({
               : "NEW",
         cat,
         product_id: product.id,
-        is_best_seller: product.is_best_seller,
-        is_limited: product.is_limited,
-        is_featured: product.is_featured,
-        sale_type: product.sale_type,
+        is_best_seller: Boolean(product.is_best_seller),
+        is_limited: Boolean(product.is_limited),
+        is_featured: Boolean(product.is_featured),
+        sale_type: product.sale_type || null,
         variants: product.variants || [],
-        description: product.description,
-        category_id: product.category_id,
-        category_slug: product.category_slug,
-        product_type: product.product_type,
-        bundle_components: product.bundle_components,
-        rawPrice: product.price,
-        rawOriginalPrice: product.original_price,
+        description: product.description || null,
+        category_id: product.category_id || null,
+        category_slug: product.category_slug || null,
+        product_type: product.product_type || null,
+        bundle_components: product.bundle_components || [],
+        rawPrice: product.price || 0,
+        rawOriginalPrice: product.original_price || null,
       };
     });
 
@@ -158,7 +158,7 @@ type ProductCard = {
   img: string;
   name: string;
   price: string;
-  was?: string;
+  was?: string | null;
   tag?: string;
   cat: Filter;
   product_id?: number;
@@ -168,7 +168,7 @@ type ProductCard = {
   sale_type?: string | null;
   variants?: any[];
   description?: string | null;
-  category_id?: number;
+  category_id?: number | null;
   category_slug?: string | null;
   product_type?: string | null;
   bundle_components?: any[];

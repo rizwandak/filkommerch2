@@ -5,6 +5,19 @@ let lastCapturedError: { error: unknown; at: number } | undefined;
 const TTL_MS = 5_000;
 
 function record(error: unknown) {
+  if (error) {
+    const msg = String((error as any)?.message || (error as any)?.reason || error);
+    const stack = String((error as any)?.stack || "");
+    if (
+      msg.includes("katulampa.gopay.sh") ||
+      msg.includes("play.google.com/log") ||
+      msg.includes("faro-web-sdk") ||
+      stack.includes("katulampa") ||
+      stack.includes("faro")
+    ) {
+      return;
+    }
+  }
   lastCapturedError = { error, at: Date.now() };
 }
 
