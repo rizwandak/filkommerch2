@@ -886,7 +886,7 @@ function Index() {
       {segments
         .filter((seg) => seg.enabled)
         .map((seg) => (
-          <div key={seg.id} className="w-full">
+          <div key={seg.id} className="w-full overflow-hidden">
             {(seg.elements || []).map((el) => {
               switch (el.type) {
                 case "marquee":
@@ -1230,9 +1230,9 @@ function Index() {
                                 key={cat.id}
                                 to="/products"
                                 search={{ category: String(cat.id) }}
-                                className="group text-left border-2 border-ink rounded-lg bg-background p-4 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-4px] transition-all duration-300 flex flex-col h-full cursor-pointer overflow-visible"
+                                className="group text-left border-2 border-ink rounded-lg bg-background p-4 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-4px] transition-all duration-300 flex flex-col h-full cursor-pointer overflow-hidden"
                               >
-                                <div className="relative aspect-square w-full mb-6 shrink-0 overflow-visible flex items-center justify-center pt-2">
+                                <div className="relative aspect-square w-full mb-6 shrink-0 overflow-hidden flex items-center justify-center pt-2">
                                   {imgs.length === 0 ? (
                                     <div className="w-[90%] h-[90%] bg-muted rounded overflow-hidden border border-ink/10 shadow-sm">
                                       <img

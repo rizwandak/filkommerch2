@@ -177,7 +177,7 @@ function GlobalLayout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col pt-10 sm:pt-11 bg-background text-foreground selection:bg-brand-orange selection:text-cream has-global-marquee">
+    <div className="min-h-screen flex flex-col pt-10 sm:pt-11 bg-background text-foreground selection:bg-brand-orange selection:text-cream has-global-marquee overflow-x-hidden max-w-full w-full">
       {/* Announcement marquee fixed at the top */}
       <div className="fixed top-0 left-0 right-0 z-50 bg-ink text-cream overflow-hidden border-b border-ink h-10 sm:h-11 flex items-center shadow-sm">
         <div className="flex marquee-track whitespace-nowrap text-[10px] sm:text-xs tracking-[0.2em] font-bold h-full items-center">
