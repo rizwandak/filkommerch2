@@ -32,6 +32,7 @@ import { Card, CardContent } from "@frontend/components/ui/card";
 import { toast } from "sonner";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Navbar } from "@/components/Navbar";
+import logo from "@/assets/logo-fm.jpg";
 
 const scrollToId = (id: string) => {
   const el = document.getElementById(id);
@@ -371,11 +372,10 @@ function ProductsCatalogPage() {
               <div className="space-y-1.5">
                 <button
                   onClick={() => setSelectedCategory("ALL")}
-                  className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${
-                    selectedCategory === "ALL"
+                  className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${selectedCategory === "ALL"
                       ? "bg-brand-orange text-cream"
                       : "bg-card text-ink hover:bg-cream"
-                  }`}
+                    }`}
                 >
                   Semua Produk
                   {selectedCategory === "ALL" && <Check className="w-3.5 h-3.5" />}
@@ -384,11 +384,10 @@ function ProductsCatalogPage() {
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategory(String(cat.id))}
-                    className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${
-                      selectedCategory === String(cat.id)
+                    className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${selectedCategory === String(cat.id)
                         ? "bg-brand-orange text-cream"
                         : "bg-card text-ink hover:bg-cream"
-                    }`}
+                      }`}
                   >
                     {cat.name}
                     {selectedCategory === String(cat.id) && <Check className="w-3.5 h-3.5" />}
@@ -412,11 +411,10 @@ function ProductsCatalogPage() {
                   <button
                     key={type.id}
                     onClick={() => setSelectedSaleType(type.id)}
-                    className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${
-                      selectedSaleType === type.id
+                    className={`w-full text-left text-xs px-3 py-2 rounded-lg font-bold transition flex justify-between items-center border border-ink cursor-pointer ${selectedSaleType === type.id
                         ? "bg-brand-orange text-cream"
                         : "bg-card text-ink hover:bg-cream"
-                    }`}
+                      }`}
                   >
                     {type.name}
                     {selectedSaleType === type.id && <Check className="w-3.5 h-3.5" />}
@@ -458,11 +456,10 @@ function ProductsCatalogPage() {
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     onClick={() => setSelectedSize("ALL")}
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
-                      selectedSize === "ALL"
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${selectedSize === "ALL"
                         ? "bg-ink text-cream"
                         : "bg-card text-ink hover:bg-cream"
-                    }`}
+                      }`}
                   >
                     ALL
                   </button>
@@ -470,11 +467,10 @@ function ProductsCatalogPage() {
                     <button
                       key={size}
                       onClick={() => setSelectedSize(size)}
-                      className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
-                        selectedSize === size
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${selectedSize === size
                           ? "bg-ink text-cream"
                           : "bg-card text-ink hover:bg-cream"
-                      }`}
+                        }`}
                     >
                       {size}
                     </button>
@@ -492,11 +488,10 @@ function ProductsCatalogPage() {
                 <div className="flex flex-wrap gap-1.5">
                   <button
                     onClick={() => setSelectedColor("ALL")}
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
-                      selectedColor === "ALL"
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${selectedColor === "ALL"
                         ? "bg-ink text-cream"
                         : "bg-card text-ink hover:bg-cream"
-                    }`}
+                      }`}
                   >
                     ALL
                   </button>
@@ -504,11 +499,10 @@ function ProductsCatalogPage() {
                     <button
                       key={col}
                       onClick={() => setSelectedColor(col)}
-                      className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${
-                        selectedColor === col
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded transition border-2 border-ink cursor-pointer ${selectedColor === col
                           ? "bg-ink text-cream"
                           : "bg-card text-ink hover:bg-cream"
-                      }`}
+                        }`}
                     >
                       {col}
                     </button>

@@ -26,6 +26,8 @@ import { getProducts, getStoreSettings, type ProductWithVariants } from "@backen
 import { useAuth } from "@/lib/auth";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Navbar } from "@/components/Navbar";
+import { toast } from "sonner";
+import { extractLegacyConfigFromSegments } from "@/lib/homepage-types";
 import pVarsity from "@/assets/p-varsity.jpg";
 import pHoodie from "@/assets/p-hoodie.jpg";
 import pTshirt from "@/assets/p-tshirt.jpg";
@@ -155,16 +157,20 @@ function PreOrderPage() {
 
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
+  const [cart, setCart] = useState<any[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const [pathname, setPathname] = useState("");
   useEffect(() => setPathname(window.location.pathname), []);
   const search = typeof window !== "undefined" ? window.location.search : "";
 
-  // Load wishlist from localStorage
+  // Load wishlist and cart from localStorage
   useEffect(() => {
     try {
       const savedWishlist = localStorage.getItem("wishlist");
       if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
+      const savedCart = localStorage.getItem("cart");
+      if (savedCart) setCart(JSON.parse(savedCart));
     } catch (e) {}
   }, []);
 

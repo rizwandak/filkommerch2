@@ -33,7 +33,7 @@ import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import type { ProductWithVariants } from "@backend/server-actions";
+import { getProducts, getStoreSettings, getCategories, type ProductWithVariants } from "@backend/server-actions";
 import { Navbar } from "@/components/Navbar";
 import {
   type HomepageSegment,
@@ -60,7 +60,6 @@ import workJacket from "@/assets/workjacket.png";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    const { getProducts, getStoreSettings, getCategories } = await import("@backend/server-actions");
     const [productsRes, settingsRes, categoriesRes] = await Promise.all([
       getProducts(),
       getStoreSettings(),
@@ -171,6 +170,10 @@ type ProductCard = {
   description?: string | null;
   category_id?: number;
   category_slug?: string | null;
+  product_type?: string | null;
+  bundle_components?: any[];
+  rawPrice?: number;
+  rawOriginalPrice?: number | null;
 };
 
 const FALLBACK_PRODUCTS: ProductCard[] = [
@@ -397,7 +400,7 @@ function HeroCarousel({ images }: HeroCarouselProps) {
   // Keyboard navigation for image preview lightbox
   useEffect(() => {
     if (previewIndex === null) return;
-    
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setPreviewIndex(null);
@@ -418,7 +421,7 @@ function HeroCarousel({ images }: HeroCarouselProps) {
         <CarouselContent className="h-full -ml-0">
           {slideImages.map((imgUrl, index) => (
             <CarouselItem key={index} className="h-full pl-0 relative">
-              <div 
+              <div
                 className="w-full h-full relative overflow-hidden group/slide cursor-zoom-in"
                 onClick={() => setPreviewIndex(index)}
               >
@@ -446,11 +449,10 @@ function HeroCarousel({ images }: HeroCarouselProps) {
             <button
               key={index}
               onClick={() => api?.scrollTo(index)}
-              className={`h-2.5 rounded-full transition-all duration-300 border border-ink cursor-pointer ${
-                index === current
+              className={`h-2.5 rounded-full transition-all duration-300 border border-ink cursor-pointer ${index === current
                   ? "bg-brand-orange w-7 shadow-sm"
                   : "bg-cream/60 hover:bg-cream w-2.5"
-              }`}
+                }`}
               aria-label={`Buka slide ${index + 1}`}
             />
           ))}
@@ -459,12 +461,12 @@ function HeroCarousel({ images }: HeroCarouselProps) {
 
       {/* Fullscreen Lightbox Preview Modal */}
       {previewIndex !== null && (
-        <div 
+        <div
           className="fixed inset-0 z-[100] flex items-center justify-center bg-ink/90 backdrop-blur-md transition-opacity duration-300 animate-fade-in"
           onClick={() => setPreviewIndex(null)}
         >
           {/* Close button */}
-          <button 
+          <button
             onClick={() => setPreviewIndex(null)}
             className="absolute top-6 right-6 text-cream/70 hover:text-cream transition-colors p-2 hover:bg-cream/10 rounded-full cursor-pointer z-[101]"
             aria-label="Close preview"
@@ -501,7 +503,7 @@ function HeroCarousel({ images }: HeroCarouselProps) {
           )}
 
           {/* Main preview container */}
-          <div 
+          <div
             className="relative max-w-[90vw] max-h-[80vh] sm:max-h-[85vh] flex flex-col items-center justify-center animate-scale-in"
             onClick={(e) => e.stopPropagation()}
           >
@@ -522,12 +524,27 @@ function HeroCarousel({ images }: HeroCarouselProps) {
 }
 
 function Index() {
+  const parsePrice = (p: string) => {
+    return Number(p.replace(/[^0-9]/g, ""));
+  };
+
+  const formatRp = (n: number) => {
+    return "Rp " + n.toLocaleString("id-ID");
+  };
+
+  const scrollToId = (id: string) => {
+    const el = document.getElementById(id);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const [filter, setFilter] = useState<Filter>("ALL");
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [quickViewProduct, setQuickViewProduct] = useState<ProductCard | null>(null);
   const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({});
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const [pathname, setPathname] = useState("");
   const [search, setSearch] = useState("");
@@ -538,17 +555,37 @@ function Index() {
     setHash(window.location.hash);
   }, []);
 
-  // Load wishlist from localStorage
+  // Load wishlist and cart from localStorage
   useEffect(() => {
     try {
       const savedWishlist = localStorage.getItem("wishlist");
       if (savedWishlist) {
         setWishlist(JSON.parse(savedWishlist));
       }
+      const savedCart = localStorage.getItem("cart");
+      if (savedCart) {
+        setCart(JSON.parse(savedCart));
+      }
     } catch (e) {
       // ignore
     }
   }, []);
+
+  const saveCart = (newCart: CartItem[]) => {
+    setCart(newCart);
+    localStorage.setItem("cart", JSON.stringify(newCart));
+  };
+
+  const updateQty = (id: string, delta: number) => {
+    const updated = cart
+      .map((i) => (i.id === id ? { ...i, qty: i.qty + delta } : i))
+      .filter((i) => i.qty > 0);
+    saveCart(updated);
+  };
+
+  const removeItem = (id: string) => {
+    saveCart(cart.filter((i) => i.id !== id));
+  };
 
   // Handle hash scroll
   useEffect(() => {
@@ -569,8 +606,10 @@ function Index() {
 
   const [query, setQuery] = useState("");
   const [email, setEmail] = useState("");
-  const { products: loaderProducts, settings, categories } = Route.useLoaderData();
-  const dbProducts = loaderProducts;
+  const loaderData = Route.useLoaderData() || {};
+  const dbProducts = loaderData.products || [];
+  const settings = loaderData.settings || null;
+  const categories = loaderData.categories || [];
 
   // Merge database layout configuration with default segments list
   const segments = useMemo((): HomepageSegment[] => {
@@ -769,7 +808,7 @@ function Index() {
     try {
       const saved = localStorage.getItem("indexCart");
       if (saved) currentCart = JSON.parse(saved);
-    } catch (e) {}
+    } catch (e) { }
 
     const existingIdx = currentCart.findIndex((i) => i.id === itemId);
     if (existingIdx !== -1) {
@@ -1273,7 +1312,7 @@ function Index() {
                     >
                       <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
                         <div className={`flex flex-col ${hasImages ? "lg:flex-row" : ""} items-center justify-center gap-8 lg:gap-12`}>
-                          
+
                           {/* Left Photo (Desktop only) */}
                           {el.config.leftImage && (
                             <div className="w-full lg:w-1/4 max-w-[280px] aspect-[3/4] shrink-0 border-2 border-ink rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] order-2 lg:order-1 lg:block hidden">
@@ -1489,30 +1528,30 @@ function Index() {
                   const bundlesToRender =
                     dbBundles.length > 0
                       ? dbBundles.map((p) => {
-                          const itemsList = p.bundle_components
-                            ? p.bundle_components.map((c: any) => c.name).join(", ")
-                            : "";
-                          let saveText = "Save up to 15%";
-                          if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
-                            const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
-                            saveText = `Save ${pct}%`;
-                          }
-                          return {
-                            id: p.id,
-                            name: p.name,
-                            price: p.price,
-                            originalPrice: p.was,
-                            description: p.description || "",
-                            itemsList,
-                            saveText,
-                            isReal: true,
-                          };
-                        })
+                        const itemsList = p.bundle_components
+                          ? p.bundle_components.map((c: any) => c.name).join(", ")
+                          : "";
+                        let saveText = "Save up to 15%";
+                        if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
+                          const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
+                          saveText = `Save ${pct}%`;
+                        }
+                        return {
+                          id: p.id,
+                          name: p.name,
+                          price: p.price,
+                          originalPrice: p.was,
+                          description: p.description || "",
+                          itemsList,
+                          saveText,
+                          isReal: true,
+                        };
+                      })
                       : (el.config.items || []).map((bundle: any) => ({
-                          ...bundle,
-                          saveText: "Save up to 15%",
-                          isReal: false,
-                        }));
+                        ...bundle,
+                        saveText: "Save up to 15%",
+                        isReal: false,
+                      }));
 
                   return (
                     <section key={el.id} className="bg-cream py-16 sm:py-24 border-b-2 border-ink animate-slide-up">

@@ -229,11 +229,10 @@ function FAQPage() {
                   />
                 )}
                 <div
-                  className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl text-sm sm:text-base border-2 border-ink leading-relaxed font-medium ${
-                    msg.role === "user"
+                  className={`max-w-[85%] sm:max-w-[75%] p-3.5 rounded-2xl text-sm sm:text-base border-2 border-ink leading-relaxed font-medium ${msg.role === "user"
                       ? "bg-brand-blue text-cream rounded-tr-none"
                       : "bg-white text-ink rounded-tl-none shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-                  }`}
+                    }`}
                 >
                   {msg.text}
                 </div>
