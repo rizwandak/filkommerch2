@@ -339,7 +339,11 @@ function AdminHomepageEditorPage() {
     elementType: string;
   } | null>(null);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  const getApiBaseUrl = () => {
+    let url = import.meta.env.VITE_API_URL || "https://filkommerch.com";
+    return url.replace(/\/api\/?$/, "").replace(/\/$/, "");
+  };
+  const API_BASE_URL = getApiBaseUrl();
 
   // Sensors for DnD kit
   const sensors = useSensors(

@@ -280,7 +280,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
 
   return (
     <>
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink">
+      <header className="fixed top-0 left-0 right-0 z-50 w-full bg-background/95 backdrop-blur border-b-2 border-ink shadow-md">
         {!isHideMarquee && (
           <div className="bg-ink text-cream overflow-hidden border-b border-ink h-9 sm:h-10 flex items-center shadow-sm">
             <div className="flex marquee-track whitespace-nowrap text-xs sm:text-xs tracking-[0.18em] font-extrabold h-full items-center">
@@ -522,6 +522,9 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
           </form>
         )}
       </header>
+
+      {/* Height Spacer to prevent page content overlap under fixed header */}
+      <div className={isHideMarquee ? "h-[64px] sm:h-[72px]" : "h-[100px] sm:h-[112px]"} />
 
       {/* Mobile Menu Overlay */}
       {menuOpen && (

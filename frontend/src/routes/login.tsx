@@ -154,7 +154,6 @@ function LoginPage() {
       if (result && result.success && result.user) {
         setUser(result.user);
         localStorage.setItem("user", JSON.stringify(result.user));
-        toast.success(`Selamat datang kembali, ${result.user.type === "admin" ? result.user.username : result.user.name}!`);
         
         // Redirect to homepage for all users. Users with admin/cashier role can navigate to admin dashboard via navbar avatar dropdown.
         window.location.href = "/";
@@ -176,7 +175,6 @@ function LoginPage() {
         };
         setUser(fallbackUser);
         localStorage.setItem("user", JSON.stringify(fallbackUser));
-        toast.success(`Selamat datang kembali (Offline), ${account.name}!`);
         window.location.href = "/";
       } else {
         toast.error(result?.error || "Username atau password salah!");
@@ -196,7 +194,6 @@ function LoginPage() {
         };
         setUser(fallbackUser);
         localStorage.setItem("user", JSON.stringify(fallbackUser));
-        toast.success(`Selamat datang kembali (Offline), ${account.name}!`);
         window.location.href = "/";
       } else {
         toast.error(error.message || "Gagal login.");
@@ -215,9 +212,6 @@ function LoginPage() {
   }) => {
     setLoading(true);
     try {
-      const isUB = profile.hd === "student.ub.ac.id" || profile.email.endsWith("@student.ub.ac.id");
-      const organization = isUB ? "FILKOM UB" : "Umum";
-
       // Call backend google auth route
       const result = await authGoogleLogin({ data: { email: profile.email, name: profile.name } });
       if (result && result.success && result.user) {
@@ -227,11 +221,6 @@ function LoginPage() {
         };
         setUser(updatedUser);
         localStorage.setItem("user", JSON.stringify(updatedUser));
-
-        const roleText = result.user.type === "admin" ? result.user.role.toUpperCase() : "BUYER";
-        toast.success(`Welcome, ${profile.name}!`, {
-          description: `Masuk sebagai ${roleText}`,
-        });
         window.location.href = "/";
       } else {
         // Fallback for buyer
@@ -246,10 +235,6 @@ function LoginPage() {
         setUser(fallbackUser);
         localStorage.setItem("user", JSON.stringify(fallbackUser));
         upsertBuyer(fallbackUser);
-
-        toast.success(`Welcome, ${profile.name}!`, {
-          description: `Masuk sebagai civitas ${organization}`,
-        });
         window.location.href = "/";
       }
     } catch (error) {

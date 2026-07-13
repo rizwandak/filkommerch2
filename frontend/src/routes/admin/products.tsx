@@ -126,7 +126,12 @@ function AdminProductsPage() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  const getApiBaseUrl = () => {
+    let url = import.meta.env.VITE_API_URL || "https://filkommerch.com";
+    url = url.replace(/\/api\/?$/, "").replace(/\/$/, "");
+    return url;
+  };
+  const API_BASE_URL = getApiBaseUrl();
 
   const loadProducts = async () => {
     const [productsRes, categoriesRes] = await Promise.all([
@@ -187,36 +192,114 @@ function AdminProductsPage() {
     setDialogOpen(true);
   };
 
+  const cropToSquare = (file: File): Promise<File> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const size = Math.min(img.width, img.height);
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            const offsetX = (img.width - size) / 2;
+            const offsetY = (img.height - size) / 2;
+            ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, size, size);
+          }
+          canvas.toBlob(
+            (blob) => {
+              if (blob) {
+                const targetName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+                const croppedFile = new File([blob], targetName, {
+                  type: "image/jpeg",
+                  lastModified: Date.now(),
+                });
+                resolve(croppedFile);
+              } else {
+                resolve(file);
+              }
+            },
+            "image/jpeg",
+            0.92
+          );
+        };
+        img.onerror = () => resolve(file);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve(file);
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleUploadImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const formData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-      formData.append("files", files[i]);
-    }
-
     try {
-      toast.loading("Mengunggah foto...");
-      const res = await fetch(`${API_BASE_URL}/api/upload-multiple`, {
-        method: "POST",
-        body: formData,
-        headers: {
-          "ngrok-skip-browser-warning": "true"
+      toast.loading("Memproses & Mengunggah foto (Auto Crop 1:1)...");
+      const croppedFiles = await Promise.all(
+        Array.from(files).map((f) => cropToSquare(f))
+      );
+
+      let newUploadedUrls: string[] = [];
+
+      // Try batch upload via /api/upload-multiple
+      try {
+        const formData = new FormData();
+        for (let i = 0; i < croppedFiles.length; i++) {
+          formData.append("files", croppedFiles[i]);
         }
-      });
-      const data = await res.json();
+
+        const res = await fetch(`${API_BASE_URL}/api/upload-multiple`, {
+          method: "POST",
+          body: formData,
+          headers: {
+            "ngrok-skip-browser-warning": "true",
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.urls && Array.isArray(data.urls)) {
+            newUploadedUrls = data.urls;
+          }
+        }
+      } catch (err) {
+        console.warn("Batch upload failed, falling back to sequential upload:", err);
+      }
+
+      // Fallback: upload each file individually via /api/upload if batch upload didn't return URLs
+      if (newUploadedUrls.length === 0) {
+        for (const file of croppedFiles) {
+          const formData = new FormData();
+          formData.append("file", file);
+          const singleRes = await fetch(`${API_BASE_URL}/api/upload`, {
+            method: "POST",
+            body: formData,
+            headers: {
+              "ngrok-skip-browser-warning": "true",
+            },
+          });
+          const singleData = await singleRes.json();
+          if (singleData.success && singleData.url) {
+            newUploadedUrls.push(singleData.url);
+          }
+        }
+      }
+
       toast.dismiss();
 
-      if (data.success && data.urls) {
+      if (newUploadedUrls.length > 0) {
         setForm((prev) => ({
           ...prev,
-          images: [...prev.images, ...data.urls],
-          image_url: prev.image_url || data.urls[0],
+          images: [...prev.images, ...newUploadedUrls],
+          image_url: prev.image_url || newUploadedUrls[0],
         }));
-        toast.success(`${data.urls.length} foto berhasil diunggah`);
+        toast.success(`${newUploadedUrls.length} foto 1:1 berhasil diunggah`);
       } else {
-        toast.error(data.error || "Gagal mengunggah foto");
+        toast.error("Gagal mengunggah foto. Periksa koneksi atau format file.");
       }
     } catch (err) {
       toast.dismiss();
@@ -299,8 +382,8 @@ function AdminProductsPage() {
       size_chart_url: form.size_chart_url || undefined,
       images: form.images,
       variants: form.variants.map((v) => ({
-        size: v.size,
-        color: v.color || null,
+        size: v.size || "One Size",
+        color: v.color || "",
         stock: parseInt(v.stock) || 0,
         filkom_price: v.filkom_price ? parseFloat(v.filkom_price) : null,
       })),
@@ -615,187 +698,214 @@ function AdminProductsPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{form.id ? "Edit Produk" : "Tambah Produk"}</DialogTitle>
+        <DialogContent className="max-w-4xl sm:max-w-4xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-8 border-2 border-ink rounded-2xl shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] bg-background">
+          <DialogHeader className="border-b border-border pb-3">
+            <DialogTitle className="display text-xl sm:text-2xl text-ink uppercase tracking-wide flex items-center justify-between">
+              <span>{form.id ? "Edit Produk Merchandise" : "Tambah Produk Baru"}</span>
+            </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Kategori</Label>
-              <div className="flex gap-2">
-                <Select
-                  value={form.category_id}
-                  onValueChange={(v) => setForm({ ...form, category_id: v })}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Pilih kategori" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={String(c.id)}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setCategoryDialogOpen(true)}
-                  title="Kelola Kategori"
-                  className="shrink-0 h-9 w-9 border-dashed border-2 hover:border-brand-orange hover:text-brand-orange transition-colors"
-                >
-                  <FolderPlus className="h-4 w-4" />
-                </Button>
+          <div className="space-y-6 pt-2">
+            {/* Top Toggle: Status Aktif (Tampilkan Produk) */}
+            <div className="flex items-center justify-between border-2 border-ink p-4 rounded-xl bg-cream/40 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className={`w-3.5 h-3.5 rounded-full ${form.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-400'}`} />
+                <div>
+                  <Label htmlFor="top_is_active_toggle" className="text-xs font-black text-ink uppercase tracking-wider cursor-pointer flex items-center gap-2">
+                    TAMPILKAN PRODUK (STATUS AKTIF)
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                    {form.is_active ? "Produk aktif dan ditampilkan di beranda, katalog, serta POS kasir." : "Produk disembunyikan dari beranda, katalog, dan kasir POS."}
+                  </p>
+                </div>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Nama</Label>
-              <Input
-                value={form.name}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    name: e.target.value,
-                    slug: e.target.value.toLowerCase().replace(/\s+/g, "-"),
-                  })
-                }
+              <input
+                id="top_is_active_toggle"
+                type="checkbox"
+                checked={form.is_active}
+                onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                className="h-5 w-5 rounded border-2 border-ink bg-background cursor-pointer accent-brand-orange"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label>Slug</Label>
-              <Input
-                value={form.slug}
-                onChange={(e) => setForm({ ...form, slug: e.target.value })}
-              />
-            </div>
+            {/* Section 1: Categories & Product Type */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="font-extrabold text-xs uppercase text-ink">Kategori Produk</Label>
+                <div className="flex gap-2">
+                  <Select
+                    value={form.category_id}
+                    onValueChange={(v) => setForm({ ...form, category_id: v })}
+                  >
+                    <SelectTrigger className="flex-1 border-2 border-ink/40">
+                      <SelectValue placeholder="Pilih Kategori" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setCategoryDialogOpen(true)}
+                    title="Kelola Kategori"
+                    className="shrink-0 h-10 w-10 border-2 border-dashed border-ink hover:border-brand-orange hover:text-brand-orange transition-colors"
+                  >
+                    <FolderPlus className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
 
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Harga Utama / Promo (Rp)</Label>
-                <Input
-                  type="number"
-                  value={form.price}
-                  onChange={(e) => setForm({ ...form, price: e.target.value })}
-                  placeholder="Harga jual"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Harga Asli / Sebelum Diskon (Rp)</Label>
-                <Input
-                  type="number"
-                  value={form.original_price}
-                  onChange={(e) => setForm({ ...form, original_price: e.target.value })}
-                  placeholder="Opsional, untuk coret harga"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Harga Civitas FILKOM UB (Rp)</Label>
-                <Input
-                  type="number"
-                  value={form.filkom_price}
-                  onChange={(e) => setForm({ ...form, filkom_price: e.target.value })}
-                  placeholder="Harga khusus Civitas FILKOM UB"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Harga Promo Khusus (Rp)</Label>
-                <Input
-                  type="number"
-                  value={form.promo_price}
-                  onChange={(e) => setForm({ ...form, promo_price: e.target.value })}
-                  placeholder="Harga promo diskon (jika ada)"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Tipe Produk</Label>
+                <Label className="font-extrabold text-xs uppercase text-ink">Tipe Penjualan Produk</Label>
                 <Select
                   value={form.product_type}
                   onValueChange={(v) => setForm({ ...form, product_type: v })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="border-2 border-ink/40">
                     <SelectValue placeholder="Ready Stock" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ready">Ready Stock</SelectItem>
-                    <SelectItem value="preorder">Pre-Order</SelectItem>
-                    <SelectItem value="bundle">Bundle / Paket</SelectItem>
+                    <SelectItem value="ready">Ready Stock (Normal)</SelectItem>
+                    <SelectItem value="preorder">Pre-Order Campaign</SelectItem>
+                    <SelectItem value="bundle">Bundle / Paket Hemat</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+            </div>
 
-              <div className="space-y-2">
-                <Label>Model Rilis / Label</Label>
-                <Select
-                  value={form.sale_type || "ready_stock"}
-                  onValueChange={(v) => setForm({ ...form, sale_type: v })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Ready Stock" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ready_stock">Ready Stock (Normal)</SelectItem>
-                    <SelectItem value="limited_drop">Limited Drop</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Batas Stok Menipis</Label>
+            {/* Section 2: Name & Slug */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+              <div className="sm:col-span-7 space-y-2">
+                <Label className="font-extrabold text-xs uppercase text-ink">Nama Produk *</Label>
                 <Input
-                  type="number"
-                  value={form.low_stock_threshold}
-                  onChange={(e) => setForm({ ...form, low_stock_threshold: e.target.value })}
-                  placeholder="Default 5"
+                  value={form.name}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      name: e.target.value,
+                      slug: e.target.value.toLowerCase().replace(/\s+/g, "-"),
+                    })
+                  }
+                  placeholder="Contoh: FILKOM Varsity Jacket 2026 Edition"
+                  className="border-2 border-ink/40"
+                />
+              </div>
+              <div className="sm:col-span-5 space-y-2">
+                <Label className="font-extrabold text-xs uppercase text-ink">URL Slug *</Label>
+                <Input
+                  value={form.slug}
+                  onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                  placeholder="filkom-varsity-jacket-2026"
+                  className="border-2 border-ink/40"
                 />
               </div>
             </div>
 
+            {/* Section 3: Pricing Scheme (Skema Harga) */}
+            <div className="p-4 border-2 border-ink rounded-xl bg-white space-y-3 shadow-xs">
+              <h4 className="text-xs font-black uppercase tracking-wider text-brand-orange flex items-center gap-2">
+                💰 SKEMA PENGATURAN HARGA PRODUK
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-extrabold uppercase text-ink">
+                    Harga Umum (Rp) *
+                  </Label>
+                  <Input
+                    type="number"
+                    value={form.price}
+                    onChange={(e) => setForm({ ...form, price: e.target.value })}
+                    placeholder="Harga reguler"
+                    className="border-2 border-ink/40 font-extrabold text-ink"
+                  />
+                  <p className="text-[9px] text-muted-foreground">Harga standar untuk umum</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-extrabold uppercase text-brand-orange">
+                    Harga Civitas FILKOM (Rp)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={form.filkom_price}
+                    onChange={(e) => setForm({ ...form, filkom_price: e.target.value })}
+                    placeholder="Harga mahasiswa FILKOM"
+                    className="border-2 border-brand-orange/40 font-extrabold text-brand-orange"
+                  />
+                  <p className="text-[9px] text-muted-foreground">Khusus civitas terverifikasi</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-extrabold uppercase text-red-600">
+                    Harga Promo Khusus (Rp)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={form.promo_price}
+                    onChange={(e) => setForm({ ...form, promo_price: e.target.value })}
+                    placeholder="Opsional promo"
+                    className="border-2 border-red-500/40 text-red-600 font-bold"
+                  />
+                  <p className="text-[9px] text-muted-foreground">Harga event/flash sale</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-extrabold uppercase text-muted-foreground">
+                    Harga Coret / Asli (Rp)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={form.original_price}
+                    onChange={(e) => setForm({ ...form, original_price: e.target.value })}
+                    placeholder="Opsional harga asal"
+                    className="border-2 border-border"
+                  />
+                  <p className="text-[9px] text-muted-foreground">Untuk tampilan harga dicoret</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Conditional Parameters: Pre-Order */}
             {form.product_type === "preorder" && (
-              <div className="border border-brand-orange/30 bg-orange-50/20 p-4 rounded-lg space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-orange">
-                  Parameter Pre-Order
+              <div className="border-2 border-brand-orange bg-orange-50/30 p-4 rounded-xl space-y-4">
+                <h4 className="text-xs font-black uppercase tracking-wider text-brand-orange">
+                  🔥 PARAMETER PRE-ORDER CAMPAIGN
                 </h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Mulai Pre-Order</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-bold">Tanggal Mulai PO</Label>
                     <Input
                       type="datetime-local"
                       value={form.preorder_start_at}
                       onChange={(e) => setForm({ ...form, preorder_start_at: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Selesai Pre-Order</Label>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-bold">Tanggal Selesai PO</Label>
                     <Input
                       type="datetime-local"
                       value={form.preorder_end_at}
                       onChange={(e) => setForm({ ...form, preorder_end_at: e.target.value })}
                     />
                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Minimum Order Qty (MOQ)</Label>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-bold">Kuota Minimum Order (MOQ)</Label>
                     <Input
                       type="number"
-                      placeholder="Kuota minimum"
+                      placeholder="Contoh: 50 pcs"
                       value={form.preorder_moq}
                       onChange={(e) => setForm({ ...form, preorder_moq: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Estimasi Produksi (Hari)</Label>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-bold">Estimasi Waktu Produksi (Hari)</Label>
                     <Input
                       type="number"
                       placeholder="Contoh: 14 hari"
@@ -806,12 +916,14 @@ function AdminProductsPage() {
                 </div>
               </div>
             )}
+
+            {/* Conditional Parameters: Bundle */}
             {form.product_type === "bundle" && (
-              <div className="border border-brand-blue/30 bg-blue-50/5 p-4 rounded-lg space-y-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-brand-blue font-bold">
-                  Daftar Produk Komponen Paket
+              <div className="border-2 border-brand-blue bg-blue-50/20 p-4 rounded-xl space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-brand-blue">
+                  📦 DAFTAR PRODUK DALAM PAKET BUNDLE
                 </h4>
-                <div className="max-h-48 overflow-y-auto space-y-2 border border-border rounded p-2 bg-background">
+                <div className="max-h-48 overflow-y-auto space-y-2 border-2 border-border rounded-xl p-3 bg-background">
                   {products
                     .filter((p) => p.id !== form.id && p.product_type !== "bundle")
                     .map((p) => {
@@ -819,7 +931,7 @@ function AdminProductsPage() {
                       return (
                         <label
                           key={p.id}
-                          className="flex items-center gap-2 text-xs font-medium cursor-pointer hover:bg-muted p-1.5 rounded"
+                          className="flex items-center gap-2.5 text-xs font-bold cursor-pointer hover:bg-cream/40 p-2 rounded-lg border border-transparent hover:border-ink/20"
                         >
                           <input
                             type="checkbox"
@@ -831,260 +943,296 @@ function AdminProductsPage() {
                                 : currentIds.filter((id) => id !== p.id);
                               setForm({ ...form, component_ids: nextIds });
                             }}
-                            className="h-3.5 w-3.5 rounded border-border"
+                            className="h-4 w-4 rounded border-2 border-ink accent-brand-orange"
                           />
                           <span>
-                            {p.name} (Rp {p.price.toLocaleString("id-ID")})
+                            {p.name} — <strong className="text-brand-orange">Rp {Number(p.price).toLocaleString("id-ID")}</strong>
                           </span>
                         </label>
                       );
                     })}
-                  {products.filter((p) => p.id !== form.id && p.product_type !== "bundle")
-                    .length === 0 && (
-                    <p className="text-xs text-muted-foreground text-center py-4">
-                      Tidak ada produk lain tersedia
-                    </p>
-                  )}
                 </div>
               </div>
             )}
 
-            {/* Multiple Product Images Upload */}
-            <div className="space-y-2">
-              <Label className="font-bold text-xs uppercase text-ink">
-                Foto Produk (Unggah Langsung) *
-              </Label>
-              <div className="flex flex-col gap-3">
+            {/* Section 4: Product Image Uploads & Main Cover Selector */}
+            <div className="space-y-3 border-2 border-ink p-4 rounded-xl bg-white shadow-xs">
+              <div className="flex items-center justify-between">
+                <Label className="font-black text-xs uppercase text-ink">
+                  📷 FOTO PRODUK (AUTO CROP 1:1 SQUARE) *
+                </Label>
+                <span className="text-[10px] text-brand-orange font-mono font-extrabold uppercase">
+                  Klik foto untuk set Sampul Utama
+                </span>
+              </div>
+
+              <div className="space-y-3">
                 <input
                   type="file"
                   multiple
                   accept="image/*"
                   onChange={handleUploadImages}
-                  className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-2 file:border-ink file:text-xs file:font-semibold file:bg-cream file:text-ink hover:file:bg-cream/80 cursor-pointer"
+                  className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-2 file:border-ink file:text-xs file:font-extrabold file:bg-cream file:text-ink hover:file:bg-brand-orange hover:file:text-white cursor-pointer"
                 />
 
-                {/* Image Previews */}
+                {/* Uploaded Image Cards Grid */}
                 {form.images.length > 0 && (
-                  <div className="flex flex-wrap gap-2 p-2 border-2 border-dashed border-border rounded-lg bg-cream/10">
-                    {form.images.map((img, idx) => (
-                      <div
-                        key={idx}
-                        className="relative w-16 h-16 rounded overflow-hidden border border-ink/40 group"
-                      >
-                        <img src={resolveImageUrl(img)} alt="preview" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newImages = form.images.filter((_, i) => i !== idx);
-                            setForm({
-                              ...form,
-                              images: newImages,
-                              image_url: newImages.length > 0 ? newImages[0] : "",
-                            });
-                          }}
-                          className="absolute inset-0 bg-red-600/85 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-xs font-bold"
+                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 p-3 border-2 border-dashed border-border rounded-xl bg-cream/10">
+                    {form.images.map((img, idx) => {
+                      const isMainCover = form.image_url === img || (idx === 0 && !form.image_url);
+                      return (
+                        <div
+                          key={idx}
+                          className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group bg-cream flex flex-col justify-between ${
+                            isMainCover ? "border-brand-orange ring-4 ring-brand-orange/30 shadow-md" : "border-ink/40"
+                          }`}
                         >
-                          <X className="w-4 h-4" />
-                        </button>
-                        {idx === 0 && (
-                          <span className="absolute bottom-0 inset-x-0 bg-ink/90 text-white text-[8px] font-extrabold text-center uppercase tracking-wider py-0.5">
-                            Utama
-                          </span>
-                        )}
-                      </div>
-                    ))}
+                          <img src={resolveImageUrl(img)} alt="preview" className="w-full h-full object-cover" />
+
+                          {/* Action Overlay */}
+                          <div className="absolute inset-0 bg-ink/75 flex flex-col items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-center">
+                            {!isMainCover && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  // Set as main cover image (move to front of images array)
+                                  const filtered = form.images.filter((_, i) => i !== idx);
+                                  const reordered = [img, ...filtered];
+                                  setForm({
+                                    ...form,
+                                    images: reordered,
+                                    image_url: img,
+                                  });
+                                  toast.success("Foto diatur sebagai Sampul Utama!");
+                                }}
+                                className="w-full py-1 px-2 bg-brand-orange text-ink font-black text-[9px] rounded uppercase border border-ink hover:scale-105 transition-transform cursor-pointer"
+                              >
+                                Set Utama
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newImages = form.images.filter((_, i) => i !== idx);
+                                setForm({
+                                  ...form,
+                                  images: newImages,
+                                  image_url: newImages.length > 0 ? newImages[0] : "",
+                                });
+                              }}
+                              className="w-full py-1 px-2 bg-red-600 text-white font-bold text-[9px] rounded uppercase hover:bg-red-700 cursor-pointer flex items-center justify-center gap-1"
+                            >
+                              <X className="w-3 h-3" /> Hapus
+                            </button>
+                          </div>
+
+                          {/* Main Badge */}
+                          {isMainCover && (
+                            <span className="absolute top-1 left-1 bg-brand-orange text-ink text-[8px] font-black px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase tracking-wider">
+                              ⭐ Utama
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Specifications fields (bahan, asal, aplikasi) */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-y py-3 my-2">
-              <div className="space-y-1">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground">
-                  Bahan
-                </Label>
-                <Input
-                  placeholder="Cotton Fleece, dll"
-                  value={form.bahan}
-                  onChange={(e) => setForm({ ...form, bahan: e.target.value })}
-                  className="text-xs"
-                />
+            {/* Section 5: Specifications & Size Chart */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-extrabold uppercase text-ink">Bahan Kain / Material</Label>
+                  <Input
+                    placeholder="Contoh: Heavyweight Cotton 330GSM"
+                    value={form.bahan}
+                    onChange={(e) => setForm({ ...form, bahan: e.target.value })}
+                    className="border-2 border-ink/40 text-xs"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-extrabold uppercase text-ink">Aplikasi Sablon / Bordir</Label>
+                  <Input
+                    placeholder="Contoh: High Precision Bordir Timbul"
+                    value={form.aplikasi}
+                    onChange={(e) => setForm({ ...form, aplikasi: e.target.value })}
+                    className="border-2 border-ink/40 text-xs"
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground">
-                  Asal
-                </Label>
-                <Input
-                  placeholder="Creative Div, dll"
-                  value={form.asal}
-                  onChange={(e) => setForm({ ...form, asal: e.target.value })}
-                  className="text-xs"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] font-bold uppercase text-muted-foreground">
-                  Aplikasi/Detail
-                </Label>
-                <Input
-                  placeholder="Bordir, DTF, dll"
-                  value={form.aplikasi}
-                  onChange={(e) => setForm({ ...form, aplikasi: e.target.value })}
-                  className="text-xs"
-                />
+
+              <div className="space-y-2">
+                <Label className="font-extrabold text-xs uppercase text-ink">Foto Size Chart (Unggah)</Label>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleUploadSizeChart}
+                    className="text-xs file:mr-4 file:py-2 file:px-3 file:rounded-xl file:border-2 file:border-ink file:text-xs file:font-semibold file:bg-cream file:text-ink hover:file:bg-cream/80 cursor-pointer"
+                  />
+
+                  {form.size_chart_url && (
+                    <div className="relative w-36 aspect-[4/3] rounded-xl border-2 border-ink overflow-hidden bg-cream group">
+                      <img
+                        src={form.size_chart_url}
+                        alt="Size Chart Preview"
+                        className="w-full h-full object-contain"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, size_chart_url: "" })}
+                        className="absolute inset-0 bg-red-600/85 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-xs font-bold"
+                      >
+                        Hapus Size Chart
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Size Chart Image Upload */}
-            <div className="space-y-2 pb-2">
-              <Label className="font-bold text-xs uppercase text-ink">
-                Foto Size Chart (Unggah Langsung)
-              </Label>
-              <div className="flex flex-col gap-2">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleUploadSizeChart}
-                  className="text-xs file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-2 file:border-ink file:text-xs file:font-semibold file:bg-cream file:text-ink hover:file:bg-cream/80 cursor-pointer"
-                />
-
-                {form.size_chart_url && (
-                  <div className="relative w-32 aspect-[4/3] rounded border border-ink/40 overflow-hidden bg-cream group">
-                    <img
-                      src={form.size_chart_url}
-                      alt="Size Chart Preview"
-                      className="w-full h-full object-contain"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, size_chart_url: "" })}
-                      className="absolute inset-0 bg-red-600/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-xs font-bold"
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 border-2 border-ink p-3.5 rounded-xl bg-cream/10 my-2">
-              <input
-                id="is_active_toggle"
-                type="checkbox"
-                checked={form.is_active}
-                onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
-                className="h-4 w-4 rounded border-2 border-ink bg-background cursor-pointer"
-              />
-              <div className="grid gap-1.5 leading-none">
-                <Label htmlFor="is_active_toggle" className="text-xs font-bold text-ink cursor-pointer uppercase tracking-wider">
-                  Tampilkan Produk (Status Aktif)
-                </Label>
-                <p className="text-[10px] text-muted-foreground font-medium">
-                  Jika dinonaktifkan, produk disembunyikan dari beranda, katalog, dan POS.
-                </p>
-              </div>
-            </div>
-
+            {/* Description */}
             <div className="space-y-2">
-              <Label>Deskripsi</Label>
+              <Label className="font-extrabold text-xs uppercase text-ink">Deskripsi Lengkap Produk</Label>
               <Textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
+                placeholder="Tuliskan detail deskripsi keunggulan merchandise..."
+                rows={3}
+                className="border-2 border-ink/40 text-xs"
               />
             </div>
 
-            <div className="space-y-3">
-              <div className="flex justify-between items-center border-b pb-1">
-                <Label className="text-sm font-semibold">Varian & Stok</Label>
+            {/* Section 6: Variants & Subvariants Management */}
+            <div className="space-y-3 border-2 border-ink p-4 rounded-xl bg-white shadow-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-ink pb-3">
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-ink flex items-center gap-2">
+                    🏷️ PENGATURAN VARIAN &amp; SUBVARIAN STOK
+                  </h4>
+                  <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                    Atur Varian 1 (Warna), Subvarian 2 (Ukuran), Stok, &amp; Penambahan Harga (Rp) dari harga utama. Jika tanpa varian, biarkan 1 baris standar.
+                  </p>
+                </div>
                 <Button
                   type="button"
                   variant="outline"
-                  size="sm"
                   onClick={() =>
                     setForm({
                       ...form,
                       variants: [
                         ...form.variants,
-                        { size: "", color: "", stock: "0", filkom_price: "" },
+                        { size: "S", color: "", stock: "10", filkom_price: "" },
                       ],
                     })
                   }
-                  className="h-8 text-xs font-bold"
+                  className="bg-cream hover:bg-brand-orange hover:text-white border-2 border-ink font-black text-xs px-3 py-1.5 h-auto uppercase cursor-pointer"
                 >
-                  + Varian Baru
+                  <Plus className="w-3.5 h-3.5 mr-1" /> Varian Baru
                 </Button>
               </div>
-              <div className="space-y-2">
+
+              <div className="space-y-2.5">
+                {/* Variant Column Headers */}
+                <div className="grid grid-cols-12 gap-2 text-[10px] font-black uppercase text-muted-foreground px-1">
+                  <div className="col-span-3">Varian 1 (mis. Warna)</div>
+                  <div className="col-span-3">Subvarian 2 (mis. Ukuran)</div>
+                  <div className="col-span-2">Stok (Pcs)</div>
+                  <div className="col-span-3">Penambahan Harga / Add-on (Rp)</div>
+                  <div className="col-span-1 text-center">Hapus</div>
+                </div>
+
                 {form.variants.map((v, i) => (
-                  <div key={i} className="flex gap-2 items-center">
-                    <Input
-                      placeholder="Ukuran (S, M, L, dll)"
-                      value={v.size}
-                      onChange={(e) => {
-                        const variants = [...form.variants];
-                        variants[i] = { ...variants[i], size: e.target.value };
-                        setForm({ ...form, variants });
-                      }}
-                      className="flex-1"
-                    />
-                    <Input
-                      placeholder="Warna (Opsional)"
-                      value={v.color}
-                      onChange={(e) => {
-                        const variants = [...form.variants];
-                        variants[i] = { ...variants[i], color: e.target.value };
-                        setForm({ ...form, variants });
-                      }}
-                      className="flex-1"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Stok"
-                      value={v.stock}
-                      onChange={(e) => {
-                        const variants = [...form.variants];
-                        variants[i] = { ...variants[i], stock: e.target.value };
-                        setForm({ ...form, variants });
-                      }}
-                      className="w-20"
-                    />
-                    <Input
-                      type="number"
-                      placeholder="Harga Filkom"
-                      value={v.filkom_price}
-                      onChange={(e) => {
-                        const variants = [...form.variants];
-                        variants[i] = { ...variants[i], filkom_price: e.target.value };
-                        setForm({ ...form, variants });
-                      }}
-                      className="w-28 text-xs"
-                    />
-                    {form.variants.length > 1 && (
+                  <div key={i} className="grid grid-cols-12 gap-2 items-center bg-cream/20 p-2 rounded-xl border border-ink/20">
+                    <div className="col-span-3">
+                      <Input
+                        placeholder="Navy, Black, dll"
+                        value={v.color}
+                        onChange={(e) => {
+                          const variants = [...form.variants];
+                          variants[i] = { ...variants[i], color: e.target.value };
+                          setForm({ ...form, variants });
+                        }}
+                        className="text-xs border-ink/30"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        placeholder="S, M, L, XL, All Size"
+                        value={v.size}
+                        onChange={(e) => {
+                          const variants = [...form.variants];
+                          variants[i] = { ...variants[i], size: e.target.value };
+                          setForm({ ...form, variants });
+                        }}
+                        className="text-xs border-ink/30"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Input
+                        type="number"
+                        placeholder="Stok"
+                        value={v.stock}
+                        onChange={(e) => {
+                          const variants = [...form.variants];
+                          variants[i] = { ...variants[i], stock: e.target.value };
+                          setForm({ ...form, variants });
+                        }}
+                        className="text-xs border-ink/30 text-center font-extrabold"
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        placeholder="+0 (mis. 10000 untuk XXL)"
+                        value={v.filkom_price}
+                        onChange={(e) => {
+                          const variants = [...form.variants];
+                          variants[i] = { ...variants[i], filkom_price: e.target.value };
+                          setForm({ ...form, variants });
+                        }}
+                        className="text-xs border-ink/30 font-bold"
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-center">
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="text-destructive hover:bg-red-50 hover:text-destructive shrink-0"
+                        className="text-destructive hover:bg-red-50 hover:text-destructive h-8 w-8 rounded-lg cursor-pointer"
                         onClick={() => {
                           const variants = form.variants.filter((_, idx) => idx !== i);
-                          setForm({ ...form, variants });
+                          setForm({ ...form, variants: variants.length > 0 ? variants : [{ size: "One Size", color: "", stock: "0", filkom_price: "" }] });
                         }}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    )}
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
+          <DialogFooter className="mt-6 pt-4 border-t border-border flex flex-row gap-3 justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDialogOpen(false)}
+              className="border-2 border-ink font-bold text-xs uppercase px-5 py-2.5 h-auto rounded-xl hover:bg-cream"
+            >
               Batal
             </Button>
-            <Button onClick={() => void handleSave()} disabled={saving}>
-              {saving ? "Menyimpan..." : "Simpan"}
+            <Button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-ink hover:bg-brand-orange text-white font-extrabold text-xs uppercase px-6 py-2.5 h-auto rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
+            >
+              {saving ? "Menyimpan..." : "Simpan Produk"}
             </Button>
           </DialogFooter>
         </DialogContent>

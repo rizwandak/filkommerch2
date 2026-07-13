@@ -1235,7 +1235,7 @@ export const createProduct = async (req: Request, res: Response) => {
     for (const variant of input.variants) {
       await execute(
         "INSERT INTO product_variants (product_id, size, color, stock, filkom_price) VALUES (?, ?, ?, ?, ?)",
-        [productId, variant.size, variant.color || null, variant.stock, variant.filkom_price || null]
+        [productId, variant.size || "One Size", variant.color || "", variant.stock || 0, variant.filkom_price || null]
       );
     }
 
@@ -1331,18 +1331,18 @@ export const updateProduct = async (req: Request, res: Response) => {
     for (const variant of input.variants) {
       const existing = await queryOne<any>(
         "SELECT id FROM product_variants WHERE product_id = ? AND size = ? AND COALESCE(color, '') = COALESCE(?, '') LIMIT 1",
-        [input.id, variant.size, variant.color || null]
+        [input.id, variant.size || "One Size", variant.color || ""]
       );
 
       if (existing) {
         await execute(
           "UPDATE product_variants SET stock = ?, filkom_price = ?, is_active = TRUE WHERE id = ?",
-          [variant.stock, variant.filkom_price || null, existing.id]
+          [variant.stock || 0, variant.filkom_price || null, existing.id]
         );
       } else {
         await execute(
           "INSERT INTO product_variants (product_id, size, color, stock, filkom_price, is_active) VALUES (?, ?, ?, ?, ?, TRUE)",
-          [input.id, variant.size, variant.color || null, variant.stock, variant.filkom_price || null]
+          [input.id, variant.size || "One Size", variant.color || "", variant.stock || 0, variant.filkom_price || null]
         );
       }
     }

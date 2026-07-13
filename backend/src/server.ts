@@ -126,10 +126,12 @@ if (!fs.existsSync(uploadsDir)) {
 // Daftar MIME types yang diizinkan
 const ALLOWED_MIME_TYPES = [
   "image/jpeg",
+  "image/jpg",
   "image/png",
   "image/gif",
   "image/webp",
   "image/svg+xml",
+  "application/octet-stream",
 ];
 
 const storage = multer.diskStorage({
@@ -138,7 +140,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
+    const ext = path.extname(file.originalname) || ".jpg";
     cb(null, file.fieldname + "-" + uniqueSuffix + ext);
   },
 });
@@ -146,11 +148,13 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 5 * 1024 * 1024, // Maksimal 5MB per file
-    files: 10, // Maksimal 10 file per request
+    fileSize: 10 * 1024 * 1024, // Maksimal 10MB per file
+    files: 15, // Maksimal 15 file per request
   },
   fileFilter: (req, file, cb) => {
-    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const isImageExt = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"].includes(ext);
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype) || isImageExt || file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
       cb(new Error(`Tipe file tidak diizinkan: ${file.mimetype}. Hanya gambar yang diperbolehkan.`));

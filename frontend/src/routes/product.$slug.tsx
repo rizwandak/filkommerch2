@@ -463,24 +463,28 @@ function ProductDetailPage() {
     }
   };
 
+  const [activeTab, setActiveTab] = useState<"detail" | "spesifikasi" | "panduan">("detail");
+
   return (
-    <div className="min-h-screen bg-[#FCFAF7] text-ink">
-      {/* Header */}
+    <div className="min-h-screen bg-[#FCFAF7] text-ink flex flex-col justify-between">
+      {/* Header Navbar */}
       <Navbar />
 
-      {/* Main product box */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="bg-white border-2 border-ink rounded-xl shadow-[6px_6px_0px_0px_rgba(27,27,27,1)] overflow-hidden grid md:grid-cols-12">
-          {/* LEFT: Image gallery (5 cols) */}
-          <div className="md:col-span-6 p-6 border-b-2 md:border-b-0 md:border-r-2 border-ink flex flex-col justify-between">
+      {/* Main Container */}
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8 flex-1 w-full">
+        {/* 3-Column Layout: Left (Fixed Sticky Photo) | Middle (Details & Tabs) | Right (Fixed Sticky Buy Card) */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-8 items-start">
+          {/* COLUMN 1: LEFT STICKY GALLERY (4 Cols - Fixed Anchored) */}
+          <div className="md:col-span-4 md:sticky md:top-28 self-start space-y-4">
+            {/* Main Rigid 1:1 Aspect-Square Image Box */}
             <div
               onClick={() => setIsZoomOpen(true)}
-              className="aspect-[4/5] bg-cream border-2 border-ink rounded-lg overflow-hidden relative cursor-zoom-in group/img"
+              className="aspect-square w-full bg-cream border-2 border-ink rounded-2xl overflow-hidden relative cursor-zoom-in group/img shadow-[5px_5px_0px_0px_rgba(27,27,27,1)]"
             >
               <img
                 src={resolveImageUrl(activeImage)}
                 alt={product.name}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover/img:scale-[1.02]"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
               />
               <button
                 onClick={(e) => {
@@ -488,31 +492,32 @@ function ProductDetailPage() {
                   setIsWishlisted(!isWishlisted);
                   toast.success(isWishlisted ? "Dihapus dari wishlist" : "Ditambahkan ke wishlist");
                 }}
-                className="absolute top-4 right-4 p-2.5 bg-white/95 rounded-full shadow border border-ink hover:scale-105 transition-transform z-10"
+                className="absolute top-3.5 right-3.5 p-2.5 bg-white/95 rounded-full shadow border-2 border-ink hover:scale-105 transition-transform z-10 cursor-pointer"
+                aria-label="Wishlist"
               >
-                <Heart className={`w-5 h-5 ${isWishlisted ? "fill-red-500 text-red-500" : ""}`} />
+                <Heart className={`w-4 h-4 ${isWishlisted ? "fill-red-500 text-red-500" : "text-ink"}`} />
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsZoomOpen(true);
                 }}
-                className="absolute bottom-4 right-4 p-2 bg-white/95 rounded-full shadow border border-ink hover:scale-105 transition-transform z-10"
+                className="absolute bottom-3.5 right-3.5 p-2 bg-white/95 rounded-full shadow border-2 border-ink hover:scale-105 transition-transform z-10 cursor-pointer"
                 aria-label="Zoom image"
               >
                 <Search className="w-4 h-4 text-ink" />
               </button>
             </div>
 
-            {/* Thumbnails */}
-            <div className="flex gap-3 mt-4 overflow-x-auto pb-1">
+            {/* Thumbnails Row */}
+            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
               {images.map((img, idx) => (
                 <button
                   key={idx}
                   onClick={() => setActiveImage(img)}
-                  className={`w-20 aspect-square rounded border-2 overflow-hidden bg-cream shrink-0 transition-all ${
+                  className={`w-16 h-16 aspect-square rounded-xl border-2 overflow-hidden bg-cream shrink-0 transition-all cursor-pointer ${
                     activeImage === img
-                      ? "border-brand-orange scale-95 shadow-sm"
+                      ? "border-brand-orange scale-95 shadow-sm ring-2 ring-brand-orange/30"
                       : "border-ink/25 hover:border-ink"
                   }`}
                 >
@@ -522,45 +527,46 @@ function ProductDetailPage() {
             </div>
           </div>
 
-          {/* RIGHT: Product details (6 cols) */}
-          <div className="md:col-span-6 p-6 sm:p-8 flex flex-col justify-between space-y-6">
+          {/* COLUMN 2: MIDDLE DETAILS & TABS (5 Cols - Internal Scroll Slider) */}
+          <div className="md:col-span-5 space-y-6 md:max-h-[calc(100vh-140px)] md:overflow-y-auto pr-2 md:pr-4">
+            {/* Title & Category Header */}
             <div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-[10px] bg-brand-orange/10 text-brand-orange font-extrabold px-2.5 py-1 rounded tracking-widest uppercase">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className="text-[10px] bg-brand-orange text-ink font-mono font-extrabold px-2.5 py-0.5 rounded-full border border-ink uppercase">
                   {product.category_name || "APPAREL"}
                 </span>
-                <span className="text-[10px] bg-blue-50 text-blue-900 font-bold px-2 py-1 rounded">
-                  OFFICIAL FIT
-                </span>
-              </div>
-
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-ink uppercase tracking-tight">
-                {product.name}
-              </h1>
-
-              <div className="mt-3 flex items-baseline gap-3 flex-wrap">
-                <span className="text-3xl font-extrabold text-ink tracking-tight">
-                  Rp {currentPrice.toLocaleString("id-ID")}
-                </span>
-                {originalPrice && originalPrice > currentPrice && (
-                  <span className="text-sm font-semibold text-muted-foreground line-through decoration-red-500">
-                    Rp {originalPrice.toLocaleString("id-ID")}
-                  </span>
-                )}
                 {product.sale_type && (
-                  <span className="text-[10px] font-extrabold bg-red-100 text-red-700 px-2 py-0.5 rounded tracking-wide uppercase">
+                  <span className="text-[10px] font-extrabold bg-red-100 text-red-700 px-2 py-0.5 rounded uppercase border border-red-200">
                     {product.sale_type}
                   </span>
                 )}
               </div>
 
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-ink uppercase tracking-tight leading-tight">
+                {product.name}
+              </h1>
+            </div>
+
+            {/* Price Section */}
+            <div className="p-4 bg-white border-2 border-ink rounded-2xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] space-y-2">
+              <div className="flex items-baseline gap-3 flex-wrap">
+                <span className="text-3xl sm:text-4xl font-black text-brand-orange tracking-tight">
+                  Rp {currentPrice.toLocaleString("id-ID")}
+                </span>
+                {originalPrice && originalPrice > currentPrice && (
+                  <span className="text-sm font-extrabold text-red-500 line-through">
+                    Rp {originalPrice.toLocaleString("id-ID")}
+                  </span>
+                )}
+              </div>
+
               {user?.is_filkom_verified === 1 ? (
-                <div className="mt-2 text-xs font-bold text-green-700 bg-green-50 border border-green-200 rounded px-2.5 py-1.5 w-fit flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-                  🎉 Harga Khusus Civitas FILKOM Aktif!
+                <div className="text-xs font-bold text-brand-orange bg-brand-orange/10 border border-brand-orange/30 rounded-lg p-2.5 flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-brand-orange animate-pulse" />
+                  🎉 Selamat kamu dapat harga khusus mahasiswa FILKOM!
                 </div>
               ) : product.filkom_price && Number(product.filkom_price) > 0 ? (
-                <div className="mt-2 text-xs font-medium text-muted-foreground bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 w-fit">
+                <div className="text-xs font-medium text-muted-foreground bg-slate-50 border border-slate-200 rounded-lg p-2">
                   {user ? (
                     <span>
                       💡{" "}
@@ -570,481 +576,421 @@ function ProductDetailPage() {
                       >
                         Verifikasi NIM Anda
                       </button>{" "}
-                      untuk mendapatkan harga khusus FILKOM Rp{" "}
+                      untuk klaim diskon Civitas Rp{" "}
                       {Number(product.filkom_price).toLocaleString("id-ID")}
                     </span>
                   ) : (
                     <span>
-                      💡 Login & verifikasi NIM untuk mendapatkan harga khusus FILKOM Rp{" "}
+                      💡 Login &amp; verifikasi NIM untuk harga Civitas Rp{" "}
                       {Number(product.filkom_price).toLocaleString("id-ID")}
                     </span>
                   )}
                 </div>
               ) : null}
+            </div>
 
-              {product.product_type === "bundle" &&
-                product.bundle_components &&
-                product.bundle_components.length > 0 && (
-                  <div className="p-4 bg-brand-blue/5 border-2 border-brand-blue/30 rounded-xl space-y-2 mt-4">
-                    <h4 className="font-extrabold text-brand-blue text-xs uppercase tracking-wider flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-brand-blue animate-pulse" />
-                      Isi Paket Bundling (Komponen Produk):
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {product.bundle_components.map((comp) => (
-                        <div
-                          key={comp.id}
-                          className="flex gap-2 p-2 bg-white border border-border rounded-lg shadow-sm items-center"
-                        >
-                          {comp.image_url ? (
-                            <img
-                              src={resolveImageUrl(comp.image_url)}
-                              alt={comp.name}
-                              className="w-10 h-10 object-cover rounded border border-border shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 bg-cream rounded border border-border flex items-center justify-center text-[9px] text-muted-foreground shrink-0 font-bold">
-                              No Image
-                            </div>
-                          )}
-                          <p className="font-bold text-ink uppercase tracking-tight text-[11px] truncate">
-                            {comp.name}
-                          </p>
+            {/* Product Variant Selectors */}
+            {product.product_type === "bundle" ? (
+              <div className="space-y-4 border-2 border-ink p-4 rounded-2xl bg-white shadow-sm">
+                <p className="font-extrabold text-ink uppercase text-xs tracking-wider">
+                  Pilih Ukuran / Warna Varian Paket Bundle:
+                </p>
+                {product.bundle_components?.map((comp) => {
+                  const selectedVar = selectedBundleVariants[comp.id];
+                  const compColors = Array.from(
+                    new Set(comp.variants?.map((v) => v.color).filter(Boolean)),
+                  ) as string[];
+                  const compSizes = Array.from(
+                    new Set(comp.variants?.map((v) => v.size).filter(Boolean)),
+                  ) as string[];
+
+                  const currentSize = selectedVar?.size || "";
+                  const currentColor = selectedVar?.color || null;
+
+                  return (
+                    <div
+                      key={comp.id}
+                      className="p-3.5 bg-cream/30 border border-ink/30 rounded-xl space-y-2.5"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-extrabold text-ink text-xs uppercase truncate">
+                          {comp.name}
+                        </h4>
+                        {selectedVar && (
+                          <span
+                            className={`text-[9px] font-extrabold ${selectedVar.stock <= 3 ? "text-red-600 bg-red-50" : "text-brand-orange bg-brand-orange/10"} px-2 py-0.5 border border-ink/20 rounded`}
+                          >
+                            Stok: {selectedVar.stock}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Colors */}
+                      {compColors.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {compColors.map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => {
+                                const matched =
+                                  comp.variants.find(
+                                    (v) => v.color === color && v.size === currentSize,
+                                  ) ||
+                                  comp.variants.find((v) => v.color === color) ||
+                                  comp.variants[0];
+                                if (matched) {
+                                  setSelectedBundleVariants((prev) => ({
+                                    ...prev,
+                                    [comp.id]: matched,
+                                  }));
+                                }
+                              }}
+                              className={`px-3 py-1 text-[11px] font-bold border-2 transition rounded-lg cursor-pointer ${
+                                currentColor === color
+                                  ? "bg-brand-orange text-ink border-ink scale-95"
+                                  : "bg-white text-ink border-border hover:border-ink"
+                              }`}
+                            >
+                              {color}
+                            </button>
+                          ))}
                         </div>
+                      )}
+
+                      {/* Sizes */}
+                      {compSizes.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {compSizes.map((size) => (
+                            <button
+                              key={size}
+                              type="button"
+                              onClick={() => {
+                                const matched =
+                                  comp.variants.find(
+                                    (v) => v.size === size && v.color === currentColor,
+                                  ) ||
+                                  comp.variants.find((v) => v.size === size) ||
+                                  comp.variants[0];
+                                if (matched) {
+                                  setSelectedBundleVariants((prev) => ({
+                                    ...prev,
+                                    [comp.id]: matched,
+                                  }));
+                                }
+                              }}
+                              className={`w-9 h-8 flex items-center justify-center text-[11px] font-bold border-2 transition rounded-lg cursor-pointer ${
+                                currentSize === size
+                                  ? "bg-brand-orange text-ink border-ink scale-95"
+                                  : "bg-white text-ink border-border hover:border-ink"
+                              }`}
+                            >
+                              {size}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-4 p-4 bg-white border-2 border-ink rounded-2xl shadow-sm">
+                {/* Selection: Colors */}
+                {colors.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-extrabold uppercase text-ink">
+                      Pilih Warna: <span className="text-brand-orange">{selectedColor || "-"}</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {colors.map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => setSelectedColor(color)}
+                          className={`px-4 py-2 text-xs font-bold border-2 transition rounded-xl cursor-pointer ${
+                            selectedColor === color
+                              ? "bg-brand-orange text-ink border-ink shadow-sm scale-95 font-black"
+                              : "bg-white text-ink border-border hover:border-ink"
+                          }`}
+                        >
+                          {color}
+                        </button>
                       ))}
                     </div>
                   </div>
                 )}
 
-              {product.product_type === "preorder" && (
-                <div className="mt-4 p-4 bg-orange-50 border-2 border-brand-orange rounded-lg text-xs space-y-2 text-ink shadow-[2px_2px_0px_0px_rgba(242,87,33,0.15)]">
-                  <div className="flex items-center gap-2 text-brand-orange font-bold uppercase tracking-wider text-[10px]">
-                    <span className="w-2 h-2 rounded-full bg-brand-orange animate-ping" />
-                    Pre-Order Active
-                  </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                    <div>
-                      <span className="text-muted-foreground">Mulai PO:</span>{" "}
-                      <span className="font-bold">
-                        {product.preorder_start_at
-                          ? new Date(product.preorder_start_at).toLocaleDateString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "-"}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">Akhir PO:</span>{" "}
-                      <span className="font-bold">
-                        {product.preorder_end_at
-                          ? new Date(product.preorder_end_at).toLocaleDateString("id-ID", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })
-                          : "-"}
-                      </span>
-                    </div>
-                    {product.preorder_moq && (
-                      <div>
-                        <span className="text-muted-foreground">Kuota MOQ:</span>{" "}
-                        <span className="font-bold">{product.preorder_moq} pcs</span>
-                      </div>
-                    )}
-                    {product.production_eta_days && (
-                      <div>
-                        <span className="text-muted-foreground">Estimasi Produksi:</span>{" "}
-                        <span className="font-bold">{product.production_eta_days} Hari</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Selection: Colors & Sizes for Bundle Components OR Normal Product */}
-              {product.product_type === "bundle" ? (
-                <div className="mt-6 space-y-5 border-t border-border pt-4">
-                  <p className="font-extrabold text-ink uppercase text-xs tracking-wider">
-                    Pilih Ukuran / Warna Varian Paket:
-                  </p>
-                  {product.bundle_components?.map((comp) => {
-                    const selectedVar = selectedBundleVariants[comp.id];
-                    const compColors = Array.from(
-                      new Set(comp.variants?.map((v) => v.color).filter(Boolean)),
-                    ) as string[];
-                    const compSizes = Array.from(
-                      new Set(comp.variants?.map((v) => v.size).filter(Boolean)),
-                    ) as string[];
-
-                    const currentSize = selectedVar?.size || "";
-                    const currentColor = selectedVar?.color || null;
-
-                    return (
-                      <div
-                        key={comp.id}
-                        className="p-4 bg-cream/20 border-2 border-ink rounded-lg space-y-3.5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-                      >
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-extrabold text-ink text-xs uppercase tracking-tight">
-                            {comp.name}
-                          </h4>
-                          {selectedVar && (
-                            <span
-                              className={`text-[9px] font-bold ${selectedVar.stock <= 3 ? "text-red-600 bg-red-50 border-red-200" : "text-emerald-700 bg-emerald-50 border-emerald-200"} px-2 py-0.5 border rounded`}
-                            >
-                              Stok: {selectedVar.stock} pcs
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Colors Selector */}
-                        {compColors.length > 0 && (
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-                              Warna
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {compColors.map((color) => (
-                                <button
-                                  key={color}
-                                  type="button"
-                                  onClick={() => {
-                                    const matched =
-                                      comp.variants.find(
-                                        (v) => v.color === color && v.size === currentSize,
-                                      ) ||
-                                      comp.variants.find((v) => v.color === color) ||
-                                      comp.variants[0];
-                                    if (matched) {
-                                      setSelectedBundleVariants((prev) => ({
-                                        ...prev,
-                                        [comp.id]: matched,
-                                      }));
-                                    }
-                                  }}
-                                  className={`px-3 py-1 text-[11px] font-semibold border-2 transition rounded ${
-                                    currentColor === color
-                                      ? "bg-ink text-white border-ink scale-95"
-                                      : "bg-white text-ink border-border hover:border-ink"
-                                  }`}
-                                >
-                                  {color}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Sizes Selector */}
-                        {compSizes.length > 0 && (
-                          <div className="space-y-1">
-                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">
-                              Ukuran
-                            </p>
-                            <div className="flex flex-wrap gap-1.5">
-                              {compSizes.map((size) => (
-                                <button
-                                  key={size}
-                                  type="button"
-                                  onClick={() => {
-                                    const matched =
-                                      comp.variants.find(
-                                        (v) => v.size === size && v.color === currentColor,
-                                      ) ||
-                                      comp.variants.find((v) => v.size === size) ||
-                                      comp.variants[0];
-                                    if (matched) {
-                                      setSelectedBundleVariants((prev) => ({
-                                        ...prev,
-                                        [comp.id]: matched,
-                                      }));
-                                    }
-                                  }}
-                                  className={`w-9 h-8 flex items-center justify-center text-[11px] font-bold border-2 transition rounded ${
-                                    currentSize === size
-                                      ? "bg-ink text-white border-ink scale-95"
-                                      : "bg-white text-ink border-border hover:border-ink"
-                                  }`}
-                                >
-                                  {size}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <>
-                  {/* Selection: Colors */}
-                  {colors.length > 0 && (
-                    <div className="mt-6 space-y-2">
-                      <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                        Pilih Warna:{" "}
-                        <span className="text-ink font-extrabold">{selectedColor || "-"}</span>
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {colors.map((color) => (
-                          <button
-                            key={color}
-                            onClick={() => setSelectedColor(color)}
-                            className={`px-4 py-2 text-xs font-semibold border-2 transition rounded ${
-                              selectedColor === color
-                                ? "bg-ink text-white border-ink shadow-sm scale-95"
-                                : "bg-white text-ink border-border hover:border-ink"
-                            }`}
-                          >
-                            {color}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Selection: Sizes */}
-                  {sizes.length > 0 && (
-                    <div className="mt-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                          Pilih Ukuran:{" "}
-                          <span className="text-ink font-extrabold">{selectedSize || "-"}</span>
-                        </p>
+                {/* Selection: Sizes */}
+                {sizes.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-extrabold uppercase text-ink">
+                      Pilih Ukuran: <span className="text-brand-orange">{selectedSize || "-"}</span>
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {sizes.map((size) => (
                         <button
-                          onClick={() => setIsSizeGuideOpen(true)}
-                          className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+                          key={size}
+                          onClick={() => setSelectedSize(size)}
+                          className={`w-12 h-10 flex items-center justify-center text-xs font-extrabold border-2 transition rounded-xl cursor-pointer ${
+                            selectedSize === size
+                              ? "bg-brand-orange text-ink border-ink shadow-sm scale-95 font-black"
+                              : "bg-white text-ink border-border hover:border-ink"
+                          }`}
                         >
-                          <svg
-                            width="14"
-                            height="14"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                            <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                            <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                          </svg>
-                          Cari Ukuranmu
+                          {size}
                         </button>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {sizes.map((size) => (
-                          <button
-                            key={size}
-                            onClick={() => setSelectedSize(size)}
-                            className={`w-12 h-10 flex items-center justify-center text-xs font-bold border-2 transition rounded ${
-                              selectedSize === size
-                                ? "bg-ink text-white border-ink shadow-sm scale-95"
-                                : "bg-white text-ink border-border hover:border-ink"
-                            }`}
-                          >
-                            {size}
-                          </button>
-                        ))}
-                      </div>
+                      ))}
                     </div>
-                  )}
-                </>
-              )}
-
-              {/* Quantity and Stock status */}
-              <div className="mt-6 flex items-center gap-6">
-                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground shrink-0">
-                  Jumlah:
-                </p>
-                <div className="flex items-center border-2 border-ink rounded">
-                  <button
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    className="p-2 border-r border-ink hover:bg-cream active:scale-95 transition-all"
-                    aria-label="Decrease quantity"
-                  >
-                    <Minus className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="w-12 text-center text-sm font-extrabold">{quantity}</span>
-                  <button
-                    onClick={() => setQuantity(Math.min(currentStock, quantity + 1))}
-                    disabled={currentStock <= 0}
-                    className="p-2 border-l border-ink hover:bg-cream active:scale-95 transition-all disabled:opacity-50"
-                    aria-label="Increase quantity"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Stok:{" "}
-                  <span
-                    className={`font-bold ${currentStock <= 3 ? "text-red-600 animate-pulse" : "text-ink"}`}
-                  >
-                    {currentStock} pcs
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* FOMO Stock Indicator */}
-            {currentStock > 0 && currentStock <= 5 && (
-              <div className="mt-6 p-3 bg-red-50 border-2 border-red-500 rounded flex items-center gap-2 animate-pulse">
-                <svg
-                  width="18"
-                  height="18"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#ef4444"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-                  <line x1="12" y1="9" x2="12" y2="13"></line>
-                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
-                </svg>
-                <p className="text-sm font-extrabold text-red-600 tracking-tight">
-                  Hurry up! Sisa stok tinggal {currentStock} pcs lagi di ukuran ini!
-                </p>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => handleAddToCart(false)}
-                disabled={currentStock <= 0}
-                className="flex-1 py-6 border-2 border-ink hover:bg-cream text-ink font-bold text-xs uppercase tracking-widest transition-transform active:scale-98"
-              >
-                Masukkan Keranjang
-              </Button>
-              <Button
-                onClick={() => handleAddToCart(true)}
-                disabled={currentStock <= 0}
-                className="flex-1 py-6 bg-ink hover:bg-brand-orange text-white font-bold text-xs uppercase tracking-widest transition-all active:scale-98 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-              >
-                Beli Sekarang
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Section: Specifications */}
-        <div className="mt-8">
-          {/* Specifications Box (Full Width 12 cols) */}
-          <div className="bg-white border-2 border-ink rounded-xl p-6 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
-            <h2 className="text-lg font-bold text-ink uppercase tracking-wider border-b border-border pb-3 mb-4">
-              Spesifikasi & Deskripsi
-            </h2>
-            <div className="space-y-4 text-sm leading-relaxed text-muted-foreground">
-              <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-border text-xs">
-                <span className="font-bold text-ink uppercase tracking-wider">Bahan</span>
-                <span className="col-span-2">
-                  {product.bahan || "Premium Cotton Fleece / Heavyweight Cotton 24s"}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-border text-xs">
-                <span className="font-bold text-ink uppercase tracking-wider">Aplikasi</span>
-                <span className="col-span-2">
-                  {product.aplikasi || "Embroidery (Bordir Timbul) / High Quality DTF Screen Print"}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 py-1.5 border-b border-border text-xs">
-                <span className="font-bold text-ink uppercase tracking-wider">Asal</span>
-                <span className="col-span-2">
-                  {product.asal || "Dibuat oleh BEM FILKOM UB Creative Division"}
-                </span>
-              </div>
-
-              <div className="pt-2">
-                <p className="font-bold text-ink uppercase text-xs mb-2 tracking-wider">
-                  Penjelasan Produk:
-                </p>
-                <div className="whitespace-pre-wrap text-sm text-muted-foreground">
-                  {product.description ||
-                    "Tidak ada deskripsi produk kustom yang diberikan. Barang merchandise resmi dari Fakultas Ilmu Komputer Universitas Brawijaya dengan kualitas premium, jaminan kenyamanan dipakai kuliah seharian."}
+            {/* Pre-Order Banner if Preorder product */}
+            {product.product_type === "preorder" && (
+              <div className="p-4 bg-orange-50 border-2 border-brand-orange rounded-xl text-xs space-y-2 text-ink shadow-sm">
+                <div className="flex items-center gap-2 text-brand-orange font-extrabold uppercase tracking-wider text-[10px]">
+                  <span className="w-2 h-2 rounded-full bg-brand-orange animate-ping" />
+                  Kampanye Pre-Order Aktif
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                  <div>
+                    <span className="text-muted-foreground">Mulai PO:</span>{" "}
+                    <span className="font-bold">
+                      {product.preorder_start_at
+                        ? new Date(product.preorder_start_at).toLocaleDateString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "-"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Akhir PO:</span>{" "}
+                    <span className="font-bold">
+                      {product.preorder_end_at
+                        ? new Date(product.preorder_end_at).toLocaleDateString("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "-"}
+                    </span>
+                  </div>
+                  {product.preorder_moq && (
+                    <div>
+                      <span className="text-muted-foreground">Kuota MOQ:</span>{" "}
+                      <span className="font-bold">{product.preorder_moq} pcs</span>
+                    </div>
+                  )}
+                  {product.production_eta_days && (
+                    <div>
+                      <span className="text-muted-foreground">Estimasi Produksi:</span>{" "}
+                      <span className="font-bold">{product.production_eta_days} Hari</span>
+                    </div>
+                  )}
                 </div>
               </div>
+            )}
 
-              <div className="pt-2 border-t border-border mt-4">
-                <p className="font-bold text-ink uppercase text-xs mb-2 tracking-wider">
-                  Ukuran Chart:
-                </p>
-                {product.size_chart_url ? (
-                  <div className="mt-2 max-w-lg border-2 border-ink rounded-lg overflow-hidden bg-cream">
-                    <img
-                      src={resolveImageUrl(product.size_chart_url)}
-                      alt="Size Chart"
-                      className="w-full h-auto object-contain max-h-[350px]"
-                    />
+            {/* TABBED CONTENT SECTION (Deskripsi | Spesifikasi | Panduan) */}
+            <div className="border-2 border-ink rounded-2xl bg-white overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] mt-8">
+              {/* Tab Navigation Headers */}
+              <div className="flex border-b-2 border-ink bg-cream/40">
+                <button
+                  onClick={() => setActiveTab("detail")}
+                  className={`flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer border-r border-ink/20 ${
+                    activeTab === "detail"
+                      ? "bg-white text-brand-orange border-b-4 border-b-brand-orange font-extrabold"
+                      : "text-muted-foreground hover:text-ink hover:bg-cream"
+                  }`}
+                >
+                  Deskripsi
+                </button>
+                <button
+                  onClick={() => setActiveTab("spesifikasi")}
+                  className={`flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer border-r border-ink/20 ${
+                    activeTab === "spesifikasi"
+                      ? "bg-white text-brand-orange border-b-4 border-b-brand-orange font-extrabold"
+                      : "text-muted-foreground hover:text-ink hover:bg-cream"
+                  }`}
+                >
+                  Spesifikasi
+                </button>
+                <button
+                  onClick={() => setActiveTab("panduan")}
+                  className={`flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer ${
+                    activeTab === "panduan"
+                      ? "bg-white text-brand-orange border-b-4 border-b-brand-orange font-extrabold"
+                      : "text-muted-foreground hover:text-ink hover:bg-cream"
+                  }`}
+                >
+                  Panduan Ukuran
+                </button>
+              </div>
+
+              {/* Tab Content Body */}
+              <div className="p-5 text-xs sm:text-sm space-y-4">
+                {activeTab === "detail" && (
+                  <div className="space-y-3 leading-relaxed text-ink font-medium whitespace-pre-line">
+                    {product.description ||
+                      "Merchandise resmi Fakultas Ilmu Komputer Universitas Brawijaya. Diproduksi dengan standar kualitas kain premium yang nyaman dipakai untuk aktivitas perkuliahan maupun harian."}
                   </div>
-                ) : (
-                  <ul className="list-disc list-inside text-xs space-y-1">
-                    <li>S : 50 cm x 66 cm</li>
-                    <li>M : 53 cm x 69 cm</li>
-                    <li>L : 56 cm x 72 cm</li>
-                    <li>XL : 59 cm x 75 cm</li>
-                    <li>XXL : 62 cm x 78 cm</li>
-                  </ul>
+                )}
+
+                {activeTab === "spesifikasi" && (
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-3 gap-2 py-2 border-b border-border">
+                      <span className="font-extrabold text-ink uppercase text-[11px]">Bahan kain</span>
+                      <span className="col-span-2 text-muted-foreground font-semibold">
+                        {product.bahan || "Cotton Heavyweight 330GSM Premium"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 py-2 border-b border-border">
+                      <span className="font-extrabold text-ink uppercase text-[11px]">Aplikasi Sablon/Bordir</span>
+                      <span className="col-span-2 text-muted-foreground font-semibold">
+                        {product.aplikasi || "High Precision Bordir Komputer & DTF Print"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 py-2">
+                      <span className="font-extrabold text-ink uppercase text-[11px]">Produsen/Asal</span>
+                      <span className="col-span-2 text-muted-foreground font-semibold">
+                        {product.asal || "BEM FILKOM UB Creative Merchandise Division"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "panduan" && (
+                  <div className="space-y-4">
+                    {product.size_chart_url ? (
+                      <div className="border-2 border-ink rounded-xl overflow-hidden max-w-md bg-cream mx-auto">
+                        <img
+                          src={resolveImageUrl(product.size_chart_url)}
+                          alt="Size Chart"
+                          className="w-full h-auto object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="bg-cream/40 p-4 border border-ink/20 rounded-xl space-y-2">
+                        <p className="font-extrabold text-ink uppercase text-xs">Chart Standar Ukuran (cm):</p>
+                        <ul className="space-y-1.5 text-xs text-ink font-semibold">
+                          <li className="flex justify-between py-1 border-b border-border"><span>S</span><span>Panjang 66 cm × Lebar 50 cm</span></li>
+                          <li className="flex justify-between py-1 border-b border-border"><span>M</span><span>Panjang 69 cm × Lebar 53 cm</span></li>
+                          <li className="flex justify-between py-1 border-b border-border"><span>L</span><span>Panjang 72 cm × Lebar 56 cm</span></li>
+                          <li className="flex justify-between py-1 border-b border-border"><span>XL</span><span>Panjang 75 cm × Lebar 59 cm</span></li>
+                          <li className="flex justify-between py-1"><span>XXL</span><span>Panjang 78 cm × Lebar 62 cm</span></li>
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Lookbook / Gallery Box */}
-          <div className="mt-8 bg-white border-2 border-ink rounded-xl p-6 sm:p-8 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
-            <div className="flex items-center justify-between border-b border-border pb-3 mb-6">
-              <h2 className="text-lg font-bold text-ink uppercase tracking-wider flex items-center gap-2">
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                >
-                  <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
-                  <circle cx="12" cy="13" r="4"></circle>
-                </svg>
-                Dipakai Sama Siapa?
-              </h2>
-              <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest hidden sm:inline-block">
-                On-Model Gallery
-              </span>
-            </div>
+          {/* COLUMN 3: RIGHT STICKY CHECKOUT SIDEBAR BOX (3 Cols - Fixed Anchored) */}
+          <div className="md:col-span-3 md:sticky md:top-28 self-start space-y-5">
+            <div className="bg-white border-2 border-ink rounded-2xl p-5 shadow-[6px_6px_0px_0px_rgba(27,27,27,1)] space-y-5">
+              <h3 className="font-extrabold text-ink text-xs uppercase tracking-wider pb-2.5 border-b-2 border-ink flex items-center justify-between">
+                <span>Atur jumlah dan catatan</span>
+              </h3>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                pVarsity,
-                pHoodie,
-                pTshirt,
-                pTee2,
-              ].map((img, idx) => (
-                <div
-                  key={idx}
-                  className="group relative aspect-[4/5] bg-cream border-2 border-ink rounded-lg overflow-hidden cursor-pointer"
-                  onClick={() => {
-                    setActiveImage(img);
-                    setIsZoomOpen(true);
-                  }}
-                >
-                  <img
-                    src={resolveImageUrl(img)}
-                    alt={`Lookbook ${idx + 1}`}
-                    className="w-full h-full object-cover grayscale-[20%] group-hover:grayscale-0 transition-all duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-ink/0 group-hover:bg-ink/10 transition-colors" />
-                  <div className="absolute bottom-2 left-2 bg-white border-2 border-ink text-ink text-[10px] font-extrabold px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0">
-                    LIHAT
+              {/* Selected Variant Summary Card */}
+              <div className="flex items-center gap-3 p-2.5 bg-cream/40 rounded-xl border border-ink/20">
+                <img
+                  src={resolveImageUrl(activeImage)}
+                  alt="selected"
+                  className="w-11 h-11 object-cover rounded-lg border border-ink shrink-0"
+                />
+                <div className="min-w-0 flex-1 leading-tight">
+                  <p className="font-extrabold text-ink text-xs uppercase truncate">
+                    {product.name}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground font-bold uppercase mt-0.5">
+                    {[selectedSize, selectedColor].filter(Boolean).join(", ") || "Default Fit"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Quantity Selector + Stock Info */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center border-2 border-ink rounded-xl bg-cream/20 overflow-hidden">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="p-2 border-r-2 border-ink hover:bg-cream active:scale-95 transition-all cursor-pointer"
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="w-12 text-center text-xs font-black">{quantity}</span>
+                    <button
+                      onClick={() => setQuantity(Math.min(currentStock, quantity + 1))}
+                      disabled={currentStock <= 0}
+                      className="p-2 border-l-2 border-ink hover:bg-cream active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                      aria-label="Increase quantity"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="text-right text-xs">
+                    <span className="text-muted-foreground font-bold">Stok: </span>
+                    <span className={currentStock <= 3 ? "text-red-600 font-black animate-pulse" : "text-ink font-black"}>
+                      {currentStock}
+                    </span>
                   </div>
                 </div>
-              ))}
+              </div>
+
+              {/* Subtotal Display */}
+              <div className="pt-3 border-t border-border flex items-baseline justify-between">
+                <span className="text-xs font-bold text-muted-foreground">Subtotal</span>
+                <span className="text-xl sm:text-2xl font-black text-brand-orange tracking-tight">
+                  Rp {(currentPrice * quantity).toLocaleString("id-ID")}
+                </span>
+              </div>
+
+              {/* Primary Action Buttons */}
+              <div className="space-y-2.5 pt-1">
+                <button
+                  onClick={() => handleAddToCart(false)}
+                  disabled={currentStock <= 0}
+                  className="w-full py-3 px-4 bg-brand-orange hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Plus className="w-4 h-4" /> + Keranjang
+                </button>
+                <button
+                  onClick={() => handleAddToCart(true)}
+                  disabled={currentStock <= 0}
+                  className="w-full py-3 px-4 bg-white hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  Beli Langsung
+                </button>
+              </div>
+
+              {/* Action Utilities Footer */}
+              <div className="pt-3 border-t border-border flex items-center justify-center text-[11px] font-bold text-muted-foreground">
+                <button
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({
+                        title: product.name,
+                        url: window.location.href,
+                      });
+                    } else {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.success("Tautan produk berhasil disalin!");
+                    }
+                  }}
+                  className="flex items-center justify-center gap-1.5 hover:text-ink transition-colors cursor-pointer py-1 px-3 rounded-lg hover:bg-cream/50"
+                >
+                  <Share2 className="w-3.5 h-3.5 text-brand-orange" /> Bagikan Produk (Share)
+                </button>
+              </div>
             </div>
-            <p className="text-xs font-medium text-muted-foreground mt-4 text-center">
-              *Foto ini adalah contoh (dummy). Nantinya akan diisi dengan foto asli mahasiswa FILKOM
-              yang memakai merch ini.
-            </p>
           </div>
         </div>
       </main>

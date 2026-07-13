@@ -453,8 +453,8 @@ function HeroCarousel({ images }: HeroCarouselProps) {
               key={index}
               onClick={() => api?.scrollTo(index)}
               className={`h-2.5 rounded-full transition-all duration-300 border border-ink cursor-pointer ${index === current
-                  ? "bg-brand-orange w-7 shadow-sm"
-                  : "bg-cream/60 hover:bg-cream w-2.5"
+                ? "bg-brand-orange w-7 shadow-sm"
+                : "bg-cream/60 hover:bg-cream w-2.5"
                 }`}
               aria-label={`Buka slide ${index + 1}`}
             />
@@ -562,9 +562,8 @@ function ScrollFadeSegment({ children }: { children: React.ReactNode }) {
   return (
     <div
       ref={ref}
-      className={`w-full overflow-hidden transition-all duration-700 ease-out transform ${
-        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-      }`}
+      className={`w-full overflow-hidden transition-all duration-700 ease-out transform ${isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+        }`}
     >
       {children}
     </div>
@@ -1060,24 +1059,42 @@ function Index() {
 
                   const gridProducts = getSegmentProducts(el.config);
                   const isMainHero = el.config.title?.toLowerCase().includes("hero");
+                  
+                  // Strictly filter products assigned to "Main Hero" category (excluding bundles)
+                  const heroCategoryProducts = products.filter((p) => {
+                    const catName = (p.cat || (p as any).category_name || "").toLowerCase();
+                    const catSlug = ((p as any).category_slug || "").toLowerCase();
+                    const prodType = ((p as any).product_type || "").toLowerCase();
+                    return (
+                      prodType !== "bundle" &&
+                      (catName.includes("main hero") ||
+                       catName.includes("hero") ||
+                       catSlug.includes("main-hero") ||
+                       catSlug.includes("hero"))
+                    );
+                  });
+
+                  const heroProductsToRender = heroCategoryProducts.length > 0
+                    ? heroCategoryProducts
+                    : gridProducts.filter((p) => (p as any).product_type !== "bundle");
 
                   return (
                     isMainHero ? (
                       <section key={el.id} className="bg-neutral-950 text-neutral-100 py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
                         <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
-                          <div className="flex flex-col items-center text-center mb-10 sm:mb-12 gap-2">
+                          <div className="flex flex-col items-center text-center mb-10 sm:mb-14 gap-2">
                             {el.config.subtitle && (
-                              <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
-                                {el.config.subtitle}
+                              <div className="text-xs sm:text-sm tracking-[0.35em] text-brand-orange font-black mb-1 uppercase">
+                                🔥 {el.config.subtitle}
                               </div>
                             )}
-                            <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-white font-bold uppercase">
+                            <h2 className="display text-4xl sm:text-6xl lg:text-7xl text-white font-extrabold uppercase tracking-wide">
                               {el.config.title}
                             </h2>
                           </div>
 
-                          <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
-                            {gridProducts.map((p) => {
+                          <div className="flex flex-wrap justify-center gap-6 lg:gap-8">
+                            {heroProductsToRender.map((p) => {
                               let discountText = null;
                               if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
                                 const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
@@ -1094,58 +1111,96 @@ function Index() {
                               return (
                                 <div
                                   key={p.id}
-                                  className="group flex flex-col border-2 border-neutral-950 bg-white text-neutral-900 rounded-lg overflow-hidden shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-y-[-4px] transition-all duration-300 w-full max-w-[280px]"
+                                  className="group flex flex-col border-2 border-ink bg-neutral-900 text-cream rounded-2xl overflow-hidden shadow-[6px_6px_0px_0px_rgba(255,107,0,0.85)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(255,107,0,1)] transition-all duration-200 w-full max-w-[340px] sm:max-w-[380px]"
                                 >
+                                  {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
                                   <Link
                                     to="/product/$slug"
                                     params={{ slug: p.id }}
-                                    className="relative aspect-[4/5] overflow-hidden block border-b-2 border-neutral-950 bg-neutral-100 animate-fade-in"
+                                    className="relative w-full aspect-square border-b-2 border-ink bg-neutral-950 overflow-hidden block"
                                   >
                                     <img
                                       src={resolveImageUrl(p.img)}
                                       alt={p.name}
                                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                                     />
-                                    {p.tag && (
-                                      <span className="absolute top-3 left-3 text-[9px] font-bold tracking-widest px-2.5 py-1 bg-neutral-950 text-white rounded-full uppercase">
-                                        {p.tag}
-                                      </span>
-                                    )}
-                                  </Link>
-                                  <div className="p-4 flex flex-col flex-1">
-                                    <div className="text-[10px] font-bold tracking-widest text-brand-orange uppercase mb-1">
-                                      {p.cat}
+                                    <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+                                      {p.tag && (
+                                        <span className="text-[10px] font-black tracking-wider px-3 py-1 bg-brand-orange text-ink rounded-full border border-ink shadow-sm uppercase">
+                                          {p.tag}
+                                        </span>
+                                      )}
+                                      {discountText && (
+                                        <span className="text-[10px] font-black tracking-wider px-3 py-1 bg-red-600 text-white rounded-full border border-ink shadow-sm uppercase">
+                                          🔥 {discountText}
+                                        </span>
+                                      )}
                                     </div>
-                                    <Link
-                                      to="/product/$slug"
-                                      params={{ slug: p.id }}
-                                      className="hover:text-brand-orange transition-colors"
-                                    >
-                                      <h3 className="text-sm sm:text-base font-extrabold text-neutral-950 leading-snug tracking-wide line-clamp-1 mb-1">
-                                        {p.name}
-                                      </h3>
-                                    </Link>
-                                    {p.description && (
-                                      <p className="text-xs text-neutral-600 line-clamp-2 mb-3 leading-relaxed">
-                                        {p.description}
-                                      </p>
-                                    )}
-                                    <div className="flex flex-col gap-1 mt-auto">
-                                      {p.was && (
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                          <span className="text-xs text-neutral-400 line-through font-bold">
-                                            {p.was}
+                                  </Link>
+
+                                  {/* Details Content Body Below Image */}
+                                  <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-4">
+                                    <div>
+                                      {/* Header: Category & Title */}
+                                      <div className="text-[10px] font-extrabold tracking-widest text-brand-orange uppercase mb-1">
+                                        {p.cat || "MAIN HERO"}
+                                      </div>
+                                      <Link
+                                        to="/product/$slug"
+                                        params={{ slug: p.id }}
+                                        className="hover:text-brand-orange transition-colors"
+                                      >
+                                        <h3 className="font-extrabold text-xl sm:text-2xl text-white uppercase tracking-wide leading-tight group-hover:text-brand-orange transition-colors">
+                                          {p.name}
+                                        </h3>
+                                      </Link>
+                                      {p.description && (
+                                        <p className="text-xs sm:text-sm text-neutral-300 font-medium mt-2 leading-relaxed line-clamp-2">
+                                          {p.description}
+                                        </p>
+                                      )}
+
+                                      {/* Price Section */}
+                                      <div className="flex flex-wrap items-baseline justify-between gap-2 mt-6 pt-4 border-t border-neutral-800">
+                                        <div>
+                                          <span className="text-2xl sm:text-3xl font-black text-brand-orange tracking-tight">
+                                            {p.price}
                                           </span>
-                                          {discountText && (
-                                            <span className="text-[9px] font-extrabold tracking-widest px-1.5 py-0.5 bg-brand-orange/10 text-brand-orange border border-brand-orange/20 rounded">
-                                              {discountText}
+                                          {p.was && (
+                                            <span className="ml-2.5 text-xs sm:text-sm font-extrabold text-red-500 line-through">
+                                              {p.was}
                                             </span>
                                           )}
                                         </div>
-                                      )}
-                                      <span className="text-base sm:text-lg font-black text-neutral-950">
-                                        {p.price}
-                                      </span>
+                                        <span className="text-[9px] font-extrabold tracking-widest text-brand-orange bg-brand-orange/10 border border-brand-orange/30 px-2.5 py-1 rounded uppercase">
+                                          HERO ITEM
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    {/* Dual Action Buttons */}
+                                    <div className="pt-4 border-t border-neutral-800 flex gap-2.5">
+                                      <button
+                                        onClick={() => {
+                                          if ((p as any).rawProduct) {
+                                            addToCart((p as any).rawProduct);
+                                          } else {
+                                            addToCart(p);
+                                          }
+                                        }}
+                                        className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-extrabold tracking-wider text-xs py-3 px-3 rounded-xl border-2 border-neutral-600 shadow-[2px_2px_0px_0px_rgba(255,255,255,0.7)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5"
+                                      >
+                                        <ShoppingBag className="w-3.5 h-3.5 text-brand-orange" />
+                                        MASUK BAG
+                                      </button>
+
+                                      <Link
+                                        to="/product/$slug"
+                                        params={{ slug: p.id }}
+                                        className="flex-1 bg-brand-orange hover:bg-cream text-ink hover:text-ink font-extrabold tracking-wider text-xs py-3 px-3 rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(255,255,255,0.7)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5 text-center"
+                                      >
+                                        PESAN <ArrowRight className="w-3.5 h-3.5" />
+                                      </Link>
                                     </div>
                                   </div>
                                 </div>
@@ -1598,9 +1653,6 @@ function Index() {
                   const bundlesToRender =
                     dbBundles.length > 0
                       ? dbBundles.map((p) => {
-                        const itemsList = p.bundle_components
-                          ? p.bundle_components.map((c: any) => c.name).join(", ")
-                          : "";
                         let saveText = "Save up to 15%";
                         if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
                           const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
@@ -1612,100 +1664,193 @@ function Index() {
                           price: p.price,
                           originalPrice: p.was,
                           description: p.description || "",
-                          itemsList,
+                          img: p.img,
+                          bundleComponents: p.bundle_components || [],
                           saveText,
                           isReal: true,
+                          rawProduct: p,
                         };
                       })
                       : (el.config.items || []).map((bundle: any) => ({
                         ...bundle,
-                        saveText: "Save up to 15%",
+                        img: bundle.image || pTote,
+                        bundleComponents: [],
+                        saveText: bundle.saveText || "Save 20%",
                         isReal: false,
                       }));
 
                   return (
-                    <section key={el.id} className="bg-cream py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
-                      <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
-                        <div className="text-center mb-12">
+                    <section key={el.id} className="bg-cream py-10 sm:py-16 border-b-2 border-ink animate-slide-up">
+                      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
+                        <div className="text-center mb-8">
                           {el.config.subtitle && (
-                            <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
+                            <div className="text-[10px] sm:text-xs tracking-[0.3em] text-brand-orange font-bold mb-1.5 uppercase">
                               {el.config.subtitle}
                             </div>
                           )}
-                          <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-ink font-bold uppercase">
-                            {el.config.title || "Rekomendasi Bundling"}
+                          <h2 className="display text-2xl sm:text-4xl lg:text-5xl text-ink font-bold uppercase">
+                            {el.config.title || "Exclusive Bundles"}
                           </h2>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto">
                           {bundlesToRender.map((bundle: any, bIdx: number) => (
                             <div
                               key={bIdx}
-                              className="border-2 border-ink bg-background rounded-xl p-6 sm:p-8 flex flex-col justify-between shadow-[6px_6px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] transition-all duration-200"
+                              className="border-2 border-ink bg-background rounded-2xl overflow-hidden flex flex-col shadow-[5px_5px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] transition-all duration-200"
                             >
-                              <div>
-                                <div className="flex justify-between items-start gap-4 mb-4">
-                                  <div>
-                                    <span className="text-[9px] font-extrabold tracking-widest text-brand-orange bg-brand-orange/10 px-2.5 py-1 rounded-full uppercase">
-                                      {bundle.saveText}
-                                    </span>
-                                    <h3 className="font-extrabold text-xl sm:text-2xl text-ink mt-2 uppercase tracking-wide">
-                                      {bundle.name}
-                                    </h3>
-                                  </div>
-                                  <div className="text-right">
-                                    {bundle.originalPrice && (
-                                      <span className="text-xs text-muted-foreground line-through block font-bold">
-                                        {bundle.originalPrice}
-                                      </span>
-                                    )}
-                                    <span className="text-lg sm:text-xl font-black text-brand-orange block">
-                                      {bundle.price}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                <p className="text-xs sm:text-sm text-muted-foreground font-medium mb-6">
-                                  {bundle.description}
-                                </p>
-
-                                {bundle.itemsList && (
-                                  <div className="space-y-2 mb-8">
-                                    <div className="text-[10px] font-bold text-ink uppercase tracking-wider mb-2">
-                                      ISI BUNDLE:
-                                    </div>
-                                    {bundle.itemsList.split(",").map((it: string, itIdx: number) => (
-                                      <div key={itIdx} className="flex items-center gap-2 text-xs font-semibold text-ink">
-                                        <Check className="w-4 h-4 text-brand-orange shrink-0" />
-                                        <span>{it.trim()}</span>
-                                      </div>
-                                    ))}
+                              {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
+                              <div className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden group">
+                                <img
+                                  src={resolveImageUrl(bundle.img || pTote)}
+                                  alt={bundle.name}
+                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                />
+                                {bundle.saveText && (
+                                  <div className="absolute top-3 left-3 bg-brand-orange text-ink font-mono font-black text-xs tracking-wider px-3 py-1 rounded-full border border-ink shadow-sm uppercase">
+                                    🔥 {bundle.saveText}
                                   </div>
                                 )}
                               </div>
 
-                              {bundle.isReal ? (
-                                <Link
-                                  to="/product/$slug"
-                                  params={{ slug: bundle.id }}
-                                  className="w-full text-center py-3 bg-ink hover:bg-brand-orange text-cream hover:text-ink font-bold text-xs tracking-widest uppercase transition-all duration-300 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none cursor-pointer font-extrabold block"
-                                >
-                                  ORDER BUNDLE NOW
-                                </Link>
-                              ) : (
-                                <button
-                                  onClick={() => {
-                                    if (bundle.link) {
-                                      navigate({ to: bundle.link });
-                                    } else {
-                                      scrollToId("shop");
-                                    }
-                                  }}
-                                  className="w-full text-center py-3 bg-ink hover:bg-brand-orange text-cream hover:text-ink font-bold text-xs tracking-widest uppercase transition-all duration-300 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none cursor-pointer font-extrabold"
-                                >
-                                  ORDER BUNDLE NOW
-                                </button>
-                              )}
+                              {/* Details Content Body Below Image */}
+                              <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-4">
+                                <div>
+                                  {/* Header: Title + Prices */}
+                                  <div className="flex flex-wrap items-baseline justify-between gap-2 pb-3 border-b border-border">
+                                    <div className="min-w-0 flex-1">
+                                      <h3 className="font-extrabold text-base sm:text-xl text-ink uppercase tracking-wide leading-tight">
+                                        {bundle.name}
+                                      </h3>
+                                      {bundle.description && (
+                                        <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-1 leading-snug">
+                                          {bundle.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      {bundle.originalPrice && (
+                                        <span className="text-xs sm:text-sm font-extrabold text-red-500 line-through block leading-none mb-0.5">
+                                          {bundle.originalPrice}
+                                        </span>
+                                      )}
+                                      <span className="text-xl sm:text-2xl font-black text-brand-orange leading-tight block">
+                                        {bundle.price}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {/* Included Components Grid */}
+                                  <div className="mt-3.5 space-y-2">
+                                    <div className="text-[10px] font-black text-ink uppercase tracking-widest flex items-center gap-1.5">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse" />
+                                      ISI PAKET BUNDLE:
+                                    </div>
+
+                                    {bundle.bundleComponents && bundle.bundleComponents.length > 0 ? (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {bundle.bundleComponents.map((comp: any, compIdx: number) => (
+                                          <div
+                                            key={comp.id || compIdx}
+                                            className="flex items-center gap-2 p-2 bg-secondary/60 border border-ink/15 rounded-lg shadow-2xs"
+                                          >
+                                            <img
+                                              src={resolveImageUrl(comp.image_url || comp.img || pTee2)}
+                                              alt={comp.name}
+                                              className="w-9 h-9 object-cover rounded border border-ink/20 shrink-0"
+                                            />
+                                            <div className="min-w-0 flex-1 leading-tight">
+                                              <p className="font-extrabold text-ink text-[10px] sm:text-[11px] uppercase truncate">
+                                                {comp.name}
+                                              </p>
+                                              <p className="text-[8.5px] sm:text-[9px] text-muted-foreground font-semibold uppercase mt-0.5">
+                                                {comp.price ? `Value ${formatRp(parsePrice(comp.price))}` : "Inklusif"}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    ) : bundle.itemsList ? (
+                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {bundle.itemsList.split(",").map((it: string, itIdx: number) => {
+                                          const trimmedName = it.trim();
+                                          const matchProd = products.find(
+                                            (p) => p.name.toLowerCase().includes(trimmedName.toLowerCase())
+                                          );
+                                          const compImg = matchProd?.img || (itIdx % 2 === 0 ? pTshirt : pHoodie);
+
+                                          return (
+                                            <div
+                                              key={itIdx}
+                                              className="flex items-center gap-2 p-2 bg-secondary/60 border border-ink/15 rounded-lg shadow-2xs"
+                                            >
+                                              <img
+                                                src={resolveImageUrl(compImg)}
+                                                alt={trimmedName}
+                                                className="w-9 h-9 object-cover rounded border border-ink/20 shrink-0"
+                                              />
+                                              <div className="min-w-0 flex-1 leading-tight">
+                                                <p className="font-extrabold text-ink text-[10px] sm:text-[11px] uppercase truncate">
+                                                  {trimmedName}
+                                                </p>
+                                                <p className="text-[8.5px] sm:text-[9px] text-brand-orange font-bold uppercase mt-0.5">
+                                                  ✓ Inklusif
+                                                </p>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+
+                                {/* Dual Action Buttons */}
+                                <div className="pt-3.5 border-t border-border flex gap-2.5">
+                                  <button
+                                    onClick={() => {
+                                      if (bundle.rawProduct) {
+                                        addToCart(bundle.rawProduct);
+                                      } else {
+                                        addToCart({
+                                          id: bundle.id || `bundle-${bIdx}`,
+                                          name: bundle.name,
+                                          price: bundle.price,
+                                          img: bundle.img || pTote,
+                                          cat: "BUNDLE",
+                                        });
+                                      }
+                                    }}
+                                    className="flex-1 bg-white hover:bg-neutral-100 text-ink font-extrabold tracking-wider text-xs py-3 px-3 rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5"
+                                  >
+                                    <ShoppingBag className="w-3.5 h-3.5 text-brand-orange" />
+                                    MASUK BAG
+                                  </button>
+
+                                  {bundle.isReal ? (
+                                    <Link
+                                      to="/product/$slug"
+                                      params={{ slug: bundle.id }}
+                                      className="flex-1 bg-ink hover:bg-brand-orange text-cream hover:text-ink font-extrabold tracking-wider text-xs py-3 px-3 rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5 text-center"
+                                    >
+                                      PESAN <ArrowRight className="w-3.5 h-3.5" />
+                                    </Link>
+                                  ) : (
+                                    <button
+                                      onClick={() => {
+                                        if (bundle.link) {
+                                          navigate({ to: bundle.link });
+                                        } else {
+                                          scrollToId("shop");
+                                        }
+                                      }}
+                                      className="flex-1 bg-ink hover:bg-brand-orange text-cream hover:text-ink font-extrabold tracking-wider text-xs py-3 px-3 rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5"
+                                    >
+                                      PESAN <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1820,76 +1965,148 @@ function Index() {
 
 
       {/* 10. Footer */}
-      <footer className="bg-background border-t border-border">
-        <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-14 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10">
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <img src={logo} alt="Filkom Merch logo" className="w-10 h-10 rounded-full" />
+      <footer className="bg-background border-t-2 border-ink">
+        <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-12 lg:py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
+          {/* Brand Info */}
+          <div className="lg:col-span-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <img
+                src={logo}
+                alt="Filkom Merch logo"
+                className="w-10 h-10 rounded-full object-cover ring-2 ring-ink shadow-sm"
+              />
               <img src={logoFilkom} alt="FILKOM UB logo" className="w-9 h-9 object-contain" />
-              <span className="display text-lg text-ink font-bold">Filkom Merch</span>
+              <div className="leading-tight">
+                <span className="display text-lg text-ink font-bold block">Filkom Merch</span>
+                <span className="text-[9px] font-black tracking-widest text-muted-foreground uppercase">
+                  UNIVERSITAS BRAWIJAYA
+                </span>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground max-w-xs leading-relaxed font-medium">
-              Official store Universitas Brawijaya. Bekerjasama langsung dengan Fakultas Ilmu
-              Komputer (FILKOM) dan BEM FILKOM UB.
+            <p className="text-xs text-muted-foreground leading-relaxed font-medium max-w-sm">
+              Official store merchandise resmi mahasiswa Fakultas Ilmu Komputer Universitas Brawijaya. Dibuat oleh mahasiswa, untuk civitas akademika premium &amp; eksklusif.
             </p>
-            <div className="flex gap-3 mt-5 text-ink">
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Instagram"
-                className="hover:text-brand-orange transition-colors"
-              >
-                <Instagram className="w-5 h-5" />
-              </a>
-              <a
-                href="https://facebook.com"
-                target="_blank"
-                rel="noreferrer"
-                aria-label="Facebook"
-                className="hover:text-brand-orange transition-colors"
-              >
-                <Facebook className="w-5 h-5" />
-              </a>
+            {/* Social Media Links */}
+            <div className="pt-2">
+              <div className="text-[10px] font-extrabold tracking-widest text-ink uppercase mb-2">
+                FOLLOW KAMI
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href="https://instagram.com/merchfilkom"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-ink/20 bg-secondary/60 hover:bg-ink hover:text-cream text-xs font-bold transition-all cursor-pointer"
+                >
+                  <Instagram className="w-4 h-4 text-brand-orange shrink-0" />
+                  <span>@merchfilkom</span>
+                </a>
+                <a
+                  href="https://tiktok.com/@filkommerch"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-ink/20 bg-secondary/60 hover:bg-ink hover:text-cream text-xs font-bold transition-all cursor-pointer"
+                >
+                  <svg className="w-3.5 h-3.5 fill-brand-orange shrink-0" viewBox="0 0 24 24">
+                    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 0 0-.79-.05A6.34 6.34 0 0 0 3.15 15a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V6.84a8.16 8.16 0 0 0 4.76 1.5V4.89a4.85 4.85 0 0 1-1.00-.20z" />
+                  </svg>
+                  <span>@filkommerch</span>
+                </a>
+              </div>
             </div>
           </div>
-          {[
-            { title: "SHOP", items: ["New Drop", "Jackets", "Hoodies", "Tees", "Accessories"] },
-            { title: "BANTUAN", items: ["Size Guide", "Shipping", "Returns", "FAQ"] },
-            { title: "TENTANG", items: ["Cerita Kami", "Lookbook", "Kontak", "Pre-Order"] },
-          ].map((col) => (
-            <div key={col.title}>
-              <div className="text-xs font-bold tracking-[0.2em] text-ink mb-4">{col.title}</div>
-              <ul className="space-y-2 text-sm text-muted-foreground font-medium">
-                {col.items.map((i) => (
-                  <li key={i}>
-                    <button
-                      onClick={() => {
-                        scrollToId(col.title === "SHOP" ? "shop" : "about");
-                      }}
-                      className="hover:text-ink text-left transition-colors cursor-pointer"
-                    >
-                      {i}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+
+          {/* Catalog Links */}
+          <div className="lg:col-span-3 space-y-3">
+            <div className="text-xs font-extrabold tracking-[0.2em] text-ink uppercase">
+              KATALOG PRODUK
             </div>
-          ))}
-          <div>
-            <div className="text-xs font-bold tracking-[0.2em] text-ink mb-4">
-              KONTAK (WA SUPPORT)
+            <ul className="space-y-2 text-xs font-medium text-muted-foreground">
+              <li>
+                <Link to="/products" className="hover:text-brand-orange transition-colors">
+                  Semua Produk Merchandise
+                </Link>
+              </li>
+              <li>
+                <Link to="/pre-order" className="hover:text-brand-orange transition-colors">
+                  Open Pre-Order Varsity '25
+                </Link>
+              </li>
+              <li>
+                <Link to="/products" className="hover:text-brand-orange transition-colors">
+                  Varsity &amp; Outerwear
+                </Link>
+              </li>
+              <li>
+                <Link to="/products" className="hover:text-brand-orange transition-colors">
+                  Heavyweight Hoodies
+                </Link>
+              </li>
+              <li>
+                <Link to="/products" className="hover:text-brand-orange transition-colors">
+                  T-Shirts &amp; Oversized Tees
+                </Link>
+              </li>
+              <li>
+                <Link to="/products" className="hover:text-brand-orange transition-colors">
+                  Caps, Totebags &amp; Lanyards
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Information & Navigation */}
+          <div className="lg:col-span-2 space-y-3">
+            <div className="text-xs font-extrabold tracking-[0.2em] text-ink uppercase">
+              NAVIGASI &amp; FAQ
             </div>
-            <ul className="space-y-3 text-sm">
+            <ul className="space-y-2 text-xs font-medium text-muted-foreground">
+              <li>
+                <Link to="/" className="hover:text-brand-orange transition-colors">
+                  Beranda Utama
+                </Link>
+              </li>
+              <li>
+                <button
+                  onClick={() => scrollToId("about")}
+                  className="hover:text-brand-orange text-left transition-colors cursor-pointer"
+                >
+                  Tentang Kami
+                </button>
+              </li>
+              <li>
+                <Link to="/faq" className="hover:text-brand-orange transition-colors">
+                  Pertanyaan Umum (FAQ)
+                </Link>
+              </li>
+              <li>
+                <Link to="/orders" className="hover:text-brand-orange transition-colors">
+                  Pesanan Saya
+                </Link>
+              </li>
+              <li>
+                <Link to="/login" className="hover:text-brand-orange transition-colors">
+                  Sign In / Akun UB
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Contact Support */}
+          <div className="lg:col-span-3 space-y-3">
+            <div className="text-xs font-extrabold tracking-[0.2em] text-ink uppercase">
+              LOKASI &amp; WA SUPPORT
+            </div>
+            <ul className="space-y-2.5 text-xs text-muted-foreground">
               <li>
                 <a
                   href="https://wa.me/6282235526105?text=Halo%20Admin%20Aliya,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 hover:text-brand-orange text-xs text-muted-foreground hover:font-bold transition-all"
+                  className="inline-flex items-center gap-2 hover:text-brand-orange hover:font-bold transition-all text-xs"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                  Admin Aliya (Tanya Produk)
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                  Admin Aliya (Tanya Produk &amp; Ukuran)
                 </a>
               </li>
               <li>
@@ -1897,19 +2114,24 @@ function Index() {
                   href="https://wa.me/6282287190402?text=Halo%20Admin%20Puty,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 hover:text-brand-orange text-xs text-muted-foreground hover:font-bold transition-all"
+                  className="inline-flex items-center gap-2 hover:text-brand-orange hover:font-bold transition-all text-xs"
                 >
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                  Admin Puty (Keluhan & Custom)
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
+                  Admin Puty (Keluhan &amp; Custom Order)
                 </a>
+              </li>
+              <li className="pt-1 text-[11px] text-muted-foreground leading-relaxed">
+                📍 <strong className="text-ink">Pickup Point:</strong> FILKOM Merch, Gedung A FILKOM UB.
               </li>
             </ul>
           </div>
         </div>
-        <div className="border-t border-border">
-          <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-5 flex flex-col md:flex-row justify-between gap-2 text-xs text-muted-foreground">
-            <div>© 2026 Filkom Merch UB · Official student merchandise.</div>
-            <div>Made with ♥ in Malang. Integrated with Midtrans Payment.</div>
+
+        {/* Bottom Bar */}
+        <div className="border-t border-border bg-secondary/30">
+          <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-4 flex flex-col md:flex-row justify-between items-center gap-2 text-[11px] text-muted-foreground font-medium">
+            <div>© 2026 Filkom Merch UB · Official Merchandise Fakultas Ilmu Komputer Universitas Brawijaya.</div>
+            <div>Made with ♥ by Mahasiswa FILKOM UB.</div>
           </div>
         </div>
       </footer>

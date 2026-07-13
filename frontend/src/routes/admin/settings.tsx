@@ -28,7 +28,11 @@ function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  const getApiBaseUrl = () => {
+    let url = import.meta.env.VITE_API_URL || "https://filkommerch.com";
+    return url.replace(/\/api\/?$/, "").replace(/\/$/, "");
+  };
+  const API_BASE_URL = getApiBaseUrl();
 
   const handleUploadQris = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isCashier) {
