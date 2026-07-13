@@ -28,9 +28,9 @@ import { Label } from "@frontend/components/ui/label";
 import { toast } from "sonner";
 import logo from "@/assets/logo-fm.jpg";
 import logoFilkom from "@/assets/logo_filkom.png";
-import { GoogleLogin } from "@react-oauth/google";
+import { useGoogleLogin } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
-import loginBgVideo from "@/assets/login-bg-video.mp4";
+import { resolveImageUrl } from "@/lib/image-resolver";
 import loginBgImage from "@/assets/hero.jpg";
 
 export const Route = createFileRoute("/login")({
@@ -206,18 +206,20 @@ function LoginPage() {
     }
   };
 
-  const handleGoogleSuccess = async (credentialResponse: any) => {
+  const handleGoogleProfileLogin = async (profile: {
+    sub: string;
+    email: string;
+    name: string;
+    picture?: string;
+    hd?: string;
+  }) => {
     setLoading(true);
     try {
-      const token = credentialResponse.credential;
-      if (!token) throw new Error("No credential returned");
-
-      const decoded = jwtDecode<GoogleJwtPayload>(token);
-      const isUB = decoded.hd === "student.ub.ac.id" || decoded.email.endsWith("@student.ub.ac.id");
+      const isUB = profile.hd === "student.ub.ac.id" || profile.email.endsWith("@student.ub.ac.id");
       const organization = isUB ? "FILKOM UB" : "Umum";
 
       // Call backend google auth route
-      const result = await authGoogleLogin({ data: { email: decoded.email, name: decoded.name } });
+      const result = await authGoogleLogin({ data: { email: profile.email, name: profile.name } });
       if (result && result.success && result.user) {
         const updatedUser = {
           ...result.user,
@@ -227,7 +229,7 @@ function LoginPage() {
         localStorage.setItem("user", JSON.stringify(updatedUser));
 
         const roleText = result.user.type === "admin" ? result.user.role.toUpperCase() : "BUYER";
-        toast.success(`Welcome, ${decoded.name}!`, {
+        toast.success(`Welcome, ${profile.name}!`, {
           description: `Masuk sebagai ${roleText}`,
         });
         window.location.href = "/";
@@ -235,17 +237,17 @@ function LoginPage() {
         // Fallback for buyer
         const fallbackUser: BuyerUser = {
           type: "buyer",
-          id: decoded.sub,
-          email: decoded.email,
-          name: decoded.name,
-          picture: decoded.picture,
+          id: profile.sub,
+          email: profile.email,
+          name: profile.name,
+          picture: profile.picture,
           is_google: true,
         };
         setUser(fallbackUser);
         localStorage.setItem("user", JSON.stringify(fallbackUser));
         upsertBuyer(fallbackUser);
 
-        toast.success(`Welcome, ${decoded.name}! (Offline)`, {
+        toast.success(`Welcome, ${profile.name}!`, {
           description: `Masuk sebagai civitas ${organization}`,
         });
         window.location.href = "/";
@@ -258,29 +260,47 @@ function LoginPage() {
     }
   };
 
-  const handleGoogleError = () => {
-    toast.error("Google login failed");
-  };
+  const loginWithGoogle = useGoogleLogin({
+    onSuccess: async (tokenResponse) => {
+      setLoading(true);
+      try {
+        const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        });
+        const profile = await res.json();
+        if (profile.email) {
+          await handleGoogleProfileLogin({
+            sub: profile.sub,
+            email: profile.email,
+            name: profile.name,
+            picture: profile.picture,
+            hd: profile.hd,
+          });
+        } else {
+          toast.error("Gagal mengambil data profil Google");
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Google OAuth failed");
+      } finally {
+        setLoading(false);
+      }
+    },
+    onError: () => toast.error("Google Login Cancelled"),
+  });
 
   return (
     <div className="min-h-screen bg-white text-ink flex flex-col lg:flex-row items-stretch overflow-hidden font-sans">
       {/* LEFT: Branding/Hero Section (visible on desktop) */}
       <div className="hidden lg:flex lg:w-[45%] relative flex-col justify-between p-12 text-white overflow-hidden border-r-2 border-ink">
-        {/* Background Video (Local Asset) with Zoom Effect and fallbacks */}
-        <video
-          autoPlay
-          loop
-          muted
-          playsInline
+        {/* Background Image (Uploaded Asset) */}
+        <img
+          src={resolveImageUrl("/uploads/file-1783266825899-609321798.jpeg")}
+          alt="FILKOM Merch Login Background"
           className="absolute inset-0 w-full h-full object-cover scale-105 pointer-events-none transition-transform duration-[15000ms] ease-out hover:scale-110"
-          poster={loginBgImage}
-        >
-          <source src={loginBgVideo} type="video/mp4" />
-          Your browser does not support the video tag.
-        </video>
-        {/* Gradient Overlays for High Contrast */}
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-950/85 via-indigo-900/80 to-brand-blue/70 mix-blend-multiply pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-transparent to-ink/10 pointer-events-none" />
+        />
+        {/* Natural Photo Contrast Overlay for Text Legibility (No Blue Tint) */}
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/90 via-ink/30 to-black/30 pointer-events-none" />
 
         {/* Floating Animated Geometric Objects */}
         <div className="absolute top-[15%] left-[10%] w-24 h-24 rounded-full border border-white/10 bg-white/5 blur-[2px] animate-[spin_35s_linear_infinite] pointer-events-none" />
@@ -379,71 +399,8 @@ function LoginPage() {
 
           {/* Mode Forms */}
           {mode === "login" && (
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="username"
-                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
-                >
-                  Username or Email
-                </Label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="username"
-                    placeholder="Masukkan username atau email"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    autoComplete="username"
-                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label
-                  htmlFor="password"
-                  className="text-xs font-extrabold uppercase tracking-wider text-ink"
-                >
-                  Password
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    autoComplete="current-password"
-                    className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
-                    required
-                  />
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-ink text-cream hover:bg-brand-orange hover:text-white border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] font-bold tracking-wider h-11 transition-all text-xs uppercase"
-              >
-                <LogIn className="w-4 h-4 mr-2" />
-                {loading ? "MEMPROSES..." : "MASUK KE AKUN"}
-              </Button>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-muted-foreground/20"></div>
-                </div>
-                <div className="relative flex justify-center text-[10px]">
-                  <span className="px-3.5 bg-[#FCFAF7] text-muted-foreground font-black tracking-widest">
-                    OR
-                  </span>
-                </div>
-              </div>
-
-              {/* Google login option styled premium with education banner */}
+            <div className="space-y-6">
+              {/* Google login option styled premium with education banner (AT TOP) */}
               <div className="space-y-4">
                 <div className="p-4 bg-brand-blue/5 border border-brand-blue/20 rounded-2xl flex items-start gap-3 shadow-sm">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-blue/10 text-brand-blue">
@@ -459,20 +416,102 @@ function LoginPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-center w-full py-1">
-                  <GoogleLogin
-                    onSuccess={handleGoogleSuccess}
-                    onError={handleGoogleError}
-                    useOneTap
-                    shape="pill"
-                    theme="outline"
-                    size="large"
-                    text="signin_with"
-                  />
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => loginWithGoogle()}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-3 bg-white hover:bg-neutral-50 text-ink border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] font-extrabold tracking-wider h-11 px-4 rounded-lg transition-all text-xs uppercase cursor-pointer"
+                  >
+                    <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>MASUK DENGAN AKUN GOOGLE UB</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="text-center pt-4 text-xs font-semibold">
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-muted-foreground/20"></div>
+                </div>
+                <div className="relative flex justify-center text-[10px]">
+                  <span className="px-3.5 bg-[#FCFAF7] text-muted-foreground font-black tracking-widest uppercase">
+                    ATAU LOGIN MANUAL
+                  </span>
+                </div>
+              </div>
+
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="username"
+                    className="text-xs font-extrabold uppercase tracking-wider text-ink"
+                  >
+                    Username or Email
+                  </Label>
+                  <div className="relative">
+                    <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="username"
+                      placeholder="Masukkan username atau email"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      autoComplete="username"
+                      className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="password"
+                    className="text-xs font-extrabold uppercase tracking-wider text-ink"
+                  >
+                    Password
+                  </Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
+                      className="pl-10.5 border-2 border-ink focus-visible:ring-0 focus-visible:border-brand-orange h-11 text-sm bg-white"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-ink text-cream hover:bg-brand-orange hover:text-white border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] font-bold tracking-wider h-11 transition-all text-xs uppercase"
+                >
+                  <LogIn className="w-4 h-4 mr-2" />
+                  {loading ? "MEMPROSES..." : "MASUK KE AKUN"}
+                </Button>
+              </form>
+
+              <div className="text-center pt-2 text-xs font-semibold">
                 <span className="text-muted-foreground">Belum punya akun? </span>
                 <button
                   type="button"
@@ -486,7 +525,7 @@ function LoginPage() {
                   Daftar Sekarang &rarr;
                 </button>
               </div>
-            </form>
+            </div>
           )}
 
           {mode === "register" && (

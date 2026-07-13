@@ -30,7 +30,7 @@ import {
   ZoomIn,
 } from "lucide-react";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -526,6 +526,51 @@ function HeroCarousel({ images }: HeroCarouselProps) {
   );
 }
 
+function ScrollFadeSegment({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [isVisible, setIsVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    if (typeof IntersectionObserver === "undefined") {
+      setIsVisible(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.unobserve(el);
+        }
+      },
+      {
+        threshold: 0.05,
+        rootMargin: "0px 0px -40px 0px",
+      }
+    );
+
+    observer.observe(el);
+
+    return () => {
+      if (el) observer.unobserve(el);
+    };
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      className={`w-full overflow-hidden transition-all duration-700 ease-out transform ${
+        isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
 function Index() {
   const parsePrice = (p: any): number => {
     if (typeof p === "number") return p;
@@ -886,7 +931,7 @@ function Index() {
       {segments
         .filter((seg) => seg.enabled)
         .map((seg) => (
-          <div key={seg.id} className="w-full overflow-hidden">
+          <ScrollFadeSegment key={seg.id}>
             {(seg.elements || []).map((el) => {
               switch (el.type) {
                 case "marquee":
@@ -1770,26 +1815,9 @@ function Index() {
                   return null;
               }
             })}
-          </div>
+          </ScrollFadeSegment>
         ))}
 
-      {/* Trust Indicators Row before Footer */}
-      <section className="bg-cream py-6 border-b-2 border-ink shadow-sm">
-        <div className="max-w-[1400px] mx-auto px-5 lg:px-10 flex flex-wrap justify-center items-center gap-8 md:gap-14 opacity-75 grayscale hover:grayscale-0 transition-all duration-300">
-          <div className="flex items-center gap-2 text-[10px] tracking-widest text-ink font-bold font-mono">
-            <Lock className="w-4 h-4 text-brand-orange" /> SECURED BY MIDTRANS
-          </div>
-          <div className="flex items-center gap-2 text-[10px] tracking-widest text-ink font-bold font-mono">
-            <User className="w-4 h-4 text-brand-orange" /> GOOGLE STUDENT LOGIN
-          </div>
-          <div className="flex items-center gap-2 text-[10px] tracking-widest text-ink font-bold font-mono">
-            <Check className="w-4 h-4 text-brand-orange" /> BEM FILKOM PARTNER
-          </div>
-          <div className="flex items-center gap-2 text-[10px] tracking-widest text-ink font-bold font-mono">
-            <ShieldCheck className="w-4 h-4 text-brand-orange" /> 100% GARANSI PREMIUM
-          </div>
-        </div>
-      </section>
 
       {/* 10. Footer */}
       <footer className="bg-background border-t border-border">

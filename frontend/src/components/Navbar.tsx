@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { HackerModeToggle } from "./HackerModeToggle";
+import { useQuery } from "@tanstack/react-query";
+import { getStoreSettings } from "@/backend/server-actions";
 import { VerificationModal } from "@frontend/components/VerificationModal";
 import { toast } from "sonner";
 import {
@@ -54,9 +56,29 @@ function formatRp(n: number) {
   return "Rp " + n.toLocaleString("id-ID");
 }
 
-function scrollToId(id: string) {
-  const el = document.getElementById(id);
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+function getMarqueeText(settings: any) {
+  const defaultText = "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN | 100% PRODUK MAHASISWA | CASHBACK 5% MEMBER | DROP BARU TIAP BULAN";
+  if (!settings || !settings.homepage_layout) return defaultText;
+  try {
+    const parsed = typeof settings.homepage_layout === "object"
+      ? settings.homepage_layout
+      : JSON.parse(settings.homepage_layout);
+    if (Array.isArray(parsed)) {
+      for (const segment of parsed) {
+        if (segment.elements) {
+          const marqueeEl = segment.elements.find((e: any) => e.type === "marquee");
+          if (marqueeEl && marqueeEl.config?.text) {
+            return marqueeEl.config.text;
+          }
+        }
+      }
+    } else if (parsed?.marqueeText) {
+      return parsed.marqueeText;
+    }
+  } catch (e) {
+    console.error("Error parsing homepage layout in marquee:", e);
+  }
+  return defaultText;
 }
 
 interface NavbarProps {
@@ -72,6 +94,17 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
   const hash = location.hash;
   const { user, logout } = useAuth();
 
+  const scrollToId = (id: string) => {
+    if (id === "top") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } else {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      }
+    }
+  };
+
   // State variables
   const [cart, setCart] = useState<CartItem[]>([]);
   const [cartOpen, setCartOpen] = useState(false);
@@ -80,6 +113,8 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [localQuery, setLocalQuery] = useState("");
+
+  const displayQuery = searchQuery !== undefined ? searchQuery : localQuery;
 
   // Refs for click outside detection
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -201,7 +236,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const query = searchQuery !== undefined ? searchQuery : localQuery;
-    
+
     if (pathname === "/" || pathname === "/products") {
       // If we are on home/catalog, let's trigger scroll or filter via state
       if (onSearchQueryChange) {
@@ -231,12 +266,38 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
     }
   };
 
-  const displayQuery = searchQuery !== undefined ? searchQuery : localQuery;
+  const { data: settingsData } = useQuery({
+    queryKey: ["storeSettings"],
+    queryFn: () => getStoreSettings(),
+  });
+  const settings = settingsData?.settings || null;
+  const marqueeText = getMarqueeText(settings);
+
+  const isHideMarquee =
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/pos") ||
+    pathname.startsWith("/checkout");
 
   return (
     <>
       <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 flex items-center justify-between h-16 sm:h-20">
+        {!isHideMarquee && (
+          <div className="bg-ink text-cream overflow-hidden border-b border-ink h-9 sm:h-10 flex items-center shadow-sm">
+            <div className="flex marquee-track whitespace-nowrap text-xs sm:text-xs tracking-[0.18em] font-extrabold h-full items-center">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="flex shrink-0 items-center gap-10 px-5">
+                  {marqueeText.split("|").map((t: string, idx: number) => (
+                    <span key={idx} className="flex items-center gap-10">
+                      {t.trim().toUpperCase()}
+                      <span className="text-brand-orange">✦</span>
+                    </span>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 py-1.5 sm:py-2.5 flex items-center justify-between">
           <Link
             to="/"
             onClick={(e) => {
@@ -251,12 +312,12 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
               <img
                 src={logo}
                 alt="Filkom Merch UB"
-                className="h-[42px] w-[42px] sm:h-[55px] sm:w-[55px] rounded-full object-cover ring-2 ring-ink shadow-sm"
+                className="h-9 w-9 sm:h-[48px] sm:w-[48px] rounded-full object-cover ring-2 ring-ink shadow-sm"
               />
               <img
                 src={logoFilkom}
                 alt="Logo FILKOM UB"
-                className="h-[37px] w-[37px] sm:h-[51px] sm:w-[51px] object-contain"
+                className="h-8 w-8 sm:h-[42px] sm:w-[42px] object-contain"
               />
             </div>
             <div className="leading-tight hidden sm:block">
@@ -282,11 +343,10 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                   <button
                     key={n.label}
                     onClick={() => scrollToId(n.target!)}
-                    className={`text-[11px] font-bold tracking-[0.2em] transition-colors cursor-pointer uppercase ${
-                      isActive
-                        ? "text-brand-orange border-b-2 border-brand-orange"
-                        : "text-ink hover:text-brand-orange"
-                    }`}
+                    className={`text-[11px] font-bold tracking-[0.2em] transition-colors cursor-pointer uppercase ${isActive
+                      ? "text-brand-orange border-b-2 border-brand-orange"
+                      : "text-ink hover:text-brand-orange"
+                      }`}
                   >
                     {n.label}
                   </button>
@@ -298,11 +358,10 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                   key={n.label}
                   to={n.href.startsWith("/#") ? "/" : (n.href as any)}
                   hash={n.isScroll ? n.target : undefined}
-                  className={`text-[11px] font-bold tracking-[0.2em] transition-colors uppercase ${
-                    isActive
-                      ? "text-brand-orange border-b-2 border-brand-orange"
-                      : "text-ink hover:text-brand-orange"
-                  }`}
+                  className={`text-[11px] font-bold tracking-[0.2em] transition-colors uppercase ${isActive
+                    ? "text-brand-orange border-b-2 border-brand-orange"
+                    : "text-ink hover:text-brand-orange"
+                    }`}
                 >
                   {n.label}
                 </Link>
@@ -310,25 +369,25 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
             })}
           </nav>
 
-          <div className="flex items-center gap-4 text-ink">
+          <div className="flex items-center gap-1 sm:gap-1.5 text-ink">
             <HackerModeToggle />
             <button
               aria-label="Search"
               onClick={() => setSearchOpen((v) => !v)}
-              className="hover:text-brand-orange transition-colors"
+              className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg hover:text-brand-orange hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
             >
               <Search className="w-5 h-5" />
             </button>
-            <div className="relative" ref={userMenuRef}>
+            <div className="relative flex items-center" ref={userMenuRef}>
               <button
                 aria-label="Account"
                 onClick={() => setUserMenuOpen((v) => !v)}
-                className="hover:text-brand-orange transition-colors"
+                className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg hover:text-brand-orange hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <User className="w-5 h-5" />
               </button>
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] z-50 animate-scale-in">
+                <div className="absolute right-0 top-full mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] z-50 animate-scale-in">
                   {user ? (
                     <>
                       <div className="px-5 py-3 border-b border-border">
@@ -415,19 +474,19 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
             </div>
             <button
               aria-label="Cart"
-              className="relative hover:text-brand-orange transition-colors"
+              className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center relative rounded-lg hover:text-brand-orange hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
               onClick={() => setCartOpen(true)}
             >
               <ShoppingBag className="w-5 h-5" />
               {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-brand-orange text-cream text-[9px] min-w-4 h-4 px-1 rounded-full flex items-center justify-center font-bold">
+                <span className="absolute top-0.5 right-0.5 bg-brand-orange text-cream text-[9px] min-w-[17px] h-[17px] px-1 rounded-full flex items-center justify-center font-bold shadow-sm">
                   {cartCount}
                 </span>
               )}
             </button>
             <button
               aria-label="Menu"
-              className="lg:hidden"
+              className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center lg:hidden rounded-lg hover:text-brand-orange hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
               onClick={() => setMenuOpen(true)}
             >
               <Menu className="w-5 h-5" />

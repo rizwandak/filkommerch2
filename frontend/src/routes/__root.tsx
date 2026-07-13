@@ -155,16 +155,8 @@ const getMarqueeText = (settings: any) => {
 };
 
 function GlobalLayout() {
-  const { data } = useQuery({
-    queryKey: ["storeSettings"],
-    queryFn: () => getStoreSettings(),
-  });
-
   const location = useLocation();
   const isAdminOrCashier = location.pathname.startsWith("/admin") || location.pathname.startsWith("/pos");
-
-  const settings = data?.settings || null;
-  const marqueeText = getMarqueeText(settings);
 
   if (isAdminOrCashier) {
     return (
@@ -177,23 +169,7 @@ function GlobalLayout() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col pt-10 sm:pt-11 bg-background text-foreground selection:bg-brand-orange selection:text-cream has-global-marquee overflow-x-hidden max-w-full w-full">
-      {/* Announcement marquee fixed at the top */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-ink text-cream overflow-hidden border-b border-ink h-10 sm:h-11 flex items-center shadow-sm">
-        <div className="flex marquee-track whitespace-nowrap text-[10px] sm:text-xs tracking-[0.2em] font-bold h-full items-center">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="flex shrink-0 items-center gap-10 px-5">
-              {marqueeText.split("|").map((t: string, idx: number) => (
-                <span key={idx} className="flex items-center gap-10">
-                  {t.trim().toUpperCase()}
-                  <span className="text-brand-orange">✦</span>
-                </span>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-      
+    <div className="min-h-screen flex flex-col bg-background text-foreground selection:bg-brand-orange selection:text-cream overflow-x-hidden max-w-full w-full">
       {/* Nested routes render here */}
       <div className="flex-1 flex flex-col min-w-0">
         <Outlet />
