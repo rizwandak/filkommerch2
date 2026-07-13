@@ -401,10 +401,10 @@ function CheckoutPage() {
       </div>
 
       {/* Main Content */}
-      <div className="mx-auto max-w-6xl px-4 py-8 pb-36 lg:pb-8">
-        <div className="grid gap-8 lg:grid-cols-3">
+      <div className="mx-auto max-w-6xl px-3.5 sm:px-6 py-6 sm:py-8 pb-36 lg:pb-8 w-full min-w-0">
+        <div className="grid gap-6 lg:gap-8 lg:grid-cols-3">
           {/* Left Section */}
-          <div className={currentStep === 1 ? "lg:col-span-3" : "lg:col-span-2"}>
+          <div className={`${currentStep === 1 ? "lg:col-span-3" : "lg:col-span-2"} min-w-0 pr-1 sm:pr-0`}>
             {currentStep === 1 && (
               <CartReviewStep
                 items={cartItems}
@@ -512,7 +512,7 @@ function CheckoutPage() {
           {/* Right Section - Order Summary (Desktop Side Column) */}
           {currentStep > 1 && (
             <div className="hidden lg:block lg:col-span-1">
-              <Card className="sticky top-4 border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+              <Card className="sticky top-4 border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] sm:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
                 <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
                   <CardTitle className="display text-xs tracking-wider uppercase text-ink">Ringkasan Pesanan</CardTitle>
                 </CardHeader>
@@ -750,17 +750,17 @@ interface CartReviewStepProps {
 
 function CartReviewStep({ items, onQuantityChange, onRemoveItem }: CartReviewStepProps) {
   return (
-    <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
-      <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
+    <Card className="border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] sm:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
+      <CardHeader className="bg-cream/20 border-b-2 border-ink py-3.5 sm:py-4 px-4 sm:px-6">
         <CardTitle className="display text-sm tracking-wider uppercase text-ink">Keranjang Belanja</CardTitle>
         <CardDescription className="text-xs">Periksa kembali item belanjaan Anda sebelum melanjutkan</CardDescription>
       </CardHeader>
-      <CardContent className="p-4 sm:p-6">
-        <div className="space-y-4">
+      <CardContent className="p-3.5 sm:p-6">
+        <div className="space-y-3.5 sm:space-y-4">
           {items.map((item) => (
             <div
               key={item.id}
-              className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border-2 border-ink p-4 gap-4 bg-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+              className="flex flex-col sm:flex-row sm:items-center justify-between rounded-xl border-2 border-ink p-3.5 sm:p-4 gap-3 sm:gap-4 bg-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] max-w-full overflow-hidden"
             >
               <div className="flex items-center gap-4 flex-1 min-w-0">
                 <div className="w-16 h-20 bg-cream border-2 border-ink rounded overflow-hidden flex items-center justify-center shrink-0 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]">
@@ -980,7 +980,7 @@ function CustomerDetailsStep({
   }, [distId]);
   
   return (
-    <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+    <Card className="border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] sm:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
       <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
         <CardTitle className="display text-sm tracking-wider uppercase text-ink">
           Informasi Pelanggan
@@ -1303,7 +1303,7 @@ interface PaymentReviewStepProps {
 function PaymentReviewStep({ items, customer }: PaymentReviewStepProps) {
   return (
     <div className="space-y-6">
-      <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+      <Card className="border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] sm:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
         <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
           <CardTitle className="display text-sm tracking-wider uppercase text-ink">Detail Pesanan Anda</CardTitle>
         </CardHeader>
@@ -1338,7 +1338,7 @@ function PaymentReviewStep({ items, customer }: PaymentReviewStepProps) {
         </CardContent>
       </Card>
 
-      <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+      <Card className="border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] sm:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
         <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
           <CardTitle className="display text-sm tracking-wider uppercase text-ink">Informasi Pengiriman</CardTitle>
         </CardHeader>
@@ -1394,7 +1394,7 @@ function QrCodePaymentStep({ qrUrl, orderId, customerName }: QrCodePaymentStepPr
 
   return (
     <div className="space-y-6">
-      <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+      <Card className="border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] sm:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
         <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
           <CardTitle className="display text-sm tracking-wider uppercase text-ink">Scan QR Code untuk Membayar</CardTitle>
           <CardDescription className="text-xs">
@@ -1449,7 +1449,7 @@ function QrCodePaymentStep({ qrUrl, orderId, customerName }: QrCodePaymentStepPr
       </Card>
 
       {/* Payment Status */}
-      <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+      <Card className="border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] sm:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
         <CardHeader className="bg-cream/20 border-b-2 border-ink py-3.5">
           <CardTitle className="display text-xs uppercase tracking-wider text-ink font-bold">Status Pembayaran</CardTitle>
         </CardHeader>

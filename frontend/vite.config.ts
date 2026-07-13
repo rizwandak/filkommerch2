@@ -15,6 +15,9 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    server: {
+      allowedHosts: [".ngrok-free.app"],
+    },
     resolve: {
       alias: {
         "@frontend": resolve(__dirname, "./src/frontend"),
