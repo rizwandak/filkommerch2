@@ -343,8 +343,10 @@ function PreOrderPage() {
     toast.success("Added to bag", { description: itemName });
   }, []);
 
-  function parsePrice(p: string) {
-    return Number(p.replace(/[^0-9]/g, ""));
+  function parsePrice(p: any): number {
+    if (typeof p === "number") return p;
+    if (!p) return 0;
+    return Number(String(p).replace(/[^0-9]/g, "")) || 0;
   }
 
   function formatRp(n: number) {

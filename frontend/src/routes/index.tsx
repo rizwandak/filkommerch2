@@ -273,8 +273,10 @@ type CartItem = {
   image_url?: string;
 };
 
-function parsePrice(p: string) {
-  return Number(p.replace(/[^0-9]/g, ""));
+function parsePrice(p: any): number {
+  if (typeof p === "number") return p;
+  if (!p) return 0;
+  return Number(String(p).replace(/[^0-9]/g, "")) || 0;
 }
 
 function formatRp(n: number) {
@@ -524,8 +526,10 @@ function HeroCarousel({ images }: HeroCarouselProps) {
 }
 
 function Index() {
-  const parsePrice = (p: string) => {
-    return Number(p.replace(/[^0-9]/g, ""));
+  const parsePrice = (p: any): number => {
+    if (typeof p === "number") return p;
+    if (!p) return 0;
+    return Number(String(p).replace(/[^0-9]/g, "")) || 0;
   };
 
   const formatRp = (n: number) => {
@@ -1013,8 +1017,8 @@ function Index() {
                                 const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
                                 discountText = `Save ${pct}%`;
                               } else if (p.was && p.price) {
-                                const rawPrice = Number(p.price.replace(/[^0-9]/g, ""));
-                                const rawOriginalPrice = Number(p.was.replace(/[^0-9]/g, ""));
+                                const rawPrice = parsePrice(p.price);
+                                const rawOriginalPrice = parsePrice(p.was);
                                 if (rawOriginalPrice > rawPrice) {
                                   const pct = Math.round(((rawOriginalPrice - rawPrice) / rawOriginalPrice) * 100);
                                   discountText = `Save ${pct}%`;
@@ -1105,8 +1109,8 @@ function Index() {
                                 const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
                                 discountText = `Save ${pct}%`;
                               } else if (p.was && p.price) {
-                                const rawPrice = Number(p.price.replace(/[^0-9]/g, ""));
-                                const rawOriginalPrice = Number(p.was.replace(/[^0-9]/g, ""));
+                                const rawPrice = parsePrice(p.price);
+                                const rawOriginalPrice = parsePrice(p.was);
                                 if (rawOriginalPrice > rawPrice) {
                                   const pct = Math.round(((rawOriginalPrice - rawPrice) / rawOriginalPrice) * 100);
                                   discountText = `Save ${pct}%`;
