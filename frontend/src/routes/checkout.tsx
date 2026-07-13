@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ShoppingBag, ArrowLeft, Loader2, QrCode, Copy, Check, CreditCard } from "lucide-react";
+import { ShoppingBag, ArrowLeft, Loader2, QrCode, Copy, Check, CreditCard, ChevronUp, ChevronDown, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import { toast } from "sonner";
@@ -75,6 +75,7 @@ function CheckoutPage() {
   const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
+  const [summaryDrawerOpen, setSummaryDrawerOpen] = useState(false);
 
   const steps: CheckoutStep[] = [
     { step: 1, title: "Review Cart" },
@@ -391,7 +392,7 @@ function CheckoutPage() {
       </div>
 
       {/* Main Content */}
-      <div className="mx-auto max-w-6xl px-4 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-8 pb-36 lg:pb-8">
         <div className="grid gap-8 lg:grid-cols-3">
           {/* Left Section */}
           <div className={currentStep === 1 ? "lg:col-span-3" : "lg:col-span-2"}>
@@ -449,8 +450,8 @@ function CheckoutPage() {
               <QrCodePaymentStep qrUrl={qrUrl} orderId={orderId} customerName={customerName} />
             )}
 
-            {/* Navigation Buttons */}
-            <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4">
+            {/* Navigation Buttons (Desktop only, for step 4 or general layout) */}
+            <div className="mt-6 sm:mt-8 hidden lg:flex flex-col sm:flex-row gap-3 sm:gap-4">
               {currentStep > 1 && currentStep < 4 && (
                 <Button
                   variant="outline"
@@ -499,9 +500,9 @@ function CheckoutPage() {
             </div>
           </div>
 
-          {/* Right Section - Order Summary */}
+          {/* Right Section - Order Summary (Desktop Side Column) */}
           {currentStep > 1 && (
-            <div className="lg:col-span-1">
+            <div className="hidden lg:block lg:col-span-1">
               <Card className="sticky top-4 border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
                 <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
                   <CardTitle className="display text-xs tracking-wider uppercase text-ink">Ringkasan Pesanan</CardTitle>
@@ -573,6 +574,160 @@ function CheckoutPage() {
           </div>
         )}
       </div>
+
+      {/* Mobile Sticky Bottom Bar (Fixed at screen bottom for Mobile & Tablet <1024px) */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t-2 border-ink p-3 shadow-[0px_-4px_16px_rgba(0,0,0,0.15)]">
+        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
+          {/* Price & Summary Drawer Toggle */}
+          <button
+            type="button"
+            onClick={() => setSummaryDrawerOpen(true)}
+            className="flex flex-col text-left cursor-pointer group pr-2 border-r border-ink/10 shrink-0"
+          >
+            <div className="flex items-center gap-1 text-[10px] font-black uppercase text-muted-foreground tracking-wider group-hover:text-brand-orange transition-colors">
+              <span>Rincian ({cartItems.reduce((s, i) => s + i.quantity, 0)})</span>
+              <ChevronUp className="w-3 h-3 text-brand-orange animate-bounce" />
+            </div>
+            <span className="text-sm sm:text-base font-black text-brand-orange leading-tight">
+              Rp {totalAmount.toLocaleString("id-ID")}
+            </span>
+          </button>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2 flex-1 justify-end">
+            {currentStep > 1 && currentStep < 4 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentStep(currentStep - 1)}
+                className="h-10 text-xs font-bold uppercase border-2 border-ink shrink-0 px-2.5 cursor-pointer hover:bg-cream"
+              >
+                ←
+              </Button>
+            )}
+
+            {currentStep < 3 && (
+              <Button
+                onClick={() => {
+                  if (validateStep()) {
+                    setCurrentStep(currentStep + 1);
+                  }
+                }}
+                className="flex-1 max-w-[200px] h-10 text-xs font-bold uppercase tracking-wider bg-ink text-white hover:bg-brand-orange shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+              >
+                Lanjut →
+              </Button>
+            )}
+
+            {currentStep === 3 && (
+              <Button
+                onClick={handlePayment}
+                disabled={isProcessing}
+                className="flex-1 max-w-[220px] h-10 bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider text-xs shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                    Memproses...
+                  </>
+                ) : (
+                  <>
+                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                    Bayar Sekarang
+                  </>
+                )}
+              </Button>
+            )}
+
+            {currentStep === 4 && (
+              <Button asChild className="flex-1 max-w-[180px] h-10 font-bold uppercase text-xs cursor-pointer">
+                <a href="/">Selesai</a>
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Pop-Up Drawer Modal for Order Breakdown */}
+      {summaryDrawerOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div
+            className="fixed inset-0"
+            onClick={() => setSummaryDrawerOpen(false)}
+          />
+          <div className="relative w-full max-w-lg bg-card rounded-t-2xl border-t-2 border-x-2 border-ink p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl z-10 animate-in slide-in-from-bottom duration-300">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b-2 border-ink pb-3">
+              <div>
+                <h3 className="display text-xs uppercase tracking-wider text-ink font-bold">Rincian Pesanan</h3>
+                <p className="text-[10px] text-muted-foreground font-semibold">
+                  {cartItems.reduce((s, i) => s + i.quantity, 0)} produk di keranjang
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSummaryDrawerOpen(false)}
+                className="p-1.5 rounded-full border border-ink/20 hover:bg-muted text-ink cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Cart itemized list */}
+            <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+              {cartItems.map((item) => (
+                <div key={item.id} className="flex items-center gap-3 border-b border-muted pb-2.5 last:border-0 last:pb-0">
+                  <div className="w-12 h-14 bg-cream border border-ink rounded overflow-hidden shrink-0">
+                    {item.image_url || (item as any).img ? (
+                      <img src={resolveImageUrl(item.image_url || (item as any).img)} alt={item.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-ink leading-tight truncate">{item.name}</p>
+                    {item.size && (
+                      <span className="inline-block text-[9px] font-bold text-muted-foreground mt-0.5">
+                        Ukuran: {item.size}
+                      </span>
+                    )}
+                    <p className="text-[10px] text-muted-foreground">
+                      {item.quantity} × Rp {item.price.toLocaleString("id-ID")}
+                    </p>
+                  </div>
+                  <span className="font-extrabold text-xs text-brand-orange shrink-0">
+                    Rp {(item.price * item.quantity).toLocaleString("id-ID")}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Delivery & Total */}
+            <div className="border-t-2 border-ink pt-3 space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground font-semibold">Pengiriman:</span>
+                <span className="font-bold text-ink uppercase text-[10px]">
+                  {fulfillmentType === "pickup" ? "Ambil di Kampus (Gratis)" : "Kurir (Ada Ongkir)"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center font-extrabold text-sm pt-2 border-t border-dashed border-ink/20">
+                <span>Total Tagihan</span>
+                <span className="text-base text-brand-orange font-black">
+                  Rp {totalAmount.toLocaleString("id-ID")}
+                </span>
+              </div>
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => setSummaryDrawerOpen(false)}
+              className="w-full h-11 bg-ink text-white font-bold uppercase tracking-wider text-xs rounded-xl cursor-pointer"
+            >
+              Tutup Rincian
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
     </div>
   );
