@@ -354,29 +354,38 @@ function CheckoutPage() {
         </div>
       </div>
 
-      {/* Steps */}
+      {/* Steps Indicator Bar */}
       <div className="border-b border-border bg-card">
-        <div className="mx-auto max-w-6xl px-4 py-4">
-          <div className="flex items-center justify-between">
+        <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-1 sm:gap-2">
             {steps.map((s, index) => (
-              <div key={s.step} className="flex items-center flex-1">
+              <div key={s.step} className="flex items-center flex-1 min-w-0">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${
+                  className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs sm:text-sm font-bold shrink-0 ${
                     currentStep >= s.step
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-primary text-primary-foreground shadow-sm"
                       : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {s.step}
                 </div>
-                <div className="ml-3 hidden text-sm font-medium sm:block">{s.title}</div>
+                <div className="ml-2 hidden text-xs sm:text-sm font-bold sm:block truncate">{s.title}</div>
                 {index < steps.length - 1 && (
                   <div
-                    className={`ml-4 h-1 flex-1 ${currentStep > s.step ? "bg-primary" : "bg-muted"}`}
+                    className={`ml-1.5 sm:ml-4 h-1 flex-1 rounded-full transition-colors ${
+                      currentStep > s.step ? "bg-primary" : "bg-muted"
+                    }`}
                   />
                 )}
               </div>
             ))}
+          </div>
+          {/* Active step title mobile badge */}
+          <div className="mt-2 text-center sm:hidden">
+            <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+              Langkah {currentStep} dari 4:{" "}
+              <span className="text-primary font-bold">{steps.find((s) => s.step === currentStep)?.title}</span>
+            </span>
           </div>
         </div>
       </div>
@@ -441,10 +450,14 @@ function CheckoutPage() {
             )}
 
             {/* Navigation Buttons */}
-            <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row gap-3 sm:gap-4">
               {currentStep > 1 && currentStep < 4 && (
-                <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)}>
-                  Back
+                <Button
+                  variant="outline"
+                  onClick={() => setCurrentStep(currentStep - 1)}
+                  className="w-full sm:w-auto h-11 sm:h-10 text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer border-2 border-ink hover:bg-cream"
+                >
+                  ← Kembali
                 </Button>
               )}
               {currentStep < 3 && (
@@ -454,15 +467,16 @@ function CheckoutPage() {
                       setCurrentStep(currentStep + 1);
                     }
                   }}
+                  className="w-full sm:flex-1 h-11 sm:h-10 text-xs sm:text-sm font-bold uppercase tracking-wider cursor-pointer bg-ink text-white hover:bg-brand-orange"
                 >
-                  Next
+                  Lanjut →
                 </Button>
               )}
               {currentStep === 3 && (
                 <Button
                   onClick={handlePayment}
                   disabled={isProcessing}
-                  className="flex-1 bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider text-xs sm:text-sm"
+                  className="w-full flex-1 h-12 sm:h-10 bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider text-xs sm:text-sm cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
                 >
                   {isProcessing ? (
                     <>
@@ -478,8 +492,8 @@ function CheckoutPage() {
                 </Button>
               )}
               {currentStep === 4 && (
-                <Button asChild className="flex-1">
-                  <a href="/">Done</a>
+                <Button asChild className="w-full flex-1 h-11 sm:h-10 font-bold uppercase cursor-pointer">
+                  <a href="/">Selesai</a>
                 </Button>
               )}
             </div>
@@ -1223,10 +1237,10 @@ function QrCodePaymentStep({ qrUrl, orderId, customerName }: QrCodePaymentStepPr
             Gunakan aplikasi pembayaran apapun (GoPay, Dana, OVO, dll)
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col items-center gap-6">
+        <CardContent className="flex flex-col items-center gap-4 sm:gap-6 p-4 sm:p-6">
           {/* QR Code */}
-          <div className="rounded-lg border-4 border-primary p-6 bg-white">
-            <img src={qrUrl} alt="QRIS Payment" className="w-64 h-64 object-contain" />
+          <div className="rounded-lg border-4 border-primary p-3 sm:p-6 bg-white shadow-md max-w-full">
+            <img src={qrUrl} alt="QRIS Payment" className="w-48 h-48 sm:w-64 sm:h-64 object-contain max-w-full" />
           </div>
 
           {/* Order ID */}
