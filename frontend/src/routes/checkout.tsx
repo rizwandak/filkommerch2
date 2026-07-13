@@ -1333,33 +1333,33 @@ function PaymentReviewStep({ items, customer }: PaymentReviewStepProps) {
         <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
           <CardTitle className="display text-sm tracking-wider uppercase text-ink">Informasi Pengiriman</CardTitle>
         </CardHeader>
-        <CardContent className="p-4 sm:p-6 space-y-3 text-xs text-ink font-medium">
+        <CardContent className="p-3.5 sm:p-6 space-y-3 text-xs text-ink font-medium">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-ink/10 pb-3">
-            <div>
+            <div className="min-w-0">
               <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">Penerima</span>
-              <span className="font-bold text-sm">{customer.name}</span>
+              <span className="font-bold text-sm truncate block">{customer.name}</span>
             </div>
             {customer.nim && (
-              <div>
+              <div className="min-w-0">
                 <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">NIM</span>
-                <span className="font-mono font-bold text-brand-orange">{customer.nim}</span>
+                <span className="font-mono font-bold text-brand-orange truncate block">{customer.nim}</span>
               </div>
             )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-ink/10 pb-3">
-            <div>
+            <div className="min-w-0">
               <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">Email</span>
-              <span className="font-semibold">{customer.email}</span>
+              <span className="font-semibold truncate block">{customer.email}</span>
             </div>
-            <div>
+            <div className="min-w-0">
               <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">WhatsApp</span>
-              <span className="font-mono font-semibold">{customer.phone}</span>
+              <span className="font-mono font-semibold truncate block">{customer.phone}</span>
             </div>
           </div>
           {customer.address && (
-            <div>
+            <div className="min-w-0">
               <span className="text-[9px] font-black uppercase text-muted-foreground tracking-wider block">Alamat Tujuan</span>
-              <p className="font-bold text-brand-blue">{customer.address}</p>
+              <p className="font-bold text-brand-blue leading-relaxed break-words">{customer.address}</p>
             </div>
           )}
         </CardContent>
@@ -1384,54 +1384,52 @@ function QrCodePaymentStep({ qrUrl, orderId, customerName }: QrCodePaymentStepPr
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Scan QR Code untuk Membayar</CardTitle>
-          <CardDescription>
-            Gunakan aplikasi pembayaran apapun (GoPay, Dana, OVO, dll)
+    <div className="space-y-6">
+      <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+        <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
+          <CardTitle className="display text-sm tracking-wider uppercase text-ink">Scan QR Code untuk Membayar</CardTitle>
+          <CardDescription className="text-xs">
+            Gunakan aplikasi pembayaran apapun (GoPay, Dana, OVO, ShopeePay, dll)
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col items-center gap-4 sm:gap-6 p-4 sm:p-6">
+        <CardContent className="flex flex-col items-center gap-4 sm:gap-6 p-4 sm:p-6 text-ink">
           {/* QR Code */}
-          <div className="rounded-lg border-4 border-primary p-3 sm:p-6 bg-white shadow-md max-w-full">
-            <img src={qrUrl} alt="QRIS Payment" className="w-48 h-48 sm:w-64 sm:h-64 object-contain max-w-full" />
+          <div className="rounded-xl border-2 border-ink p-3 sm:p-6 bg-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] max-w-full">
+            <img src={qrUrl} alt="QRIS Payment" className="w-44 h-44 sm:w-60 sm:h-60 object-contain max-w-full" />
           </div>
 
           {/* Order ID */}
-          <div className="w-full">
-            <label className="text-sm font-semibold text-foreground mb-2 block">Order ID</label>
+          <div className="w-full space-y-1.5">
+            <label className="text-xs font-extrabold uppercase tracking-wider text-ink block">Order ID Pesanan</label>
             <div className="flex gap-2">
-              <Input value={orderId || ""} readOnly className="font-mono text-xs" />
-              <Button variant="outline" size="sm" onClick={handleCopy} className="shrink-0">
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              <Input value={orderId || ""} readOnly className="font-mono text-xs border-2 border-ink font-bold bg-cream/10" />
+              <Button variant="outline" size="sm" onClick={handleCopy} className="shrink-0 border-2 border-ink font-bold cursor-pointer hover:bg-cream">
+                {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
               </Button>
             </div>
           </div>
 
           {/* Instructions */}
-          <div className="w-full space-y-3 rounded-lg bg-blue-50 p-4">
-            <p className="font-semibold text-blue-900">Cara Membayar:</p>
-            <ol className="space-y-2 text-sm text-blue-800 list-decimal list-inside">
-              <li>Buka aplikasi pembayaran Anda (GoPay, Dana, OVO, LinkAja, dsb)</li>
-              <li>Pilih menu "Scan QR Code"</li>
+          <div className="w-full space-y-2.5 rounded-xl border-2 border-ink bg-[#FCFAF7] p-4 text-xs shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
+            <p className="font-extrabold uppercase tracking-wider text-brand-orange text-[11px]">Cara Membayar:</p>
+            <ol className="space-y-1.5 text-xs text-ink font-medium list-decimal list-inside leading-relaxed">
+              <li>Buka aplikasi e-wallet / mobile banking (GoPay, Dana, OVO, BCA, dll)</li>
+              <li>Pilih menu <span className="font-bold">"Scan QR Code"</span></li>
               <li>Arahkan kamera ke QR code di atas</li>
-              <li>Verifikasi jumlah pembayaran</li>
-              <li>Masukkan PIN/password Anda</li>
-              <li>Pembayaran berhasil! Anda akan mendapat notifikasi</li>
+              <li>Verifikasi nominal tagihan & selesaikan pembayaran</li>
             </ol>
           </div>
 
           {/* Payment Methods */}
           <div className="w-full">
-            <p className="text-xs font-semibold text-muted-foreground mb-3">
-              Metode Pembayaran yang Diterima:
+            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2.5">
+              Metode Pembayaran Diterima:
             </p>
-            <div className="grid grid-cols-3 gap-2">
-              {["GoPay", "OVO", "Dana", "LinkAja", "AlfaBank", "Jago"].map((method) => (
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {["GoPay", "OVO", "Dana", "ShopeePay", "BCA", "Mandiri"].map((method) => (
                 <div
                   key={method}
-                  className="rounded border border-border p-2 text-center text-xs font-medium text-foreground"
+                  className="rounded-lg border-2 border-ink bg-white p-2 text-center text-[10px] font-extrabold uppercase text-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] truncate"
                 >
                   {method}
                 </div>
@@ -1442,17 +1440,17 @@ function QrCodePaymentStep({ qrUrl, orderId, customerName }: QrCodePaymentStepPr
       </Card>
 
       {/* Payment Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Status Pembayaran</CardTitle>
+      <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+        <CardHeader className="bg-cream/20 border-b-2 border-ink py-3.5">
+          <CardTitle className="display text-xs uppercase tracking-wider text-ink font-bold">Status Pembayaran</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4">
           <div className="flex items-center gap-3">
-            <div className="h-3 w-3 rounded-full bg-yellow-500 animate-pulse" />
-            <p className="text-sm">Menunggu pembayaran dari {customerName}...</p>
+            <div className="h-3 w-3 rounded-full bg-amber-500 animate-ping shrink-0" />
+            <p className="text-xs font-bold text-ink">Menunggu pembayaran dari <span className="text-brand-orange">{customerName}</span>...</p>
           </div>
-          <p className="text-xs text-muted-foreground mt-3">
-            Halaman ini akan otomatis diperbarui saat pembayaran diterima
+          <p className="text-[10px] text-muted-foreground mt-2 font-medium">
+            Halaman ini akan otomatis diperbarui saat pembayaran diterima oleh sistem.
           </p>
         </CardContent>
       </Card>
