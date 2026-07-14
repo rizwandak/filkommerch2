@@ -107,7 +107,7 @@ function OrderConfirmationPage() {
     const formData = new FormData();
     formData.append("file", file);
 
-    const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+    const API_BASE_URL = import.meta.env.VITE_API_URL || "https://filkommerch.com";
 
     try {
       setUploadingProof(true);

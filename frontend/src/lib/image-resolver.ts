@@ -21,7 +21,20 @@ export function resolveImageUrl(url: string | undefined): string {
     return url;
   }
 
-  // If it is already a full http/https URL (keep localhost / 127.0.0.1 as is so local uploads load)
+  // Intercept stored localhost / 127.0.0.1 URLs and map to live backend on production / mobile devices
+  if (url.startsWith("http://127.0.0.1:8080") || url.startsWith("http://localhost:8080")) {
+    const cleanPath = url.replace(/^http:\/\/(127\.0\.0\.1|localhost):8080/, "");
+    if (
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ) {
+      return `http://127.0.0.1:8080${cleanPath}`;
+    }
+    const liveApiUrl = getLiveApiUrl();
+    return `${liveApiUrl}${cleanPath}`;
+  }
+
+  // If it is already a full http/https URL
   if (url.startsWith("http://") || url.startsWith("https://")) {
     return url;
   }

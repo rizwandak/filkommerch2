@@ -9,7 +9,6 @@ import {
   ShieldCheck,
   Truck,
   RotateCcw,
-  Heart,
   Share2,
   Minus,
   Plus,
@@ -123,7 +122,6 @@ function ProductDetailPage() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState<string>("");
-  const [isWishlisted, setIsWishlisted] = useState(false);
 
   const [selectedBundleVariants, setSelectedBundleVariants] = useState<Record<number, any>>({});
   const [isZoomOpen, setIsZoomOpen] = useState(false);
@@ -486,17 +484,6 @@ function ProductDetailPage() {
                 alt={product.name}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
               />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsWishlisted(!isWishlisted);
-                  toast.success(isWishlisted ? "Dihapus dari wishlist" : "Ditambahkan ke wishlist");
-                }}
-                className="absolute top-3.5 right-3.5 p-2.5 bg-white/95 rounded-full shadow border-2 border-ink hover:scale-105 transition-transform z-10 cursor-pointer"
-                aria-label="Wishlist"
-              >
-                <Heart className={`w-4 h-4 ${isWishlisted ? "fill-red-500 text-red-500" : "text-ink"}`} />
-              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
