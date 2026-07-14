@@ -1,15 +1,13 @@
-import { useState, useCallback, useEffect } from "react";
-import Cropper from "react-easy-crop";
+import { useState, useRef, useEffect } from "react";
 import { getCroppedImg } from "@/lib/crop-image";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@frontend/components/ui/dialog";
-import { Slider } from "@frontend/components/ui/slider";
 import { Button } from "@frontend/components/ui/button";
 import { toast } from "sonner";
 
 interface ImageCropperModalProps {
   isOpen: boolean;
   imageSrc: string;
-  elementType: string;
+  elementType?: string;
   onClose: () => void;
   onCropComplete: (croppedFile: File) => void;
   onUploadOriginal: () => void;
@@ -18,47 +16,179 @@ interface ImageCropperModalProps {
 export function ImageCropperModal({
   isOpen,
   imageSrc,
-  elementType,
   onClose,
   onCropComplete,
   onUploadOriginal,
 }: ImageCropperModalProps) {
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [aspect, setAspect] = useState<number>(5 / 6);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgDim, setImgDim] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const [cropBox, setCropBox] = useState<{ x: number; y: number; size: number }>({ x: 0, y: 0, size: 0 });
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Set default aspect ratio based on element type
-  useEffect(() => {
-    if (elementType === "image_banner") {
-      setAspect(16 / 9);
-    } else if (elementType === "limited_drop") {
-      setAspect(4 / 5);
+  // Dragging interaction state
+  const dragRef = useRef<{
+    mode: "move" | "top-left" | "top-right" | "bottom-left" | "bottom-right" | null;
+    startX: number;
+    startY: number;
+    startCrop: { x: number; y: number; size: number };
+  }>({
+    mode: null,
+    startX: 0,
+    startY: 0,
+    startCrop: { x: 0, y: 0, size: 0 },
+  });
+
+  // Calculate exact rendered dimensions of photo content inside object-contain container
+  const initializeCropBox = () => {
+    if (!imgRef.current || !containerRef.current) return;
+    const natW = imgRef.current.naturalWidth;
+    const natH = imgRef.current.naturalHeight;
+    const contW = containerRef.current.clientWidth;
+    const contH = containerRef.current.clientHeight;
+
+    if (natW <= 0 || natH <= 0 || contW <= 0 || contH <= 0) return;
+
+    const contAspect = contW / contH;
+    const imgAspect = natW / natH;
+
+    let dispW = 0;
+    let dispH = 0;
+
+    if (imgAspect > contAspect) {
+      dispW = contW;
+      dispH = contW / imgAspect;
     } else {
-      setAspect(5 / 6); // default for hero banner
+      dispH = contH;
+      dispW = contH * imgAspect;
     }
-  }, [elementType, isOpen]);
 
-  const onCropChange = (crop: { x: number; y: number }) => {
-    setCrop(crop);
+    setImgDim({ width: dispW, height: dispH });
+
+    const maxSquare = Math.min(dispW, dispH);
+    const initX = (dispW - maxSquare) / 2;
+    const initY = (dispH - maxSquare) / 2;
+
+    setCropBox({
+      x: initX,
+      y: initY,
+      size: maxSquare,
+    });
+    setImgLoaded(true);
   };
 
-  const onZoomChange = (zoom: number) => {
-    setZoom(zoom);
+  useEffect(() => {
+    if (isOpen) {
+      setImgLoaded(false);
+    }
+  }, [isOpen, imageSrc]);
+
+  // Recalculate if window resizes while open
+  useEffect(() => {
+    const handleResize = () => {
+      if (isOpen && imgLoaded) {
+        initializeCropBox();
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isOpen, imgLoaded]);
+
+  // Pointer Event Handlers for Dragging Box & Corners
+  const handlePointerDown = (
+    e: React.PointerEvent,
+    mode: "move" | "top-left" | "top-right" | "bottom-left" | "bottom-right"
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+
+    dragRef.current = {
+      mode,
+      startX: e.clientX,
+      startY: e.clientY,
+      startCrop: { ...cropBox },
+    };
   };
 
-  const onCropAreaComplete = useCallback((_croppedArea: any, croppedAreaPixels: any) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  }, []);
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const { mode, startX, startY, startCrop } = dragRef.current;
+    if (!mode || imgDim.width <= 0 || imgDim.height <= 0) return;
+
+    e.preventDefault();
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+
+    const w = imgDim.width;
+    const h = imgDim.height;
+    const minSize = 30;
+
+    let { x, y, size } = startCrop;
+
+    if (mode === "move") {
+      x = Math.max(0, Math.min(w - size, startCrop.x + dx));
+      y = Math.max(0, Math.min(h - size, startCrop.y + dy));
+    } else if (mode === "bottom-right") {
+      const delta = (dx + dy) / 2;
+      const maxSize = Math.min(w - startCrop.x, h - startCrop.y);
+      size = Math.max(minSize, Math.min(maxSize, startCrop.size + delta));
+    } else if (mode === "bottom-left") {
+      const delta = (-dx + dy) / 2;
+      const maxSize = Math.min(startCrop.x + startCrop.size, h - startCrop.y);
+      size = Math.max(minSize, Math.min(maxSize, startCrop.size + delta));
+      x = startCrop.x + (startCrop.size - size);
+    } else if (mode === "top-right") {
+      const delta = (dx - dy) / 2;
+      const maxSize = Math.min(w - startCrop.x, startCrop.y + startCrop.size);
+      size = Math.max(minSize, Math.min(maxSize, startCrop.size + delta));
+      y = startCrop.y + (startCrop.size - size);
+    } else if (mode === "top-left") {
+      const delta = (-dx - dy) / 2;
+      const maxSize = Math.min(startCrop.x + startCrop.size, startCrop.y + startCrop.size);
+      size = Math.max(minSize, Math.min(maxSize, startCrop.size + delta));
+      x = startCrop.x + (startCrop.size - size);
+      y = startCrop.y + (startCrop.size - size);
+    }
+
+    setCropBox({ x, y, size });
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (dragRef.current.mode) {
+      dragRef.current.mode = null;
+      try {
+        (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+      } catch (err) {
+        // pointer release fallback
+      }
+    }
+  };
 
   const handleCrop = async () => {
-    if (!imageSrc || !croppedAreaPixels) return;
+    if (!imageSrc || !imgRef.current || cropBox.size <= 0) return;
     setIsProcessing(true);
     try {
-      const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
+      const natW = imgRef.current.naturalWidth;
+      const natH = imgRef.current.naturalHeight;
+      const dispW = imgDim.width;
+      const dispH = imgDim.height;
+
+      const scaleX = natW / dispW;
+      const scaleY = natH / dispH;
+
+      const pixelCrop = {
+        x: cropBox.x * scaleX,
+        y: cropBox.y * scaleY,
+        width: cropBox.size * scaleX,
+        height: cropBox.size * scaleY,
+      };
+
+      const croppedBlob = await getCroppedImg(imageSrc, pixelCrop);
       if (croppedBlob) {
-        const croppedFile = new File([croppedBlob], "cropped-image.jpg", { type: "image/jpeg" });
+        const croppedFile = new File([croppedBlob], `cropped-${Date.now()}.jpg`, { type: "image/jpeg" });
         onCropComplete(croppedFile);
       } else {
         toast.error("Gagal memotong gambar.");
@@ -73,140 +203,100 @@ export function ImageCropperModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent className="sm:max-w-[550px] bg-cream border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] text-ink p-6 max-h-[90vh] overflow-y-auto z-[9999]">
+      <DialogContent className="sm:max-w-[640px] bg-cream border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] text-ink p-6 max-h-[92vh] overflow-y-auto z-[9999]">
         <DialogHeader className="border-b border-ink/10 pb-3">
-          <DialogTitle className="display text-lg uppercase font-black">Sesuaikan & Potong Foto ✂️</DialogTitle>
+          <DialogTitle className="display text-lg uppercase font-black">Potong Foto 1:1 Square ✂️</DialogTitle>
+          <p className="text-[11px] text-muted-foreground font-medium">
+            Geser kotak foto untuk mengatur posisi, dan **tarik 4 pegangan sudut bundar** untuk memperbesar/memperkecil kotak crop 1:1 (terkunci otomatis tepat di batas tepi fisik foto).
+          </p>
         </DialogHeader>
 
-        {/* Aspect Ratio Selectors based on element type */}
-        <div className="space-y-1.5 py-3 border-b border-ink/10">
-          <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Pilih Rasio Aspek:</label>
-          <div className="flex flex-wrap gap-2 justify-start">
-            {elementType === "hero_banner" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setAspect(5 / 6)}
-                  className={`px-3 py-1.5 border-2 border-ink text-[10px] font-bold uppercase cursor-pointer transition-all ${
-                    aspect === 5 / 6 ? "bg-ink text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-cream/40 text-ink hover:bg-cream/60"
-                  }`}
-                >
-                  Lookbook Desktop (5:6)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAspect(1 / 1)}
-                  className={`px-3 py-1.5 border-2 border-ink text-[10px] font-bold uppercase cursor-pointer transition-all ${
-                    aspect === 1 / 1 ? "bg-ink text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-cream/40 text-ink hover:bg-cream/60"
-                  }`}
-                >
-                  Square Mobile (1:1)
-                </button>
-              </>
-            )}
-
-            {elementType === "image_banner" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setAspect(16 / 9)}
-                  className={`px-3 py-1.5 border-2 border-ink text-[10px] font-bold uppercase cursor-pointer transition-all ${
-                    aspect === 16 / 9 ? "bg-ink text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-cream/40 text-ink hover:bg-cream/60"
-                  }`}
-                >
-                  Landscape (16:9)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAspect(21 / 9)}
-                  className={`px-3 py-1.5 border-2 border-ink text-[10px] font-bold uppercase cursor-pointer transition-all ${
-                    aspect === 21 / 9 ? "bg-ink text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-cream/40 text-ink hover:bg-cream/60"
-                  }`}
-                >
-                  Ultra Wide (21:9)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAspect(1 / 1)}
-                  className={`px-3 py-1.5 border-2 border-ink text-[10px] font-bold uppercase cursor-pointer transition-all ${
-                    aspect === 1 / 1 ? "bg-ink text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-cream/40 text-ink hover:bg-cream/60"
-                  }`}
-                >
-                  Square (1:1)
-                </button>
-              </>
-            )}
-
-            {elementType === "limited_drop" && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setAspect(4 / 5)}
-                  className={`px-3 py-1.5 border-2 border-ink text-[10px] font-bold uppercase cursor-pointer transition-all ${
-                    aspect === 4 / 5 ? "bg-ink text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-cream/40 text-ink hover:bg-cream/60"
-                  }`}
-                >
-                  Drop Portrait (4:5)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAspect(1 / 1)}
-                  className={`px-3 py-1.5 border-2 border-ink text-[10px] font-bold uppercase cursor-pointer transition-all ${
-                    aspect === 1 / 1 ? "bg-ink text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-cream/40 text-ink hover:bg-cream/60"
-                  }`}
-                >
-                  Square (1:1)
-                </button>
-              </>
-            )}
-
-            {elementType !== "hero_banner" && elementType !== "image_banner" && elementType !== "limited_drop" && (
-              <button
-                type="button"
-                onClick={() => setAspect(1 / 1)}
-                className="px-3 py-1.5 border-2 border-ink text-[10px] font-bold uppercase bg-ink text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-              >
-                Square (1:1)
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Cropper Container */}
-        <div className="relative w-full h-[280px] bg-neutral-900 border-2 border-ink rounded overflow-hidden mt-4">
-          <Cropper
-            image={imageSrc}
-            crop={crop}
-            zoom={zoom}
-            aspect={aspect}
-            onCropChange={onCropChange}
-            onZoomChange={onZoomChange}
-            onCropComplete={onCropAreaComplete}
+        {/* Cropper Work Area Container */}
+        <div
+          ref={containerRef}
+          className="relative w-full h-[380px] bg-neutral-950 rounded-xl border-2 border-ink overflow-hidden flex items-center justify-center select-none mt-3"
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+        >
+          {/* Preload hidden image for natural dimension detection */}
+          <img
+            ref={imgRef}
+            src={imageSrc}
+            alt="Crop target hidden"
+            onLoad={initializeCropBox}
+            className="hidden"
           />
-        </div>
 
-        {/* Zoom Control Slider */}
-        <div className="space-y-2 mt-4">
-          <label className="text-[10px] font-black uppercase flex justify-between tracking-wide">
-            <span>Perbesar / Zoom</span>
-            <span className="font-mono text-[10px]">{Math.round(zoom * 100)}%</span>
-          </label>
-          <div className="flex items-center gap-4">
-            <span className="text-[10px] font-bold">1x</span>
-            <Slider
-              value={[zoom]}
-              min={1}
-              max={3}
-              step={0.05}
-              onValueChange={(val) => setZoom(val[0])}
-              className="flex-1 cursor-pointer"
-            />
-            <span className="text-[10px] font-bold">3x</span>
-          </div>
+          {/* Exact-Fit Photo & Bounded Overlay Wrapper */}
+          {imgLoaded && imgDim.width > 0 && imgDim.height > 0 && (
+            <div
+              className="relative pointer-events-auto shadow-2xl"
+              style={{
+                width: `${imgDim.width}px`,
+                height: `${imgDim.height}px`,
+              }}
+            >
+              {/* Display Photo */}
+              <img
+                src={imageSrc}
+                alt="Crop target"
+                className="w-full h-full block object-fill pointer-events-none"
+              />
+
+              {/* Bounded 1:1 Crop Box Overlay */}
+              {cropBox.size > 0 && (
+                <div
+                  className="absolute cursor-grab active:cursor-grabbing border-2 border-brand-orange ring-1 ring-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)]"
+                  style={{
+                    left: `${cropBox.x}px`,
+                    top: `${cropBox.y}px`,
+                    width: `${cropBox.size}px`,
+                    height: `${cropBox.size}px`,
+                  }}
+                  onPointerDown={(e) => handlePointerDown(e, "move")}
+                >
+                  {/* 3x3 Grid Lines */}
+                  <div className="absolute inset-0 grid grid-cols-3 grid-rows-3 pointer-events-none">
+                    <div className="border-r border-b border-white/40" />
+                    <div className="border-r border-b border-white/40" />
+                    <div className="border-b border-white/40" />
+                    <div className="border-r border-b border-white/40" />
+                    <div className="border-r border-b border-white/40" />
+                    <div className="border-b border-white/40" />
+                    <div className="border-r border-white/40" />
+                    <div className="border-r border-white/40" />
+                    <div />
+                  </div>
+
+                  {/* 4 Corner Drag Handles (Tarik Sudut untuk Resize 1:1) */}
+                  {/* Top-Left */}
+                  <div
+                    className="absolute -top-3 -left-3 w-6 h-6 bg-brand-orange border-2 border-white rounded-full cursor-nwse-resize shadow-md hover:scale-125 transition-transform"
+                    onPointerDown={(e) => handlePointerDown(e, "top-left")}
+                  />
+                  {/* Top-Right */}
+                  <div
+                    className="absolute -top-3 -right-3 w-6 h-6 bg-brand-orange border-2 border-white rounded-full cursor-nesw-resize shadow-md hover:scale-125 transition-transform"
+                    onPointerDown={(e) => handlePointerDown(e, "top-right")}
+                  />
+                  {/* Bottom-Left */}
+                  <div
+                    className="absolute -bottom-3 -left-3 w-6 h-6 bg-brand-orange border-2 border-white rounded-full cursor-nesw-resize shadow-md hover:scale-125 transition-transform"
+                    onPointerDown={(e) => handlePointerDown(e, "bottom-left")}
+                  />
+                  {/* Bottom-Right */}
+                  <div
+                    className="absolute -bottom-3 -right-3 w-6 h-6 bg-brand-orange border-2 border-white rounded-full cursor-nwse-resize shadow-md hover:scale-125 transition-transform"
+                    onPointerDown={(e) => handlePointerDown(e, "bottom-right")}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}
-        <DialogFooter className="pt-4 border-t border-ink/10 mt-6 flex flex-col sm:flex-row justify-between items-center gap-3">
+        <DialogFooter className="pt-4 border-t border-ink/10 mt-4 flex flex-col sm:flex-row justify-between items-center gap-3">
           <Button
             type="button"
             variant="outline"
@@ -229,7 +319,7 @@ export function ImageCropperModal({
             <Button
               type="button"
               onClick={handleCrop}
-              disabled={isProcessing}
+              disabled={isProcessing || !imgLoaded}
               className="bg-brand-orange hover:bg-brand-orange/90 text-ink border-2 border-ink text-xs font-bold uppercase px-5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
             >
               {isProcessing ? "Memotong..." : "Potong & Unggah"}

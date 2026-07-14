@@ -1,22 +1,14 @@
-const API_URL =
-  (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
-  import.meta.env.VITE_API_URL ||
-  "http://127.0.0.1:8080";
+const getLiveApiUrl = () => {
+  let url =
+    (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
+    (typeof import.meta !== "undefined" ? import.meta.env?.VITE_API_URL : undefined) ||
+    "https://filkommerch.com";
+  url = url.replace(/\/api\/?$/, "").replace(/\/$/, "");
+  return url;
+};
 
 export function resolveImageUrl(url: string | undefined): string {
   if (!url) return "";
-
-  // If we are currently running locally in the browser, keep using localhost directly.
-  // This ensures local desktop development works without ngrok browser warning pages.
-  if (typeof window !== "undefined") {
-    const currentHost = window.location.hostname;
-    if (currentHost === "localhost" || currentHost === "127.0.0.1") {
-      if (url.startsWith("/uploads")) {
-        return `http://localhost:8080${url}`;
-      }
-      return url;
-    }
-  }
 
   // If it is a local asset import or browser-generated URL (blob/data URL)
   if (
@@ -24,29 +16,27 @@ export function resolveImageUrl(url: string | undefined): string {
     url.startsWith("blob:") ||
     url.startsWith("/src/") ||
     url.startsWith("/@fs/") ||
-    url.startsWith("/assets/") ||
-    url.startsWith("http") === false
+    url.startsWith("/assets/")
   ) {
-    // If it starts with /uploads, it's a relative path from the backend
-    if (url.startsWith("/uploads")) {
-      const baseUrl = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
-      return `${baseUrl}${url}`;
-    }
     return url;
   }
 
-  // If the url is an absolute URL containing localhost or 127.0.0.1 on port 8080,
-  // AND the current configured API_URL is NOT localhost/127.0.0.1
-  if (url.includes("localhost:8080") || url.includes("127.0.0.1:8080")) {
-    const isApiLocal =
-      API_URL.includes("localhost:8080") ||
-      API_URL.includes("127.0.0.1:8080") ||
-      API_URL.includes("localhost:") ||
-      API_URL.includes("127.0.0.1:");
-    if (!isApiLocal) {
-      const baseUrl = API_URL.endsWith("/") ? API_URL.slice(0, -1) : API_URL;
-      return url.replace(/^https?:\/\/(localhost|127\.0\.0\.1):8080/, baseUrl);
+  // If it is already a full http/https URL (keep localhost / 127.0.0.1 as is so local uploads load)
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+
+  // Relative /uploads paths
+  if (url.startsWith("/uploads") || url.startsWith("uploads/")) {
+    const cleanPath = url.startsWith("/") ? url : `/${url}`;
+    if (
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ) {
+      return `http://127.0.0.1:8080${cleanPath}`;
     }
+    const liveApiUrl = getLiveApiUrl();
+    return `${liveApiUrl}${cleanPath}`;
   }
 
   return url;

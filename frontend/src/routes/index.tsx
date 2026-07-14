@@ -1059,7 +1059,7 @@ function Index() {
 
                   const gridProducts = getSegmentProducts(el.config);
                   const isMainHero = el.config.title?.toLowerCase().includes("hero");
-                  
+
                   // Strictly filter products assigned to "Main Hero" category (excluding bundles)
                   const heroCategoryProducts = products.filter((p) => {
                     const catName = (p.cat || (p as any).category_name || "").toLowerCase();
@@ -1068,9 +1068,9 @@ function Index() {
                     return (
                       prodType !== "bundle" &&
                       (catName.includes("main hero") ||
-                       catName.includes("hero") ||
-                       catSlug.includes("main-hero") ||
-                       catSlug.includes("hero"))
+                        catName.includes("hero") ||
+                        catSlug.includes("main-hero") ||
+                        catSlug.includes("hero"))
                     );
                   });
 
@@ -1993,13 +1993,13 @@ function Index() {
               </div>
               <div className="flex flex-wrap gap-2">
                 <a
-                  href="https://instagram.com/merchfilkom"
+                  href="https://instagram.com/merchfilkomub"
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-ink/20 bg-secondary/60 hover:bg-ink hover:text-cream text-xs font-bold transition-all cursor-pointer"
                 >
                   <Instagram className="w-4 h-4 text-brand-orange shrink-0" />
-                  <span>@merchfilkom</span>
+                  <span>@merchfilkomub</span>
                 </a>
                 <a
                   href="https://tiktok.com/@filkommerch"

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, FolderPlus, X, Check } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Plus, Pencil, Trash2, FolderPlus, X, Check, Star, Crop } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@frontend/components/ui/button";
@@ -31,10 +31,13 @@ import {
   createCategory,
   updateCategory,
   deleteCategory,
+  uploadImagesServerAction,
+  uploadSingleImageServerAction,
   type ProductWithVariants,
   type Category,
 } from "@backend/server-actions";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import { ImageCropperModal } from "@frontend/components/admin/ImageCropperModal";
 
 export const Route = createFileRoute("/admin/products")({
   component: AdminProductsPage,
@@ -125,6 +128,92 @@ function AdminProductsPage() {
   const [saving, setSaving] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
+  const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperImageSrc, setCropperImageSrc] = useState("");
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleOpenCropper = (idx: number) => {
+    const imgUrl = form.images[idx];
+    if (!imgUrl) return;
+    setEditingImageIndex(idx);
+    setCropperImageSrc(resolveImageUrl(imgUrl));
+    setCropperOpen(true);
+  };
+
+  const optimizeImageFile = (file: File, maxDimension = 2000, quality = 0.88): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          let width = img.width;
+          let height = img.height;
+
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, width, height);
+          }
+          const dataUrl = canvas.toDataURL("image/jpeg", quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => resolve((e.target?.result as string) || "");
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleCropperComplete = async (croppedFile: File) => {
+    if (editingImageIndex === null) return;
+    const idx = editingImageIndex;
+
+    try {
+      toast.loading("Mengunggah foto hasil crop 1:1...");
+      const dataUrl = await optimizeImageFile(croppedFile, 1600, 0.9);
+      const res = await uploadSingleImageServerAction({ data: { dataUrl, name: croppedFile.name } });
+
+      toast.dismiss();
+
+      if (res.success && res.url) {
+        setForm((prev) => {
+          const updatedImages = [...prev.images];
+          const oldUrl = updatedImages[idx];
+          updatedImages[idx] = res.url;
+          const isCurrentMain = prev.image_url === oldUrl || (idx === 0 && !prev.image_url);
+          return {
+            ...prev,
+            images: updatedImages,
+            image_url: isCurrentMain ? res.url : prev.image_url,
+          };
+        });
+        toast.success("Foto berhasil di-crop 1:1 dengan resolusi asli!");
+      } else {
+        toast.error(res.error || "Gagal menyimpan foto");
+      }
+    } catch (err) {
+      toast.dismiss();
+      console.error(err);
+      toast.error("Gagal memproses foto");
+    } finally {
+      setCropperOpen(false);
+      setEditingImageIndex(null);
+    }
+  };
 
   const getApiBaseUrl = () => {
     let url = import.meta.env.VITE_API_URL || "https://filkommerch.com";
@@ -200,18 +289,19 @@ function AdminProductsPage() {
         img.onload = () => {
           const canvas = document.createElement("canvas");
           const size = Math.min(img.width, img.height);
-          canvas.width = size;
-          canvas.height = size;
+          const targetSize = Math.min(size, 1200);
+          canvas.width = targetSize;
+          canvas.height = targetSize;
           const ctx = canvas.getContext("2d");
           if (ctx) {
             const offsetX = (img.width - size) / 2;
             const offsetY = (img.height - size) / 2;
-            ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, size, size);
+            ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, targetSize, targetSize);
           }
           canvas.toBlob(
             (blob) => {
               if (blob) {
-                const targetName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
+                const targetName = (file.name || "image").replace(/\.[^/.]+$/, "") + ".jpg";
                 const croppedFile = new File([blob], targetName, {
                   type: "image/jpeg",
                   lastModified: Date.now(),
@@ -222,7 +312,7 @@ function AdminProductsPage() {
               }
             },
             "image/jpeg",
-            0.92
+            0.88
           );
         };
         img.onerror = () => resolve(file);
@@ -233,73 +323,64 @@ function AdminProductsPage() {
     });
   };
 
+  const cropToSquareDataUrl = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const size = Math.min(img.width, img.height);
+          const targetSize = Math.min(size, 1000);
+          canvas.width = targetSize;
+          canvas.height = targetSize;
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            const offsetX = (img.width - size) / 2;
+            const offsetY = (img.height - size) / 2;
+            ctx.drawImage(img, offsetX, offsetY, size, size, 0, 0, targetSize, targetSize);
+          }
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+          resolve(dataUrl);
+        };
+        img.onerror = () => {
+          resolve((e.target?.result as string) || "");
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleUploadImages = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     try {
-      toast.loading("Memproses & Mengunggah foto (Auto Crop 1:1)...");
-      const croppedFiles = await Promise.all(
-        Array.from(files).map((f) => cropToSquare(f))
+      toast.loading("Memproses & Mengunggah foto...");
+
+      const base64Items = await Promise.all(
+        Array.from(files).map(async (f) => {
+          const dataUrl = await optimizeImageFile(f, 2000, 0.88);
+          return { dataUrl, name: f.name };
+        })
       );
 
-      let newUploadedUrls: string[] = [];
-
-      // Try batch upload via /api/upload-multiple
-      try {
-        const formData = new FormData();
-        for (let i = 0; i < croppedFiles.length; i++) {
-          formData.append("files", croppedFiles[i]);
-        }
-
-        const res = await fetch(`${API_BASE_URL}/api/upload-multiple`, {
-          method: "POST",
-          body: formData,
-          headers: {
-            "ngrok-skip-browser-warning": "true",
-          },
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.urls && Array.isArray(data.urls)) {
-            newUploadedUrls = data.urls;
-          }
-        }
-      } catch (err) {
-        console.warn("Batch upload failed, falling back to sequential upload:", err);
-      }
-
-      // Fallback: upload each file individually via /api/upload if batch upload didn't return URLs
-      if (newUploadedUrls.length === 0) {
-        for (const file of croppedFiles) {
-          const formData = new FormData();
-          formData.append("file", file);
-          const singleRes = await fetch(`${API_BASE_URL}/api/upload`, {
-            method: "POST",
-            body: formData,
-            headers: {
-              "ngrok-skip-browser-warning": "true",
-            },
-          });
-          const singleData = await singleRes.json();
-          if (singleData.success && singleData.url) {
-            newUploadedUrls.push(singleData.url);
-          }
-        }
-      }
+      // Call TanStack server action
+      const res = await uploadImagesServerAction({ data: { files: base64Items } });
 
       toast.dismiss();
 
-      if (newUploadedUrls.length > 0) {
+      if (res.success && res.urls && res.urls.length > 0) {
         setForm((prev) => ({
           ...prev,
-          images: [...prev.images, ...newUploadedUrls],
-          image_url: prev.image_url || newUploadedUrls[0],
+          images: [...prev.images, ...res.urls],
+          image_url: prev.image_url || res.urls[0],
         }));
-        toast.success(`${newUploadedUrls.length} foto 1:1 berhasil diunggah`);
+        toast.success(`${res.urls.length} foto berhasil diunggah`);
       } else {
-        toast.error("Gagal mengunggah foto. Periksa koneksi atau format file.");
+        toast.error(res.error || "Gagal mengunggah foto ke server");
       }
     } catch (err) {
       toast.dismiss();
@@ -312,34 +393,63 @@ function AdminProductsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
       toast.loading("Mengunggah foto size chart...");
-      const res = await fetch(`${API_BASE_URL}/api/upload`, {
-        method: "POST",
-        body: formData,
-        headers: {
-          "ngrok-skip-browser-warning": "true"
-        }
-      });
-      const data = await res.json();
+      const dataUrl = await cropToSquareDataUrl(file);
+
+      const res = await uploadSingleImageServerAction({ data: { dataUrl, name: file.name } });
+
       toast.dismiss();
 
-      if (data.success && data.url) {
+      if (res.success && res.url) {
         setForm((prev) => ({
           ...prev,
-          size_chart_url: data.url,
+          size_chart_url: res.url,
         }));
-        toast.success("Foto size chart berhasil diunggah");
+        toast.success("Foto size chart berhasil disimpan ke folder uploads server");
       } else {
-        toast.error(data.error || "Gagal mengunggah size chart");
+        toast.error(res.error || "Gagal memasang foto size chart");
       }
     } catch (err) {
       toast.dismiss();
       console.error(err);
-      toast.error("Gagal mengunggah size chart");
+      toast.error("Gagal mengunggah foto size chart");
+    }
+  };
+
+  const handleEditImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || editingImageIndex === null) return;
+
+    const idx = editingImageIndex;
+    try {
+      toast.loading("Memproses & Crop 1:1 foto pengganti...");
+      const dataUrl = await cropToSquareDataUrl(file);
+
+      const res = await uploadSingleImageServerAction({ data: { dataUrl, name: file.name } });
+      const newUrl = res.url || dataUrl;
+
+      setForm((prev) => {
+        const updatedImages = [...prev.images];
+        const oldUrl = updatedImages[idx];
+        updatedImages[idx] = newUrl;
+        const isCurrentMain = prev.image_url === oldUrl || (idx === 0 && !prev.image_url);
+        return {
+          ...prev,
+          images: updatedImages,
+          image_url: isCurrentMain ? newUrl : prev.image_url,
+        };
+      });
+
+      toast.dismiss();
+      toast.success("Foto berhasil diubah & di-crop 1:1");
+    } catch (err) {
+      toast.dismiss();
+      console.error(err);
+      toast.error("Gagal mengedit foto");
+    } finally {
+      setEditingImageIndex(null);
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
     }
   };
 
@@ -975,6 +1085,15 @@ function AdminProductsPage() {
                   className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-2 file:border-ink file:text-xs file:font-extrabold file:bg-cream file:text-ink hover:file:bg-brand-orange hover:file:text-white cursor-pointer"
                 />
 
+                {/* Hidden File Input for Single Image Editing (Crop Replacement) */}
+                <input
+                  ref={editFileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleEditImageFile}
+                  className="hidden"
+                />
+
                 {/* Uploaded Image Cards Grid */}
                 {form.images.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 p-3 border-2 border-dashed border-border rounded-xl bg-cream/10">
@@ -989,40 +1108,57 @@ function AdminProductsPage() {
                         >
                           <img src={resolveImageUrl(img)} alt="preview" className="w-full h-full object-cover" />
 
-                          {/* Action Overlay */}
-                          <div className="absolute inset-0 bg-ink/75 flex flex-col items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity p-2 text-center">
-                            {!isMainCover && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  // Set as main cover image (move to front of images array)
-                                  const filtered = form.images.filter((_, i) => i !== idx);
-                                  const reordered = [img, ...filtered];
-                                  setForm({
-                                    ...form,
-                                    images: reordered,
-                                    image_url: img,
-                                  });
-                                  toast.success("Foto diatur sebagai Sampul Utama!");
-                                }}
-                                className="w-full py-1 px-2 bg-brand-orange text-ink font-black text-[9px] rounded uppercase border border-ink hover:scale-105 transition-transform cursor-pointer"
-                              >
-                                Set Utama
-                              </button>
-                            )}
+                          {/* Hover Action Overlay with 3 Icon Buttons */}
+                          <div className="absolute inset-0 bg-ink/70 backdrop-blur-[2px] flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200 p-2 z-10">
+                            {/* Option 1: Crop 1:1 Interactive Cropper */}
                             <button
                               type="button"
+                              title="Crop 1:1 / Sesuaikan Foto"
+                              onClick={() => handleOpenCropper(idx)}
+                              className="h-8 w-8 rounded-full flex items-center justify-center bg-white/90 hover:bg-brand-orange hover:text-white text-ink shadow-md border border-ink/20 transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                            >
+                              <Crop className="w-4 h-4" />
+                            </button>
+
+                            {/* Option 2: Jadikan Utama / Sampul Utama */}
+                            <button
+                              type="button"
+                              title={isMainCover ? "Sampul Utama (Aktif)" : "Jadikan Sampul Utama"}
+                              onClick={() => {
+                                const filtered = form.images.filter((_, i) => i !== idx);
+                                const reordered = [img, ...filtered];
+                                setForm({
+                                  ...form,
+                                  images: reordered,
+                                  image_url: img,
+                                });
+                                toast.success("Foto diatur sebagai Sampul Utama!");
+                              }}
+                              className={`h-8 w-8 rounded-full flex items-center justify-center shadow-md border border-ink/20 transition-all hover:scale-110 active:scale-95 cursor-pointer ${
+                                isMainCover
+                                  ? "bg-amber-400 text-ink ring-2 ring-amber-300"
+                                  : "bg-white/90 hover:bg-amber-400 hover:text-ink text-ink"
+                              }`}
+                            >
+                              <Star className={`w-4 h-4 ${isMainCover ? "fill-ink text-ink" : ""}`} />
+                            </button>
+
+                            {/* Option 3: Hapus */}
+                            <button
+                              type="button"
+                              title="Hapus Foto"
                               onClick={() => {
                                 const newImages = form.images.filter((_, i) => i !== idx);
                                 setForm({
                                   ...form,
                                   images: newImages,
-                                  image_url: newImages.length > 0 ? newImages[0] : "",
+                                  image_url: newImages.length > 0 ? (isMainCover ? newImages[0] : form.image_url) : "",
                                 });
+                                toast.success("Foto dihapus");
                               }}
-                              className="w-full py-1 px-2 bg-red-600 text-white font-bold text-[9px] rounded uppercase hover:bg-red-700 cursor-pointer flex items-center justify-center gap-1"
+                              className="h-8 w-8 rounded-full flex items-center justify-center bg-white/90 hover:bg-red-600 hover:text-white text-red-600 shadow-md border border-ink/20 transition-all hover:scale-110 active:scale-95 cursor-pointer"
                             >
-                              <X className="w-3 h-3" /> Hapus
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
 
@@ -1291,6 +1427,21 @@ function AdminProductsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageSrc={cropperImageSrc}
+        elementType="product_image"
+        onClose={() => {
+          setCropperOpen(false);
+          setEditingImageIndex(null);
+        }}
+        onCropComplete={handleCropperComplete}
+        onUploadOriginal={() => {
+          setCropperOpen(false);
+          setEditingImageIndex(null);
+        }}
+      />
     </div>
   );
 }

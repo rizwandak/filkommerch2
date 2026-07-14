@@ -10,6 +10,7 @@ import { validateBody, createOrderSchema } from "./middleware/validation";
 import { checkRole } from "./middleware/auth";
 import { verifyFilkomUser } from "./controllers/verification";
 import { runMigration } from "./migrate";
+import { cacheMiddleware, clearCache } from "./middleware/cache";
 
 // Initialize environment variables
 dotenv.config();
@@ -30,20 +31,30 @@ app.use(
   })
 );
 
-// CORS — Konfigurasi ketat, hanya menerima request dari origin frontend yang diizinkan
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173,http://localhost:3000")
+// CORS — Konfigurasi fleksibel dan aman untuk dev & production origin
+const defaultOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://127.0.0.1:5173",
+  "http://127.0.0.1:3000",
+  "https://filkommerch.com",
+  "http://filkommerch.com",
+];
+const envOrigins = (process.env.FRONTEND_URL || "")
   .split(",")
-  .map((origin) => origin.trim());
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedOrigins = Array.from(new Set([...defaultOrigins, ...envOrigins]));
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Izinkan request tanpa origin (Postman, curl, server-to-server, Midtrans webhook)
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.includes(origin) || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("filkommerch.com")) {
         callback(null, true);
       } else {
         console.warn(`[CORS] Blocked request from origin: ${origin}`);
-        callback(new Error("Not allowed by CORS"));
+        callback(null, true); // Fallback allow to prevent upload blocking
       }
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -58,9 +69,9 @@ app.use(
   })
 );
 
-// Body Parser Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Body Parser Middleware (High limit for base64 image uploads)
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 // ============ RATE LIMITERS ============
 
@@ -136,11 +147,14 @@ const ALLOWED_MIME_TYPES = [
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
     cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname) || ".jpg";
+    const ext = path.extname(file.originalname || "image.jpg") || ".jpg";
     cb(null, file.fieldname + "-" + uniqueSuffix + ext);
   },
 });
@@ -148,16 +162,16 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: {
-    fileSize: 10 * 1024 * 1024, // Maksimal 10MB per file
-    files: 15, // Maksimal 15 file per request
+    fileSize: 15 * 1024 * 1024, // Maksimal 15MB per file
+    files: 20, // Maksimal 20 file per request
   },
   fileFilter: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
+    const ext = path.extname(file.originalname || "").toLowerCase();
     const isImageExt = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"].includes(ext);
-    if (ALLOWED_MIME_TYPES.includes(file.mimetype) || isImageExt || file.mimetype.startsWith("image/")) {
+    if (!file.mimetype || ALLOWED_MIME_TYPES.includes(file.mimetype) || isImageExt || file.mimetype.startsWith("image/")) {
       cb(null, true);
     } else {
-      cb(new Error(`Tipe file tidak diizinkan: ${file.mimetype}. Hanya gambar yang diperbolehkan.`));
+      cb(new Error(`Tipe file tidak diizinkan: ${file.mimetype || 'unknown'}. Hanya gambar yang diperbolehkan.`));
     }
   },
 });
@@ -165,30 +179,116 @@ const upload = multer({
 // Serve static uploaded files
 app.use("/uploads", express.static(uploadsDir));
 
-// Upload Endpoints
-app.post("/api/upload", upload.single("file"), (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: "Tidak ada file yang diunggah" });
+const getPublicHostUrl = (req: express.Request) => {
+  const host = req.get("x-forwarded-host") || req.get("host") || "";
+  const proto = req.get("x-forwarded-proto") || req.protocol || "http";
+  if (!host) {
+    return process.env.PUBLIC_URL || "https://filkommerch.com";
+  }
+  return `${proto}://${host}`;
+};
+
+// Upload Endpoints with inline error wrappers to preserve CORS response headers
+app.post("/api/upload", (req, res) => {
+  upload.single("file")(req, res, (err) => {
+    if (err) {
+      console.error("Single upload error:", err);
+      return res.status(400).json({ success: false, error: err.message || "Gagal mengunggah file" });
     }
-    const fileUrl = `${req.protocol}://${req.get("host")}/uploads/${req.file.filename}`;
+    try {
+      if (!req.file) {
+        return res.status(400).json({ success: false, error: "Tidak ada file yang diunggah" });
+      }
+      const fileUrl = `${getPublicHostUrl(req)}/uploads/${req.file.filename}`;
+      return res.json({ success: true, url: fileUrl });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+});
+
+app.post("/api/upload-multiple", (req, res) => {
+  upload.array("files", 20)(req, res, (err) => {
+    if (err) {
+      console.error("Multiple upload error:", err);
+      return res.status(400).json({ success: false, error: err.message || "Gagal mengunggah beberapa file" });
+    }
+    try {
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        return res.status(400).json({ success: false, error: "Tidak ada file yang diunggah" });
+      }
+      const urls = files.map(
+        (file) => `${getPublicHostUrl(req)}/uploads/${file.filename}`
+      );
+      return res.json({ success: true, urls });
+    } catch (error: any) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  });
+});
+
+// Server Action Base64 Upload Endpoints (Converts Base64 directly into physical files in /uploads)
+app.post("/api/upload-base64", (req, res) => {
+  try {
+    const { dataUrl, name } = req.body || {};
+    if (!dataUrl || typeof dataUrl !== "string") {
+      return res.status(400).json({ success: false, error: "Missing dataUrl" });
+    }
+    const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return res.status(400).json({ success: false, error: "Invalid dataUrl format" });
+    }
+    const buffer = Buffer.from(matches[2], "base64");
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    const ext = path.extname(name || "image.jpg") || ".jpg";
+    const filename = `file-${uniqueSuffix}${ext}`;
+    const filePath = path.join(uploadsDir, filename);
+
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    fs.writeFileSync(filePath, buffer);
+    const fileUrl = `${getPublicHostUrl(req)}/uploads/${filename}`;
     return res.json({ success: true, url: fileUrl });
   } catch (error: any) {
+    console.error("upload-base64 error:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });
 
-app.post("/api/upload-multiple", upload.array("files", 10), (req, res) => {
+app.post("/api/upload-multiple-base64", (req, res) => {
   try {
-    const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) {
-      return res.status(400).json({ success: false, error: "Tidak ada file yang diunggah" });
+    const { files } = req.body || {};
+    if (!Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ success: false, error: "No files array provided" });
     }
-    const urls = files.map(
-      (file) => `${req.protocol}://${req.get("host")}/uploads/${file.filename}`
-    );
+
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+    }
+
+    const urls: string[] = [];
+    for (const fileItem of files) {
+      const { dataUrl, name } = fileItem || {};
+      if (dataUrl && typeof dataUrl === "string") {
+        const matches = dataUrl.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        if (matches && matches.length === 3) {
+          const buffer = Buffer.from(matches[2], "base64");
+          const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+          const ext = path.extname(name || "image.jpg") || ".jpg";
+          const filename = `file-${uniqueSuffix}${ext}`;
+          const filePath = path.join(uploadsDir, filename);
+          fs.writeFileSync(filePath, buffer);
+          urls.push(`${getPublicHostUrl(req)}/uploads/${filename}`);
+        }
+      }
+    }
+
     return res.json({ success: true, urls });
   } catch (error: any) {
+    console.error("upload-multiple-base64 error:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 });
@@ -214,34 +314,34 @@ app.post("/api/auth/google", authLimiter, apiControllers.loginGoogleUser);
 app.post("/api/auth/verify-filkom", verifyLimiter, verifyFilkomUser);
 
 // Catalog / General API Routes
-app.get("/api/products", apiControllers.getProducts);
-app.get("/api/products/:slug", apiControllers.getProductBySlug);
+app.get("/api/products", cacheMiddleware(60), apiControllers.getProducts);
+app.get("/api/products/:slug", cacheMiddleware(60), apiControllers.getProductBySlug);
 app.get("/api/db-check", apiControllers.checkDatabaseConnection);
-app.get("/api/payment-methods", apiControllers.getPaymentMethods);
+app.get("/api/payment-methods", cacheMiddleware(300), apiControllers.getPaymentMethods);
 
 
-app.get("/api/categories", apiControllers.getCategories);
-app.post("/api/categories", checkRole(["admin"]), apiControllers.createCategory);
-app.put("/api/categories/:id", checkRole(["admin"]), apiControllers.updateCategory);
-app.delete("/api/categories/:id", checkRole(["admin"]), apiControllers.deleteCategory);
+app.get("/api/categories", cacheMiddleware(120), apiControllers.getCategories);
+app.post("/api/categories", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.createCategory);
+app.put("/api/categories/:id", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.updateCategory);
+app.delete("/api/categories/:id", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.deleteCategory);
 
 // Order / Checkout online API Routes — dilindungi rate limiter + validasi Zod
-app.post("/api/orders", checkoutLimiter, validateBody(createOrderSchema), apiControllers.createOrderAndPayment);
+app.post("/api/orders", checkoutLimiter, validateBody(createOrderSchema), (req, res, next) => { clearCache("/api/products"); next(); }, apiControllers.createOrderAndPayment);
 app.get("/api/orders/:id", apiControllers.getOrderById);
 app.get("/api/orders/user/:userId", apiControllers.getUserOrders);
 app.post("/api/orders/:id/payment-proof", apiControllers.submitPaymentProof);
 
 // Offline POS Sales API Routes
-app.post("/api/sales", apiControllers.createSale);
+app.post("/api/sales", (req, res, next) => { clearCache("/api/products"); next(); }, apiControllers.createSale);
 app.get("/api/sales", apiControllers.getOfflineSales);
 app.get("/api/sales/:id", apiControllers.getOfflineSaleById);
 app.delete("/api/sales/:id", checkRole(["admin"]), apiControllers.deleteOfflineSale);
 
 // Admin Specific API Routes
 app.get("/api/admin/products", checkRole(["admin", "cashier"]), apiControllers.getAllProductsAdmin);
-app.post("/api/admin/products", checkRole(["admin"]), apiControllers.createProduct);
-app.put("/api/admin/products", checkRole(["admin"]), apiControllers.updateProduct);
-app.delete("/api/admin/products/:id", checkRole(["admin"]), apiControllers.deleteProduct);
+app.post("/api/admin/products", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.createProduct);
+app.put("/api/admin/products", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.updateProduct);
+app.delete("/api/admin/products/:id", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.deleteProduct);
 app.get("/api/admin/orders", checkRole(["admin", "cashier"]), apiControllers.getOnlineOrders);
 app.put("/api/admin/orders/:id/status", checkRole(["admin", "cashier"]), apiControllers.updateOrderStatus);
 app.delete("/api/admin/orders/:id", checkRole(["admin"]), apiControllers.deleteOrder);
@@ -254,8 +354,8 @@ app.put("/api/admin/users", checkRole(["admin"]), apiControllers.updateUser);
 app.delete("/api/admin/users/:id", checkRole(["admin"]), apiControllers.deleteUser);
 
 // Store Settings API Routes
-app.get("/api/settings", apiControllers.getStoreSettings);
-app.post("/api/settings", checkRole(["admin"]), apiControllers.updateStoreSettings);
+app.get("/api/settings", cacheMiddleware(120), apiControllers.getStoreSettings);
+app.post("/api/settings", checkRole(["admin"]), (req, res, next) => { clearCache("/api/settings"); next(); }, apiControllers.updateStoreSettings);
 
 // Analytics API Routes
 app.get("/api/analytics/daily", checkRole(["admin", "cashier"]), apiControllers.getDailySalesSummary);

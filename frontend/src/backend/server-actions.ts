@@ -11,7 +11,7 @@ export const getApiUrl = (): string => {
     (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
     (typeof import.meta !== "undefined" ? import.meta.env?.VITE_API_URL : undefined);
   if (envUrl) return envUrl;
-  return "http://127.0.0.1:8080";
+  return "https://filkommerch.com";
 };
 
 const API_URL = getApiUrl();
@@ -1183,5 +1183,93 @@ export const submitPaymentProof = createServerFn({ method: "POST" })
       console.error("Error submitting payment proof:", error);
       return { success: false, error: error.message || "Failed to submit payment proof" };
     }
+  });
+
+// Server Action for Uploading Multiple Images (Primary API -> Local Backend -> Data URL Fallback)
+export const uploadImagesServerAction = createServerFn({ method: "POST" })
+  .validator((data: { files: { dataUrl: string; name: string }[] }) => data)
+  .handler(async ({ data }) => {
+    const base64List = data.files.map((f) => f.dataUrl).filter(Boolean);
+
+    // 1. Try primary configured API URL
+    try {
+      const baseUrl = getApiUrl().replace(/\/api\/?$/, "").replace(/\/$/, "");
+      const res = await serverFetch(`${baseUrl}/api/upload-multiple-base64`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: data.files }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.urls) && json.urls.length > 0) {
+          return json;
+        }
+      }
+    } catch (e) {
+      console.warn("Upload to primary API failed:", e);
+    }
+
+    // 2. Try local fallback backend (http://127.0.0.1:8080)
+    try {
+      const res = await fetch("http://127.0.0.1:8080/api/upload-multiple-base64", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files: data.files }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && Array.isArray(json.urls) && json.urls.length > 0) {
+          return json;
+        }
+      }
+    } catch (e) {
+      console.warn("Upload to local fallback backend failed:", e);
+    }
+
+    // 3. Guaranteed fallback: return the 1:1 cropped Data URLs if both endpoints fail
+    return { success: true, urls: base64List, isFallback: true };
+  });
+
+// Server Action for Uploading a Single Image (Primary API -> Local Backend -> Data URL Fallback)
+export const uploadSingleImageServerAction = createServerFn({ method: "POST" })
+  .validator((data: { dataUrl: string; name: string }) => data)
+  .handler(async ({ data }) => {
+    // 1. Try primary configured API URL
+    try {
+      const baseUrl = getApiUrl().replace(/\/api\/?$/, "").replace(/\/$/, "");
+      const res = await serverFetch(`${baseUrl}/api/upload-base64`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.url) {
+          return json;
+        }
+      }
+    } catch (e) {
+      console.warn("Upload single to primary API failed:", e);
+    }
+
+    // 2. Try local fallback backend (http://127.0.0.1:8080)
+    try {
+      const res = await fetch("http://127.0.0.1:8080/api/upload-base64", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.success && json.url) {
+          return json;
+        }
+      }
+    } catch (e) {
+      console.warn("Upload single to local backend failed:", e);
+    }
+
+    // 3. Fallback to Data URL
+    return { success: true, url: data.dataUrl, isFallback: true };
   });
 

@@ -6,7 +6,8 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/server.js",
-    "dev": "nodemon --watch src -e ts --exec ts-node src/server.ts"
+    "dev": "nodemon --watch src -e ts --exec ts-node src/server.ts",
+    "test:load": "autocannon -c 100 -d 10 https://filkommerch.com/api/products"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

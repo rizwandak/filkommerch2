@@ -20,20 +20,24 @@ export async function getCroppedImg(
   }
 
   // Set ukuran canvas agar pas dengan piksel hasil pemotongan
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
+  canvas.width = Math.max(1, Math.round(pixelCrop.width));
+  canvas.height = Math.max(1, Math.round(pixelCrop.height));
+
+  // Isi background putih jika area potong menjangkau luar foto
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Gambar area potong di canvas
   ctx.drawImage(
     image,
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height,
+    Math.round(pixelCrop.x),
+    Math.round(pixelCrop.y),
+    Math.round(pixelCrop.width),
+    Math.round(pixelCrop.height),
     0,
     0,
-    pixelCrop.width,
-    pixelCrop.height
+    canvas.width,
+    canvas.height
   );
 
   // Ubah hasil canvas ke format Blob JPEG
