@@ -1,6 +1,7 @@
 import mysql from "mysql2/promise";
 import dotenv from "dotenv";
 import path from "path";
+import fs from "fs";
 
 // Load environment variables
 dotenv.config();
@@ -138,6 +139,33 @@ export async function runMigration() {
       }
     } catch (err: any) {
       console.error("Error seeding homepage_layout:", err.message);
+    }
+
+    // Automatically execute db_sync.sql seed file if available
+    try {
+      const syncFilePath = path.join(__dirname, "../db_sync.sql");
+      const altSyncPath = path.join(__dirname, "db_sync.sql");
+      const targetSyncPath = fs.existsSync(syncFilePath) ? syncFilePath : fs.existsSync(altSyncPath) ? altSyncPath : null;
+
+      if (targetSyncPath) {
+        console.log("Found db_sync.sql! Synchronizing database records...");
+        const sqlContent = fs.readFileSync(targetSyncPath, "utf-8");
+        const statements = sqlContent
+          .split(";")
+          .map(s => s.trim())
+          .filter(s => s.length > 0 && !s.startsWith("--"));
+
+        for (const statement of statements) {
+          try {
+            await connection.query(statement);
+          } catch (err: any) {
+            console.error("Error executing sync statement:", err.message);
+          }
+        }
+        console.log("✅ Database records synchronized successfully from db_sync.sql!");
+      }
+    } catch (syncErr: any) {
+      console.error("Error running db_sync.sql:", syncErr.message);
     }
 
     console.log("Migration finished successfully!");
