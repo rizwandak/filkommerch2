@@ -4,7 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { HackerModeToggle } from "./HackerModeToggle";
 import { useQuery } from "@tanstack/react-query";
-import { getStoreSettings } from "@/backend/server-actions";
+import { getStoreSettings, getActivePreOrderCampaignServerAction } from "@/backend/server-actions";
 import { VerificationModal } from "@frontend/components/VerificationModal";
 import { toast } from "sonner";
 import {
@@ -23,14 +23,14 @@ import {
 } from "lucide-react";
 
 import logo from "@/assets/logo-fm.jpg";
+import logoFmRemoveBg from "@/assets/logo_fm_removebg.png";
 import logoFilkom from "@/assets/logo_filkom.png";
 
 const NAV = [
   { label: "BERANDA", href: "/", isScroll: true, target: "top" },
   { label: "PRODUK", href: "/products" },
   { label: "PRE-ORDER", href: "/pre-order" },
-  { label: "TENTANG KAMI", href: "/#about", isScroll: true, target: "about" },
-  { label: "FAQ", href: "/faq" },
+  { label: "TANYA BARA", href: "/faq" },
 ];
 
 export interface CartItem {
@@ -111,6 +111,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [localQuery, setLocalQuery] = useState("");
 
@@ -118,6 +119,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
 
   // Refs for click outside detection
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const mobileToolsRef = useRef<HTMLDivElement>(null);
 
   // Load cart from localStorage
   const loadCart = useCallback(() => {
@@ -157,7 +159,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
     };
   }, [loadCart]);
 
-  // Click outside listener for user menu dropdown
+  // Click outside listener for dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -167,12 +169,19 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
       ) {
         setUserMenuOpen(false);
       }
+      if (
+        mobileToolsOpen &&
+        mobileToolsRef.current &&
+        !mobileToolsRef.current.contains(event.target as Node)
+      ) {
+        setMobileToolsOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [userMenuOpen]);
+  }, [userMenuOpen, mobileToolsOpen]);
 
   // Sync cart back to localStorage
   const saveCart = (newCart: CartItem[]) => {
@@ -273,6 +282,20 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
   const settings = settingsData?.settings || null;
   const marqueeText = getMarqueeText(settings);
 
+  const { data: activePoRes } = useQuery({
+    queryKey: ["activePreOrderCampaign"],
+    queryFn: () => getActivePreOrderCampaignServerAction(),
+    staleTime: 30 * 1000,
+  });
+  const hasActivePo = Boolean(activePoRes?.data && Number(activePoRes.data.is_active) === 1);
+
+  const navItems = NAV.filter((item) => {
+    if (item.href === "/pre-order") {
+      return hasActivePo;
+    }
+    return true;
+  });
+
   const isHideMarquee =
     pathname.startsWith("/admin") ||
     pathname.startsWith("/pos") ||
@@ -297,7 +320,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
             </div>
           </div>
         )}
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 py-1.5 sm:py-2.5 flex items-center justify-between">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 py-3 sm:py-4 flex items-center justify-between">
           <Link
             to="/"
             onClick={(e) => {
@@ -308,16 +331,16 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
             }}
             className="flex items-center gap-2 sm:gap-3 text-left hover:opacity-90 transition-opacity"
           >
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-2 sm:gap-3">
               <img
-                src={logo}
+                src={logoFmRemoveBg}
                 alt="Filkom Merch UB"
-                className="h-9 w-9 sm:h-[48px] sm:w-[48px] rounded-full object-cover ring-2 ring-ink shadow-sm"
+                className="h-8 w-auto sm:h-[40px] sm:w-auto object-contain"
               />
               <img
                 src={logoFilkom}
                 alt="Logo FILKOM UB"
-                className="h-8 w-8 sm:h-[42px] sm:w-[42px] object-contain"
+                className="h-6 w-auto sm:h-[32px] sm:w-auto object-contain"
               />
             </div>
             <div className="leading-tight hidden sm:block">
@@ -334,7 +357,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
           </Link>
 
           <nav className="hidden lg:flex items-center gap-8">
-            {NAV.map((n) => {
+            {navItems.map((n) => {
               const isActive = pathname === n.href || (n.href === "/" && pathname === "/" && !hash);
               const isScrollOnHome = n.isScroll && pathname === "/";
 
@@ -370,108 +393,113 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
           </nav>
 
           <div className="flex items-center gap-1 sm:gap-1.5 text-ink">
-            <HackerModeToggle />
-            <button
-              aria-label="Search"
-              onClick={() => setSearchOpen((v) => !v)}
-              className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg hover:text-brand-orange hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <div className="relative flex items-center" ref={userMenuRef}>
+            {/* Desktop Action Tools (Hidden on mobile < sm to prevent overlapping logos) */}
+            <div className="hidden sm:flex items-center gap-1 sm:gap-1.5">
+              <HackerModeToggle />
               <button
-                aria-label="Account"
-                onClick={() => setUserMenuOpen((v) => !v)}
+                aria-label="Search"
+                onClick={() => setSearchOpen((v) => !v)}
                 className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg hover:text-brand-orange hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
               >
-                <User className="w-5 h-5" />
+                <Search className="w-5 h-5" />
               </button>
-              {userMenuOpen && (
-                <div className="absolute right-0 top-full mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] z-50 animate-scale-in">
-                  {user ? (
-                    <>
-                      <div className="px-5 py-3 border-b border-border">
-                        <p className="text-sm font-bold text-foreground break-words">
-                          {user.type === "admin" ? user.username : user.name}
-                        </p>
-                        <p className="text-xs text-muted-foreground break-all">{user.email}</p>
-                        <span className="inline-block mt-1 px-2 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-900 rounded">
-                          {user.type === "admin" ? "ADMIN" : "BUYER"}
-                        </span>
-                        {user && (
-                          <div className="mt-1.5">
-                            {user.is_filkom_verified === 1 ? (
-                              <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-800 rounded">
-                                ✓ FILKOM VERIFIED
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => {
-                                  setIsVerifyOpen(true);
-                                  setUserMenuOpen(false);
-                                }}
-                                className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/20 border border-brand-orange/30 px-2 py-1 rounded w-full text-center transition-all cursor-pointer block"
-                              >
-                                Verifikasi NIM
-                              </button>
-                            )}
-                          </div>
+              <div className="relative flex items-center" ref={userMenuRef}>
+                <button
+                  aria-label="Account"
+                  onClick={() => setUserMenuOpen((v) => !v)}
+                  className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center rounded-lg hover:text-brand-orange hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                >
+                  <User className="w-5 h-5" />
+                </button>
+                {userMenuOpen && (
+                  <div className="absolute right-0 top-full mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] z-50 animate-scale-in">
+                    {user ? (
+                      <>
+                        <div className="px-5 py-3 border-b border-border">
+                          <p className="text-sm font-bold text-foreground break-words">
+                            {user.type === "admin" ? user.username : user.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground break-all">{user.email}</p>
+                          <span className="inline-block mt-1 px-2 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-900 rounded">
+                            {user.type === "admin" ? "ADMIN" : "BUYER"}
+                          </span>
+                          {user && (
+                            <div className="mt-1.5">
+                              {user.is_filkom_verified === 1 ? (
+                                <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-800 rounded">
+                                  ✓ FILKOM VERIFIED
+                                </span>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setIsVerifyOpen(true);
+                                    setUserMenuOpen(false);
+                                  }}
+                                  className="text-[10px] font-bold text-brand-orange bg-brand-orange/10 hover:bg-brand-orange/20 border border-brand-orange/30 px-2 py-1 rounded w-full text-center transition-all cursor-pointer block"
+                                >
+                                  Verifikasi NIM
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        {user.type === "admin" && (
+                          <Link
+                            to="/admin/dashboard"
+                            className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-blue"
+                            onClick={() => setUserMenuOpen(false)}
+                          >
+                            <LayoutDashboard className="w-4 h-4" />
+                            Panel Admin
+                          </Link>
                         )}
-                      </div>
-                      {user.type === "admin" && (
-                        <Link
-                          to="/admin/dashboard"
-                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-blue"
-                          onClick={() => setUserMenuOpen(false)}
+                        {user.type === "admin" && (
+                          <Link
+                            to="/pos"
+                            className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-orange"
+                            onClick={() => setUserMenuOpen(false)}
+                          >
+                            <MonitorSmartphone className="w-4 h-4" />
+                            Kasir / POS
+                          </Link>
+                        )}
+                        {user && (
+                          <Link
+                            to="/orders"
+                            className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border"
+                            onClick={() => setUserMenuOpen(false)}
+                          >
+                            <ShoppingBag className="w-4 h-4" />
+                            Pesanan Saya
+                          </Link>
+                        )}
+                        <button
+                          onClick={() => {
+                            logout();
+                            setUserMenuOpen(false);
+                            toast.success("Logged out");
+                          }}
+                          className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 pointer-events-auto"
                         >
-                          <LayoutDashboard className="w-4 h-4" />
-                          Panel Admin
-                        </Link>
-                      )}
-                      {user.type === "admin" && (
-                        <Link
-                          to="/pos"
-                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold text-brand-orange"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <MonitorSmartphone className="w-4 h-4" />
-                          Kasir / POS
-                        </Link>
-                      )}
-                      {user && (
-                        <Link
-                          to="/orders"
-                          className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border"
-                          onClick={() => setUserMenuOpen(false)}
-                        >
-                          <ShoppingBag className="w-4 h-4" />
-                          Pesanan Saya
-                        </Link>
-                      )}
-                      <button
-                        onClick={() => {
-                          logout();
-                          setUserMenuOpen(false);
-                          toast.success("Logged out");
-                        }}
-                        className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 pointer-events-auto"
+                          <LogOut className="w-4 h-4" />
+                          Logout
+                        </button>
+                      </>
+                    ) : (
+                      <Link
+                        to="/login"
+                        className="block px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary"
+                        onClick={() => setUserMenuOpen(false)}
                       >
-                        <LogOut className="w-4 h-4" />
-                        Logout
-                      </button>
-                    </>
-                  ) : (
-                    <Link
-                      to="/login"
-                      className="block px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary"
-                      onClick={() => setUserMenuOpen(false)}
-                    >
-                      Sign In
-                    </Link>
-                  )}
-                </div>
-              )}
+                        Sign In
+                      </Link>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Shopping Cart Bag Button (Always visible on all screen sizes) */}
             <button
               aria-label="Cart"
               className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center relative rounded-lg hover:text-brand-orange hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
@@ -484,6 +512,127 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                 </span>
               )}
             </button>
+
+            {/* Smartphone Combined Quick Tools Button (Night Mode + Search + Account in 1 popover, left of Hamburger) */}
+            <div className="relative flex sm:hidden items-center" ref={mobileToolsRef}>
+              <button
+                aria-label="Quick Tools & Account"
+                onClick={() => setMobileToolsOpen((v) => !v)}
+                className="w-9 h-9 flex items-center justify-center rounded-lg hover:text-brand-orange hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer relative border border-ink/20 bg-secondary/60"
+              >
+                <User className="w-4.5 h-4.5" />
+                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-brand-orange" />
+              </button>
+
+              {mobileToolsOpen && (
+                <div className="absolute right-0 top-full mt-2 w-[280px] bg-background border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] z-50 p-4 space-y-4 animate-scale-in text-left">
+                  {/* 1. Quick Search Box */}
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-1.5 block">
+                      🔍 Cari Produk
+                    </label>
+                    <form
+                      onSubmit={(e) => {
+                        handleSearchSubmit(e);
+                        setMobileToolsOpen(false);
+                      }}
+                      className="flex items-center gap-2 bg-secondary/80 border border-ink/20 rounded-lg px-2.5 py-1.5"
+                    >
+                      <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <input
+                        type="text"
+                        placeholder="Cari produk..."
+                        value={displayQuery}
+                        onChange={(e) => handleSearchChange(e.target.value)}
+                        className="w-full bg-transparent text-xs text-foreground focus:outline-none font-medium"
+                      />
+                    </form>
+                  </div>
+
+                  {/* 2. Theme Switch (Night Mode) */}
+                  <div className="flex items-center justify-between pt-2 border-t border-border">
+                    <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                      🌙 Mode Tampilan
+                    </span>
+                    <HackerModeToggle />
+                  </div>
+
+                  {/* 3. Account / Verification Info */}
+                  <div className="pt-2 border-t border-border space-y-2">
+                    {user ? (
+                      <div>
+                        <div className="bg-secondary/40 p-2.5 rounded-lg border border-ink/10 space-y-1">
+                          <p className="text-xs font-extrabold text-foreground truncate">
+                            {user.type === "admin" ? user.username : user.name}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground truncate">{user.email}</p>
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold bg-blue-100 text-blue-900 rounded uppercase">
+                              {user.type === "admin" ? "ADMIN" : "BUYER"}
+                            </span>
+                            {user.is_filkom_verified === 1 ? (
+                              <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold bg-emerald-100 text-emerald-800 rounded uppercase">
+                                ✓ VERIFIED
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setIsVerifyOpen(true);
+                                  setMobileToolsOpen(false);
+                                }}
+                                className="text-[9px] font-extrabold text-brand-orange bg-brand-orange/10 border border-brand-orange/30 px-2 py-0.5 rounded cursor-pointer"
+                              >
+                                Verifikasi NIM
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5 mt-2.5">
+                          {user.type === "admin" && (
+                            <Link
+                              to="/admin/dashboard"
+                              className="block px-3 py-2 text-xs font-bold text-brand-blue bg-blue-50/60 rounded-lg hover:bg-blue-100 border border-blue-200"
+                              onClick={() => setMobileToolsOpen(false)}
+                            >
+                              Panel Admin
+                            </Link>
+                          )}
+                          <Link
+                            to="/orders"
+                            className="block px-3 py-2 text-xs font-bold text-foreground bg-secondary/60 rounded-lg hover:bg-secondary border border-ink/10"
+                            onClick={() => setMobileToolsOpen(false)}
+                          >
+                            Pesanan Saya
+                          </Link>
+                          <button
+                            onClick={() => {
+                              logout();
+                              setMobileToolsOpen(false);
+                              toast.success("Logged out");
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-bold text-red-600 bg-red-50/60 hover:bg-red-100 rounded-lg border border-red-200 flex items-center gap-2 cursor-pointer"
+                          >
+                            <LogOut className="w-3.5 h-3.5" />
+                            Logout
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Link
+                        to="/login"
+                        className="block w-full text-center py-2 text-xs font-extrabold text-cream bg-ink hover:bg-brand-orange hover:text-ink rounded-lg border border-ink transition-colors"
+                        onClick={() => setMobileToolsOpen(false)}
+                      >
+                        Sign In Akun UB
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Hamburger Menu Icon (lg:hidden) */}
             <button
               aria-label="Menu"
               className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center lg:hidden rounded-lg hover:text-brand-orange hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
@@ -542,7 +691,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
             </button>
           </div>
           <nav className="flex-1 flex flex-col px-5 py-6 sm:py-8 gap-1">
-            {NAV.map((n, idx) => (
+            {navItems.map((n, idx) => (
               <Link
                 key={n.label}
                 to={n.href.startsWith("/#") ? "/" : (n.href as any)}

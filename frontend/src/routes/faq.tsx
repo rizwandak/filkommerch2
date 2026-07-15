@@ -24,6 +24,7 @@ import { toast } from "sonner";
 import { extractLegacyConfigFromSegments } from "@/lib/homepage-types";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import baraSmile from "@/assets/bara-smile.png";
 
 export const Route = createFileRoute("/faq")({
@@ -86,7 +87,7 @@ const PRESET_QUESTIONS = [
   {
     id: "pickup",
     q: "Ngambil pesanannya dimana Bar?",
-    a: "Pilih aja 'Pickup di Kampus' pas checkout! Nanti tim Bara bakal nungguin kamu di Gazebo FILKOM UB sesuai jadwal yang dikirim via WhatsApp. Jangan lupa bawa bukti pesanan ya! 🐯",
+    a: "Pilih aja 'Pickup di Kampus' pas checkout! Nanti tim Bara bakal nungguin kamu di Toko FILKOM Merch sesuai jadwal yang dikirim via WhatsApp. Jangan lupa bawa bukti pesanan ya! 🐯",
   },
   {
     id: "discount",
@@ -125,7 +126,7 @@ function FAQPage() {
     {
       id: "1",
       role: "bara",
-      text: "Halo Ksatria! Namaku Bara, maskot FILKOM Merch. 😎 Ada yang bisa Bara bantu hari ini?",
+      text: "Halo FILKOM Buddies! Namaku Bara, maskot FILKOM. 😎 Ada yang bisa Bara bantu hari ini?",
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
@@ -345,12 +346,7 @@ function FAQPage() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-background border-t border-border mt-auto">
-        <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-10 flex flex-col md:flex-row justify-between gap-4 text-xs text-muted-foreground">
-          <div>© 2026 Filkom Merch UB · Official student merchandise.</div>
-          <div>Integrated with Midtrans Payment.</div>
-        </div>
-      </footer>
+      <Footer />
 
 
     </div>

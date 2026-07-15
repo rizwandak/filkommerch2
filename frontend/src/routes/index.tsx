@@ -36,6 +36,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { getProducts, getStoreSettings, getCategories, type ProductWithVariants } from "@backend/server-actions";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import {
   type HomepageSegment,
   convertLegacyToSegments,
@@ -58,6 +59,7 @@ import pTee2 from "@/assets/p-tee2.jpg";
 import about from "@/assets/about.jpg";
 import varsityEdutech from "@/assets/varsityedutech.png";
 import workJacket from "@/assets/workjacket.png";
+import baraSmile from "@/assets/bara-smile.png";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
@@ -739,7 +741,7 @@ function Index() {
       whyDesc2:
         "Bahan cotton fleece tebal, sablon presisi tinggi, dan jahitan standar distro internasional.",
       whyTitle3: "Bebas Ongkir Kampus",
-      whyDesc3: "Pesan online, ambil langsung di Gazebo FILKOM UB tanpa biaya kirim sepeser pun.",
+      whyDesc3: "Pesan online, ambil langsung di Toko FILKOM Merch tanpa biaya kirim sepeser pun.",
       whyTitle4: "Pembayaran Instan",
       whyDesc4:
         "Mendukung pembayaran otomatis QRIS, ShopeePay, GoPay, dan transfer bank via Midtrans.",
@@ -749,7 +751,7 @@ function Index() {
         "Ya, Filkom Merchandise adalah toko merchandise resmi mahasiswa Fakultas Ilmu Komputer Universitas Brawijaya yang bekerjasama dengan pihak fakultas dan BEM FILKOM UB.",
       faqQ2: "Bagaimana cara mengambil pesanan saya?",
       faqA2:
-        "Anda dapat memilih metode pengambilan 'Pickup di Kampus' saat checkout. Tim kami akan bersiap di Gazebo FILKOM UB pada jadwal pengambilan yang diinfokan via WhatsApp.",
+        "Anda dapat memilih metode pengambilan 'Pickup di Kampus' saat checkout. Tim kami akan bersiap di Toko FILKOM Merch pada jadwal pengambilan yang diinfokan via WhatsApp.",
       faqQ3: "Berapa lama estimasi pengerjaan barang Pre-Order?",
       faqA3:
         "Proses produksi barang pre-order biasanya memakan waktu 14 hingga 21 hari kerja setelah sesi pemesanan ditutup, tergantung tingkat kerumitan desain dan antrean vendor.",
@@ -1093,7 +1095,7 @@ function Index() {
                             </h2>
                           </div>
 
-                          <div className="flex flex-wrap justify-center gap-6 lg:gap-8">
+                          <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                             {heroProductsToRender.map((p) => {
                               let discountText = null;
                               if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
@@ -1111,7 +1113,7 @@ function Index() {
                               return (
                                 <div
                                   key={p.id}
-                                  className="group flex flex-col border-2 border-ink bg-neutral-900 text-cream rounded-2xl overflow-hidden shadow-[6px_6px_0px_0px_rgba(255,107,0,0.85)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(255,107,0,1)] transition-all duration-200 w-full max-w-[340px] sm:max-w-[380px]"
+                                  className="group flex flex-col border-2 border-ink bg-neutral-900 text-cream rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(255,107,0,085)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(255,107,0,1)] transition-all duration-200 w-full sm:w-[260px] md:w-[290px] shrink-0"
                                 >
                                   {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
                                   <Link
@@ -1124,14 +1126,14 @@ function Index() {
                                       alt={p.name}
                                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                                     />
-                                    <div className="absolute top-3 left-3 flex flex-col gap-1.5 items-start">
+                                    <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
                                       {p.tag && (
-                                        <span className="text-[10px] font-black tracking-wider px-3 py-1 bg-brand-orange text-ink rounded-full border border-ink shadow-sm uppercase">
+                                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-brand-orange text-ink rounded-full border border-ink shadow-xs uppercase">
                                           {p.tag}
                                         </span>
                                       )}
                                       {discountText && (
-                                        <span className="text-[10px] font-black tracking-wider px-3 py-1 bg-red-600 text-white rounded-full border border-ink shadow-sm uppercase">
+                                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-red-600 text-white rounded-full border border-ink shadow-xs uppercase">
                                           🔥 {discountText}
                                         </span>
                                       )}
@@ -1139,10 +1141,10 @@ function Index() {
                                   </Link>
 
                                   {/* Details Content Body Below Image */}
-                                  <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-4">
+                                  <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
                                     <div>
                                       {/* Header: Category & Title */}
-                                      <div className="text-[10px] font-extrabold tracking-widest text-brand-orange uppercase mb-1">
+                                      <div className="text-[8.5px] font-extrabold tracking-widest text-brand-orange uppercase mb-0.5">
                                         {p.cat || "MAIN HERO"}
                                       </div>
                                       <Link
@@ -1150,36 +1152,28 @@ function Index() {
                                         params={{ slug: p.id }}
                                         className="hover:text-brand-orange transition-colors"
                                       >
-                                        <h3 className="font-extrabold text-xl sm:text-2xl text-white uppercase tracking-wide leading-tight group-hover:text-brand-orange transition-colors">
+                                        <h3 className="font-extrabold text-xs sm:text-sm text-white uppercase tracking-wide leading-tight group-hover:text-brand-orange transition-colors">
                                           {p.name}
                                         </h3>
                                       </Link>
-                                      {p.description && (
-                                        <p className="text-xs sm:text-sm text-neutral-300 font-medium mt-2 leading-relaxed line-clamp-2">
-                                          {p.description}
-                                        </p>
-                                      )}
+                                    </div>
 
-                                      {/* Price Section */}
-                                      <div className="flex flex-wrap items-baseline justify-between gap-2 mt-6 pt-4 border-t border-neutral-800">
-                                        <div>
-                                          <span className="text-2xl sm:text-3xl font-black text-brand-orange tracking-tight">
-                                            {p.price}
-                                          </span>
-                                          {p.was && (
-                                            <span className="ml-2.5 text-xs sm:text-sm font-extrabold text-red-500 line-through">
-                                              {p.was}
-                                            </span>
-                                          )}
-                                        </div>
-                                        <span className="text-[9px] font-extrabold tracking-widest text-brand-orange bg-brand-orange/10 border border-brand-orange/30 px-2.5 py-1 rounded uppercase">
-                                          HERO ITEM
+                                    {/* Price Section */}
+                                    <div className="pt-2 border-t border-neutral-800 flex items-baseline justify-between gap-1">
+                                      <div>
+                                        <span className="text-base sm:text-lg font-black text-brand-orange tracking-tight block leading-none">
+                                          {p.price}
                                         </span>
+                                        {p.was && (
+                                          <span className="text-[10px] font-extrabold text-red-500 line-through block mt-0.5">
+                                            {p.was}
+                                          </span>
+                                        )}
                                       </div>
                                     </div>
 
-                                    {/* Dual Action Buttons */}
-                                    <div className="pt-4 border-t border-neutral-800 flex gap-2.5">
+                                    {/* Dual Icon Action Buttons - Below Price, Full Width Split 50/50 */}
+                                    <div className="pt-1 flex gap-1.5 w-full">
                                       <button
                                         onClick={() => {
                                           if ((p as any).rawProduct) {
@@ -1188,18 +1182,19 @@ function Index() {
                                             addToCart(p);
                                           }
                                         }}
-                                        className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-extrabold tracking-wider text-xs py-3 px-3 rounded-xl border-2 border-neutral-600 shadow-[2px_2px_0px_0px_rgba(255,255,255,0.7)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5"
+                                        title="Masuk Bag"
+                                        className="flex-1 h-8 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-brand-orange border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center"
                                       >
-                                        <ShoppingBag className="w-3.5 h-3.5 text-brand-orange" />
-                                        MASUK BAG
+                                        <ShoppingBag className="w-4 h-4" />
                                       </button>
 
                                       <Link
                                         to="/product/$slug"
                                         params={{ slug: p.id }}
-                                        className="flex-1 bg-brand-orange hover:bg-cream text-ink hover:text-ink font-extrabold tracking-wider text-xs py-3 px-3 rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(255,255,255,0.7)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5 text-center"
+                                        title="Pesan Sekarang"
+                                        className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center"
                                       >
-                                        PESAN <ArrowRight className="w-3.5 h-3.5" />
+                                        <ArrowRight className="w-4 h-4" />
                                       </Link>
                                     </div>
                                   </div>
@@ -1223,7 +1218,7 @@ function Index() {
                             </h2>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
+                          <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                             {gridProducts.map((p) => {
                               let discountText = null;
                               if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
@@ -1241,58 +1236,89 @@ function Index() {
                               return (
                                 <div
                                   key={p.id}
-                                  className="group flex flex-col border-2 border-ink bg-cream rounded-lg overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-4px] transition-all duration-300"
+                                  className="group flex flex-col border-2 border-ink bg-cream text-ink rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-full sm:w-[260px] md:w-[290px] shrink-0"
                                 >
+                                  {/* Top Full-Width 1:1 Aspect-Square Cover Photo */}
                                   <Link
                                     to="/product/$slug"
                                     params={{ slug: p.id }}
-                                    className="relative aspect-[4/5] overflow-hidden block border-b-2 border-ink bg-secondary animate-fade-in"
+                                    className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden block"
                                   >
                                     <img
                                       src={resolveImageUrl(p.img)}
                                       alt={p.name}
                                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                                     />
-                                    {p.tag && (
-                                      <span className="absolute top-3 left-3 text-[9px] font-bold tracking-widest px-2.5 py-1 bg-ink text-cream rounded-full uppercase">
-                                        {p.tag}
-                                      </span>
-                                    )}
-                                  </Link>
-                                  <div className="p-5 flex flex-col flex-1">
-                                    <div className="text-[10px] font-bold tracking-widest text-brand-orange uppercase mb-1">
-                                      {p.cat}
+                                    <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                                      {p.tag && (
+                                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-brand-orange text-cream rounded-full border border-ink shadow-xs uppercase">
+                                          {p.tag}
+                                        </span>
+                                      )}
+                                      {discountText && (
+                                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-red-600 text-white rounded-full border border-ink shadow-xs uppercase">
+                                          🔥 {discountText}
+                                        </span>
+                                      )}
                                     </div>
-                                    <Link
-                                      to="/product/$slug"
-                                      params={{ slug: p.id }}
-                                      className="hover:text-brand-orange transition-colors"
-                                    >
-                                      <h3 className="text-base font-bold text-ink leading-snug tracking-wide line-clamp-1 mb-1">
-                                        {p.name}
-                                      </h3>
-                                    </Link>
-                                    {p.description && (
-                                      <p className="text-xs text-muted-foreground line-clamp-2 mb-3 leading-relaxed">
-                                        {p.description}
-                                      </p>
-                                    )}
-                                    <div className="flex flex-col gap-1 mt-auto">
-                                      {p.was && (
-                                        <div className="flex flex-wrap items-center gap-1.5">
-                                          <span className="text-xs text-muted-foreground line-through font-bold">
+                                  </Link>
+
+                                  {/* Details Content Body Below Image */}
+                                  <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                                    <div>
+                                      {/* Header: Category & Title */}
+                                      <div className="text-[8.5px] font-extrabold tracking-widest text-brand-orange uppercase mb-0.5">
+                                        {p.cat}
+                                      </div>
+                                      <Link
+                                        to="/product/$slug"
+                                        params={{ slug: p.id }}
+                                        className="hover:text-brand-orange transition-colors"
+                                      >
+                                        <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight group-hover:text-brand-orange transition-colors">
+                                          {p.name}
+                                        </h3>
+                                      </Link>
+                                    </div>
+
+                                    {/* Price Section */}
+                                    <div className="pt-2 border-t border-ink/10 flex items-baseline justify-between gap-1">
+                                      <div>
+                                        <span className="text-base sm:text-lg font-black text-ink tracking-tight block leading-none">
+                                          {p.price}
+                                        </span>
+                                        {p.was && (
+                                          <span className="text-[10px] font-extrabold text-red-500 line-through block mt-0.5">
                                             {p.was}
                                           </span>
-                                          {discountText && (
-                                            <span className="text-[9px] font-extrabold tracking-widest px-1.5 py-0.5 bg-brand-orange/10 text-brand-orange border border-brand-orange/20 rounded">
-                                              {discountText}
-                                            </span>
-                                          )}
-                                        </div>
-                                      )}
-                                      <span className="text-base sm:text-lg font-black text-ink">
-                                        {p.price}
-                                      </span>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Dual Icon Action Buttons - Below Price, Full Width Split 50/50 */}
+                                    <div className="pt-1 flex gap-1.5 w-full">
+                                      <button
+                                        onClick={() => {
+                                          if ((p as any).rawProduct) {
+                                            addToCart((p as any).rawProduct);
+                                          } else {
+                                            addToCart(p);
+                                          }
+                                        }}
+                                        title="Masuk Bag"
+                                        className="flex-1 h-8 rounded-lg bg-ink hover:bg-brand-orange text-cream border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
+                                      >
+                                        <ShoppingBag className="w-4 h-4 text-brand-orange" />
+                                      </button>
+
+                                      <Link
+                                        to="/product/$slug"
+                                        params={{ slug: p.id }}
+                                        title="Pesan Sekarang"
+                                        className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
+                                      >
+                                        <ArrowRight className="w-4 h-4" />
+                                      </Link>
                                     </div>
                                   </div>
                                 </div>
@@ -1445,6 +1471,10 @@ function Index() {
                                 src={resolveImageUrl(el.config.leftImage)}
                                 alt="About Left Visual"
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const parent = (e.target as HTMLImageElement).closest('div[class*="aspect-"]');
+                                  if (parent) (parent as HTMLElement).style.display = 'none';
+                                }}
                               />
                             </div>
                           )}
@@ -1471,6 +1501,10 @@ function Index() {
                                 src={resolveImageUrl(el.config.rightImage)}
                                 alt="About Right Visual"
                                 className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  const parent = (e.target as HTMLImageElement).closest('div[class*="aspect-"]');
+                                  if (parent) (parent as HTMLElement).style.display = 'none';
+                                }}
                               />
                             </div>
                           )}
@@ -1484,6 +1518,10 @@ function Index() {
                                     src={resolveImageUrl(el.config.leftImage)}
                                     alt="About Left Visual"
                                     className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const parent = (e.target as HTMLImageElement).closest('div[class*="aspect-"]');
+                                      if (parent) (parent as HTMLElement).style.display = 'none';
+                                    }}
                                   />
                                 </div>
                               ) : <div />}
@@ -1493,6 +1531,10 @@ function Index() {
                                     src={resolveImageUrl(el.config.rightImage)}
                                     alt="About Right Visual"
                                     className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      const parent = (e.target as HTMLImageElement).closest('div[class*="aspect-"]');
+                                      if (parent) (parent as HTMLElement).style.display = 'none';
+                                    }}
                                   />
                                 </div>
                               ) : <div />}
@@ -1532,34 +1574,40 @@ function Index() {
                   return (
                     <section key={el.id} className="bg-background py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
                       <div className="max-w-[1000px] mx-auto px-5">
-                        <div className="text-center mb-12">
-                          <div className="text-xs tracking-[0.3em] text-brand-orange font-bold mb-2 uppercase">
-                            TANYA BARA / FAQ
-                          </div>
-                          <h2 className="display text-3xl sm:text-5xl text-ink font-bold uppercase">
-                            Pertanyaan Umum.
-                          </h2>
-                        </div>
-
-                        <div className="space-y-4">
-                          {el.config.items?.map((item: any) => (
-                            <div
-                              key={item.id}
-                              className="border-2 border-ink rounded-lg bg-cream/35 overflow-hidden shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-                            >
-                              <details className="group [&_summary::-webkit-details-marker]:hidden">
-                                <summary className="flex items-center justify-between p-5 text-ink font-bold text-sm sm:text-base cursor-pointer hover:bg-cream/70 select-none">
-                                  <span>{item.q}</span>
-                                  <span className="ml-1.5 shrink-0 rounded-full border-2 border-ink p-1 bg-background text-ink group-open:rotate-180 transition-transform duration-300">
-                                    <ChevronDown className="w-3.5 h-3.5" />
-                                  </span>
-                                </summary>
-                                <div className="p-5 border-t-2 border-ink bg-background text-xs sm:text-sm text-muted-foreground leading-relaxed font-medium whitespace-pre-line">
-                                  {item.a}
-                                </div>
-                              </details>
+                        <div className="border-2 border-ink bg-cream/40 rounded-2xl p-6 sm:p-10 shadow-[6px_6px_0px_0px_rgba(27,27,27,1)] flex flex-col md:flex-row items-center justify-between gap-8">
+                          {/* Mascot Visual */}
+                          <div className="relative shrink-0 flex items-center justify-center">
+                            <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-full border-2 border-ink bg-amber-100 flex items-center justify-center p-2 shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
+                              <img src={baraSmile} alt="Bara Mascot" className="w-full h-full object-contain" />
                             </div>
-                          ))}
+                            <div className="absolute -top-2 -right-2 bg-brand-orange text-ink font-mono font-black text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs">
+                              💬 AI ASSISTANT
+                            </div>
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 text-center md:text-left space-y-3">
+                            <div className="text-xs tracking-[0.3em] text-brand-orange font-bold uppercase">
+                              PUSAT BANTUAN & FAQ
+                            </div>
+                            <h2 className="display text-2xl sm:text-4xl text-ink font-bold uppercase leading-tight">
+                              Ada Pertanyaan? Tanya Bara Aja!
+                            </h2>
+                            <p className="text-xs sm:text-sm text-muted-foreground font-medium leading-relaxed max-w-lg">
+                              Punya pertanyaan seputar ukuran produk, estimasi Pre-Order, opsi kirim, atau mekanisme pickup di FILKOM Merch? Diskusi langsung dengan maskot Bara!
+                            </p>
+                          </div>
+
+                          {/* CTA Button */}
+                          <div className="shrink-0 w-full md:w-auto">
+                            <Link
+                              to="/faq"
+                              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-ink text-cream hover:bg-brand-orange hover:text-ink font-bold text-xs uppercase tracking-wider px-6 py-4 rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] transition-all transform hover:-translate-y-0.5 cursor-pointer"
+                            >
+                              TANYA BARA SEKARANG
+                              <ArrowRight className="w-4 h-4" />
+                            </Link>
+                          </div>
                         </div>
                       </div>
                     </section>
@@ -1692,12 +1740,11 @@ function Index() {
                             {el.config.title || "Exclusive Bundles"}
                           </h2>
                         </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-6xl mx-auto">
+                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                           {bundlesToRender.map((bundle: any, bIdx: number) => (
                             <div
                               key={bIdx}
-                              className="border-2 border-ink bg-background rounded-2xl overflow-hidden flex flex-col shadow-[5px_5px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] transition-all duration-200"
+                              className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-full sm:w-[260px] md:w-[290px] shrink-0"
                             >
                               {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
                               <div className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden group">
@@ -1707,71 +1754,51 @@ function Index() {
                                   className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                 />
                                 {bundle.saveText && (
-                                  <div className="absolute top-3 left-3 bg-brand-orange text-ink font-mono font-black text-xs tracking-wider px-3 py-1 rounded-full border border-ink shadow-sm uppercase">
+                                  <div className="absolute top-2 left-2 bg-brand-orange text-ink font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
                                     🔥 {bundle.saveText}
                                   </div>
                                 )}
                               </div>
 
-                              {/* Details Content Body Below Image */}
-                              <div className="p-5 sm:p-6 flex-1 flex flex-col justify-between space-y-4">
+                                {/* Details Content Body Below Image */}
+                              <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
                                 <div>
-                                  {/* Header: Title + Prices */}
-                                  <div className="flex flex-wrap items-baseline justify-between gap-2 pb-3 border-b border-border">
-                                    <div className="min-w-0 flex-1">
-                                      <h3 className="font-extrabold text-base sm:text-xl text-ink uppercase tracking-wide leading-tight">
-                                        {bundle.name}
-                                      </h3>
-                                      {bundle.description && (
-                                        <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-1 leading-snug">
-                                          {bundle.description}
-                                        </p>
-                                      )}
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                      {bundle.originalPrice && (
-                                        <span className="text-xs sm:text-sm font-extrabold text-red-500 line-through block leading-none mb-0.5">
-                                          {bundle.originalPrice}
-                                        </span>
-                                      )}
-                                      <span className="text-xl sm:text-2xl font-black text-brand-orange leading-tight block">
-                                        {bundle.price}
-                                      </span>
-                                    </div>
+                                  {/* Header: Title Only */}
+                                  <div className="pb-1.5 border-b border-border">
+                                    <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight">
+                                      {bundle.name}
+                                    </h3>
                                   </div>
 
                                   {/* Included Components Grid */}
-                                  <div className="mt-3.5 space-y-2">
-                                    <div className="text-[10px] font-black text-ink uppercase tracking-widest flex items-center gap-1.5">
+                                  <div className="mt-2 space-y-1">
+                                    <div className="text-[8.5px] font-black text-ink uppercase tracking-widest flex items-center gap-1">
                                       <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse" />
-                                      ISI PAKET BUNDLE:
+                                      PAKET BUNDLE:
                                     </div>
 
                                     {bundle.bundleComponents && bundle.bundleComponents.length > 0 ? (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      <div className="grid grid-cols-1 gap-1">
                                         {bundle.bundleComponents.map((comp: any, compIdx: number) => (
                                           <div
                                             key={comp.id || compIdx}
-                                            className="flex items-center gap-2 p-2 bg-secondary/60 border border-ink/15 rounded-lg shadow-2xs"
+                                            className="flex items-center gap-1.5 p-1 bg-secondary/60 border border-ink/15 rounded-md shadow-2xs"
                                           >
                                             <img
                                               src={resolveImageUrl(comp.image_url || comp.img || pTee2)}
                                               alt={comp.name}
-                                              className="w-9 h-9 object-cover rounded border border-ink/20 shrink-0"
+                                              className="w-6 h-6 object-cover rounded border border-ink/20 shrink-0"
                                             />
                                             <div className="min-w-0 flex-1 leading-tight">
-                                              <p className="font-extrabold text-ink text-[10px] sm:text-[11px] uppercase truncate">
+                                              <p className="font-extrabold text-ink text-[9px] uppercase truncate">
                                                 {comp.name}
-                                              </p>
-                                              <p className="text-[8.5px] sm:text-[9px] text-muted-foreground font-semibold uppercase mt-0.5">
-                                                {comp.price ? `Value ${formatRp(parsePrice(comp.price))}` : "Inklusif"}
                                               </p>
                                             </div>
                                           </div>
                                         ))}
                                       </div>
                                     ) : bundle.itemsList ? (
-                                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      <div className="grid grid-cols-1 gap-1">
                                         {bundle.itemsList.split(",").map((it: string, itIdx: number) => {
                                           const trimmedName = it.trim();
                                           const matchProd = products.find(
@@ -1782,19 +1809,16 @@ function Index() {
                                           return (
                                             <div
                                               key={itIdx}
-                                              className="flex items-center gap-2 p-2 bg-secondary/60 border border-ink/15 rounded-lg shadow-2xs"
+                                              className="flex items-center gap-1.5 p-1 bg-secondary/60 border border-ink/15 rounded-md shadow-2xs"
                                             >
                                               <img
                                                 src={resolveImageUrl(compImg)}
                                                 alt={trimmedName}
-                                                className="w-9 h-9 object-cover rounded border border-ink/20 shrink-0"
+                                                className="w-6 h-6 object-cover rounded border border-ink/20 shrink-0"
                                               />
                                               <div className="min-w-0 flex-1 leading-tight">
-                                                <p className="font-extrabold text-ink text-[10px] sm:text-[11px] uppercase truncate">
+                                                <p className="font-extrabold text-ink text-[9px] uppercase truncate">
                                                   {trimmedName}
-                                                </p>
-                                                <p className="text-[8.5px] sm:text-[9px] text-brand-orange font-bold uppercase mt-0.5">
-                                                  ✓ Inklusif
                                                 </p>
                                               </div>
                                             </div>
@@ -1803,52 +1827,57 @@ function Index() {
                                       </div>
                                     ) : null}
                                   </div>
+
+                                  {/* Price Below Bundle List */}
+                                  <div className="mt-2.5 pt-2 border-t border-border flex items-baseline justify-between">
+                                    {bundle.originalPrice && (
+                                      <span className="text-[10px] font-extrabold text-red-500 line-through leading-none">
+                                        {bundle.originalPrice}
+                                      </span>
+                                    )}
+                                    <span className="text-base sm:text-lg font-black text-brand-orange leading-tight ml-auto">
+                                      {bundle.price}
+                                    </span>
+                                  </div>
                                 </div>
 
-                                {/* Dual Action Buttons */}
-                                <div className="pt-3.5 border-t border-border flex gap-2.5">
+                                {/* Dual Icon Action Buttons - Below Components, Full Width Split 50/50 */}
+                                <div className="pt-2 border-t border-border flex items-center gap-1.5 w-full">
                                   <button
                                     onClick={() => {
-                                      if (bundle.rawProduct) {
+                                      if (bundle.isReal && bundle.rawProduct) {
                                         addToCart(bundle.rawProduct);
                                       } else {
                                         addToCart({
-                                          id: bundle.id || `bundle-${bIdx}`,
+                                          id: `bundle-${bIdx}`,
                                           name: bundle.name,
                                           price: bundle.price,
-                                          img: bundle.img || pTote,
+                                          img: bundle.img,
                                           cat: "BUNDLE",
                                         });
                                       }
                                     }}
-                                    className="flex-1 bg-white hover:bg-neutral-100 text-ink font-extrabold tracking-wider text-xs py-3 px-3 rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5"
+                                    title="Masuk Bag"
+                                    className="flex-1 h-8 rounded-lg bg-ink hover:bg-brand-orange text-cream border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
                                   >
-                                    <ShoppingBag className="w-3.5 h-3.5 text-brand-orange" />
-                                    MASUK BAG
+                                    <ShoppingBag className="w-4 h-4 text-brand-orange" />
                                   </button>
 
-                                  {bundle.isReal ? (
-                                    <Link
-                                      to="/product/$slug"
-                                      params={{ slug: bundle.id }}
-                                      className="flex-1 bg-ink hover:bg-brand-orange text-cream hover:text-ink font-extrabold tracking-wider text-xs py-3 px-3 rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5 text-center"
-                                    >
-                                      PESAN <ArrowRight className="w-3.5 h-3.5" />
-                                    </Link>
-                                  ) : (
-                                    <button
-                                      onClick={() => {
-                                        if (bundle.link) {
-                                          navigate({ to: bundle.link });
-                                        } else {
-                                          scrollToId("shop");
-                                        }
-                                      }}
-                                      className="flex-1 bg-ink hover:bg-brand-orange text-cream hover:text-ink font-extrabold tracking-wider text-xs py-3 px-3 rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all uppercase cursor-pointer flex items-center justify-center gap-1.5"
-                                    >
-                                      PESAN <ArrowRight className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
+                                  <button
+                                    onClick={() => {
+                                      if (bundle.isReal && bundle.rawProduct) {
+                                        navigate({ to: "/product/$slug", params: { slug: bundle.rawProduct.id } });
+                                      } else if (bundle.link) {
+                                        navigate({ to: bundle.link });
+                                      } else {
+                                        scrollToId("shop");
+                                      }
+                                    }}
+                                    title="Pesan Sekarang"
+                                    className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
+                                  >
+                                    <ArrowRight className="w-4 h-4" />
+                                  </button>
                                 </div>
                               </div>
                             </div>
@@ -1965,176 +1994,7 @@ function Index() {
 
 
       {/* 10. Footer */}
-      <footer className="bg-background border-t-2 border-ink">
-        <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-12 lg:py-16 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-8 lg:gap-10">
-          {/* Brand Info */}
-          <div className="lg:col-span-4 space-y-4">
-            <div className="flex items-center gap-3">
-              <img
-                src={logo}
-                alt="Filkom Merch logo"
-                className="w-10 h-10 rounded-full object-cover ring-2 ring-ink shadow-sm"
-              />
-              <img src={logoFilkom} alt="FILKOM UB logo" className="w-9 h-9 object-contain" />
-              <div className="leading-tight">
-                <span className="display text-lg text-ink font-bold block">Filkom Merch</span>
-                <span className="text-[9px] font-black tracking-widest text-muted-foreground uppercase">
-                  UNIVERSITAS BRAWIJAYA
-                </span>
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground leading-relaxed font-medium max-w-sm">
-              Official store merchandise resmi mahasiswa Fakultas Ilmu Komputer Universitas Brawijaya. Dibuat oleh mahasiswa, untuk civitas akademika premium &amp; eksklusif.
-            </p>
-            {/* Social Media Links */}
-            <div className="pt-2">
-              <div className="text-[10px] font-extrabold tracking-widest text-ink uppercase mb-2">
-                FOLLOW KAMI
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <a
-                  href="https://instagram.com/merchfilkomub"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-ink/20 bg-secondary/60 hover:bg-ink hover:text-cream text-xs font-bold transition-all cursor-pointer"
-                >
-                  <Instagram className="w-4 h-4 text-brand-orange shrink-0" />
-                  <span>@merchfilkomub</span>
-                </a>
-                <a
-                  href="https://tiktok.com/@filkommerch"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-ink/20 bg-secondary/60 hover:bg-ink hover:text-cream text-xs font-bold transition-all cursor-pointer"
-                >
-                  <svg className="w-3.5 h-3.5 fill-brand-orange shrink-0" viewBox="0 0 24 24">
-                    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-2.88 2.5 2.89 2.89 0 0 1-2.89-2.89 2.89 2.89 0 0 1 2.89-2.89c.28 0 .54.04.79.1v-3.5a6.37 6.37 0 0 0-.79-.05A6.34 6.34 0 0 0 3.15 15a6.34 6.34 0 0 0 6.34 6.34 6.34 6.34 0 0 0 6.34-6.34V6.84a8.16 8.16 0 0 0 4.76 1.5V4.89a4.85 4.85 0 0 1-1.00-.20z" />
-                  </svg>
-                  <span>@filkommerch</span>
-                </a>
-              </div>
-            </div>
-          </div>
-
-          {/* Catalog Links */}
-          <div className="lg:col-span-3 space-y-3">
-            <div className="text-xs font-extrabold tracking-[0.2em] text-ink uppercase">
-              KATALOG PRODUK
-            </div>
-            <ul className="space-y-2 text-xs font-medium text-muted-foreground">
-              <li>
-                <Link to="/products" className="hover:text-brand-orange transition-colors">
-                  Semua Produk Merchandise
-                </Link>
-              </li>
-              <li>
-                <Link to="/pre-order" className="hover:text-brand-orange transition-colors">
-                  Open Pre-Order Varsity '25
-                </Link>
-              </li>
-              <li>
-                <Link to="/products" className="hover:text-brand-orange transition-colors">
-                  Varsity &amp; Outerwear
-                </Link>
-              </li>
-              <li>
-                <Link to="/products" className="hover:text-brand-orange transition-colors">
-                  Heavyweight Hoodies
-                </Link>
-              </li>
-              <li>
-                <Link to="/products" className="hover:text-brand-orange transition-colors">
-                  T-Shirts &amp; Oversized Tees
-                </Link>
-              </li>
-              <li>
-                <Link to="/products" className="hover:text-brand-orange transition-colors">
-                  Caps, Totebags &amp; Lanyards
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Information & Navigation */}
-          <div className="lg:col-span-2 space-y-3">
-            <div className="text-xs font-extrabold tracking-[0.2em] text-ink uppercase">
-              NAVIGASI &amp; FAQ
-            </div>
-            <ul className="space-y-2 text-xs font-medium text-muted-foreground">
-              <li>
-                <Link to="/" className="hover:text-brand-orange transition-colors">
-                  Beranda Utama
-                </Link>
-              </li>
-              <li>
-                <button
-                  onClick={() => scrollToId("about")}
-                  className="hover:text-brand-orange text-left transition-colors cursor-pointer"
-                >
-                  Tentang Kami
-                </button>
-              </li>
-              <li>
-                <Link to="/faq" className="hover:text-brand-orange transition-colors">
-                  Pertanyaan Umum (FAQ)
-                </Link>
-              </li>
-              <li>
-                <Link to="/orders" className="hover:text-brand-orange transition-colors">
-                  Pesanan Saya
-                </Link>
-              </li>
-              <li>
-                <Link to="/login" className="hover:text-brand-orange transition-colors">
-                  Sign In / Akun UB
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Contact Support */}
-          <div className="lg:col-span-3 space-y-3">
-            <div className="text-xs font-extrabold tracking-[0.2em] text-ink uppercase">
-              LOKASI &amp; WA SUPPORT
-            </div>
-            <ul className="space-y-2.5 text-xs text-muted-foreground">
-              <li>
-                <a
-                  href="https://wa.me/6282235526105?text=Halo%20Admin%20Aliya,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 hover:text-brand-orange hover:font-bold transition-all text-xs"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                  Admin Aliya (Tanya Produk &amp; Ukuran)
-                </a>
-              </li>
-              <li>
-                <a
-                  href="https://wa.me/6282287190402?text=Halo%20Admin%20Puty,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 hover:text-brand-orange hover:font-bold transition-all text-xs"
-                >
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 animate-pulse" />
-                  Admin Puty (Keluhan &amp; Custom Order)
-                </a>
-              </li>
-              <li className="pt-1 text-[11px] text-muted-foreground leading-relaxed">
-                📍 <strong className="text-ink">Pickup Point:</strong> FILKOM Merch, Gedung A FILKOM UB.
-              </li>
-            </ul>
-          </div>
-        </div>
-
-        {/* Bottom Bar */}
-        <div className="border-t border-border bg-secondary/30">
-          <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-4 flex flex-col md:flex-row justify-between items-center gap-2 text-[11px] text-muted-foreground font-medium">
-            <div>© 2026 Filkom Merch UB · Official Merchandise Fakultas Ilmu Komputer Universitas Brawijaya.</div>
-            <div>Made with ♥ by Mahasiswa FILKOM UB.</div>
-          </div>
-        </div>
-      </footer>
+      <Footer />
 
 
 

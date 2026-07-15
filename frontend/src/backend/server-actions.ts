@@ -1,17 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
+import { getApiBaseUrl } from "@/lib/api-config";
 
 // Helper to resolve API base URL across SSR, client, and fallback envs
 export const getApiUrl = (): string => {
-  if (typeof window !== "undefined") {
-    // In client browser, use relative paths or explicit env
-    return (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) || "";
-  }
-  const envUrl =
-    (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
-    (typeof import.meta !== "undefined" ? import.meta.env?.VITE_API_URL : undefined);
-  if (envUrl) return envUrl;
-  return "https://filkommerch.com";
+  return getApiBaseUrl();
 };
 
 const API_URL = getApiUrl();
@@ -1049,13 +1042,13 @@ export const deleteUserAdmin = createServerFn({ method: "POST" })
 
 // Update order status
 export const updateOrderStatus = createServerFn({ method: "POST" })
-  .validator((d: { id: string; status: string; shipping_address?: string }) => d)
+  .validator((d: { id: string; status: string; shipping_address?: string; notes?: string }) => d)
   .handler(async ({ data: input }) => {
     try {
       const res = await serverFetch(`${API_URL}/api/admin/orders/${input.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: input.status, shipping_address: input.shipping_address }),
+        body: JSON.stringify({ status: input.status, shipping_address: input.shipping_address, notes: input.notes }),
       });
       if (!res.ok) {
         const errorText = await res.text();
@@ -1209,9 +1202,9 @@ export const uploadImagesServerAction = createServerFn({ method: "POST" })
       console.warn("Upload to primary API failed:", e);
     }
 
-    // 2. Try local fallback backend (http://127.0.0.1:8080)
+    // 2. Try live fallback backend (https://filkommerch.com)
     try {
-      const res = await fetch("http://127.0.0.1:8080/api/upload-multiple-base64", {
+      const res = await fetch("https://filkommerch.com/api/upload-multiple-base64", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ files: data.files }),
@@ -1223,7 +1216,7 @@ export const uploadImagesServerAction = createServerFn({ method: "POST" })
         }
       }
     } catch (e) {
-      console.warn("Upload to local fallback backend failed:", e);
+      console.warn("Upload to live fallback backend failed:", e);
     }
 
     // 3. Guaranteed fallback: return the 1:1 cropped Data URLs if both endpoints fail
@@ -1252,9 +1245,9 @@ export const uploadSingleImageServerAction = createServerFn({ method: "POST" })
       console.warn("Upload single to primary API failed:", e);
     }
 
-    // 2. Try local fallback backend (http://127.0.0.1:8080)
+    // 2. Try live fallback backend (https://filkommerch.com)
     try {
-      const res = await fetch("http://127.0.0.1:8080/api/upload-base64", {
+      const res = await fetch("https://filkommerch.com/api/upload-base64", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
@@ -1266,10 +1259,122 @@ export const uploadSingleImageServerAction = createServerFn({ method: "POST" })
         }
       }
     } catch (e) {
-      console.warn("Upload single to local backend failed:", e);
+      console.warn("Upload single to live backend failed:", e);
     }
 
     // 3. Fallback to Data URL
     return { success: true, url: data.dataUrl, isFallback: true };
+  });
+
+// ============ PRE-ORDER CAMPAIGN SERVER ACTIONS ============
+
+export interface PreOrderCampaign {
+  id: number;
+  batch_name: string;
+  start_date: string;
+  end_date: string;
+  extended_end_date: string | null;
+  is_active: number;
+  description: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Fetch All Pre-Order Campaigns
+export const getPreOrderCampaignsServerAction = createServerFn({ method: "GET" })
+  .handler(async () => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/pre-order-campaigns`);
+      if (!res.ok) return { success: false, data: [] };
+      return await res.json();
+    } catch (e) {
+      console.warn("getPreOrderCampaignsServerAction error:", e);
+      return { success: false, data: [] };
+    }
+  });
+
+// Fetch Active Pre-Order Campaign
+export const getActivePreOrderCampaignServerAction = createServerFn({ method: "GET" })
+  .handler(async () => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/pre-order-campaigns/active`);
+      if (!res.ok) return { success: false, data: null };
+      return await res.json();
+    } catch (e) {
+      console.warn("getActivePreOrderCampaignServerAction error:", e);
+      return { success: false, data: null };
+    }
+  });
+
+// Create Pre-Order Campaign
+export const createPreOrderCampaignServerAction = createServerFn({ method: "POST" })
+  .validator((data: Omit<PreOrderCampaign, "id">) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/pre-order-campaigns`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("createPreOrderCampaignServerAction error:", e);
+      return { success: false, error: e.message || "Failed to create pre-order campaign" };
+    }
+  });
+
+// Update Pre-Order Campaign
+export const updatePreOrderCampaignServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number } & Partial<PreOrderCampaign>) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/pre-order-campaigns/${data.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("updatePreOrderCampaignServerAction error:", e);
+      return { success: false, error: e.message || "Failed to update pre-order campaign" };
+    }
+  });
+
+// Delete Pre-Order Campaign
+export const deletePreOrderCampaignServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/pre-order-campaigns/${data.id}`, {
+        method: "DELETE",
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("deletePreOrderCampaignServerAction error:", e);
+      return { success: false, error: e.message || "Failed to delete pre-order campaign" };
+    }
+  });
+
+// Toggle Pre-Order Campaign Active Status
+export const togglePreOrderCampaignActiveServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number; is_active: boolean }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/pre-order-campaigns/${data.id}/toggle-active`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: data.is_active }),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("togglePreOrderCampaignActiveServerAction error:", e);
+      return { success: false, error: e.message || "Failed to toggle pre-order campaign active status" };
+    }
   });
 

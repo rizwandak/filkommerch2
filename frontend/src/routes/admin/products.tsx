@@ -33,9 +33,11 @@ import {
   deleteCategory,
   uploadImagesServerAction,
   uploadSingleImageServerAction,
+  getActivePreOrderCampaignServerAction,
   type ProductWithVariants,
   type Category,
 } from "@backend/server-actions";
+import { useQuery } from "@tanstack/react-query";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { ImageCropperModal } from "@frontend/components/admin/ImageCropperModal";
 
@@ -82,7 +84,7 @@ const emptyForm = (): ProductForm => ({
   filkom_price: "",
   promo_price: "",
   sale_type: "ready_stock",
-  product_type: "ready",
+  product_type: "apparel",
   low_stock_threshold: "5",
   preorder_start_at: "",
   preorder_end_at: "",
@@ -132,6 +134,12 @@ function AdminProductsPage() {
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperImageSrc, setCropperImageSrc] = useState("");
   const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  const { data: activePoRes } = useQuery({
+    queryKey: ["activePreOrderCampaign"],
+    queryFn: () => getActivePreOrderCampaignServerAction(),
+  });
+  const activePoCampaign = activePoRes?.data || null;
 
   const handleOpenCropper = (idx: number) => {
     const imgUrl = form.images[idx];
@@ -251,13 +259,8 @@ function AdminProductsPage() {
       original_price: product.original_price ? String(product.original_price) : "",
       filkom_price: product.filkom_price ? String(product.filkom_price) : "",
       promo_price: product.promo_price ? String(product.promo_price) : "",
-      sale_type: product.sale_type === "limited_drop" ? "limited_drop" : "ready_stock",
-      product_type:
-        product.product_type === "bundle"
-          ? "bundle"
-          : product.sale_type === "pre_order"
-            ? "preorder"
-            : "ready",
+      sale_type: product.sale_type || "ready_stock",
+      product_type: product.product_type === "bundle" ? "bundle" : "apparel",
       low_stock_threshold: product.low_stock_threshold ? String(product.low_stock_threshold) : "5",
       preorder_start_at: formatDateForInput(product.preorder_start_at),
       preorder_end_at: formatDateForInput(product.preorder_end_at),
@@ -473,12 +476,7 @@ function AdminProductsPage() {
       original_price: form.original_price ? parseFloat(form.original_price) : null,
       filkom_price: form.filkom_price ? parseFloat(form.filkom_price) : null,
       promo_price: form.promo_price ? parseFloat(form.promo_price) : null,
-      sale_type:
-        form.product_type === "preorder"
-          ? "pre_order"
-          : form.sale_type === "limited_drop"
-            ? "limited_drop"
-            : "ready_stock",
+      sale_type: form.sale_type,
       product_type: form.product_type === "bundle" ? "bundle" : "apparel",
       low_stock_threshold: form.low_stock_threshold ? parseInt(form.low_stock_threshold) : 5,
       preorder_start_at: form.preorder_start_at || null,
@@ -838,8 +836,8 @@ function AdminProductsPage() {
               />
             </div>
 
-            {/* Section 1: Categories & Product Type */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Section 1: Categories, Product Format, & Sale Method */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="font-extrabold text-xs uppercase text-ink">Kategori Produk</Label>
                 <div className="flex gap-2">
@@ -872,18 +870,34 @@ function AdminProductsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="font-extrabold text-xs uppercase text-ink">Tipe Penjualan Produk</Label>
+                <Label className="font-extrabold text-xs uppercase text-ink">Format / Tipe Item</Label>
                 <Select
                   value={form.product_type}
                   onValueChange={(v) => setForm({ ...form, product_type: v })}
                 >
                   <SelectTrigger className="border-2 border-ink/40">
-                    <SelectValue placeholder="Ready Stock" />
+                    <SelectValue placeholder="Tipe Item" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ready">Ready Stock (Normal)</SelectItem>
-                    <SelectItem value="preorder">Pre-Order Campaign</SelectItem>
-                    <SelectItem value="bundle">Bundle / Paket Hemat</SelectItem>
+                    <SelectItem value="apparel">Produk Satuan (Single Item)</SelectItem>
+                    <SelectItem value="bundle">Bundle / Paket Hemat (Gabungan Item)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="font-extrabold text-xs uppercase text-ink">Skema Penjualan</Label>
+                <Select
+                  value={form.sale_type}
+                  onValueChange={(v) => setForm({ ...form, sale_type: v })}
+                >
+                  <SelectTrigger className="border-2 border-ink/40 font-bold text-brand-orange">
+                    <SelectValue placeholder="Skema Penjualan" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ready_stock">Ready Stock (Normal On-Sale)</SelectItem>
+                    <SelectItem value="pre_order">Pre-Order Campaign (Tampil di Katalog PO)</SelectItem>
+                    <SelectItem value="limited_drop">Limited Edition Drop</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -984,46 +998,40 @@ function AdminProductsPage() {
 
             {/* Conditional Parameters: Pre-Order */}
             {form.product_type === "preorder" && (
-              <div className="border-2 border-brand-orange bg-orange-50/30 p-4 rounded-xl space-y-4">
-                <h4 className="text-xs font-black uppercase tracking-wider text-brand-orange">
-                  🔥 PARAMETER PRE-ORDER CAMPAIGN
+              <div className="border-2 border-brand-orange bg-orange-50/40 p-4 rounded-xl space-y-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-brand-orange flex items-center gap-1.5">
+                  🔥 PRE-ORDER CAMPAIGN TERHUBUNG
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1">
-                    <Label className="text-xs font-bold">Tanggal Mulai PO</Label>
-                    <Input
-                      type="datetime-local"
-                      value={form.preorder_start_at}
-                      onChange={(e) => setForm({ ...form, preorder_start_at: e.target.value })}
-                    />
+                {activePoCampaign ? (
+                  <div className="bg-white border-2 border-brand-orange/40 rounded-lg p-3 space-y-2 text-xs">
+                    <div className="flex items-center justify-between font-bold text-ink">
+                      <span className="text-sm font-extrabold text-brand-orange">{activePoCampaign.batch_name}</span>
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] rounded font-black">
+                        AKTIF
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-muted-foreground text-[11px] font-medium pt-1 border-t border-dashed">
+                      <div>
+                        <span className="font-bold text-ink block">Mulai PO:</span>
+                        {new Date(activePoCampaign.start_date).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+                      </div>
+                      <div>
+                        <span className="font-bold text-ink block">Selesai PO:</span>
+                        {new Date(activePoCampaign.end_date).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-emerald-700 font-semibold pt-1">
+                      ✨ Waktu PO produk ini otomatis mengikuti konfigurasi batch aktif di atas. Tidak perlu mengisi tanggal manual!
+                    </p>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-bold">Tanggal Selesai PO</Label>
-                    <Input
-                      type="datetime-local"
-                      value={form.preorder_end_at}
-                      onChange={(e) => setForm({ ...form, preorder_end_at: e.target.value })}
-                    />
+                ) : (
+                  <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-3 text-xs text-amber-900 space-y-1">
+                    <p className="font-bold text-amber-950">⚠️ Belum Ada Batch PO Aktif Saat Ini</p>
+                    <p className="text-[11px]">
+                      Anda memilih tipe Pre-Order, namun belum ada Batch Pre-Order yang diaktifkan. Anda dapat membuat &amp; mengaktifkan Batch Pre-Order baru di menu <strong>Pre-Order Batch</strong>.
+                    </p>
                   </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-bold">Kuota Minimum Order (MOQ)</Label>
-                    <Input
-                      type="number"
-                      placeholder="Contoh: 50 pcs"
-                      value={form.preorder_moq}
-                      onChange={(e) => setForm({ ...form, preorder_moq: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-bold">Estimasi Waktu Produksi (Hari)</Label>
-                    <Input
-                      type="number"
-                      placeholder="Contoh: 14 hari"
-                      value={form.production_eta_days}
-                      onChange={(e) => setForm({ ...form, production_eta_days: e.target.value })}
-                    />
-                  </div>
-                </div>
+                )}
               </div>
             )}
 

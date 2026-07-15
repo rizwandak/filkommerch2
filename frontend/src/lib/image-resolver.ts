@@ -1,14 +1,7 @@
-const getLiveApiUrl = () => {
-  let url =
-    (typeof process !== "undefined" ? process.env.VITE_API_URL : undefined) ||
-    (typeof import.meta !== "undefined" ? import.meta.env?.VITE_API_URL : undefined) ||
-    "https://filkommerch.com";
-  url = url.replace(/\/api\/?$/, "").replace(/\/$/, "");
-  return url;
-};
+import { getApiBaseUrl, LIVE_BACKEND_URL } from "./api-config";
 
-export function resolveImageUrl(url: string | undefined): string {
-  if (!url) return "";
+export function resolveImageUrl(url: string | undefined): string | undefined {
+  if (!url) return undefined;
 
   // If it is a local asset import or browser-generated URL (blob/data URL)
   if (
@@ -21,20 +14,27 @@ export function resolveImageUrl(url: string | undefined): string {
     return url;
   }
 
-  // Intercept stored localhost / 127.0.0.1 URLs and map to live backend on production / mobile devices
+  const apiBase = getApiBaseUrl();
+
+  // Intercept stored localhost / 127.0.0.1 URLs and resolve to current active backend
   if (url.startsWith("http://127.0.0.1:8080") || url.startsWith("http://localhost:8080")) {
     const cleanPath = url.replace(/^http:\/\/(127\.0\.0\.1|localhost):8080/, "");
-    if (
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-    ) {
-      return `http://127.0.0.1:8080${cleanPath}`;
-    }
-    const liveApiUrl = getLiveApiUrl();
-    return `${liveApiUrl}${cleanPath}`;
+    return `${apiBase}${cleanPath}`;
   }
 
-  // If it is already a full http/https URL
+  // If stored URL is from filkommerch.com:
+  // - When backend points to live server → remap to current apiBase (handles proxy/domain changes)
+  // - When backend points to local dev → keep original live URL so production-uploaded images still load
+  if (url.startsWith("https://filkommerch.com")) {
+    if (apiBase === LIVE_BACKEND_URL) {
+      const cleanPath = url.replace(/^https:\/\/filkommerch\.com/, "");
+      return `${apiBase}${cleanPath}`;
+    }
+    // In local dev, just return the live URL directly so it loads from production
+    return url;
+  }
+
+  // If it is any other full http/https URL
   if (url.startsWith("http://") || url.startsWith("https://")) {
     return url;
   }
@@ -42,15 +42,9 @@ export function resolveImageUrl(url: string | undefined): string {
   // Relative /uploads paths
   if (url.startsWith("/uploads") || url.startsWith("uploads/")) {
     const cleanPath = url.startsWith("/") ? url : `/${url}`;
-    if (
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-    ) {
-      return `http://127.0.0.1:8080${cleanPath}`;
-    }
-    const liveApiUrl = getLiveApiUrl();
-    return `${liveApiUrl}${cleanPath}`;
+    return `${apiBase}${cleanPath}`;
   }
 
   return url;
 }
+

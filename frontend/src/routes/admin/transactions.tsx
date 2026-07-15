@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/u
 import { Badge } from "@frontend/components/ui/badge";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
+import { Textarea } from "@frontend/components/ui/textarea";
 import { Label } from "@frontend/components/ui/label";
 import {
   Dialog,
@@ -68,6 +69,7 @@ function AdminTransactionsPage() {
   const [editOrderId, setEditOrderId] = useState<string>("");
   const [editStatus, setEditStatus] = useState<string>("");
   const [editShippingAddress, setEditShippingAddress] = useState<string>("");
+  const [editNotes, setEditNotes] = useState<string>("");
   const [savingStatus, setSavingStatus] = useState(false);
 
   const loadTransactions = async () => {
@@ -126,6 +128,7 @@ function AdminTransactionsPage() {
     setEditOrderId(order.order_id);
     setEditStatus(order.transaction_status);
     setEditShippingAddress(order.shipping_address || "");
+    setEditNotes(order.notes || "");
     setEditOpen(true);
   };
 
@@ -142,6 +145,7 @@ function AdminTransactionsPage() {
           id: editOrderId,
           status: editStatus,
           shipping_address: editShippingAddress || undefined,
+          notes: editNotes || undefined,
         },
       });
       if (result.success) {
@@ -669,6 +673,20 @@ function AdminTransactionsPage() {
                 onChange={(e) => setEditShippingAddress(e.target.value)}
                 placeholder="Masukkan alamat pengiriman/ambil"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Catatan untuk Pembeli</Label>
+              <Textarea
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Contoh: Bukti pembayaran tidak valid, silakan kirim ulang."
+                rows={3}
+                className="text-xs"
+              />
+              <p className="text-[10px] text-muted-foreground">
+                Catatan ini akan ditampilkan di halaman konfirmasi pesanan pembeli.
+              </p>
             </div>
           </div>
 

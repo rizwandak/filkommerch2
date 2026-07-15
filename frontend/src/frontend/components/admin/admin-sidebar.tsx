@@ -10,6 +10,7 @@ import {
   Users,
   Sliders,
   History,
+  CalendarClock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, type AdminRole } from "@/lib/auth";
@@ -26,6 +27,7 @@ interface NavItem {
 const adminNavItems: NavItem[] = [
   { label: "Dashboard", to: "/admin/dashboard", icon: LayoutDashboard, roles: ["admin", "cashier"] },
   { label: "Produk", to: "/admin/products", icon: Package, roles: ["admin", "cashier"] },
+  { label: "Pre-Order Batch", to: "/admin/pre-order", icon: CalendarClock, roles: ["admin", "cashier"] },
   { label: "Transaksi", to: "/admin/transactions", icon: Receipt, roles: ["admin", "cashier"] },
   { label: "Pengguna", to: "/admin/users", icon: Users, roles: ["admin", "cashier"] },
   { label: "Tata Letak", to: "/admin/homepage", icon: Sliders, roles: ["admin", "cashier"] },

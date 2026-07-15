@@ -181,8 +181,8 @@ app.use("/uploads", express.static(uploadsDir));
 
 const getPublicHostUrl = (req: express.Request) => {
   const host = req.get("x-forwarded-host") || req.get("host") || "";
-  const proto = req.get("x-forwarded-proto") || req.protocol || "http";
-  if (!host) {
+  const proto = req.get("x-forwarded-proto") || req.protocol || "https";
+  if (!host || host.includes("localhost") || host.includes("127.0.0.1")) {
     return process.env.PUBLIC_URL || "https://filkommerch.com";
   }
   return `${proto}://${host}`;
@@ -356,6 +356,14 @@ app.delete("/api/admin/users/:id", checkRole(["admin"]), apiControllers.deleteUs
 // Store Settings API Routes
 app.get("/api/settings", cacheMiddleware(120), apiControllers.getStoreSettings);
 app.post("/api/settings", checkRole(["admin"]), (req, res, next) => { clearCache("/api/settings"); next(); }, apiControllers.updateStoreSettings);
+
+// Pre-Order Campaign API Routes
+app.get("/api/pre-order-campaigns/active", apiControllers.getActivePreOrderCampaign);
+app.get("/api/pre-order-campaigns", apiControllers.getAllPreOrderCampaigns);
+app.post("/api/pre-order-campaigns", checkRole(["admin"]), apiControllers.createPreOrderCampaign);
+app.put("/api/pre-order-campaigns/:id", checkRole(["admin"]), apiControllers.updatePreOrderCampaign);
+app.patch("/api/pre-order-campaigns/:id/toggle-active", checkRole(["admin"]), apiControllers.togglePreOrderCampaignActive);
+app.delete("/api/pre-order-campaigns/:id", checkRole(["admin"]), apiControllers.deletePreOrderCampaign);
 
 // Analytics API Routes
 app.get("/api/analytics/daily", checkRole(["admin", "cashier"]), apiControllers.getDailySalesSummary);

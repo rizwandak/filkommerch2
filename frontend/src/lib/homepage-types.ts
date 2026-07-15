@@ -279,7 +279,7 @@ export function convertLegacyToSegments(legacy: any): HomepageSegment[] {
             },
             {
               title: legacyFlat.whyTitle3 || "Bebas Ongkir Kampus",
-              description: legacyFlat.whyDesc3 || "Pesan online, ambil langsung di Gazebo FILKOM UB tanpa biaya kirim sepeser pun."
+              description: legacyFlat.whyDesc3 || "Pesan online, ambil langsung di Toko FILKOM Merch tanpa biaya kirim sepeser pun."
             },
             {
               title: legacyFlat.whyTitle4 || "Pembayaran Instan",

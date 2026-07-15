@@ -32,6 +32,7 @@ import { Card, CardContent } from "@frontend/components/ui/card";
 import { toast } from "sonner";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import logo from "@/assets/logo-fm.jpg";
 
 const scrollToId = (id: string) => {
@@ -256,78 +257,7 @@ function ProductsCatalogPage() {
     <div className="min-h-screen bg-[#FCFAF7] text-ink font-sans">
       <Navbar searchQuery={searchTerm} onSearchQueryChange={setSearchTerm} />
 
-      {/* Main Banner */}
-      <section className="bg-cream border-b-2 border-ink py-14 px-4 relative overflow-hidden">
-        <div className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 flex flex-col md:flex-row items-center justify-between gap-8">
-          <div>
-            <div className="inline-flex items-center gap-1.5 bg-brand-orange text-cream border-2 border-ink px-4 py-1.5 rounded-full text-[10px] font-extrabold mb-4 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] tracking-wider uppercase">
-              <Sparkles className="w-3.5 h-3.5 animate-pulse" />
-              Civitas FILKOM UB Discount Active
-            </div>
-            <h1 className="display text-3xl sm:text-5xl text-ink uppercase tracking-tight">
-              Katalog Resmi FILKOM Merch
-            </h1>
-            <p className="mt-3 text-sm text-muted-foreground max-w-xl font-medium leading-relaxed">
-              Temukan koleksi eksklusif, apparel premium, lanyard, gantungan kunci, dan drop limited
-              pre-order Fakultas Ilmu Komputer.
-            </p>
-          </div>
-          {user?.type === "buyer" ? (
-            user.is_filkom_verified === 1 ? (
-              <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                  Status Akun:
-                </p>
-                <p className="text-lg font-extrabold text-brand-orange uppercase mt-1">
-                  Spesial Civitas FILKOM UB 🔥
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">
-                  Diskon otomatis aktif karena akun FILKOM Anda terverifikasi.
-                </p>
-              </div>
-            ) : user.is_google && user.email.endsWith("ub.ac.id") ? (
-              <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                  Diskon Civitas:
-                </p>
-                <p className="text-lg font-extrabold text-amber-600 uppercase mt-1">
-                  Belum Terverifikasi ⚠️
-                </p>
-                <button
-                  onClick={() => window.dispatchEvent(new Event("open-verification"))}
-                  className="mt-2 w-full bg-brand-orange text-cream text-[10px] font-bold py-2 rounded-lg border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none transition-all cursor-pointer block"
-                >
-                  Verifikasi NIM
-                </button>
-              </div>
-            ) : (
-              <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                  Diskon Khusus:
-                </p>
-                <p className="text-sm font-extrabold text-ink uppercase mt-1">
-                  Gunakan Akun Google UB 🎓
-                </p>
-                <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">
-                  Verifikasi NIM mahasiswa FILKOM hanya tersedia jika Anda login menggunakan akun Google UB (@student.ub.ac.id).
-                </p>
-              </div>
-            )
-          ) : (
-            <div className="bg-card border-2 border-ink rounded-xl p-5 text-center md:text-right shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] max-w-xs shrink-0">
-              <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">
-                Punya NIM FILKOM?
-              </p>
-              <p className="text-lg font-extrabold text-ink uppercase mt-1">
-                Login & Verifikasi 🎓
-              </p>
-              <p className="text-[10px] text-muted-foreground mt-1.5 leading-relaxed font-semibold">
-                Gunakan akun Google UB & hubungkan NIM Anda untuk mendapatkan diskon khusus FILKOM.
-              </p>
-            </div>
-          )}
-        </div>
-      </section>
+
 
       {/* Main Catalog Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -674,80 +604,7 @@ function ProductsCatalogPage() {
         </div>
       </main>
 
-      {/* WhatsApp Floating Contact Widget */}
-      <footer className="bg-card border-t-2 border-ink mt-20 py-12 text-ink text-xs font-bold">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <img
-                src={logo}
-                alt="Logo"
-                className="w-8 h-8 rounded-full object-cover border border-ink"
-              />
-              <span className="font-extrabold text-sm text-ink uppercase">FILKOM Merch Store</span>
-            </div>
-            <p className="text-muted-foreground font-normal leading-relaxed mb-4 max-w-sm">
-              Official store merchandise Fakultas Ilmu Komputer Universitas Brawijaya. Menyediakan
-              produk kreatif berkualitas tinggi untuk civitas akademika dan masyarakat umum.
-            </p>
-          </div>
-          <div>
-            <h4 className="font-extrabold text-ink uppercase tracking-widest mb-3 border-b-2 border-ink pb-1 inline-block">
-              Layanan Kami
-            </h4>
-            <ul className="space-y-2 font-normal text-muted-foreground mt-2">
-              <li>
-                <Link to="/products" className="hover:text-brand-orange transition">
-                  Katalog Drop Utama
-                </Link>
-              </li>
-              <li>
-                <Link
-                  to="/products"
-                  search={{ sale_type: "pre_order" }}
-                  className="hover:text-brand-orange transition"
-                >
-                  Pre-Order BATCH Aktif
-                </Link>
-              </li>
-              <li>
-                <a href="/#about" className="hover:text-brand-orange transition">
-                  Tentang Toko Resmi
-                </a>
-              </li>
-            </ul>
-          </div>
-          <div id="contact">
-            <h4 className="font-extrabold text-ink uppercase tracking-widest mb-3 border-b-2 border-ink pb-1 inline-block">
-              Hubungi Admin (WhatsApp)
-            </h4>
-            <div className="space-y-3 mt-2">
-              <a
-                href="https://wa.me/6282235526105?text=Halo%20Admin%20Aliya,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2.5 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition p-3 rounded-lg border-2 border-ink font-bold shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none cursor-pointer"
-              >
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                Hubungi Admin Aliya (Online)
-              </a>
-              <a
-                href="https://wa.me/6282287190402?text=Halo%20Admin%20Puty,%20saya%20ingin%20bertanya%20tentang%20produk%20Filkom%20Merch"
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-2.5 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition p-3 rounded-lg border-2 border-ink font-bold shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none cursor-pointer"
-              >
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                Hubungi Admin Puty (Online)
-              </a>
-            </div>
-          </div>
-        </div>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 border-t border-border pt-8 mt-8 text-center text-muted-foreground font-normal">
-          &copy; 2026 FILKOM Merchandise UB Store. Developed in alignment with Technical Brief
-          revisions.
-        </div>
-      </footer>
+      <Footer />
 
       {/* Mobile Filters Modal */}
       {showMobileFilters && (

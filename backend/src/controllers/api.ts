@@ -1442,7 +1442,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
   const connection = await getConnection();
   try {
     const { id } = req.params;
-    const { status, shipping_address } = req.body;
+    const { status, shipping_address, notes } = req.body;
 
     await connection.beginTransaction();
 
@@ -1482,21 +1482,23 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       orderStatus = "cancelled";
     }
 
+    const updateFields: string[] = ["transaction_status = ?", "payment_status = ?", "order_status = ?", "fulfillment_status = ?"];
+    const updateParams: any[] = [status, paymentStatus, orderStatus, fulfillmentStatus];
+
     if (shipping_address !== undefined) {
-      await connection.execute(
-        `UPDATE orders SET 
-          transaction_status = ?, payment_status = ?, order_status = ?, fulfillment_status = ?, shipping_address = ? 
-         WHERE order_id = ?`,
-        [status, paymentStatus, orderStatus, fulfillmentStatus, shipping_address, id]
-      );
-    } else {
-      await connection.execute(
-        `UPDATE orders SET 
-          transaction_status = ?, payment_status = ?, order_status = ?, fulfillment_status = ? 
-         WHERE order_id = ?`,
-        [status, paymentStatus, orderStatus, fulfillmentStatus, id]
-      );
+      updateFields.push("shipping_address = ?");
+      updateParams.push(shipping_address);
     }
+    if (notes !== undefined) {
+      updateFields.push("notes = ?");
+      updateParams.push(notes);
+    }
+
+    updateParams.push(id);
+    await connection.execute(
+      `UPDATE orders SET ${updateFields.join(", ")} WHERE order_id = ?`,
+      updateParams
+    );
 
     // Trigger stock deduction if transitioning to paid manually
     if (isNowPaid && wasUnpaid) {
@@ -2265,6 +2267,115 @@ export const submitPaymentProof = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error submitting payment proof:", error);
     return res.status(500).json({ success: false, error: error.message || "Failed to submit payment proof" });
+  }
+};
+
+// ============ PRE-ORDER CAMPAIGNS ============
+
+export const getPreOrderCampaigns = async (req: Request, res: Response) => {
+  try {
+    const campaigns = await query("SELECT * FROM pre_order_campaigns ORDER BY created_at DESC");
+    return res.json({ success: true, data: campaigns });
+  } catch (error: any) {
+    console.error("Error fetching pre-order campaigns:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const getAllPreOrderCampaigns = async (req: Request, res: Response) => {
+  try {
+    const campaigns = await query("SELECT * FROM pre_order_campaigns ORDER BY id DESC");
+    return res.json({ success: true, data: campaigns || [] });
+  } catch (error: any) {
+    console.error("Error fetching pre-order campaigns:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const getActivePreOrderCampaign = async (req: Request, res: Response) => {
+  try {
+    const campaign = await queryOne("SELECT * FROM pre_order_campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+    return res.json({ success: true, data: campaign || null });
+  } catch (error: any) {
+    console.error("Error fetching active pre-order campaign:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const createPreOrderCampaign = async (req: Request, res: Response) => {
+  try {
+    const { batch_name, start_date, end_date, extended_end_date, is_active, description } = req.body;
+    if (!batch_name || !start_date || !end_date) {
+      return res.status(400).json({ success: false, error: "Nama batch, tanggal mulai, dan tanggal selesai wajib diisi" });
+    }
+
+    if (is_active) {
+      await execute("UPDATE pre_order_campaigns SET is_active = 0");
+    }
+
+    const result = await execute(
+      `INSERT INTO pre_order_campaigns (batch_name, start_date, end_date, extended_end_date, is_active, description)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [batch_name, start_date, end_date, extended_end_date || null, is_active ? 1 : 0, description || null]
+    );
+
+    return res.json({ success: true, id: (result as any).insertId, message: "Campaign Pre-Order berhasil dibuat" });
+  } catch (error: any) {
+    console.error("Error creating pre-order campaign:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const updatePreOrderCampaign = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { batch_name, start_date, end_date, extended_end_date, is_active, description } = req.body;
+
+    if (!batch_name || !start_date || !end_date) {
+      return res.status(400).json({ success: false, error: "Nama batch, tanggal mulai, dan tanggal selesai wajib diisi" });
+    }
+
+    if (is_active) {
+      await execute("UPDATE pre_order_campaigns SET is_active = 0 WHERE id != ?", [id]);
+    }
+
+    await execute(
+      `UPDATE pre_order_campaigns 
+       SET batch_name = ?, start_date = ?, end_date = ?, extended_end_date = ?, is_active = ?, description = ?
+       WHERE id = ?`,
+      [batch_name, start_date, end_date, extended_end_date || null, is_active ? 1 : 0, description || null, id]
+    );
+
+    return res.json({ success: true, message: "Campaign Pre-Order berhasil diperbarui" });
+  } catch (error: any) {
+    console.error("Error updating pre-order campaign:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const togglePreOrderCampaignActive = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { is_active } = req.body;
+    if (is_active) {
+      await execute("UPDATE pre_order_campaigns SET is_active = 0 WHERE id != ?", [id]);
+    }
+    await execute("UPDATE pre_order_campaigns SET is_active = ? WHERE id = ?", [is_active ? 1 : 0, id]);
+    return res.json({ success: true, message: "Status batch berhasil diubah" });
+  } catch (error: any) {
+    console.error("Error toggling pre-order campaign active status:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const deletePreOrderCampaign = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await execute("DELETE FROM pre_order_campaigns WHERE id = ?", [id]);
+    return res.json({ success: true, message: "Campaign Pre-Order berhasil dihapus" });
+  } catch (error: any) {
+    console.error("Error deleting pre-order campaign:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 

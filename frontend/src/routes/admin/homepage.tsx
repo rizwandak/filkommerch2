@@ -1645,13 +1645,16 @@ function AdminHomepageEditorPage() {
                                   </div>
                                 )}
 
-                                {/* FAQ CONFIG */}
+                                {/* FAQ / TANYA BARA CONFIG */}
                                 {el.type === "faq" && (
                                   <div className="space-y-4">
+                                    <p className="text-xs text-muted-foreground font-semibold">
+                                      Kelola daftar pertanyaan cepat dan jawaban otomatis maskot Bara di halaman <strong>Tanya Bara (/faq)</strong>.
+                                    </p>
                                     {el.config.items?.map((item: any, idx: number) => (
                                       <div key={item.id || idx} className="border border-ink/20 p-3 rounded space-y-2 bg-cream/10">
                                         <div className="flex justify-between items-center">
-                                          <span className="text-[10px] font-bold text-brand-orange">FAQ #{idx + 1}</span>
+                                          <span className="text-[10px] font-bold text-brand-orange">Pertanyaan Tanya Bara #{idx + 1}</span>
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -1672,7 +1675,7 @@ function AdminHomepageEditorPage() {
                                               newItems[idx] = { ...newItems[idx], q: e.target.value };
                                               updateElementConfig(activeSegment.id, el.id, { items: newItems });
                                             }}
-                                            placeholder="Pertanyaan"
+                                            placeholder="Pertanyaan pembeli..."
                                             className="font-bold text-xs"
                                           />
                                           <Textarea
@@ -1682,7 +1685,7 @@ function AdminHomepageEditorPage() {
                                               newItems[idx] = { ...newItems[idx], a: e.target.value };
                                               updateElementConfig(activeSegment.id, el.id, { items: newItems });
                                             }}
-                                            placeholder="Jawaban Bara..."
+                                            placeholder="Jawaban otomatis dari Bara..."
                                             rows={2}
                                           />
                                         </div>
@@ -1699,7 +1702,7 @@ function AdminHomepageEditorPage() {
                                       }}
                                       className="w-full border border-ink text-ink font-bold text-xs uppercase py-2 hover:bg-neutral-100 cursor-pointer"
                                     >
-                                      + Tambah Pertanyaan
+                                      + Tambah Pertanyaan Tanya Bara
                                     </Button>
                                   </div>
                                 )}

@@ -83,6 +83,24 @@ export async function runMigration() {
       {
         name: "seed_bundle_category",
         sql: "INSERT IGNORE INTO categories (name, slug) VALUES ('Bundle', 'bundle')"
+      },
+      {
+        name: "pre_order_campaigns",
+        sql: `CREATE TABLE IF NOT EXISTS pre_order_campaigns (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          batch_name VARCHAR(100) NOT NULL,
+          start_date DATETIME NOT NULL,
+          end_date DATETIME NOT NULL,
+          extended_end_date DATETIME DEFAULT NULL,
+          is_active TINYINT(1) DEFAULT 0,
+          description TEXT DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )`
+      },
+      {
+        name: "products.pre_order_campaign_id",
+        sql: "ALTER TABLE products ADD COLUMN pre_order_campaign_id INT DEFAULT NULL"
       }
     ];
 

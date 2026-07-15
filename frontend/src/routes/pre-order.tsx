@@ -21,11 +21,16 @@ import {
   ShieldCheck,
   LayoutDashboard,
   MonitorSmartphone,
+  Instagram,
+  PackageCheck,
+  Sparkles,
 } from "lucide-react";
-import { getProducts, getStoreSettings, type ProductWithVariants } from "@backend/server-actions";
+import { getProducts, getStoreSettings, getActivePreOrderCampaignServerAction, type ProductWithVariants, type PreOrderCampaign } from "@backend/server-actions";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Navbar } from "@/components/Navbar";
+import { Footer } from "@/components/Footer";
 import { toast } from "sonner";
 import { extractLegacyConfigFromSegments } from "@/lib/homepage-types";
 import pVarsity from "@/assets/p-varsity.jpg";
@@ -76,7 +81,7 @@ type CartItem = {
   image_url?: string;
 };
 
-// Reusable Countdown Timer Component
+// Reusable Countdown Timer Component (Vibrant Light Mode)
 function CountdownTimer({ targetDate }: { targetDate: string }) {
   const [timeLeft, setTimeLeft] = useState<{
     days: number;
@@ -107,53 +112,99 @@ function CountdownTimer({ targetDate }: { targetDate: string }) {
     return () => clearInterval(interval);
   }, [targetDate]);
 
-  if (!timeLeft) return <div className="h-12 animate-pulse bg-white/10 rounded w-[250px]" />;
+  if (!timeLeft) return <div className="h-14 animate-pulse bg-brand-orange/20 rounded-xl w-[260px]" />;
 
   return (
     <div className="flex gap-2 sm:gap-3 text-center font-mono select-none">
-      <div className="bg-cream text-ink p-2 sm:p-3 rounded border border-ink shadow-md">
-        <span className="display text-base sm:text-3xl block leading-none font-bold">
+      <div className="bg-background text-ink p-2.5 sm:p-3.5 rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
+        <span className="display text-xl sm:text-3xl block leading-none font-black text-ink">
           {String(timeLeft.days).padStart(2, "0")}
         </span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">
-          Hari
+        <span className="text-[8px] sm:text-[9px] tracking-widest uppercase text-brand-orange font-bold mt-1 block">
+          HARI
         </span>
       </div>
-      <div className="display text-lg sm:text-3xl text-cream flex items-center">:</div>
-      <div className="bg-cream text-ink p-2 sm:p-3 rounded border border-ink shadow-md">
-        <span className="display text-base sm:text-3xl block leading-none font-bold">
+      <div className="display text-xl sm:text-3xl text-ink flex items-center font-black">:</div>
+      <div className="bg-background text-ink p-2.5 sm:p-3.5 rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
+        <span className="display text-xl sm:text-3xl block leading-none font-black text-ink">
           {String(timeLeft.hours).padStart(2, "0")}
         </span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">
-          Jam
+        <span className="text-[8px] sm:text-[9px] tracking-widest uppercase text-brand-orange font-bold mt-1 block">
+          JAM
         </span>
       </div>
-      <div className="display text-lg sm:text-3xl text-cream flex items-center">:</div>
-      <div className="bg-cream text-ink p-2 sm:p-3 rounded border border-ink shadow-md">
-        <span className="display text-base sm:text-3xl block leading-none font-bold">
+      <div className="display text-xl sm:text-3xl text-ink flex items-center font-black">:</div>
+      <div className="bg-background text-ink p-2.5 sm:p-3.5 rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
+        <span className="display text-xl sm:text-3xl block leading-none font-black text-ink">
           {String(timeLeft.minutes).padStart(2, "0")}
         </span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">
-          Min
+        <span className="text-[8px] sm:text-[9px] tracking-widest uppercase text-brand-orange font-bold mt-1 block">
+          MENIT
         </span>
       </div>
-      <div className="display text-lg sm:text-3xl text-cream flex items-center">:</div>
-      <div className="bg-cream text-ink p-2 sm:p-3 rounded border border-ink shadow-md">
-        <span className="display text-base sm:text-3xl block leading-none font-bold">
+      <div className="display text-xl sm:text-3xl text-ink flex items-center font-black">:</div>
+      <div className="bg-brand-orange text-cream p-2.5 sm:p-3.5 rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
+        <span className="display text-xl sm:text-3xl block leading-none font-black text-cream">
           {String(timeLeft.seconds).padStart(2, "0")}
         </span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-ink/75 font-bold">
-          Det
+        <span className="text-[8px] sm:text-[9px] tracking-widest uppercase text-cream/90 font-bold mt-1 block">
+          DETIK
         </span>
       </div>
     </div>
   );
 }
 
+function getPoPhaseInfo(campaign: PreOrderCampaign | null) {
+  if (!campaign || Number(campaign.is_active) !== 1) return null;
+
+  const now = new Date();
+  const start = new Date(campaign.start_date);
+  const end = new Date(campaign.end_date);
+  const ext = campaign.extended_end_date ? new Date(campaign.extended_end_date) : null;
+
+  if (now < start) {
+    return {
+      label: "PRE-ORDER AKAN DIBUKA DALAM",
+      targetDate: campaign.start_date,
+      batchName: campaign.batch_name,
+      phase: "UPCOMING",
+    };
+  }
+
+  if (now >= start && now < end) {
+    return {
+      label: "PRE-ORDER AKAN BERAKHIR DALAM",
+      targetDate: campaign.end_date,
+      batchName: campaign.batch_name,
+      phase: "ACTIVE",
+    };
+  }
+
+  if (ext && now >= end && now < ext) {
+    return {
+      label: "PRE-ORDER AKAN SEGERA DITUTUP DALAM",
+      targetDate: campaign.extended_end_date!,
+      batchName: campaign.batch_name,
+      phase: "EXTENDED",
+    };
+  }
+
+  return null;
+}
+
 function PreOrderPage() {
   const { products: dbProducts, settings } = Route.useLoaderData();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const { data: activePoRes } = useQuery({
+    queryKey: ["activePreOrderCampaign"],
+    queryFn: () => getActivePreOrderCampaignServerAction(),
+    staleTime: 30 * 1000,
+  });
+  const activePoCampaign = activePoRes?.data || null;
+  const poInfo = useMemo(() => getPoPhaseInfo(activePoCampaign), [activePoCampaign]);
 
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
@@ -234,36 +285,15 @@ function PreOrderPage() {
         cat,
         product_id: product.id,
         sale_type: product.sale_type,
+        product_type: product.product_type,
         variants: product.variants || [],
       };
     });
   }, [dbProducts]);
 
-  // Filter only PRE-ORDER items
+  // Filter only PRE-ORDER items (No dummy data!)
   const preOrderProducts = useMemo(() => {
-    const list = products.filter((p) => p.sale_type === "pre_order");
-
-    // Fallback if db has no pre-orders
-    if (list.length === 0) {
-      return [
-        {
-          id: "varsity-jacket",
-          img: pVarsity,
-          name: "Varsity Jacket — Filkom Edition (Pre-Order)",
-          price: "Rp 185.000",
-          was: "Rp 210.000",
-          tag: "PRE-ORDER",
-          cat: "JACKET" as const,
-          variants: [
-            { id: 101, size: "S", stock: 20 },
-            { id: 102, size: "M", stock: 35 },
-            { id: 103, size: "L", stock: 40 },
-            { id: 104, size: "XL", stock: 15 },
-          ],
-        },
-      ];
-    }
-    return list;
+    return products.filter((p) => p.sale_type === "pre_order");
   }, [products]);
 
   // Active filtered list
@@ -354,28 +384,33 @@ function PreOrderPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur border-b-2 border-ink">
-        <Navbar />
-      </header>
+    <div className="min-h-screen bg-background text-foreground flex flex-col justify-between">
+      <Navbar />
 
-      {/* Hero Countdown Section */}
-      <section className="bg-ink text-cream py-16 sm:py-24 border-b-2 border-ink text-center flex flex-col items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-brand-blue/10 opacity-30 pointer-events-none" />
-        <div className="max-w-3xl px-5 space-y-6 relative z-10 animate-slide-up">
-          <span className="inline-block bg-brand-orange text-ink font-mono font-extrabold text-[10px] tracking-widest px-3.5 py-1 rounded-full uppercase shadow">
-            ⏱ pre-order drops
-          </span>
-          <h1 className="display text-4xl sm:text-6xl lg:text-7xl font-extrabold uppercase leading-none tracking-wide">
-            Pre-Order Terkini.
+      {/* Hero Countdown Section (Compact Vibrant Light Mode) */}
+      <section className="bg-cream text-ink py-6 sm:py-8 border-b-2 border-ink text-center flex flex-col items-center justify-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(#ff6b00_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-15 pointer-events-none" />
+        <div className="max-w-3xl px-5 space-y-4 relative z-10 animate-slide-up">
+          <div className="inline-flex items-center gap-2 bg-brand-orange text-cream font-mono font-extrabold text-[10px] tracking-widest px-3.5 py-1 rounded-full uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] border-2 border-ink">
+            <span className="w-2 h-2 rounded-full bg-cream animate-ping" />
+            ⏱ Pre-Order
+          </div>
+
+          <h1 className="display text-3xl sm:text-5xl lg:text-6xl font-extrabold uppercase leading-none tracking-wide text-ink">
+            {poInfo ? poInfo.batchName : "Pre-Order Terkini"}
           </h1>
-          <p className="text-cream/70 text-xs sm:text-sm max-w-md mx-auto leading-relaxed">
-            Dapatkan katalog premium limited edition dengan masa produksi eksklusif. Sisa waktu
-            penutupan batch pre-order:
+
+          <p className="text-ink/80 text-xs sm:text-sm max-w-md mx-auto leading-relaxed font-semibold">
+            Katalog merchandise edisi terbatas dengan skema harga spesial early-bird.
           </p>
 
-          <div className="flex justify-center pt-2">
-            <CountdownTimer targetDate={layout.limitedCountdownEnd} />
+          <div className="flex justify-center pt-1 pb-1">
+            <div className="p-3.5 sm:p-4 rounded-xl bg-background border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] flex flex-col items-center gap-2.5">
+              <div className="text-[10px] sm:text-xs font-mono font-extrabold tracking-widest text-brand-orange uppercase bg-brand-orange/10 border border-brand-orange/30 px-3 py-1 rounded-md">
+                🔥 {poInfo ? poInfo.label.toUpperCase() : "PRE-ORDER AKAN DIBUKA DALAM"}
+              </div>
+              <CountdownTimer targetDate={poInfo ? poInfo.targetDate : layout.limitedCountdownEnd} />
+            </div>
           </div>
         </div>
       </section>
@@ -385,7 +420,7 @@ function PreOrderPage() {
         <div className="flex flex-col sm:flex-row sm:items-end justify-between mb-8 sm:mb-12 gap-4">
           <div>
             <div className="text-xs tracking-[0.3em] text-brand-orange font-bold mb-2 uppercase">
-              PRE-ORDER BATCH CATALOG
+              {poInfo ? `${poInfo.batchName.toUpperCase()} CATALOG` : "PRE-ORDER BATCH CATALOG"}
             </div>
             <h2 className="display text-2xl sm:text-4xl text-ink font-bold uppercase">
               Pre-order items.
@@ -403,107 +438,316 @@ function PreOrderPage() {
           </div>
         </div>
 
-        <div className="bg-brand-orange text-cream font-bold text-center py-4 px-4 rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] mb-8 border-2 border-ink uppercase tracking-widest text-xs sm:text-sm animate-pulse flex items-center justify-center gap-2">
-          <Star className="w-5 h-5 fill-cream" />
-          PERHATIAN: HARGA INI ADALAH HARGA TERMURAH SEBELUM ON SALE!
-          <Star className="w-5 h-5 fill-cream" />
+        <div className="bg-brand-orange text-cream font-bold text-center py-4 px-5 rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] mb-10 border-2 border-ink uppercase tracking-widest text-xs sm:text-sm flex items-center justify-center gap-2">
+          <Star className="w-5 h-5 fill-cream shrink-0" />
+          <span>PERHATIAN: HARGA PRE-ORDER ADALAH HARGA TERMURAH SPECIAL EARLY BIRD SEBELUM KEMBALI NORMAL ON-SALE!</span>
+          <Star className="w-5 h-5 fill-cream shrink-0" />
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-x-4 sm:gap-x-6 gap-y-8 sm:gap-y-12">
-          {filteredPreOrders.map((p) => {
-            const hasWishlisted = wishlist.includes(p.id);
-            const sizes = getProductAvailableSizes(p);
+        {filteredPreOrders.length === 0 ? (
+          <div className="text-center py-16 px-6 border-2 border-dashed border-ink/30 rounded-2xl bg-cream/30 space-y-4 max-w-md mx-auto">
+            <div className="w-12 h-12 bg-brand-orange/20 text-brand-orange rounded-full flex items-center justify-center mx-auto">
+              <Calendar className="w-6 h-6" />
+            </div>
+            <h3 className="text-lg font-extrabold text-ink uppercase">Belum Ada Produk Pre-Order</h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Saat ini belum ada item merchandise yang terdaftar pada batch pre-order ini. Silakan cek kembali dalam waktu dekat atau jelajahi katalog ready stock kami.
+            </p>
+            <Link
+              to="/products"
+              className="inline-flex items-center gap-2 bg-ink text-cream font-bold text-xs px-5 py-3 rounded-lg hover:bg-brand-orange transition-colors uppercase"
+            >
+              Lihat Katalog Ready Stock
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+          </div>
+        ) : (
+          <div className="space-y-16">
+            {/* 1. SEGMEN OUR MAIN HERO (Full Width Container) */}
+            {(() => {
+              const heroProducts = filteredPreOrders.filter(
+                (p) =>
+                  (p.tag === "LIMITED" || p.tag === "BEST SELLER" || p.sale_type === "pre_order") &&
+                  p.cat?.toUpperCase() !== "BUNDLE" &&
+                  p.product_type !== "bundle"
+              );
+              if (heroProducts.length === 0) return null;
 
-            return (
-              <article
-                key={p.id}
-                className="group relative flex flex-col bg-background border-2 border-ink p-2 rounded-lg hover:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] transition-all duration-300"
-              >
-                <div className="relative aspect-[4/5] bg-secondary overflow-hidden rounded border border-ink/10">
-                  <Link to="/product/$slug" params={{ slug: p.id }} className="block h-full">
-                    <img src={resolveImageUrl(p.img)} alt={p.name} className="w-full h-full object-cover" />
-                  </Link>
+              return (
+                <section id="main-hero" className="scroll-mt-32 bg-ink text-cream px-6 sm:px-10 py-12 rounded-3xl border-2 border-ink shadow-[8px_8px_0px_0px_rgba(255,107,0,1)] w-full">
+                  <div className="flex flex-col items-center text-center mb-8 gap-1">
+                    <div className="text-[11px] tracking-[0.35em] text-brand-orange font-extrabold uppercase">
+                      01 — CAMPAIGN PRE-ORDER
+                    </div>
+                    <h2 className="display text-3xl sm:text-5xl text-cream font-bold uppercase tracking-wide">
+                      OUR MAIN HERO
+                    </h2>
+                  </div>
 
-                  <span className="absolute top-2 left-2 text-[8px] sm:text-[9px] font-bold tracking-[0.18em] px-2.5 py-1 rounded bg-brand-orange text-cream uppercase">
-                    PRE-ORDER
-                  </span>
+                  <div className="flex flex-wrap justify-center items-stretch gap-6 max-w-full mx-auto">
+                    {heroProducts.map((p) => (
+                      <div
+                        key={p.id}
+                        className="group flex flex-col border-2 border-ink bg-neutral-900 rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(255,107,0,1)] hover:translate-y-[-2px] transition-all duration-300 w-full sm:w-[280px] md:w-[310px] shrink-0"
+                      >
+                        <Link
+                          to="/product/$slug"
+                          params={{ slug: p.id }}
+                          className="relative w-full aspect-square border-b-2 border-ink bg-neutral-950 overflow-hidden block"
+                        >
+                          <img
+                            src={resolveImageUrl(p.img)}
+                            alt={p.name}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          />
+                          <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                            {p.tag && (
+                              <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-brand-orange text-ink rounded-full border border-ink shadow-xs uppercase">
+                                {p.tag}
+                              </span>
+                            )}
+                          </div>
+                        </Link>
 
-                  <button
-                    onClick={() => toggleWishlist(p.id)}
-                    className="absolute top-3 right-3 p-1.5 rounded-full bg-cream border border-ink shadow-sm text-ink hover:text-red-500 hover:scale-105 transition-all z-20 cursor-pointer"
-                  >
-                    <Heart
-                      className={`w-3.5 h-3.5 ${hasWishlisted ? "fill-red-500 text-red-500" : ""}`}
-                    />
-                  </button>
-
-                  {/* Desktop Hover Actions */}
-                  <div className="absolute inset-0 bg-ink/35 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-center items-center gap-3 z-10 px-4">
-                    <button
-                      onClick={() => setQuickViewProduct(p)}
-                      className="inline-flex items-center gap-2 bg-cream text-ink border border-ink px-4 py-2 text-[10px] font-bold tracking-widest hover:bg-ink hover:text-cream transition-colors rounded shadow duration-200 cursor-pointer uppercase"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> Quick View
-                    </button>
-                    {sizes.length > 0 ? (
-                      <div className="w-full bg-cream/90 p-2 rounded text-center border border-ink/20">
-                        <div className="text-[8px] tracking-wider font-extrabold text-ink uppercase mb-1">
-                          Quick Select:
-                        </div>
-                        <div className="flex flex-wrap justify-center gap-1">
-                          {sizes.map((size: any) => (
-                            <button
-                              key={size}
-                              onClick={() => addToCart(p, size)}
-                              className="text-[9px] font-bold bg-ink text-cream hover:bg-brand-orange px-2 py-1 transition-colors border border-ink uppercase"
+                        <div className="p-3.5 flex-1 flex flex-col justify-between space-y-3">
+                          <div>
+                            <div className="text-[9px] font-extrabold tracking-widest text-brand-orange uppercase mb-0.5">
+                              {p.cat || "MAIN HERO"}
+                            </div>
+                            <Link
+                              to="/product/$slug"
+                              params={{ slug: p.id }}
+                              className="hover:text-brand-orange transition-colors"
                             >
-                              {size}
+                              <h3 className="font-extrabold text-sm sm:text-base text-white uppercase tracking-wide leading-tight group-hover:text-brand-orange transition-colors line-clamp-1">
+                                {p.name}
+                              </h3>
+                            </Link>
+
+                            <div className="flex items-baseline justify-between gap-1 mt-3 pt-2.5 border-t border-neutral-800">
+                              <div>
+                                <span className="text-base sm:text-lg font-black text-brand-orange tracking-tight">
+                                  {p.price}
+                                </span>
+                                {p.was && (
+                                  <span className="ml-1.5 text-[11px] font-bold text-red-500 line-through">
+                                    {p.was}
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[8px] font-bold tracking-widest text-brand-orange bg-brand-orange/10 border border-brand-orange/30 px-2 py-0.5 rounded uppercase">
+                                HERO
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="pt-2.5 border-t border-neutral-800 flex gap-2">
+                            <button
+                              onClick={() => addToCart(p)}
+                              className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-extrabold tracking-wider text-[10px] py-2 px-2 rounded-lg border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all uppercase cursor-pointer flex items-center justify-center gap-1"
+                            >
+                              <ShoppingBag className="w-3 h-3 text-brand-orange" />
+                              BAG
                             </button>
-                          ))}
+
+                            <Link
+                              to="/product/$slug"
+                              params={{ slug: p.id }}
+                              className="flex-1 bg-brand-orange hover:bg-cream text-ink hover:text-ink font-extrabold tracking-wider text-[10px] py-2 px-2 rounded-lg border border-ink shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all uppercase cursor-pointer flex items-center justify-center gap-1 text-center"
+                            >
+                              PESAN <ArrowRight className="w-3 h-3" />
+                            </Link>
+                          </div>
                         </div>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => addToCart(p)}
-                        className="w-full bg-cream text-ink font-bold tracking-widest text-[9px] py-2 border-t border-ink text-center hover:bg-brand-orange hover:text-cream transition-colors cursor-pointer"
-                      >
-                        Add to Bag
-                      </button>
-                    )}
+                    ))}
                   </div>
-                </div>
+                </section>
+              );
+            })()}
 
-                <div className="pt-4 flex flex-col flex-1">
-                  <div className="text-[9px] sm:text-[10px] tracking-[0.2em] font-extrabold text-muted-foreground mb-0.5 uppercase">
-                    {p.cat}
+            {/* 2. SEGMEN EXECUTIVE BUNDLES (Matches Category = Bundle OR Format = Bundle + Pre-Order) */}
+            {(() => {
+              const bundleProducts = filteredPreOrders.filter(
+                (p) =>
+                  p.sale_type === "pre_order" &&
+                  (p.cat?.toUpperCase() === "BUNDLE" || p.product_type === "bundle")
+              );
+              if (bundleProducts.length === 0) return null;
+
+              return (
+                <section id="exclusive-bundles" className="scroll-mt-32 space-y-6 w-full">
+                  <div className="flex flex-col items-center text-center mb-6 gap-1">
+                    <div className="text-[11px] tracking-[0.35em] text-brand-orange font-extrabold uppercase">
+                      02 — SPECIAL VALUE PACK
+                    </div>
+                    <h2 className="display text-3xl sm:text-5xl text-ink font-bold uppercase tracking-wide">
+                      EXCLUSIVE BUNDLES
+                    </h2>
                   </div>
-                  <Link to="/product/$slug" params={{ slug: p.id }}>
-                    <h3 className="text-xs sm:text-sm font-bold text-ink hover:text-brand-orange transition-colors leading-snug line-clamp-1">
-                      {p.name}
-                    </h3>
-                  </Link>
-                  <div className="mt-auto pt-2 flex items-baseline gap-2">
-                    <span className="text-xs sm:text-sm font-black text-ink">{p.price}</span>
-                    {p.was && (
-                      <span className="text-[10px] sm:text-xs text-muted-foreground line-through font-bold">
-                        {p.was}
-                      </span>
-                    )}
+
+                  <div className="flex flex-wrap justify-center items-stretch gap-6 max-w-full mx-auto">
+                    {bundleProducts.map((p) => (
+                      <div
+                        key={p.id}
+                        className="group flex flex-col border-2 border-ink bg-cream rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-2px] transition-all duration-300 w-full sm:w-[320px] md:w-[350px] shrink-0"
+                      >
+                        <div className="aspect-square bg-secondary relative overflow-hidden border-b-2 border-ink">
+                          <img
+                            src={resolveImageUrl(p.img)}
+                            alt={p.name}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          />
+                          <span className="absolute top-2 left-2 bg-brand-orange text-cream text-[9px] font-black tracking-widest px-2.5 py-0.5 rounded-full border border-ink uppercase">
+                            BUNDLE
+                          </span>
+                        </div>
+
+                        <div className="p-4 flex flex-col justify-between flex-1 space-y-3">
+                          <div>
+                            <div className="text-[9px] font-bold text-brand-orange tracking-widest uppercase mb-0.5">
+                              PAKET HEMAT BATCH
+                            </div>
+                            <h4 className="text-sm sm:text-base font-extrabold text-ink uppercase tracking-wide line-clamp-1">
+                              {p.name}
+                            </h4>
+                          </div>
+
+                          <div className="pt-2.5 border-t border-ink/10 flex items-center justify-between gap-2">
+                            <div>
+                              <span className="text-base sm:text-lg font-black text-ink">{p.price}</span>
+                              {p.was && (
+                                <span className="ml-1.5 text-[10px] text-muted-foreground line-through font-bold">
+                                  {p.was}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              onClick={() => addToCart(p)}
+                              className="bg-ink text-cream hover:bg-brand-orange font-extrabold text-[10px] py-2 px-3 rounded-lg border border-ink transition-colors uppercase flex items-center gap-1 cursor-pointer shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)]"
+                            >
+                              <ShoppingBag className="w-3 h-3" /> + BAG
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                </section>
+              );
+            })()}
+
+            {/* 3. SEGMEN SEMUA KATALOG PRODUK PRE-ORDER (Full Width Grid) */}
+            <section id="all-products" className="scroll-mt-32 space-y-6 w-full">
+              <div className="flex flex-col items-center text-center mb-6 gap-1">
+                <div className="text-[11px] tracking-[0.35em] text-brand-orange font-extrabold uppercase">
+                  03 — ALL PRODUCTS
                 </div>
-              </article>
-            );
-          })}
-        </div>
+                <h2 className="display text-3xl sm:text-5xl text-ink font-bold uppercase tracking-wide">
+                  ALL PRE-ORDER PRODUCTS
+                </h2>
+              </div>
+
+              <div className="flex flex-wrap justify-center items-stretch gap-4 max-w-full mx-auto">
+                {filteredPreOrders.map((p) => (
+                  <div
+                    key={p.id}
+                    className="group flex flex-col border-2 border-ink bg-cream rounded-lg overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-2px] transition-all duration-300 w-[calc(50%-8px)] sm:w-[200px] md:w-[230px] shrink-0"
+                  >
+                    <Link
+                      to="/product/$slug"
+                      params={{ slug: p.id }}
+                      className="relative aspect-square overflow-hidden block border-b-2 border-ink bg-secondary"
+                    >
+                      <img
+                        src={resolveImageUrl(p.img)}
+                        alt={p.name}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                      />
+                      <span className="absolute top-2 left-2 text-[8px] font-bold tracking-widest px-2 py-0.5 bg-brand-orange text-cream rounded-full uppercase border border-ink shadow-xs">
+                        PO
+                      </span>
+                    </Link>
+
+                    <div className="p-3 flex flex-col flex-1">
+                      <div className="text-[9px] font-bold tracking-widest text-brand-orange uppercase mb-0.5">
+                        {p.cat}
+                      </div>
+                      <Link
+                        to="/product/$slug"
+                        params={{ slug: p.id }}
+                        className="hover:text-brand-orange transition-colors"
+                      >
+                        <h3 className="text-xs font-bold text-ink leading-snug tracking-wide line-clamp-1 mb-1.5">
+                          {p.name}
+                        </h3>
+                      </Link>
+
+                      <div className="mt-auto pt-2 border-t border-ink/10 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs font-black text-ink">{p.price}</span>
+                          {p.was && (
+                            <span className="block text-[9px] text-muted-foreground line-through font-bold">
+                              {p.was}
+                            </span>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => addToCart(p)}
+                          className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
+                          title="Tambah ke bag"
+                        >
+                          <ShoppingBag className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
       </section>
 
-      {/* Footer */}
-      <footer className="bg-background border-t border-border">
-        <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-10 flex flex-col md:flex-row justify-between gap-4 text-xs text-muted-foreground">
-          <div>© 2026 Filkom Merch UB · Official student merchandise.</div>
-          <div>Integrated with Midtrans Payment.</div>
-        </div>
-      </footer>
+      {/* Floating Right Side Bookmark Navigation Widget (Mobile & Desktop) */}
+      <aside className="fixed right-2 sm:right-6 top-1/2 -translate-y-1/2 z-40 flex flex-col gap-2 bg-background/95 backdrop-blur-md p-1.5 sm:p-2.5 rounded-2xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+        <a
+          href="#main-hero"
+          className="group flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border-2 border-ink bg-brand-orange text-cream hover:bg-cream hover:text-ink hover:scale-105 transition-all text-[10px] sm:text-[11px] font-black tracking-wider uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+          title="Ke Main Hero Drop"
+        >
+          <Sparkles className="w-3.5 h-3.5 fill-cream group-hover:fill-ink shrink-0" />
+          <span className="max-w-0 opacity-0 group-hover:max-w-xs group-hover:opacity-100 transition-all duration-300 whitespace-nowrap overflow-hidden">
+            01 MAIN HERO
+          </span>
+          <span className="group-hover:hidden">01</span>
+        </a>
+        <a
+          href="#exclusive-bundles"
+          className="group flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border-2 border-ink bg-brand-blue text-cream hover:bg-cream hover:text-ink hover:scale-105 transition-all text-[10px] sm:text-[11px] font-black tracking-wider uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+          title="Ke Executive Bundles"
+        >
+          <PackageCheck className="w-3.5 h-3.5 text-cream group-hover:text-ink shrink-0" />
+          <span className="max-w-0 opacity-0 group-hover:max-w-xs group-hover:opacity-100 transition-all duration-300 whitespace-nowrap overflow-hidden">
+            02 BUNDLES
+          </span>
+          <span className="group-hover:hidden">02</span>
+        </a>
+        <a
+          href="#all-products"
+          className="group flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl border-2 border-ink bg-ink text-cream hover:bg-brand-orange hover:text-cream hover:scale-105 transition-all text-[10px] sm:text-[11px] font-black tracking-wider uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+          title="Ke Semua Produk Pre-Order"
+        >
+          <ShoppingBag className="w-3.5 h-3.5 text-cream shrink-0" />
+          <span className="max-w-0 opacity-0 group-hover:max-w-xs group-hover:opacity-100 transition-all duration-300 whitespace-nowrap overflow-hidden">
+            03 ALL PRODUCTS
+          </span>
+          <span className="group-hover:hidden">03</span>
+        </a>
+      </aside>
+
+      <Footer />
 
 
 

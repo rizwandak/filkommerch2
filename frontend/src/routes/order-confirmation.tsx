@@ -9,10 +9,11 @@ import {
   CreditCard,
   MessageCircle,
   ShoppingBag,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   getOrderById,
   regeneratePaymentToken,
@@ -50,6 +51,8 @@ function OrderConfirmationPage() {
   const [submittingProof, setSubmittingProof] = useState(false);
   const [proofUrl, setProofUrl] = useState<string>("");
   const [proofUrlTemp, setProofUrlTemp] = useState<string>("");
+  const [isEditingProof, setIsEditingProof] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load Midtrans Snap script dynamically
   useEffect(() => {
@@ -152,7 +155,8 @@ function OrderConfirmationPage() {
       if (res.success) {
         setProofUrl(proofUrlTemp);
         setProofUrlTemp("");
-        toast.success("Bukti transfer berhasil dikirim. Menunggu verifikasi admin.");
+        setIsEditingProof(false);
+        toast.success("Bukti transfer berhasil diperbarui. Menunggu verifikasi admin.");
         void fetchOrderDetails();
       } else {
         toast.error(res.error || "Gagal mengirim bukti transfer");
@@ -237,14 +241,14 @@ function OrderConfirmationPage() {
   const pStatus = order?.payment_status || "unpaid";
   const oStatus = order?.order_status || "pending_payment";
 
-  let statusIcon = <Clock className="mx-auto mb-6 h-16 w-16 text-amber-500" />;
+  let statusIcon = <Clock className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-amber-500" />;
   let statusTitle = "Menunggu Pembayaran";
   let statusDescription =
     "Pesanan Anda berhasil dibuat! Silakan lakukan pembayaran Anda sebelum batas waktu berakhir.";
   let statusBg = "bg-amber-50 border-amber-200 text-amber-900";
 
   if (oStatus === "cancelled" || pStatus === "failed" || pStatus === "expired") {
-    statusIcon = <XCircle className="mx-auto mb-6 h-16 w-16 text-red-500" />;
+    statusIcon = <XCircle className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-red-500" />;
     statusTitle = "Transaksi Gagal / Dibatalkan";
     statusDescription = "Maaf, pesanan Anda telah dibatalkan atau waktu pembayaran telah habis.";
     statusBg = "bg-red-50 border-red-200 text-red-900";
@@ -255,7 +259,7 @@ function OrderConfirmationPage() {
     oStatus === "completed" ||
     oStatus === "ready_for_pickup"
   ) {
-    statusIcon = <CheckCircle2 className="mx-auto mb-6 h-16 w-16 text-green-500" />;
+    statusIcon = <CheckCircle2 className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-green-500" />;
     statusTitle = "Pembayaran Berhasil!";
     statusDescription =
       "Terima kasih! Pembayaran Anda telah diterima dan pesanan Anda sedang kami proses.";
@@ -266,300 +270,372 @@ function OrderConfirmationPage() {
     <div className="min-h-screen bg-[#FCFAF7] text-ink">
       {/* Header */}
       <div className="border-b-2 border-ink bg-white">
-        <div className="mx-auto max-w-2xl px-4 py-6">
-          <div className="flex items-center gap-4">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 py-4">
+          <div className="flex items-center gap-3">
             <Link
               to="/"
               className="p-1 hover:bg-cream border border-transparent hover:border-ink rounded transition"
             >
               <ArrowLeft className="h-5 w-5" />
             </Link>
-            <h1 className="display text-lg tracking-wider text-ink uppercase">
+            <h1 className="display text-base sm:text-lg tracking-wider text-ink uppercase">
               Konfirmasi Pesanan
             </h1>
           </div>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="mx-auto max-w-2xl px-4 py-12">
-        <div className="text-center">
-          {statusIcon}
-          <h2 className="mb-2 text-3xl font-extrabold text-ink uppercase tracking-wider">
-            {statusTitle}
-          </h2>
-          <p className="mb-8 text-md text-muted-foreground max-w-md mx-auto">{statusDescription}</p>
-        </div>
-
-        <Card className="mb-8 border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
-          <CardHeader className="bg-cream/40 border-b-2 border-ink py-4">
-            <CardTitle className="display text-sm tracking-wider uppercase text-ink">
-              Rincian Transaksi
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4 pt-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground">ID Pesanan</p>
-                <p className="break-all font-mono text-sm font-bold text-ink mt-0.5">
-                  {search.orderId || "N/A"}
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-border p-3">
-                <p className="text-[10px] uppercase font-bold text-muted-foreground">
-                  Total Transaksi
-                </p>
-                <p className="font-bold text-sm text-brand-orange mt-0.5">
-                  Rp {order?.gross_amount?.toLocaleString("id-ID") || "0"}
+      {/* Main Content (2-Column Grid on Desktop) */}
+      <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-10">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          
+          {/* KOLOM KIRI (LEBIH BESAR): Status & Pembayaran QRIS / Upload Bukti */}
+          <div className="lg:col-span-7 space-y-6">
+            {/* Compact Status Header */}
+            <div className="text-center lg:text-left bg-white border-2 border-ink rounded-2xl p-6 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] flex flex-col sm:flex-row items-center sm:items-start gap-4">
+              <div className="shrink-0">{statusIcon}</div>
+              <div>
+                <h2 className="mb-1 text-xl sm:text-2xl font-extrabold text-ink uppercase tracking-wider">
+                  {statusTitle}
+                </h2>
+                <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                  {statusDescription}
                 </p>
               </div>
             </div>
 
-            {order && (
-              <div className="border border-border rounded-lg p-3 space-y-2 text-xs">
-                <div>
-                  <span className="text-muted-foreground uppercase font-bold text-[9px] block">
-                    Metode Pengiriman
-                  </span>
-                  <span className="font-semibold text-ink">
-                    {getFulfillmentLabel(order.fulfillment_type)}
-                  </span>
-                </div>
-                {order.fulfillment_type === "shipping" && order.shipping_address && (
-                  <div>
-                    <span className="text-muted-foreground uppercase font-bold text-[9px] block">
-                      Alamat Pengiriman
-                    </span>
-                    <span className="font-medium text-ink">{order.shipping_address}</span>
-                  </div>
-                )}
-                {order.fulfillment_type === "shipping" && (
-                  <div className="text-[10px] text-brand-orange font-semibold bg-brand-orange/5 p-2 rounded border border-brand-orange/20 mt-1">
-                    * Biaya ongkir menyesuaikan jarak, rincian & cara pembayaran ongkir akan
-                    diberitahu melalui WhatsApp.
-                  </div>
-                )}
-                {order.fulfillment_type === "pickup" && (
-                  <div className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 p-2 rounded border border-emerald-200 mt-1">
-                    * Pengambilan barang gratis di toko fisik FILKOM Merch UB.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {orderItems && orderItems.length > 0 && (
-              <div className="border border-border rounded-lg p-4 space-y-3 bg-[#FCFAF7]">
-                <p className="text-[10px] font-black text-ink uppercase tracking-wider border-b border-ink/10 pb-2">
-                  Produk yang Dipesan
-                </p>
-                <div className="space-y-3">
-                  {orderItems.map((item) => (
-                    <div key={item.id} className="flex gap-4 items-center justify-between border-b border-ink/5 pb-3 last:border-0 last:pb-0">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <div className="w-12 h-16 bg-cream border border-ink rounded overflow-hidden flex items-center justify-center shrink-0 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]">
-                          {item.image_url ? (
-                            <img src={resolveImageUrl(item.image_url)} alt={item.product_name} className="w-full h-full object-cover" />
-                          ) : (
-                            <ShoppingBag className="w-5 h-5 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs font-bold text-ink leading-tight truncate">
-                            {item.product_name}
-                          </p>
-                          <p className="text-[10px] text-muted-foreground mt-1 font-medium">
-                            {item.quantity} x Rp {item.unit_price?.toLocaleString("id-ID")}
-                          </p>
-                          {item.size && (
-                            <span className="inline-block text-[9px] font-bold bg-cream border border-ink/10 px-2 py-0.5 rounded-full mt-1.5 text-ink">
-                              Ukuran: {item.size} {item.color && item.color !== 'Default' ? `| Warna: ${item.color}` : ''}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-xs font-extrabold text-brand-orange shrink-0">
-                        Rp {item.subtotal?.toLocaleString("id-ID")}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="rounded-lg bg-blue-50/50 border border-blue-100 p-4">
-                <p className="text-xs font-bold text-blue-900 uppercase tracking-wider">
-                  Langkah Selanjutnya
-                </p>
-                <ul className="mt-2 space-y-1.5 text-xs text-blue-800 font-medium">
-                  <li>• Ambil barang di toko (jika Pickup)</li>
-                  <li>• Tunjukkan ID Pesanan kepada petugas</li>
-                  <li>• Cek status ter-update di menu Pesanan Saya</li>
-                </ul>
-              </div>
-
-              <div className="rounded-lg bg-emerald-50/50 border border-emerald-100 p-4 flex flex-col justify-between">
-                <div>
-                  <p className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                    Butuh Bantuan?
-                  </p>
-                  <p className="mt-1 text-xs text-emerald-900 leading-relaxed">
-                    Ada kendala pembayaran atau ingin menanyakan ketersediaan pengambilan barang?
-                  </p>
-                </div>
-                <a
-                  href="https://wa.me/628123456789"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold uppercase transition"
-                >
-                  <MessageCircle className="w-3.5 h-3.5 fill-white text-emerald-600" />
-                  Hubungi Admin
-                </a>
-              </div>
-            </div>
-
-            {/* Manual QRIS Payment Section */}
+            {/* Manual QRIS Payment Section & Upload Bukti */}
             {order?.payment_type === "manual_qris" && (pStatus === "unpaid" || pStatus === "pending") && oStatus !== "cancelled" && (
-              <div className="border-t-2 border-ink pt-6 mt-6 space-y-4">
-                <div className="bg-cream/40 border-2 border-ink rounded-lg p-4 space-y-3">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-ink">
-                    Pembayaran QRIS Statis
-                  </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed font-medium">
-                    Silakan scan kode QRIS di bawah ini melalui aplikasi e-wallet Anda (GoPay, OVO, Dana, LinkAja, atau Mobile Banking) dan transfer sebesar <strong>Rp {order.gross_amount.toLocaleString("id-ID")}</strong>.
+              <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
+                <CardHeader className="bg-cream/40 border-b-2 border-ink py-3.5">
+                  <CardTitle className="display text-sm tracking-wider uppercase text-ink flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-brand-orange" />
+                    Pembayaran QRIS
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-5 pt-5">
+                  <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                    Silakan bayar melalui QRIS di bawah ini sejumlah{" "}
+                    <strong className="text-brand-orange font-bold text-sm">
+                      Rp {order.gross_amount?.toLocaleString("id-ID") || "0"}
+                    </strong>{" "}
+                    dan unggah bukti transfernya pada form di bawah gambar QRIS.
                   </p>
-                  
+
                   {storeSettings?.qris_static_url ? (
-                    <div className="flex flex-col items-center justify-center p-3 bg-white border-2 border-ink rounded-lg shadow-sm">
-                      <img
-                        src={storeSettings.qris_static_url}
-                        alt="QRIS Statis"
-                        className="max-h-64 object-contain"
-                      />
-                    </div>
-                  ) : (
-                    <div className="p-4 border-2 border-dashed border-ink/20 rounded bg-muted/20 text-center text-xs text-muted-foreground font-semibold">
-                      QRIS Statis belum diset oleh Admin. Silakan hubungi admin untuk nomor rekening/QRIS.
-                    </div>
-                  )}
-                </div>
-
-                {/* Upload Bukti Pembayaran */}
-                <div className="border-2 border-ink rounded-lg p-4 space-y-3 bg-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
-                  <h3 className="font-extrabold text-xs uppercase tracking-wider text-ink">
-                    Unggah Bukti Pembayaran
-                  </h3>
-
-                  {proofUrl ? (
-                    <div className="space-y-3">
-                      <div className="relative border border-emerald-200 rounded p-3 bg-emerald-50/50 flex flex-col items-center gap-3">
+                    <div className="flex flex-col items-center justify-center p-4 bg-white border-2 border-ink rounded-xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] max-w-sm sm:max-w-md mx-auto w-full">
+                      <div className="w-full aspect-square relative flex items-center justify-center p-2 bg-white">
                         <img
-                          src={proofUrl}
-                          alt="Bukti Transfer"
-                          className="max-h-40 rounded object-contain border border-emerald-100 bg-white"
+                          src={storeSettings.qris_static_url}
+                          alt="QRIS Pembayaran"
+                          className="w-full h-full object-contain rounded-md"
                         />
-                        <span className="text-[10px] uppercase font-black text-emerald-800 tracking-wider">
-                          Bukti Pembayaran Terunggah ✓
-                        </span>
                       </div>
-                      <p className="text-[11px] text-muted-foreground text-center font-semibold uppercase tracking-wide">
-                        BEM FILKOM sedang memverifikasi pembayaran Anda.
-                      </p>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <div className="grid w-full items-center gap-1.5">
-                        <input
-                          id="payment-proof-upload"
-                          type="file"
-                          accept="image/*"
-                          onChange={handleUploadProof}
-                          disabled={uploadingProof || submittingProof}
-                          className="flex h-10 w-full rounded-md border-2 border-ink bg-background px-3 py-2 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-xs file:font-semibold cursor-pointer disabled:opacity-50"
-                        />
-                        <p className="text-[10px] text-muted-foreground">
-                          Unggah file bukti transfer Anda (format PNG, JPG, atau WEBP, max 5MB).
-                        </p>
-                      </div>
+                    <div className="p-4 border-2 border-dashed border-ink/20 rounded-lg bg-muted/20 text-center text-xs text-muted-foreground font-semibold">
+                      QRIS Pembayaran belum diset oleh Admin. Silakan hubungi admin untuk informasi pembayaran.
+                    </div>
+                  )}
 
-                      {proofUrlTemp && (
-                        <div className="relative border-2 border-dashed border-ink/20 rounded-lg p-3 bg-muted/10 flex flex-col items-center gap-2">
+                  {/* Upload Bukti Pembayaran */}
+                  <div className="border-2 border-ink rounded-xl p-4 space-y-3 bg-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
+                    <h3 className="font-extrabold text-xs uppercase tracking-wider text-ink">
+                      Unggah Bukti Pembayaran
+                    </h3>
+
+                    {proofUrl && !isEditingProof ? (
+                      <div className="space-y-3">
+                        <div className="relative border border-emerald-200 rounded-lg p-3 bg-emerald-50/50 flex flex-col items-center gap-3">
                           <img
-                            src={proofUrlTemp}
-                            alt="Preview Bukti"
-                            className="max-h-36 rounded object-contain border border-ink/10 bg-white"
+                            src={proofUrl}
+                            alt="Bukti Transfer"
+                            className="max-h-48 rounded object-contain border border-emerald-200 bg-white"
                           />
-                          <Button
-                            onClick={handleSubmitProof}
-                            disabled={submittingProof}
-                            className="w-full bg-ink text-white hover:bg-brand-orange text-xs font-bold uppercase tracking-wider h-10"
-                          >
-                            {submittingProof ? (
-                              <>
-                                <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                                Mengirim...
-                              </>
-                            ) : (
-                              "Kirim Bukti Pembayaran"
-                            )}
-                          </Button>
+                          <span className="text-[10px] uppercase font-black text-emerald-800 tracking-wider">
+                            Bukti Pembayaran Terunggah ✓
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+                        <p className="text-[11px] text-muted-foreground text-center font-semibold uppercase tracking-wide">
+                          Mohon tunggu admin memverifikasi pembayaran Anda.
+                        </p>
+                        {order?.notes && (
+                          <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg text-amber-900 text-xs font-semibold flex items-start gap-2 text-left">
+                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-extrabold uppercase block text-[10px] text-amber-800">Catatan dari Admin:</span>
+                              <p className="mt-0.5 text-[11px] font-medium leading-snug">{order.notes}</p>
+                            </div>
+                          </div>
+                        )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setIsEditingProof(true);
+                            setProofUrlTemp("");
+                          }}
+                          className="w-full border-2 border-ink bg-white text-ink hover:bg-cream text-xs font-bold uppercase tracking-wider h-10 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5 text-brand-orange" />
+                          Ganti Foto Bukti Pembayaran
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="grid w-full items-center gap-1.5">
+                          <div className="flex items-center justify-between">
+                            <label htmlFor="payment-proof-upload" className="text-[10px] uppercase font-bold text-ink">
+                              {isEditingProof ? "Pilih Foto Bukti Pembayaran Baru:" : "Pilih File Bukti Transfer:"}
+                            </label>
+                            {isEditingProof && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsEditingProof(false);
+                                  setProofUrlTemp("");
+                                }}
+                                className="text-[10px] font-bold text-red-600 hover:underline uppercase cursor-pointer"
+                              >
+                                Batal
+                              </button>
+                            )}
+                          </div>
+                          <input
+                            ref={fileInputRef}
+                            id="payment-proof-upload"
+                            type="file"
+                            accept="image/*"
+                            onChange={handleUploadProof}
+                            disabled={uploadingProof || submittingProof}
+                            className="flex h-10 w-full rounded-md border-2 border-ink bg-background px-3 py-2 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-xs file:font-semibold cursor-pointer disabled:opacity-50"
+                          />
+                          <p className="text-[10px] text-muted-foreground">
+                            Unggah file bukti transfer Anda (format PNG, JPG, atau WEBP, max 5MB).
+                          </p>
+                        </div>
+
+                        {proofUrlTemp && (
+                          <div className="relative border-2 border-dashed border-ink/20 rounded-lg p-3 bg-muted/10 flex flex-col items-center gap-3">
+                            <img
+                              src={proofUrlTemp}
+                              alt="Bukti Transfer"
+                              className="max-h-48 rounded object-contain border border-ink/10 bg-white"
+                            />
+                            <div className="flex gap-2 w-full">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex-1 border-2 border-ink bg-white text-ink hover:bg-cream text-xs font-bold uppercase tracking-wider h-10 cursor-pointer"
+                              >
+                                Pilih Foto Lain
+                              </Button>
+                              <Button
+                                type="button"
+                                onClick={handleSubmitProof}
+                                disabled={submittingProof}
+                                className="flex-1 bg-ink text-white hover:bg-brand-orange text-xs font-bold uppercase tracking-wider h-10 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                              >
+                                {submittingProof ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                                    Mengirim...
+                                  </>
+                                ) : (
+                                  "Kirim Bukti"
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
-            {/* Pay Now Button directly if order is pending */}
+            {/* Online Payment button if pending */}
             {order?.payment_type !== "manual_qris" && (pStatus === "unpaid" || pStatus === "pending") && oStatus !== "cancelled" && (
-              <div className="border-t border-dashed border-border pt-4 mt-2 space-y-2">
-                {order.snap_token && (
-                  <Button
-                    onClick={() => handlePayNow(false)}
-                    disabled={isRegenerating}
-                    className="w-full h-12 bg-emerald-600 text-white hover:bg-emerald-600/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <CreditCard className="w-4 h-4" />
-                    Lanjutkan Pembayaran
-                  </Button>
-                )}
-                <Button
-                  onClick={() => handlePayNow(true)}
-                  disabled={isRegenerating}
-                  className="w-full h-12 bg-brand-orange text-white hover:bg-brand-orange/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isRegenerating ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CreditCard className="w-4 h-4" />
+              <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
+                <CardHeader className="bg-cream/40 border-b-2 border-ink py-3.5">
+                  <CardTitle className="display text-sm tracking-wider uppercase text-ink flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 text-brand-orange" />
+                    Pembayaran Online
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 space-y-2">
+                  {order.snap_token && (
+                    <Button
+                      onClick={() => handlePayNow(false)}
+                      disabled={isRegenerating}
+                      className="w-full h-12 bg-emerald-600 text-white hover:bg-emerald-600/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <CreditCard className="w-4 h-4" />
+                      Lanjutkan Pembayaran
+                    </Button>
                   )}
-                  {isRegenerating
-                    ? "Memproses..."
-                    : order.snap_token
-                      ? "Ubah Metode Pembayaran"
-                      : "Lanjutkan Pembayaran Sekarang"}
-                </Button>
-              </div>
+                  <Button
+                    onClick={() => handlePayNow(true)}
+                    disabled={isRegenerating}
+                    className="w-full h-12 bg-brand-orange text-white hover:bg-brand-orange/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isRegenerating ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CreditCard className="w-4 h-4" />
+                    )}
+                    {isRegenerating
+                      ? "Memproses..."
+                      : order.snap_token
+                        ? "Ubah Metode Pembayaran"
+                        : "Lanjutkan Pembayaran Sekarang"}
+                  </Button>
+                </CardContent>
+              </Card>
             )}
-          </CardContent>
-        </Card>
+          </div>
 
-        <div className="flex flex-col gap-4 sm:flex-row">
-          <Button
-            asChild
-            className="flex-1 h-12 border-2 border-ink bg-white text-ink hover:bg-cream font-bold uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all"
-          >
-            <Link to="/">Lanjut Belanja</Link>
-          </Button>
-          <Button
-            asChild
-            className="flex-1 h-12 border-2 border-ink bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all"
-          >
-            <Link to="/orders">Lacak Pesanan Saya</Link>
-          </Button>
+          {/* KOLOM KANAN: Rincian Transaksi, Action Buttons, & Seksi Bantuan */}
+          <div className="lg:col-span-5 space-y-6">
+            {/* Rincian Transaksi */}
+            <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
+              <CardHeader className="bg-cream/40 border-b-2 border-ink py-3.5">
+                <CardTitle className="display text-sm tracking-wider uppercase text-ink">
+                  Rincian Transaksi
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 pt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="rounded-lg border border-border p-3">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground">ID Pesanan</p>
+                    <p className="break-all font-mono text-sm font-bold text-ink mt-0.5">
+                      {search.orderId || "N/A"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-lg border border-border p-3">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground">
+                      Total Transaksi
+                    </p>
+                    <p className="font-bold text-sm text-brand-orange mt-0.5">
+                      Rp {order?.gross_amount?.toLocaleString("id-ID") || "0"}
+                    </p>
+                  </div>
+                </div>
+
+                {order && (
+                  <div className="border border-border rounded-lg p-3 space-y-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground uppercase font-bold text-[9px] block">
+                        Metode Pengiriman
+                      </span>
+                      <span className="font-semibold text-ink">
+                        {getFulfillmentLabel(order.fulfillment_type)}
+                      </span>
+                    </div>
+                    {order.fulfillment_type === "shipping" && order.shipping_address && (
+                      <div>
+                        <span className="text-muted-foreground uppercase font-bold text-[9px] block">
+                          Alamat Pengiriman
+                        </span>
+                        <span className="font-medium text-ink">{order.shipping_address}</span>
+                      </div>
+                    )}
+                    {order.fulfillment_type === "shipping" && (
+                      <div className="text-[10px] text-brand-orange font-semibold bg-brand-orange/5 p-2 rounded border border-brand-orange/20 mt-1">
+                        * Biaya ongkir menyesuaikan jarak, rincian & cara pembayaran ongkir akan
+                        diberitahu melalui WhatsApp.
+                      </div>
+                    )}
+                    {order.fulfillment_type === "pickup" && (
+                      <div className="text-[10px] text-emerald-800 font-semibold bg-emerald-50 p-2 rounded border border-emerald-200 mt-1">
+                        * Pengambilan barang gratis di toko fisik FILKOM Merch UB.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {orderItems && orderItems.length > 0 && (
+                  <div className="border border-border rounded-lg p-4 space-y-3 bg-[#FCFAF7]">
+                    <p className="text-[10px] font-black text-ink uppercase tracking-wider border-b border-ink/10 pb-2">
+                      Produk yang Dipesan
+                    </p>
+                    <div className="space-y-3">
+                      {orderItems.map((item) => (
+                        <div key={item.id} className="flex gap-4 items-center justify-between border-b border-ink/5 pb-3 last:border-0 last:pb-0">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-12 h-16 bg-cream border border-ink rounded overflow-hidden flex items-center justify-center shrink-0 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]">
+                              {item.image_url ? (
+                                <img src={resolveImageUrl(item.image_url)} alt={item.product_name} className="w-full h-full object-cover" />
+                              ) : (
+                                <ShoppingBag className="w-5 h-5 text-muted-foreground" />
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs font-bold text-ink leading-tight truncate">
+                                {item.product_name}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground mt-1 font-medium">
+                                {item.quantity} x Rp {item.unit_price?.toLocaleString("id-ID")}
+                              </p>
+                              {item.size && (
+                                <span className="inline-block text-[9px] font-bold bg-cream border border-ink/10 px-2 py-0.5 rounded-full mt-1.5 text-ink">
+                                  Ukuran: {item.size} {item.color && item.color !== 'Default' ? `| Warna: ${item.color}` : ''}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <p className="text-xs font-extrabold text-brand-orange shrink-0">
+                            Rp {item.subtotal?.toLocaleString("id-ID")}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button
+                asChild
+                className="flex-1 h-12 border-2 border-ink bg-white text-ink hover:bg-cream font-bold uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all"
+              >
+                <Link to="/">Lanjut Belanja</Link>
+              </Button>
+              <Button
+                asChild
+                className="flex-1 h-12 border-2 border-ink bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all"
+              >
+                <Link to="/orders">Lihat Pesanan Saya</Link>
+              </Button>
+            </div>
+
+            {/* Seksi Butuh Bantuan (Di bawah Action Buttons) */}
+            <div className="rounded-xl bg-emerald-50 border-2 border-ink p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]">
+              <div className="text-center sm:text-left">
+                <p className="text-xs font-black text-emerald-950 uppercase tracking-wider">
+                  Butuh Bantuan?
+                </p>
+                <p className="mt-0.5 text-xs text-emerald-900 font-medium leading-relaxed">
+                  Ada kendala pembayaran atau ingin menanyakan ketersediaan pengambilan barang?
+                </p>
+              </div>
+              <a
+                href="https://wa.me/628123456789"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg border border-emerald-800 text-xs font-extrabold uppercase transition shadow-xs"
+              >
+                <MessageCircle className="w-4 h-4 fill-white text-emerald-600" />
+                Hubungi Admin
+              </a>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
