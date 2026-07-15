@@ -24,7 +24,10 @@ import {
   LayoutDashboard,
   MonitorSmartphone,
 } from "lucide-react";
-import { getProducts, getCategories, type ProductWithVariants } from "@backend/server-actions";
+import { getProducts, getCategories, getActivePreOrderCampaignServerAction, type ProductWithVariants } from "@backend/server-actions";
+import { useQuery } from "@tanstack/react-query";
+import { isProductVisibleToUser } from "@/lib/pre-order-utils";
+import { PreOrderNotOpenPlaceholder } from "@/components/PreOrderNotOpenPlaceholder";
 import { useAuth } from "@/lib/auth";
 import { VerificationModal } from "@frontend/components/VerificationModal";
 import { Button } from "@frontend/components/ui/button";
@@ -94,6 +97,17 @@ function ProductsCatalogPage() {
   const searchParams = useSearch({ from: "/products" });
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  const { data: activePoRes } = useQuery({
+    queryKey: ["activePreOrderCampaign"],
+    queryFn: () => getActivePreOrderCampaignServerAction(),
+    staleTime: 30 * 1000,
+  });
+  const activePoCampaign = activePoRes?.data || null;
+  const canSeeProducts = useMemo(
+    () => isProductVisibleToUser(user, activePoCampaign),
+    [user, activePoCampaign]
+  );
 
   const [pathname, setPathname] = useState("");
   const [search, setSearch] = useState("");
@@ -476,7 +490,11 @@ function ProductsCatalogPage() {
             </div>
 
             {/* Products Grid */}
-            {filteredProducts.length > 0 ? (
+            {!canSeeProducts ? (
+              <div className="col-span-full py-4">
+                <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
+              </div>
+            ) : filteredProducts.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-6">
                 {filteredProducts.map((p) => {
                   const currentPrice = getActivePrice(p);

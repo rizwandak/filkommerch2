@@ -34,9 +34,11 @@ import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { getProducts, getStoreSettings, getCategories, type ProductWithVariants } from "@backend/server-actions";
+import { getProducts, getStoreSettings, getCategories, getActivePreOrderCampaignServerAction, type ProductWithVariants } from "@backend/server-actions";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
+import { isProductVisibleToUser } from "@/lib/pre-order-utils";
+import { PreOrderNotOpenPlaceholder } from "@/components/PreOrderNotOpenPlaceholder";
 import {
   type HomepageSegment,
   convertLegacyToSegments,
@@ -590,6 +592,18 @@ function Index() {
 
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+
+  const { data: activePoRes } = useQuery({
+    queryKey: ["activePreOrderCampaign"],
+    queryFn: () => getActivePreOrderCampaignServerAction(),
+    staleTime: 30 * 1000,
+  });
+  const activePoCampaign = activePoRes?.data || null;
+  const canSeeProducts = useMemo(
+    () => isProductVisibleToUser(user, activePoCampaign),
+    [user, activePoCampaign]
+  );
+
   const [filter, setFilter] = useState<Filter>("ALL");
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [quickViewProduct, setQuickViewProduct] = useState<ProductCard | null>(null);
@@ -1095,113 +1109,117 @@ function Index() {
                             </h2>
                           </div>
 
-                          <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
-                            {heroProductsToRender.map((p) => {
-                              let discountText = null;
-                              if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
-                                const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
-                                discountText = `Save ${pct}%`;
-                              } else if (p.was && p.price) {
-                                const rawPrice = parsePrice(p.price);
-                                const rawOriginalPrice = parsePrice(p.was);
-                                if (rawOriginalPrice > rawPrice) {
-                                  const pct = Math.round(((rawOriginalPrice - rawPrice) / rawOriginalPrice) * 100);
+                          {!canSeeProducts ? (
+                            <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
+                          ) : (
+                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
+                              {heroProductsToRender.map((p) => {
+                                let discountText = null;
+                                if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
+                                  const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
                                   discountText = `Save ${pct}%`;
+                                } else if (p.was && p.price) {
+                                  const rawPrice = parsePrice(p.price);
+                                  const rawOriginalPrice = parsePrice(p.was);
+                                  if (rawOriginalPrice > rawPrice) {
+                                    const pct = Math.round(((rawOriginalPrice - rawPrice) / rawOriginalPrice) * 100);
+                                    discountText = `Save ${pct}%`;
+                                  }
                                 }
-                              }
 
-                              return (
-                                <div
-                                  key={p.id}
-                                  className="group flex flex-col border-2 border-ink bg-neutral-900 text-cream rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(255,107,0,085)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(255,107,0,1)] transition-all duration-200 w-full sm:w-[260px] md:w-[290px] shrink-0"
-                                >
-                                  {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
-                                  <Link
-                                    to="/product/$slug"
-                                    params={{ slug: p.id }}
-                                    className="relative w-full aspect-square border-b-2 border-ink bg-neutral-950 overflow-hidden block"
+                                return (
+                                  <div
+                                    key={p.id}
+                                    className="group flex flex-col border-2 border-ink bg-neutral-900 text-cream rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(255,107,0,085)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(255,107,0,1)] transition-all duration-200 w-full sm:w-[260px] md:w-[290px] shrink-0"
                                   >
-                                    <img
-                                      src={resolveImageUrl(p.img)}
-                                      alt={p.name}
-                                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                    />
-                                    <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
-                                      {p.tag && (
-                                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-brand-orange text-ink rounded-full border border-ink shadow-xs uppercase">
-                                          {p.tag}
-                                        </span>
-                                      )}
-                                      {discountText && (
-                                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-red-600 text-white rounded-full border border-ink shadow-xs uppercase">
-                                          🔥 {discountText}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </Link>
-
-                                  {/* Details Content Body Below Image */}
-                                  <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
-                                    <div>
-                                      {/* Header: Category & Title */}
-                                      <div className="text-[8.5px] font-extrabold tracking-widest text-brand-orange uppercase mb-0.5">
-                                        {p.cat || "MAIN HERO"}
-                                      </div>
-                                      <Link
-                                        to="/product/$slug"
-                                        params={{ slug: p.id }}
-                                        className="hover:text-brand-orange transition-colors"
-                                      >
-                                        <h3 className="font-extrabold text-xs sm:text-sm text-white uppercase tracking-wide leading-tight group-hover:text-brand-orange transition-colors">
-                                          {p.name}
-                                        </h3>
-                                      </Link>
-                                    </div>
-
-                                    {/* Price Section */}
-                                    <div className="pt-2 border-t border-neutral-800 flex items-baseline justify-between gap-1">
-                                      <div>
-                                        <span className="text-base sm:text-lg font-black text-brand-orange tracking-tight block leading-none">
-                                          {p.price}
-                                        </span>
-                                        {p.was && (
-                                          <span className="text-[10px] font-extrabold text-red-500 line-through block mt-0.5">
-                                            {p.was}
+                                    {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
+                                    <Link
+                                      to="/product/$slug"
+                                      params={{ slug: p.id }}
+                                      className="relative w-full aspect-square border-b-2 border-ink bg-neutral-950 overflow-hidden block"
+                                    >
+                                      <img
+                                        src={resolveImageUrl(p.img)}
+                                        alt={p.name}
+                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                      />
+                                      <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                                        {p.tag && (
+                                          <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-brand-orange text-ink rounded-full border border-ink shadow-xs uppercase">
+                                            {p.tag}
+                                          </span>
+                                        )}
+                                        {discountText && (
+                                          <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-red-600 text-white rounded-full border border-ink shadow-xs uppercase">
+                                            🔥 {discountText}
                                           </span>
                                         )}
                                       </div>
-                                    </div>
+                                    </Link>
 
-                                    {/* Dual Icon Action Buttons - Below Price, Full Width Split 50/50 */}
-                                    <div className="pt-1 flex gap-1.5 w-full">
-                                      <button
-                                        onClick={() => {
-                                          if ((p as any).rawProduct) {
-                                            addToCart((p as any).rawProduct);
-                                          } else {
-                                            addToCart(p);
-                                          }
-                                        }}
-                                        title="Masuk Bag"
-                                        className="flex-1 h-8 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-brand-orange border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center"
-                                      >
-                                        <ShoppingBag className="w-4 h-4" />
-                                      </button>
+                                    {/* Details Content Body Below Image */}
+                                    <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                                      <div>
+                                        {/* Header: Category & Title */}
+                                        <div className="text-[8.5px] font-extrabold tracking-widest text-brand-orange uppercase mb-0.5">
+                                          {p.cat || "MAIN HERO"}
+                                        </div>
+                                        <Link
+                                          to="/product/$slug"
+                                          params={{ slug: p.id }}
+                                          className="hover:text-brand-orange transition-colors"
+                                        >
+                                          <h3 className="font-extrabold text-xs sm:text-sm text-white uppercase tracking-wide leading-tight group-hover:text-brand-orange transition-colors">
+                                            {p.name}
+                                          </h3>
+                                        </Link>
+                                      </div>
 
-                                      <Link
-                                        to="/product/$slug"
-                                        params={{ slug: p.id }}
-                                        title="Pesan Sekarang"
-                                        className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center"
-                                      >
-                                        <ArrowRight className="w-4 h-4" />
-                                      </Link>
+                                      {/* Price Section */}
+                                      <div className="pt-2 border-t border-neutral-800 flex items-baseline justify-between gap-1">
+                                        <div>
+                                          <span className="text-base sm:text-lg font-black text-brand-orange tracking-tight block leading-none">
+                                            {p.price}
+                                          </span>
+                                          {p.was && (
+                                            <span className="text-[10px] font-extrabold text-red-500 line-through block mt-0.5">
+                                              {p.was}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Dual Icon Action Buttons - Below Price, Full Width Split 50/50 */}
+                                      <div className="pt-1 flex gap-1.5 w-full">
+                                        <button
+                                          onClick={() => {
+                                            if ((p as any).rawProduct) {
+                                              addToCart((p as any).rawProduct);
+                                            } else {
+                                              addToCart(p);
+                                            }
+                                          }}
+                                          title="Masuk Bag"
+                                          className="flex-1 h-8 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-brand-orange border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center"
+                                        >
+                                          <ShoppingBag className="w-4 h-4" />
+                                        </button>
+
+                                        <Link
+                                          to="/product/$slug"
+                                          params={{ slug: p.id }}
+                                          title="Pesan Sekarang"
+                                          className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center"
+                                        >
+                                          <ArrowRight className="w-4 h-4" />
+                                        </Link>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </section>
                     ) : (
@@ -1218,113 +1236,112 @@ function Index() {
                             </h2>
                           </div>
 
-                          <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
-                            {gridProducts.map((p) => {
-                              let discountText = null;
-                              if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
-                                const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
-                                discountText = `Save ${pct}%`;
-                              } else if (p.was && p.price) {
-                                const rawPrice = parsePrice(p.price);
-                                const rawOriginalPrice = parsePrice(p.was);
-                                if (rawOriginalPrice > rawPrice) {
-                                  const pct = Math.round(((rawOriginalPrice - rawPrice) / rawOriginalPrice) * 100);
+                          {!canSeeProducts ? (
+                            <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
+                          ) : (
+                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
+                              {gridProducts.map((p) => {
+                                let discountText = null;
+                                if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
+                                  const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
                                   discountText = `Save ${pct}%`;
+                                } else if (p.was && p.price) {
+                                  const rawPrice = parsePrice(p.price);
+                                  const rawOriginalPrice = parsePrice(p.was);
+                                  if (rawOriginalPrice > rawPrice) {
+                                    const pct = Math.round(((rawOriginalPrice - rawPrice) / rawOriginalPrice) * 100);
+                                    discountText = `Save ${pct}%`;
+                                  }
                                 }
-                              }
 
-                              return (
-                                <div
-                                  key={p.id}
-                                  className="group flex flex-col border-2 border-ink bg-cream text-ink rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-full sm:w-[260px] md:w-[290px] shrink-0"
-                                >
-                                  {/* Top Full-Width 1:1 Aspect-Square Cover Photo */}
-                                  <Link
-                                    to="/product/$slug"
-                                    params={{ slug: p.id }}
-                                    className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden block"
+                                return (
+                                  <div
+                                    key={p.id}
+                                    className="group flex flex-col border-2 border-ink bg-cream text-ink rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-full sm:w-[260px] md:w-[290px] shrink-0"
                                   >
-                                    <img
-                                      src={resolveImageUrl(p.img)}
-                                      alt={p.name}
-                                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                    />
-                                    <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
-                                      {p.tag && (
-                                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-brand-orange text-cream rounded-full border border-ink shadow-xs uppercase">
-                                          {p.tag}
-                                        </span>
-                                      )}
-                                      {discountText && (
-                                        <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-red-600 text-white rounded-full border border-ink shadow-xs uppercase">
-                                          🔥 {discountText}
-                                        </span>
-                                      )}
-                                    </div>
-                                  </Link>
-
-                                  {/* Details Content Body Below Image */}
-                                  <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
-                                    <div>
-                                      {/* Header: Category & Title */}
-                                      <div className="text-[8.5px] font-extrabold tracking-widest text-brand-orange uppercase mb-0.5">
-                                        {p.cat}
-                                      </div>
-                                      <Link
-                                        to="/product/$slug"
-                                        params={{ slug: p.id }}
-                                        className="hover:text-brand-orange transition-colors"
-                                      >
-                                        <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight group-hover:text-brand-orange transition-colors">
-                                          {p.name}
-                                        </h3>
-                                      </Link>
-                                    </div>
-
-                                    {/* Price Section */}
-                                    <div className="pt-2 border-t border-ink/10 flex items-baseline justify-between gap-1">
-                                      <div>
-                                        <span className="text-base sm:text-lg font-black text-ink tracking-tight block leading-none">
-                                          {p.price}
-                                        </span>
-                                        {p.was && (
-                                          <span className="text-[10px] font-extrabold text-red-500 line-through block mt-0.5">
-                                            {p.was}
+                                    <Link
+                                      to="/product/$slug"
+                                      params={{ slug: p.id }}
+                                      className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden block"
+                                    >
+                                      <img
+                                        src={resolveImageUrl(p.img)}
+                                        alt={p.name}
+                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                                      />
+                                      <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                                        {p.tag && (
+                                          <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-brand-orange text-cream rounded-full border border-ink shadow-xs uppercase">
+                                            {p.tag}
+                                          </span>
+                                        )}
+                                        {discountText && (
+                                          <span className="text-[9px] font-black tracking-wider px-2 py-0.5 bg-red-600 text-white rounded-full border border-ink shadow-xs uppercase">
+                                            🔥 {discountText}
                                           </span>
                                         )}
                                       </div>
-                                    </div>
+                                    </Link>
 
-                                    {/* Dual Icon Action Buttons - Below Price, Full Width Split 50/50 */}
-                                    <div className="pt-1 flex gap-1.5 w-full">
-                                      <button
-                                        onClick={() => {
-                                          if ((p as any).rawProduct) {
-                                            addToCart((p as any).rawProduct);
-                                          } else {
-                                            addToCart(p);
-                                          }
-                                        }}
-                                        title="Masuk Bag"
-                                        className="flex-1 h-8 rounded-lg bg-ink hover:bg-brand-orange text-cream border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
-                                      >
-                                        <ShoppingBag className="w-4 h-4 text-brand-orange" />
-                                      </button>
+                                    <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                                      <div>
+                                        <div className="text-[8.5px] font-extrabold tracking-widest text-brand-orange uppercase mb-0.5">
+                                          {p.cat}
+                                        </div>
+                                        <Link
+                                          to="/product/$slug"
+                                          params={{ slug: p.id }}
+                                          className="hover:text-brand-orange transition-colors"
+                                        >
+                                          <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight group-hover:text-brand-orange transition-colors">
+                                            {p.name}
+                                          </h3>
+                                        </Link>
+                                      </div>
 
-                                      <Link
-                                        to="/product/$slug"
-                                        params={{ slug: p.id }}
-                                        title="Pesan Sekarang"
-                                        className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
-                                      >
-                                        <ArrowRight className="w-4 h-4" />
-                                      </Link>
+                                      <div className="pt-2 border-t border-ink/10 flex items-baseline justify-between gap-1">
+                                        <div>
+                                          <span className="text-base sm:text-lg font-black text-ink tracking-tight block leading-none">
+                                            {p.price}
+                                          </span>
+                                          {p.was && (
+                                            <span className="text-[10px] font-extrabold text-red-500 line-through block mt-0.5">
+                                              {p.was}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <div className="pt-1 flex gap-1.5 w-full">
+                                        <button
+                                          onClick={() => {
+                                            if ((p as any).rawProduct) {
+                                              addToCart((p as any).rawProduct);
+                                            } else {
+                                              addToCart(p);
+                                            }
+                                          }}
+                                          title="Masuk Bag"
+                                          className="flex-1 h-8 rounded-lg bg-ink hover:bg-brand-orange text-cream border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
+                                        >
+                                          <ShoppingBag className="w-4 h-4 text-brand-orange" />
+                                        </button>
+
+                                        <Link
+                                          to="/product/$slug"
+                                          params={{ slug: p.id }}
+                                          title="Pesan Sekarang"
+                                          className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
+                                        >
+                                          <ArrowRight className="w-4 h-4" />
+                                        </Link>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       </section>
                     )
@@ -1740,8 +1757,11 @@ function Index() {
                             {el.config.title || "Exclusive Bundles"}
                           </h2>
                         </div>
-                        <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
-                          {bundlesToRender.map((bundle: any, bIdx: number) => (
+                        {!canSeeProducts ? (
+                          <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
+                        ) : (
+                          <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
+                            {bundlesToRender.map((bundle: any, bIdx: number) => (
                             <div
                               key={bIdx}
                               className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-full sm:w-[260px] md:w-[290px] shrink-0"
@@ -1883,6 +1903,7 @@ function Index() {
                             </div>
                           ))}
                         </div>
+                        )}
                       </div>
                     </section>
                   );

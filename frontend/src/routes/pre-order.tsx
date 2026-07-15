@@ -28,6 +28,8 @@ import {
 import { getProducts, getStoreSettings, getActivePreOrderCampaignServerAction, type ProductWithVariants, type PreOrderCampaign } from "@backend/server-actions";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
+import { isProductVisibleToUser } from "@/lib/pre-order-utils";
+import { PreOrderNotOpenPlaceholder } from "@/components/PreOrderNotOpenPlaceholder";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
@@ -205,6 +207,10 @@ function PreOrderPage() {
   });
   const activePoCampaign = activePoRes?.data || null;
   const poInfo = useMemo(() => getPoPhaseInfo(activePoCampaign), [activePoCampaign]);
+  const canSeeProducts = useMemo(
+    () => isProductVisibleToUser(user, activePoCampaign),
+    [user, activePoCampaign]
+  );
 
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
@@ -460,6 +466,10 @@ function PreOrderPage() {
               Lihat Katalog Ready Stock
               <ArrowRight className="w-4 h-4" />
             </Link>
+          </div>
+        ) : !canSeeProducts ? (
+          <div className="py-8">
+            <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
           </div>
         ) : (
           <div className="space-y-16">
