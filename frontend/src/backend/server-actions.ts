@@ -1,5 +1,4 @@
-import { createServerFn } from "@tanstack/react-start";
-import { getRequestHeader } from "@tanstack/react-start/server";
+import { createServerFn, getGlobalStartContext } from "@tanstack/react-start";
 import { getApiBaseUrl } from "@/lib/api-config";
 
 // Helper to resolve API base URL across SSR, client, and fallback envs
@@ -63,7 +62,7 @@ const getAuthHeaders = async () => {
     if (name) headers["x-user-name"] = decodeURIComponent(name);
   } else {
     try {
-      const cookieHeader = getRequestHeader("cookie");
+      const cookieHeader = getGlobalStartContext()?.request?.headers.get("cookie") || undefined;
       const role = getCookieValue(cookieHeader, "user_role");
       const id = getCookieValue(cookieHeader, "user_id");
       const name = getCookieValue(cookieHeader, "user_name");
