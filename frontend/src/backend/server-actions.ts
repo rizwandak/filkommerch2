@@ -324,7 +324,7 @@ export interface StoreSettings {
   tax_rate: number;
   qris_static_url: string | null;
   homepage_layout?: string | null;
-  payment_mode?: "midtrans" | "manual_qris" | null;
+  payment_mode?: "mayar" | "midtrans" | "manual_qris" | null;
 }
 
 export interface CreateProductInput {
@@ -783,7 +783,7 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
       tax_rate?: number;
       qris_static_url?: string;
       homepage_layout?: string;
-      payment_mode?: "midtrans" | "manual_qris";
+      payment_mode?: "mayar" | "midtrans" | "manual_qris";
     }) => d,
   )
   .handler(async ({ data: input }) => {

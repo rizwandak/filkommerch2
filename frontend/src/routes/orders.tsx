@@ -83,21 +83,8 @@ function UserOrdersPage() {
 
 
 
-  // Load Midtrans Snap script dynamically
-  useEffect(() => {
-    const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
-    const clientKey = "Mid-client-xBEPEMQRGEXHq99n";
-
-    let script = document.querySelector(
-      `script[src="${snapScriptUrl}"]`,
-    ) as HTMLScriptElement | null;
-    if (!script) {
-      script = document.createElement("script");
-      script.src = snapScriptUrl;
-      script.setAttribute("data-client-key", clientKey);
-      document.body.appendChild(script);
-    }
-  }, []);
+  const [mayarCheckoutUrl, setMayarCheckoutUrl] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Fetch orders
   const fetchOrders = async () => {
@@ -136,45 +123,18 @@ function UserOrdersPage() {
 
   const handlePayNow = async (order: any, shouldRegenerate: boolean = true) => {
     try {
-      let snapToken = order.snap_token;
-
-      if (shouldRegenerate || !snapToken) {
-        setPayingOrderId(order.order_id);
-        const res = await regeneratePaymentToken({ data: { orderId: order.order_id } });
-        if (!res.success || !res.token) {
-          toast.error(res.error || "Gagal memproses pembayaran baru. Silakan coba lagi.");
-          return;
-        }
-        snapToken = res.token;
-        // Update local order snap_token
-        setOrders((prev) =>
-          prev.map((o) => (o.order_id === order.order_id ? { ...o, snap_token: res.token } : o)),
-        );
+      setPayingOrderId(order.order_id);
+      const res = await regeneratePaymentToken({ data: { orderId: order.order_id } });
+      if (!res.success || (!res.token && !res.checkoutUrl)) {
+        toast.error(res.error || "Gagal memproses pembayaran baru. Silakan coba lagi.");
+        return;
       }
-
-      if ((window as any).snap) {
-        (window as any).snap.pay(snapToken, {
-          onSuccess: (snapResult: any) => {
-            toast.success("Pembayaran berhasil!");
-            void fetchOrders();
-          },
-          onPending: (snapResult: any) => {
-            toast.info("Pembayaran tertunda. Silakan selesaikan pembayaran Anda.");
-            void fetchOrders();
-          },
-          onError: (snapResult: any) => {
-            toast.error("Pembayaran gagal!");
-          },
-          onClose: () => {
-            toast.warning("Anda menutup popup pembayaran sebelum menyelesaikan transaksi.");
-          },
-        });
-      } else {
-        toast.error("Sistem pembayaran Midtrans gagal dimuat. Coba segarkan halaman.");
-      }
+      const payUrl = res.checkoutUrl || res.token;
+      setMayarCheckoutUrl(payUrl);
+      setShowPaymentModal(true);
     } catch (err: any) {
       console.error("Error paying:", err);
-      toast.error("Gagal memulai proses pembayaran.");
+      toast.error("Gagal memulai proses pembayaran Mayar.");
     } finally {
       setPayingOrderId(null);
     }
@@ -316,6 +276,41 @@ function UserOrdersPage() {
             </div>
           </div>
         </div>
+
+        {/* Mayar Payment Gateway Modal */}
+        {showPaymentModal && mayarCheckoutUrl && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="relative w-full max-w-2xl bg-card rounded-2xl border-2 border-ink shadow-2xl overflow-hidden mx-4">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b-2 border-ink bg-cream/20">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-brand-orange" />
+                  <h3 className="font-bold text-xs sm:text-sm uppercase tracking-wider text-ink">
+                    Pembayaran Online — Mayar
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    void fetchOrders();
+                  }}
+                  className="p-1.5 rounded-full border border-ink/20 hover:bg-red-50 hover:border-red-300 text-ink hover:text-red-600 transition-all cursor-pointer"
+                  title="Tutup"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              {/* Mayar Iframe */}
+              <iframe
+                src={mayarCheckoutUrl}
+                className="w-full h-[600px] sm:h-[650px] border-none"
+                title="Mayar Payment Gateway"
+                allow="payment"
+              />
+            </div>
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="relative mb-6">

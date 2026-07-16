@@ -224,6 +224,11 @@ function ProductDetailPage() {
   const currentStock = useMemo(() => {
     if (!product) return 0;
 
+    // Pre-order items do not rely on physical stock count
+    if (product.sale_type === "preorder") {
+      return 999;
+    }
+
     if (product.product_type === "bundle") {
       if (!product.bundle_components || product.bundle_components.length === 0) return 0;
       let minStock = Infinity;
@@ -924,10 +929,18 @@ function ProductDetailPage() {
                   </div>
 
                   <div className="text-right text-xs">
-                    <span className="text-muted-foreground font-bold">Stok: </span>
-                    <span className={currentStock <= 3 ? "text-red-600 font-black animate-pulse" : "text-ink font-black"}>
-                      {currentStock}
-                    </span>
+                    {product.sale_type === "preorder" ? (
+                      <span className="text-brand-orange font-black uppercase tracking-wider text-[11px] bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/30">
+                        ⚡ Pre-Order Open
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-muted-foreground font-bold">Stok: </span>
+                        <span className={currentStock <= 3 ? "text-red-600 font-black animate-pulse" : "text-ink font-black"}>
+                          {currentStock}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -945,16 +958,16 @@ function ProductDetailPage() {
                 <button
                   onClick={() => handleAddToCart(false)}
                   disabled={currentStock <= 0}
-                  className="w-full py-3 px-4 bg-brand-orange hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 bg-brand-orange hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-200"
                 >
-                  <Plus className="w-4 h-4" /> + Keranjang
+                  <Plus className="w-4 h-4" /> {currentStock <= 0 ? "Stok Habis" : "+ Keranjang"}
                 </button>
                 <button
                   onClick={() => handleAddToCart(true)}
                   disabled={currentStock <= 0}
-                  className="w-full py-3 px-4 bg-white hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 bg-white hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100"
                 >
-                  Beli Langsung
+                  {currentStock <= 0 ? "Stok Habis" : "Beli Langsung"}
                 </button>
               </div>
 

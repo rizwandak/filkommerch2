@@ -97,7 +97,7 @@ function AdminSettingsPage() {
         phone: settings.phone || undefined,
         tax_rate: settings.tax_rate,
         qris_static_url: settings.qris_static_url || undefined,
-        payment_mode: settings.payment_mode || "midtrans",
+        payment_mode: settings.payment_mode || "mayar",
         homepage_layout: settings.homepage_layout || undefined,
       },
     });
@@ -174,19 +174,19 @@ function AdminSettingsPage() {
           <div className="space-y-2">
             <Label>Metode Pembayaran Online Default</Label>
             <Select
-              value={settings.payment_mode || "midtrans"}
+              value={settings.payment_mode || "mayar"}
               onValueChange={(val) => setSettings({ ...settings, payment_mode: val as any })}
             >
               <SelectTrigger className="w-full">
                 <SelectValue placeholder="Pilih Metode Pembayaran" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="midtrans">Midtrans (Otomatis)</SelectItem>
+                <SelectItem value="mayar">Online Payment — Mayar (Otomatis)</SelectItem>
                 <SelectItem value="manual_qris">QRIS Statis & Upload Bukti (Manual)</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Tentukan apakah pembeli online melakukan transaksi otomatis via Midtrans atau transfer manual dengan scan QRIS statis lalu mengunggah bukti pembayaran.
+              Tentukan apakah pembeli online melakukan transaksi otomatis via Mayar atau transfer manual dengan scan QRIS statis lalu mengunggah bukti pembayaran.
             </p>
           </div>
 

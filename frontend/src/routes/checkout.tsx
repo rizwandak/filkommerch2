@@ -76,6 +76,8 @@ function CheckoutPage() {
   const [orderId, setOrderId] = useState<string | null>(null);
   const [copiedPaymentLink, setCopiedPaymentLink] = useState(false);
   const [summaryDrawerOpen, setSummaryDrawerOpen] = useState(false);
+  const [mayarCheckoutUrl, setMayarCheckoutUrl] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const steps: CheckoutStep[] = [
     { step: 1, title: "Review Cart" },
@@ -114,21 +116,7 @@ function CheckoutPage() {
     }
   }, [user, authLoading, navigate]);
 
-  // Load Midtrans Snap script dynamically
-  useEffect(() => {
-    const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
-    const clientKey = "Mid-client-xBEPEMQRGEXHq99n";
 
-    let script = document.querySelector(
-      `script[src="${snapScriptUrl}"]`,
-    ) as HTMLScriptElement | null;
-    if (!script) {
-      script = document.createElement("script");
-      script.src = snapScriptUrl;
-      script.setAttribute("data-client-key", clientKey);
-      document.body.appendChild(script);
-    }
-  }, []);
 
   if (authLoading) {
     return (
@@ -275,36 +263,19 @@ function CheckoutPage() {
       // Clear cart dari localStorage
       localStorage.removeItem("cart");
 
-      // Trigger Midtrans Snap popup
-      if (result.token) {
-        if ((window as any).snap) {
-          (window as any).snap.pay(result.token, {
-            onSuccess: (snapResult: any) => {
-              toast.success("Pembayaran berhasil!");
-              void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
-            },
-            onPending: (snapResult: any) => {
-              toast.info("Pembayaran tertunda. Silakan selesaikan pembayaran Anda.");
-              void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
-            },
-            onError: (snapResult: any) => {
-              toast.error("Pembayaran gagal!");
-              setIsProcessing(false);
-            },
-            onClose: () => {
-              toast.warning("Anda menutup popup pembayaran sebelum menyelesaikan transaksi.");
-              void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
-            },
-          });
-        } else {
-          // Fallback to QRIS screen if Snap fails to load
-          setQrUrl(result.qrUrl);
-          setCurrentStep(4);
-          toast.success("Pesanan berhasil dibuat! Silakan scan QRIS untuk membayar.");
-          setIsProcessing(false);
-        }
+      if (result.checkoutUrl) {
+        // Mayar payment — show iframe modal
+        setMayarCheckoutUrl(result.checkoutUrl);
+        setShowPaymentModal(true);
+        setIsProcessing(false);
+      } else if (result.qrUrl) {
+        // Manual QRIS fallback
+        setQrUrl(result.qrUrl);
+        setCurrentStep(4);
+        toast.success("Pesanan berhasil dibuat! Silakan scan QRIS untuk membayar.");
+        setIsProcessing(false);
       } else {
-        // Manual QRIS mode
+        // Fallback — navigate to order confirmation
         toast.success("Pesanan berhasil dibuat! Silakan selesaikan pembayaran Anda.");
         void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
       }
@@ -734,6 +705,42 @@ function CheckoutPage() {
             >
               Tutup Rincian
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Mayar Payment Gateway Modal */}
+      {showPaymentModal && mayarCheckoutUrl && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-2xl bg-card rounded-2xl border-2 border-ink shadow-2xl overflow-hidden mx-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b-2 border-ink bg-cream/20">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-brand-orange" />
+                <h3 className="font-bold text-xs sm:text-sm uppercase tracking-wider text-ink">
+                  Pembayaran Online — Mayar
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPaymentModal(false);
+                  toast.warning("Anda menutup popup pembayaran. Silakan selesaikan dari halaman pesanan.");
+                  void navigate({ to: "/order-confirmation", search: { orderId: orderId || "" } });
+                }}
+                className="p-1.5 rounded-full border border-ink/20 hover:bg-red-50 hover:border-red-300 text-ink hover:text-red-600 transition-all cursor-pointer"
+                title="Tutup"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {/* Mayar Iframe */}
+            <iframe
+              src={mayarCheckoutUrl}
+              className="w-full h-[600px] sm:h-[650px] border-none"
+              title="Mayar Payment Gateway"
+              allow="payment"
+            />
           </div>
         </div>
       )}
@@ -1467,26 +1474,3 @@ function QrCodePaymentStep({ qrUrl, orderId, customerName }: QrCodePaymentStepPr
   );
 }
 
-// Global type for Midtrans Snap
-declare global {
-  type MidtransSnapResult = {
-    transaction_id?: string;
-    order_id?: string;
-    transaction_status?: string;
-    [key: string]: unknown;
-  };
-
-  interface Window {
-    snap?: {
-      pay: (
-        token: string,
-        options: {
-          onSuccess?: (result: MidtransSnapResult) => void;
-          onPending?: (result: MidtransSnapResult) => void;
-          onError?: (result: MidtransSnapResult) => void;
-          onClose?: () => void;
-        },
-      ) => void;
-    };
-  }
-}

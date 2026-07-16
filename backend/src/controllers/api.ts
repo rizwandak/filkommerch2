@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { query, queryOne, execute, getConnection } from "../config/database";
 import { config } from "../config/config";
-import { snap } from "../config/midtrans";
 import bcrypt from "bcryptjs";
 
 
@@ -858,9 +857,9 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
     // 3. Check payment mode from store settings
     const [storeSettingsRows] = await connection.execute("SELECT payment_mode, qris_static_url FROM store_settings LIMIT 1");
     const storeSettings = (storeSettingsRows as any[])[0];
-    const paymentMode = storeSettings?.payment_mode ?? "midtrans";
+    const paymentMode = storeSettings?.payment_mode ?? "mayar";
 
-    let snapToken: string | null = null;
+    let checkoutUrl: string | null = null;
     let qrUrl: string | null = null;
 
     if (paymentMode === "manual_qris") {
@@ -872,56 +871,84 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         "UPDATE orders SET payment_type = ? WHERE order_id = ?",
         ["manual_qris", details.orderId]
       );
-    } else {
-      console.log("🔐 Generating QRIS snap transaction for:", details.orderId);
-      const parameter = {
-        transaction_details: {
-          order_id: details.orderId,
-          gross_amount: grossAmount
-        },
-        credit_card: {
-          secure: true
-        },
-        customer_details: {
-          first_name: details.customerName,
-          email: details.customerEmail,
-          phone: details.customerPhone
-        },
-        item_details: resolvedItems.map((item: any) => ({
-          id: String(item.variant_id),
-          price: Number(item.price),
+    } else if (paymentMode === "mayar") {
+      // ============ MAYAR INVOICE CREATION ============
+      console.log("💳 Generating Mayar invoice for:", details.orderId);
+
+      const mayarItems = resolvedItems
+        .filter((item: any) => Number(item.price) > 0)
+        .map((item: any) => ({
+          description: `${item.product_name}${item.size ? ` (${item.size})` : ""}`.substring(0, 100),
           quantity: Number(item.quantity),
-          name: item.product_name.substring(0, 50)
-        }))
-      };
+          rate: Number(item.price),
+        }));
 
       if (shippingCost > 0) {
-        parameter.item_details.push({
-          id: "shipping-cost",
-          price: shippingCost,
-          quantity: 1,
-          name: "Shipping Cost"
-        });
+        mayarItems.push({ description: "Ongkos Kirim", quantity: 1, rate: shippingCost });
       }
       if (serviceFee > 0) {
-        parameter.item_details.push({
-          id: "service-fee",
-          price: serviceFee,
-          quantity: 1,
-          name: "Service Fee"
-        });
+        mayarItems.push({ description: "Biaya Layanan", quantity: 1, rate: serviceFee });
       }
 
-      const transaction = await snap.createTransaction(parameter);
-      console.log("✅ QRIS token generated successfully");
-      snapToken = transaction.token;
-      qrUrl = `https://app.sandbox.midtrans.com/qris/${transaction.token}.png`;
+      // Determine redirect URL preferring HTTPS domain (Ngrok or Production) to prevent Chrome PNA (Private Network Access) local block
+      const origin = req.get("origin") || req.get("referer") || "";
+      const forwardedHost = req.get("x-forwarded-host");
+      let frontendUrl = "https://filkommerch.com";
 
-      // 4. Update order dengan snap token
+      if (origin.startsWith("https://")) {
+        frontendUrl = origin.replace(/\/$/, "");
+      } else if (forwardedHost) {
+        frontendUrl = `https://${forwardedHost}`;
+      } else if (process.env.FRONTEND_URL) {
+        const urls = process.env.FRONTEND_URL.split(",");
+        const httpsUrl = urls.find((u) => u.trim().startsWith("https://"));
+        if (httpsUrl) {
+          frontendUrl = httpsUrl.trim();
+        }
+      }
+      const redirectUrl = `${frontendUrl}/order-confirmation?orderId=${details.orderId}`;
+
+      const mayarPayload = {
+        name: details.customerName,
+        email: details.customerEmail,
+        mobile: details.customerPhone || "081200000000",
+        redirectUrl,
+        description: `Pesanan FILKOM Merch #${details.orderId}`,
+        items: mayarItems,
+        extraData: {
+          orderId: details.orderId,
+        },
+      };
+
+      const mayarResponse = await fetch(`${config.mayar.apiUrl}/invoice/create`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${config.mayar.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(mayarPayload),
+      });
+
+      if (!mayarResponse.ok) {
+        const errBody = await mayarResponse.text();
+        console.error("❌ Mayar API error:", mayarResponse.status, errBody);
+        throw new Error(`Gagal membuat invoice Mayar: ${mayarResponse.status}`);
+      }
+
+      const mayarResult = (await mayarResponse.json()) as { statusCode: number; messages: string; data?: { id?: string; link?: string; transactionId?: string } };
+      console.log("✅ Mayar invoice created:", mayarResult.data?.id);
+
+      checkoutUrl = mayarResult.data?.link || null;
+      const mayarInvoiceId = mayarResult.data?.id || null;
+
+      // Store Mayar checkout URL in snap_token column so continuation does not hit Mayar 429 rate limit
       await connection.execute(
         "UPDATE orders SET snap_token = ?, payment_type = ? WHERE order_id = ?",
-        [snapToken, "qris", details.orderId]
+        [checkoutUrl || mayarInvoiceId, "mayar", details.orderId]
       );
+    } else {
+      // Fallback: unknown payment mode — just proceed without gateway
+      console.warn("⚠️ Unknown payment_mode:", paymentMode, "— skipping payment gateway");
     }
 
     // Record activity log
@@ -940,7 +967,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
     return res.json({
       success: true,
       orderId: details.orderId,
-      token: snapToken,
+      checkoutUrl: checkoutUrl,
       qrUrl: qrUrl,
       paymentMode: paymentMode
     });
@@ -2376,6 +2403,348 @@ export const deletePreOrderCampaign = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error deleting pre-order campaign:", error);
     return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============ MAYAR WEBHOOK HANDLER ============
+
+export const handleMayarWebhook = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const payload = req.body;
+    console.log("🔔 Mayar webhook received:", JSON.stringify(payload).substring(0, 500));
+
+    // 1. Verify webhook token
+    const webhookToken = config.mayar.webhookToken;
+    const receivedToken = req.headers["x-callback-token"] || req.headers["x-mayar-token"] || payload?.token;
+
+    if (webhookToken && receivedToken !== webhookToken) {
+      console.error("❌ [SECURITY] Invalid Mayar webhook token");
+      return res.status(403).json({ error: "Invalid webhook token" });
+    }
+
+    // 2. Check event type — accept all variations of successful payment events
+    const event = (payload?.event || payload?.type || "").toLowerCase();
+    const status = (payload?.data?.status || payload?.status || "").toUpperCase();
+    const isPaidEvent =
+      event.includes("payment.received") ||
+      event.includes("payment.success") ||
+      event.includes("invoice.paid") ||
+      event.includes("paid") ||
+      status === "PAID" ||
+      status === "SUCCESS" ||
+      status === "SETTLEMENT";
+
+    if (!isPaidEvent) {
+      console.log(`ℹ️ Ignoring non-payment Mayar webhook event: ${event}, status: ${status}`);
+      return res.status(200).json({ success: true, message: "Event ignored" });
+    }
+
+    // 3. Extract order info from Mayar payload
+    const invoiceData = payload?.data || payload;
+    if (!invoiceData) {
+      console.warn("⚠️ No data in Mayar webhook payload");
+      return res.status(200).json({ success: true, message: "No data" });
+    }
+
+    const orderIdFromPayload = invoiceData?.extraData?.orderId || payload?.extraData?.orderId;
+    const mayarInvoiceId = invoiceData?.id || null;
+    const mayarLink = invoiceData?.link || null;
+    const transactionId = invoiceData?.transactionId || invoiceData?.transaction?.id || invoiceData?.id || null;
+
+    await connection.beginTransaction();
+
+    let order: any = null;
+
+    // Search 1: via extraData orderId
+    if (orderIdFromPayload) {
+      const [rows] = await connection.execute(
+        "SELECT id, order_id, user_id, channel, fulfillment_status, payment_status, order_status FROM orders WHERE order_id = ? FOR UPDATE",
+        [orderIdFromPayload]
+      );
+      order = (rows as any[])[0];
+    }
+
+    // Search 2: via snap_token exact match or substring
+    if (!order && mayarInvoiceId) {
+      const [rows] = await connection.execute(
+        "SELECT id, order_id, user_id, channel, fulfillment_status, payment_status, order_status FROM orders WHERE snap_token = ? OR snap_token = ? OR (snap_token IS NOT NULL AND snap_token LIKE ?) FOR UPDATE",
+        [mayarInvoiceId, mayarLink, `%${mayarInvoiceId}%`]
+      );
+      order = (rows as any[])[0];
+    }
+
+    // Search 3: via description regex matching (e.g. #FILKOM-12345678)
+    if (!order) {
+      const desc = invoiceData?.description || payload?.description || "";
+      const match = desc.match(/FILKOM-\d+/);
+      if (match) {
+        const extractedOrderId = match[0];
+        const [rows] = await connection.execute(
+          "SELECT id, order_id, user_id, channel, fulfillment_status, payment_status, order_status FROM orders WHERE order_id = ? FOR UPDATE",
+          [extractedOrderId]
+        );
+        order = (rows as any[])[0];
+      }
+    }
+
+    if (!order) {
+      console.warn("⚠️ Order not found for Mayar invoice:", mayarInvoiceId);
+      await connection.rollback();
+      return res.status(200).json({ success: true, message: "Order not found, skipped" });
+    }
+
+    const orderId = order.order_id;
+
+    // Check if already paid
+    if (order.payment_status === "paid") {
+      console.log(`ℹ️ Order ${orderId} already marked as paid, skipping.`);
+      await connection.rollback();
+      return res.status(200).json({ success: true, message: "Already processed" });
+    }
+
+    // 4. Update payments table
+    const [existingPaymentRows] = await connection.execute(
+      "SELECT id, status FROM payments WHERE order_id = ? AND provider = 'mayar' LIMIT 1 FOR UPDATE",
+      [orderId]
+    );
+    const existingPayment = (existingPaymentRows as any[])[0];
+    const paidAt = new Date();
+
+    if (existingPayment) {
+      await connection.execute(
+        `UPDATE payments SET 
+          status = 'paid', provider_transaction_id = ?, paid_at = ?, raw_callback_json = ?, updated_at = NOW()
+         WHERE id = ?`,
+        [transactionId, paidAt, JSON.stringify(payload), existingPayment.id]
+      );
+    } else {
+      await connection.execute(
+        `INSERT INTO payments (
+          order_id, provider, payment_method, amount, status, provider_transaction_id, paid_at, raw_callback_json
+        ) VALUES (?, 'mayar', 'mayar', ?, 'paid', ?, ?, ?)`,
+        [orderId, invoiceData?.amount || 0, transactionId, paidAt, JSON.stringify(payload)]
+      );
+    }
+
+    // 5. Update orders table
+    let orderStatus = 'paid';
+    let fulfillmentStatus = order.fulfillment_status;
+    if (order.channel === 'pos') {
+      orderStatus = 'completed';
+      fulfillmentStatus = 'completed';
+    }
+
+    await connection.execute(
+      `UPDATE orders SET 
+        payment_status = 'paid', order_status = ?, fulfillment_status = ?, payment_type = 'mayar',
+        transaction_status = 'settlement', midtrans_transaction_id = ?, updated_at = NOW()
+       WHERE order_id = ?`,
+      [orderStatus, fulfillmentStatus, transactionId, orderId]
+    );
+
+    // 6. Handle stock — release reservations + deduct physical stock
+    const [items] = await connection.execute(
+      "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
+      [orderId]
+    );
+    const orderItemsList = items as any[];
+
+    for (const item of orderItemsList) {
+      if (item.variant_id) {
+        // Deduct physical stock
+        await connection.execute(
+          "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
+          [item.quantity, item.variant_id]
+        );
+        // Release stock reservation
+        await connection.execute(
+          "UPDATE product_variants SET stock_reserved = GREATEST(0, CAST(stock_reserved AS SIGNED) - ?) WHERE id = ?",
+          [item.quantity, item.variant_id]
+        );
+
+        // Log stock movements
+        const [vRows] = await connection.execute(
+          "SELECT stock FROM product_variants WHERE id = ?",
+          [item.variant_id]
+        );
+        const curStock = (vRows as any[])[0]?.stock || 0;
+        await connection.execute(
+          `INSERT INTO stock_movements (
+            variant_id, movement_type, quantity_change, stock_before, stock_after,
+            reference_type, reference_id, created_by, notes
+          ) VALUES (?, 'sale', ?, ?, ?, 'order', ?, NULL, 'Pembayaran Mayar berhasil')`,
+          [item.variant_id, -item.quantity, curStock + item.quantity, curStock, orderId]
+        );
+      }
+    }
+
+    await connection.commit();
+    console.log(`✅ Mayar webhook processed: Order ${orderId} marked as PAID`);
+    return res.status(200).json({ success: true, message: "Payment processed successfully" });
+
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("❌ Error processing Mayar webhook:", error);
+    return res.status(500).json({ error: error.message || "Webhook processing failed" });
+  } finally {
+    connection.release();
+  }
+};
+
+// ============ REGENERATE PAYMENT TOKEN / MAYAR INVOICE ============
+
+export const regeneratePaymentToken = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const { orderId } = req.body;
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: "Order ID wajib diisi" });
+    }
+
+    console.log("🔄 Regenerating Mayar payment link for order:", orderId);
+
+    const [orderRows] = await connection.execute(
+      "SELECT * FROM orders WHERE order_id = ?",
+      [orderId]
+    );
+    const order = (orderRows as any[])[0];
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+    }
+
+    if (order.payment_status === "paid") {
+      return res.status(400).json({ success: false, error: "Pesanan ini sudah dibayar" });
+    }
+
+    // Reuse existing valid Mayar checkout URL if already generated to avoid hitting 429 rate limit
+    if (order.snap_token && (order.snap_token.startsWith("http://") || order.snap_token.startsWith("https://"))) {
+      console.log("⚡ Returning existing cached Mayar checkout URL for order:", orderId);
+      return res.json({
+        success: true,
+        token: order.snap_token,
+        checkoutUrl: order.snap_token,
+        redirectUrl: order.snap_token,
+      });
+    }
+
+    // Fetch order items to create a fresh invoice if needed
+    const [itemRows] = await connection.execute(
+      "SELECT * FROM order_items WHERE order_id = ?",
+      [orderId]
+    );
+    const items = itemRows as any[];
+
+    const mayarItems = items.map((item: any) => ({
+      description: `${item.product_name}${item.size ? ` (${item.size})` : ""}`.substring(0, 100),
+      quantity: Number(item.quantity),
+      rate: Number(item.unit_price),
+    }));
+
+    if (Number(order.shipping_cost) > 0) {
+      mayarItems.push({ description: "Ongkos Kirim", quantity: 1, rate: Number(order.shipping_cost) });
+    }
+    if (Number(order.service_fee) > 0) {
+      mayarItems.push({ description: "Biaya Layanan", quantity: 1, rate: Number(order.service_fee) });
+    }
+
+    const origin = req.get("origin") || req.get("referer") || "";
+    const forwardedHost = req.get("x-forwarded-host");
+    let frontendUrl = "https://filkommerch.com";
+
+    if (origin.startsWith("https://")) {
+      frontendUrl = origin.replace(/\/$/, "");
+    } else if (forwardedHost) {
+      frontendUrl = `https://${forwardedHost}`;
+    } else if (process.env.FRONTEND_URL) {
+      const urls = process.env.FRONTEND_URL.split(",");
+      const httpsUrl = urls.find((u) => u.trim().startsWith("https://"));
+      if (httpsUrl) {
+        frontendUrl = httpsUrl.trim();
+      }
+    }
+    const redirectUrl = `${frontendUrl}/order-confirmation?orderId=${orderId}`;
+
+    const mayarPayload = {
+      name: order.customer_name,
+      email: order.customer_email,
+      mobile: order.customer_phone || "081200000000",
+      redirectUrl,
+      description: `Pesanan FILKOM Merch #${orderId}`,
+      items: mayarItems,
+      extraData: {
+        orderId,
+      },
+    };
+
+    let mayarResponse: globalThis.Response;
+    try {
+      mayarResponse = await fetch(`${config.mayar.apiUrl}/invoice/create`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${config.mayar.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(mayarPayload),
+      });
+    } catch (e: any) {
+      if (order.snap_token && (order.snap_token.startsWith("http://") || order.snap_token.startsWith("https://"))) {
+        return res.json({ success: true, token: order.snap_token, checkoutUrl: order.snap_token });
+      }
+      throw e;
+    }
+
+    if (!mayarResponse.ok) {
+      const errBody = await mayarResponse.text();
+      console.error("❌ Mayar API error in regenerateToken:", mayarResponse.status, errBody);
+
+      // Handle 429 Rate Limit gracefully if we have any fallback
+      if (mayarResponse.status === 429 && order.snap_token) {
+        console.warn("⚠️ Mayar rate limited (429), returning stored snap_token fallback");
+        return res.json({
+          success: true,
+          token: order.snap_token,
+          checkoutUrl: order.snap_token,
+          redirectUrl: order.snap_token,
+        });
+      }
+
+      throw new Error(
+        mayarResponse.status === 429
+          ? "Terlalu banyak permintaan pembayaran dalam waktu singkat. Silakan tunggu 1-2 menit lalu coba lagi."
+          : `Gagal membuat invoice Mayar: ${mayarResponse.status}`
+      );
+    }
+
+    const mayarResult = (await mayarResponse.json()) as any;
+    const checkoutUrl = mayarResult.data?.link || null;
+    const mayarInvoiceId = mayarResult.data?.id || null;
+
+    if (!checkoutUrl) {
+      throw new Error("Tautan pembayaran tidak diterima dari server Mayar");
+    }
+
+    // Update order with new Mayar checkout URL
+    await connection.execute(
+      "UPDATE orders SET snap_token = ?, payment_type = 'mayar' WHERE order_id = ?",
+      [checkoutUrl, orderId]
+    );
+
+    return res.json({
+      success: true,
+      token: checkoutUrl,
+      checkoutUrl: checkoutUrl,
+      redirectUrl: checkoutUrl,
+    });
+  } catch (error: any) {
+    console.error("❌ Error regenerating Mayar invoice:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Gagal membuat tautan pembayaran Mayar",
+    });
+  } finally {
+    connection.release();
   }
 };
 

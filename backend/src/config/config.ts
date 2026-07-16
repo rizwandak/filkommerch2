@@ -12,11 +12,11 @@ export const config = {
     port: parseInt(process.env.DB_PORT || "3306"),
   },
 
-  // Midtrans
-  midtrans: {
-    serverKey: process.env.MIDTRANS_SERVER_KEY || "",
-    clientKey: process.env.MIDTRANS_CLIENT_KEY || "",
-    isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
+  // Mayar Payment Gateway
+  mayar: {
+    apiKey: process.env.MAYAR_API_KEY || "",
+    apiUrl: process.env.MAYAR_API_URL || "https://api.mayar.id/hl/v1",
+    webhookToken: process.env.MAYAR_WEBHOOK_TOKEN || "",
   },
 
   // API
@@ -27,7 +27,7 @@ export const config = {
 
 // Validate required env vars
 export function validateConfig() {
-  const required = ["DB_HOST", "DB_USER", "DB_NAME", "MIDTRANS_SERVER_KEY", "MIDTRANS_CLIENT_KEY"];
+  const required = ["DB_HOST", "DB_USER", "DB_NAME", "MAYAR_API_KEY"];
 
   const missing = required.filter((key) => !process.env[key]);
 

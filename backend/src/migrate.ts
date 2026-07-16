@@ -102,6 +102,14 @@ export async function runMigration() {
       {
         name: "products.pre_order_campaign_id",
         sql: "ALTER TABLE products ADD COLUMN pre_order_campaign_id INT DEFAULT NULL"
+      },
+      {
+        name: "payments.provider_varchar",
+        sql: "ALTER TABLE payments MODIFY COLUMN provider VARCHAR(50) NOT NULL"
+      },
+      {
+        name: "update_payment_mode_mayar",
+        sql: "UPDATE store_settings SET payment_mode = 'mayar' WHERE payment_mode = 'midtrans' OR payment_mode IS NULL"
       }
     ];
 

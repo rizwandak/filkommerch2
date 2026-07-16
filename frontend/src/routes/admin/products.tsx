@@ -145,7 +145,7 @@ function AdminProductsPage() {
     const imgUrl = form.images[idx];
     if (!imgUrl) return;
     setEditingImageIndex(idx);
-    setCropperImageSrc(resolveImageUrl(imgUrl));
+    setCropperImageSrc(resolveImageUrl(imgUrl) || "");
     setCropperOpen(true);
   };
 

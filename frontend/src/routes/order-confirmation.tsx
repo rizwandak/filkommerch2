@@ -10,6 +10,7 @@ import {
   MessageCircle,
   ShoppingBag,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
@@ -54,21 +55,39 @@ function OrderConfirmationPage() {
   const [isEditingProof, setIsEditingProof] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load Midtrans Snap script dynamically
-  useEffect(() => {
-    const snapScriptUrl = "https://app.sandbox.midtrans.com/snap/snap.js";
-    const clientKey = "Mid-client-xBEPEMQRGEXHq99n";
+  const [mayarCheckoutUrl, setMayarCheckoutUrl] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-    let script = document.querySelector(
-      `script[src="${snapScriptUrl}"]`,
-    ) as HTMLScriptElement | null;
-    if (!script) {
-      script = document.createElement("script");
-      script.src = snapScriptUrl;
-      script.setAttribute("data-client-key", clientKey);
-      document.body.appendChild(script);
+  // Auto poll order status while payment modal is open or pending
+  useEffect(() => {
+    const orderId = search.orderId;
+    if (!orderId) return;
+
+    const pStatus = order?.payment_status;
+
+    if (pStatus === "paid" || order?.order_status === "cancelled") {
+      if (showPaymentModal) {
+        setShowPaymentModal(false);
+        toast.success("✓ Pembayaran Anda telah terverifikasi dan berhasil!");
+      }
+      return;
     }
-  }, []);
+
+    const interval = setInterval(() => {
+      void getOrderById({ data: orderId }).then((result) => {
+        if (result.success && result.order) {
+          setOrder(result.order);
+          if (result.items) setOrderItems(result.items);
+          if (result.order.payment_status === "paid") {
+            setShowPaymentModal(false);
+            toast.success("✓ Pembayaran Anda telah terverifikasi dan berhasil!");
+          }
+        }
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [search.orderId, order?.payment_status, showPaymentModal]);
 
   const fetchOrderDetails = async () => {
     if (!search.orderId) {
@@ -180,42 +199,18 @@ function OrderConfirmationPage() {
     }
 
     try {
-      let snapToken = order.snap_token;
-
-      if (shouldRegenerate || !snapToken) {
-        setIsRegenerating(true);
-        const res = await regeneratePaymentToken({ data: { orderId: order.order_id } });
-        if (!res.success || !res.token) {
-          toast.error(res.error || "Gagal memproses pembayaran baru. Silakan coba lagi.");
-          return;
-        }
-        snapToken = res.token;
-        setOrder((prev: any) => (prev ? { ...prev, snap_token: res.token } : prev));
+      setIsRegenerating(true);
+      const res = await regeneratePaymentToken({ data: { orderId: order.order_id } });
+      if (!res.success || (!res.token && !res.checkoutUrl)) {
+        toast.error(res.error || "Gagal memproses pembayaran baru. Silakan coba lagi.");
+        return;
       }
-
-      if ((window as any).snap) {
-        (window as any).snap.pay(snapToken, {
-          onSuccess: (snapResult: any) => {
-            toast.success("Pembayaran berhasil!");
-            void fetchOrderDetails();
-          },
-          onPending: (snapResult: any) => {
-            toast.info("Pembayaran tertunda. Silakan selesaikan pembayaran Anda.");
-            void fetchOrderDetails();
-          },
-          onError: (snapResult: any) => {
-            toast.error("Pembayaran gagal!");
-          },
-          onClose: () => {
-            toast.warning("Anda menutup popup pembayaran sebelum menyelesaikan transaksi.");
-          },
-        });
-      } else {
-        toast.error("Sistem pembayaran Midtrans gagal dimuat. Coba segarkan halaman.");
-      }
+      const payUrl = res.checkoutUrl || res.token;
+      setMayarCheckoutUrl(payUrl);
+      setShowPaymentModal(true);
     } catch (err: any) {
       console.error("Error paying:", err);
-      toast.error("Gagal memulai proses pembayaran.");
+      toast.error("Gagal memulai proses pembayaran Mayar.");
     } finally {
       setIsRegenerating(false);
     }
@@ -638,6 +633,71 @@ function OrderConfirmationPage() {
 
         </div>
       </div>
+
+      {/* Mayar Payment Gateway Modal */}
+      {showPaymentModal && mayarCheckoutUrl && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="relative w-full max-w-2xl bg-card rounded-2xl border-2 border-ink shadow-2xl overflow-hidden mx-4">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-3.5 sm:p-4 border-b-2 border-ink bg-cream/20">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-4 h-4 text-brand-orange" />
+                <h3 className="font-bold text-xs sm:text-sm uppercase tracking-wider text-ink">
+                  Pembayaran Online — Mayar
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    toast.loading("Memeriksa status pembayaran...");
+                    await fetchOrderDetails();
+                    toast.dismiss();
+                    if (order?.payment_status === "paid") {
+                      setShowPaymentModal(false);
+                      toast.success("✓ Pembayaran berhasil terverifikasi!");
+                    } else {
+                      toast.info("Status pembayaran masih pending / belum diterima.");
+                    }
+                  }}
+                  className="h-8 text-xs font-bold border-ink/30 cursor-pointer bg-white"
+                >
+                  <RefreshCw className="w-3.5 h-3.5 mr-1" />
+                  Cek Status
+                </Button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    void fetchOrderDetails();
+                  }}
+                  className="p-1.5 rounded-full border border-ink/20 hover:bg-red-50 hover:border-red-300 text-ink hover:text-red-600 transition-all cursor-pointer"
+                  title="Tutup"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+            {/* Informational Guidance Sub-header */}
+            <div className="bg-amber-50 border-b border-amber-200 px-4 py-2 text-[11px] text-amber-900 flex items-center justify-between">
+              <span className="font-medium">💡 Selesaikan pembayaran di halaman Mayar. Status akan otomatis diperbarui.</span>
+              <span className="font-bold text-amber-950 shrink-0 ml-2">Mayar Gateway</span>
+            </div>
+            {/* Mayar Iframe */}
+            <iframe
+              src={mayarCheckoutUrl}
+              className="w-full h-[600px] sm:h-[650px] border-none"
+              title="Mayar Payment Gateway"
+              allow="payment"
+              onLoad={() => {
+                // Instantly re-check status when Mayar iframe navigates/redirects after payment
+                void fetchOrderDetails();
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

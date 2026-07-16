@@ -4,7 +4,6 @@ import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import { validateConfig } from "./config/config";
-import paymentRoutes from "./routes/payment";
 import * as apiControllers from "./controllers/api";
 import { validateBody, createOrderSchema } from "./middleware/validation";
 import { checkRole } from "./middleware/auth";
@@ -181,9 +180,9 @@ app.use("/uploads", express.static(uploadsDir));
 
 const getPublicHostUrl = (req: express.Request) => {
   const host = req.get("x-forwarded-host") || req.get("host") || "";
-  const proto = req.get("x-forwarded-proto") || req.protocol || "https";
-  if (!host || host.includes("localhost") || host.includes("127.0.0.1")) {
-    return process.env.PUBLIC_URL || "https://filkommerch.com";
+  const proto = req.get("x-forwarded-proto") || req.protocol || "http";
+  if (!host) {
+    return process.env.PUBLIC_URL || "http://127.0.0.1:8080";
   }
   return `${proto}://${host}`;
 };
@@ -304,8 +303,11 @@ app.get("/api", (req, res) => {
   res.json({ message: "FILKOM Merch API Server is running!" });
 });
 
-// payment routes (Integrasi Midtrans Client)
-app.use("/api/payment", paymentRoutes);
+// Mayar Webhook endpoint (receives callbacks from Mayar payment gateway server)
+app.post("/api/webhook-mayar", apiControllers.handleMayarWebhook);
+
+// Payment regeneration route (Mayar link creation)
+app.post("/api/payment/regenerate-token", checkoutLimiter, apiControllers.regeneratePaymentToken);
 
 // Auth API Routes — dilindungi rate limiter
 app.post("/api/auth/register", registerLimiter, apiControllers.registerBuyer);

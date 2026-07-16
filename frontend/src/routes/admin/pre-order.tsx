@@ -113,7 +113,7 @@ function AdminPreOrderBatchPage() {
     setStartDate(c.start_date ? c.start_date.substring(0, 16) : "");
     setEndDate(c.end_date ? c.end_date.substring(0, 16) : "");
     setExtendedEndDate(c.extended_end_date ? c.extended_end_date.substring(0, 16) : "");
-    setIsActive(c.is_active);
+    setIsActive(Boolean(c.is_active));
     setIsModalOpen(true);
   };
 
