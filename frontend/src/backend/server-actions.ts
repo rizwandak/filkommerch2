@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { getApiBaseUrl } from "@/lib/api-config";
 
 // Helper to resolve API base URL across SSR, client, and fallback envs
@@ -18,33 +17,20 @@ const getAuthHeaders = () => {
     "User-Agent": "PostmanRuntime/7.32.3"
   };
 
-  try {
-    const request = getRequest();
-    if (request) {
-      const cookieHeader = request.headers.get("cookie") || "";
-      const cookies = cookieHeader.split(";").reduce(
-        (acc: Record<string, string>, cookie: string) => {
-          const parts = cookie.split("=");
-          const key = parts[0]?.trim();
-          const value = parts.slice(1).join("=").trim();
-          if (key) acc[key] = decodeURIComponent(value);
-          return acc;
-        },
-        {} as Record<string, string>,
-      );
+  if (typeof window !== "undefined") {
+    const getCookie = (name: string) => {
+      const value = `; ${document.cookie}`;
+      const parts = value.split(`; ${name}=`);
+      if (parts.length === 2) return parts.pop()?.split(";").shift();
+      return undefined;
+    };
+    const role = getCookie("user_role");
+    const id = getCookie("user_id");
+    const name = getCookie("user_name");
 
-      if (cookies.user_role) {
-        headers["x-user-role"] = cookies.user_role;
-      }
-      if (cookies.user_id) {
-        headers["x-user-id"] = cookies.user_id;
-      }
-      if (cookies.user_name) {
-        headers["x-user-name"] = cookies.user_name;
-      }
-    }
-  } catch (e) {
-    console.warn("Could not retrieve web request context:", e);
+    if (role) headers["x-user-role"] = decodeURIComponent(role);
+    if (id) headers["x-user-id"] = decodeURIComponent(id);
+    if (name) headers["x-user-name"] = decodeURIComponent(name);
   }
 
   return headers;
