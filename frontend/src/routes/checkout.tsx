@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { createOrderAndPayment } from "@backend/server-actions";
+import { createOrderAndPayment, getStoreSettings } from "@backend/server-actions";
 import { Button } from "@frontend/components/ui/button";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Input } from "@frontend/components/ui/input";
@@ -94,6 +94,16 @@ function CheckoutPage() {
       if (user.nim && !customerNim) setCustomerNim(user.nim);
     }
   }, [user]);
+
+  const [storeSettings, setStoreSettings] = useState<any>(null);
+
+  useEffect(() => {
+    void getStoreSettings().then((res) => {
+      if (res?.settings) {
+        setStoreSettings(res.settings);
+      }
+    });
+  }, []);
 
   // Check auth and load cart
   useEffect(() => {
@@ -533,14 +543,25 @@ function CheckoutPage() {
                   </div>
 
                   {currentStep === 3 && (
-                    <div className="rounded-lg bg-[#FCFAF7] p-3 text-xs text-ink border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] space-y-1.5">
-                      <p className="font-extrabold uppercase text-[10px] text-brand-orange">
-                        💳 Seluruh Metode Pembayaran Online Bisa
-                      </p>
-                      <p className="text-muted-foreground leading-relaxed text-[11px]">
-                        Mendukung pembayaran otomatis via Virtual Account Bank (BCA, Mandiri, BRI, BNI), QRIS (GoPay, OVO, Dana, ShopeePay), dan Kartu Kredit.
-                      </p>
-                    </div>
+                    storeSettings?.payment_mode === "manual_qris" ? (
+                      <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-950 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] space-y-1.5">
+                        <p className="font-extrabold uppercase text-[10px] text-amber-900">
+                          📷 Pembayaran QRIS Statis (Manual)
+                        </p>
+                        <p className="text-amber-900/90 leading-relaxed text-[11px]">
+                          Scan kode QRIS statis dan upload foto bukti transfer. Pembayaran akan diverifikasi secara manual oleh admin toko.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-lg bg-[#FCFAF7] p-3 text-xs text-ink border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] space-y-1.5">
+                        <p className="font-extrabold uppercase text-[10px] text-brand-orange">
+                          💳 Online Payment — Mayar (Otomatis)
+                        </p>
+                        <p className="text-muted-foreground leading-relaxed text-[11px]">
+                          Mendukung pembayaran serba otomatis via Virtual Account Bank (BCA, Mandiri, BRI, BNI), QRIS Dinamis, E-Wallet (GoPay, OVO, Dana, ShopeePay), dan Kartu Kredit.
+                        </p>
+                      </div>
+                    )
                   )}
 
                 {currentStep === 4 && (

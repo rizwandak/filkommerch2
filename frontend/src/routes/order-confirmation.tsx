@@ -299,197 +299,209 @@ function OrderConfirmationPage() {
               </div>
             </div>
 
-            {/* Manual QRIS Payment Section & Upload Bukti */}
-            {order?.payment_type === "manual_qris" && (pStatus === "unpaid" || pStatus === "pending") && oStatus !== "cancelled" && (
-              <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
-                <CardHeader className="bg-cream/40 border-b-2 border-ink py-3.5">
-                  <CardTitle className="display text-sm tracking-wider uppercase text-ink flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-brand-orange" />
-                    Pembayaran QRIS
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-5 pt-5">
-                  <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
-                    Silakan bayar melalui QRIS di bawah ini sejumlah{" "}
-                    <strong className="text-brand-orange font-bold text-sm">
-                      Rp {order.gross_amount?.toLocaleString("id-ID") || "0"}
-                    </strong>{" "}
-                    dan unggah bukti transfernya pada form di bawah gambar QRIS.
-                  </p>
+            {/* Determine payment mode */}
+            {(() => {
+              const isManualQrisMode = order?.payment_type === "manual_qris" || storeSettings?.payment_mode === "manual_qris";
+              const isPending = (pStatus === "unpaid" || pStatus === "pending") && oStatus !== "cancelled";
 
-                  {storeSettings?.qris_static_url ? (
-                    <div className="flex flex-col items-center justify-center p-4 bg-white border-2 border-ink rounded-xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] max-w-sm sm:max-w-md mx-auto w-full">
-                      <div className="w-full aspect-square relative flex items-center justify-center p-2 bg-white">
-                        <img
-                          src={storeSettings.qris_static_url}
-                          alt="QRIS Pembayaran"
-                          className="w-full h-full object-contain rounded-md"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="p-4 border-2 border-dashed border-ink/20 rounded-lg bg-muted/20 text-center text-xs text-muted-foreground font-semibold">
-                      QRIS Pembayaran belum diset oleh Admin. Silakan hubungi admin untuk informasi pembayaran.
-                    </div>
-                  )}
+              if (!isPending) return null;
 
-                  {/* Upload Bukti Pembayaran */}
-                  <div className="border-2 border-ink rounded-xl p-4 space-y-3 bg-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
-                    <h3 className="font-extrabold text-xs uppercase tracking-wider text-ink">
-                      Unggah Bukti Pembayaran
-                    </h3>
+              if (isManualQrisMode) {
+                return (
+                  <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
+                    <CardHeader className="bg-cream/40 border-b-2 border-ink py-3.5">
+                      <CardTitle className="display text-sm tracking-wider uppercase text-ink flex items-center gap-2">
+                        <CreditCard className="w-4 h-4 text-brand-orange" />
+                        Pembayaran QRIS Statis (Manual)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-5 pt-5">
+                      <p className="text-xs text-muted-foreground leading-relaxed font-semibold">
+                        Silakan bayar melalui QRIS di bawah ini sejumlah{" "}
+                        <strong className="text-brand-orange font-bold text-sm">
+                          Rp {order?.gross_amount?.toLocaleString("id-ID") || "0"}
+                        </strong>{" "}
+                        dan unggah bukti transfernya pada form di bawah gambar QRIS.
+                      </p>
 
-                    {proofUrl && !isEditingProof ? (
-                      <div className="space-y-3">
-                        <div className="relative border border-emerald-200 rounded-lg p-3 bg-emerald-50/50 flex flex-col items-center gap-3">
-                          <img
-                            src={proofUrl}
-                            alt="Bukti Transfer"
-                            className="max-h-48 rounded object-contain border border-emerald-200 bg-white"
-                          />
-                          <span className="text-[10px] uppercase font-black text-emerald-800 tracking-wider">
-                            Bukti Pembayaran Terunggah ✓
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-muted-foreground text-center font-semibold uppercase tracking-wide">
-                          Mohon tunggu admin memverifikasi pembayaran Anda.
-                        </p>
-                        {order?.notes && (
-                          <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg text-amber-900 text-xs font-semibold flex items-start gap-2 text-left">
-                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-extrabold uppercase block text-[10px] text-amber-800">Catatan dari Admin:</span>
-                              <p className="mt-0.5 text-[11px] font-medium leading-snug">{order.notes}</p>
-                            </div>
+                      {storeSettings?.qris_static_url ? (
+                        <div className="flex flex-col items-center justify-center p-4 bg-white border-2 border-ink rounded-xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] max-w-sm sm:max-w-md mx-auto w-full">
+                          <div className="w-full aspect-square relative flex items-center justify-center p-2 bg-white">
+                            <img
+                              src={resolveImageUrl(storeSettings.qris_static_url)}
+                              alt="QRIS Pembayaran"
+                              className="w-full h-full object-contain rounded-md"
+                            />
                           </div>
-                        )}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setIsEditingProof(true);
-                            setProofUrlTemp("");
-                          }}
-                          className="w-full border-2 border-ink bg-white text-ink hover:bg-cream text-xs font-bold uppercase tracking-wider h-10 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                          <RefreshCw className="w-3.5 h-3.5 text-brand-orange" />
-                          Ganti Foto Bukti Pembayaran
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="grid w-full items-center gap-1.5">
-                          <div className="flex items-center justify-between">
-                            <label htmlFor="payment-proof-upload" className="text-[10px] uppercase font-bold text-ink">
-                              {isEditingProof ? "Pilih Foto Bukti Pembayaran Baru:" : "Pilih File Bukti Transfer:"}
-                            </label>
-                            {isEditingProof && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsEditingProof(false);
-                                  setProofUrlTemp("");
-                                }}
-                                className="text-[10px] font-bold text-red-600 hover:underline uppercase cursor-pointer"
-                              >
-                                Batal
-                              </button>
+                        </div>
+                      ) : (
+                        <div className="p-4 border-2 border-dashed border-ink/20 rounded-lg bg-muted/20 text-center text-xs text-muted-foreground font-semibold">
+                          QRIS Pembayaran belum diset oleh Admin. Silakan hubungi admin untuk informasi pembayaran.
+                        </div>
+                      )}
+
+                      {/* Upload Bukti Pembayaran */}
+                      <div className="border-2 border-ink rounded-xl p-4 space-y-3 bg-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
+                        <h3 className="font-extrabold text-xs uppercase tracking-wider text-ink">
+                          Unggah Bukti Pembayaran
+                        </h3>
+
+                        {proofUrl && !isEditingProof ? (
+                          <div className="space-y-3">
+                            <div className="relative border border-emerald-200 rounded-lg p-3 bg-emerald-50/50 flex flex-col items-center gap-3">
+                              <img
+                                src={resolveImageUrl(proofUrl)}
+                                alt="Bukti Transfer"
+                                className="max-h-48 rounded object-contain border border-emerald-200 bg-white"
+                              />
+                              <span className="text-[10px] uppercase font-black text-emerald-800 tracking-wider">
+                                Bukti Pembayaran Terunggah ✓
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground text-center font-semibold uppercase tracking-wide">
+                              Mohon tunggu admin memverifikasi pembayaran Anda.
+                            </p>
+                            {order?.notes && (
+                              <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg text-amber-900 text-xs font-semibold flex items-start gap-2 text-left">
+                                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <span className="font-extrabold uppercase block text-[10px] text-amber-800">Catatan dari Admin:</span>
+                                  <p className="mt-0.5 text-[11px] font-medium leading-snug">{order.notes}</p>
+                                </div>
+                              </div>
+                            )}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => {
+                                setIsEditingProof(true);
+                                setProofUrlTemp("");
+                              }}
+                              className="w-full border-2 border-ink bg-white text-ink hover:bg-cream text-xs font-bold uppercase tracking-wider h-10 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-brand-orange" />
+                              Ganti Foto Bukti Pembayaran
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="grid w-full items-center gap-1.5">
+                              <div className="flex items-center justify-between">
+                                <label htmlFor="payment-proof-upload" className="text-[10px] uppercase font-bold text-ink">
+                                  {isEditingProof ? "Pilih Foto Bukti Pembayaran Baru:" : "Pilih File Bukti Transfer:"}
+                                </label>
+                                {isEditingProof && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsEditingProof(false);
+                                      setProofUrlTemp("");
+                                    }}
+                                    className="text-[10px] font-bold text-red-600 hover:underline uppercase cursor-pointer"
+                                  >
+                                    Batal
+                                  </button>
+                                )}
+                              </div>
+                              <input
+                                ref={fileInputRef}
+                                id="payment-proof-upload"
+                                type="file"
+                                accept="image/*"
+                                onChange={handleUploadProof}
+                                disabled={uploadingProof || submittingProof}
+                                className="flex h-10 w-full rounded-md border-2 border-ink bg-background px-3 py-2 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-xs file:font-semibold cursor-pointer disabled:opacity-50"
+                              />
+                              <p className="text-[10px] text-muted-foreground">
+                                Unggah file bukti transfer Anda (format PNG, JPG, atau WEBP, max 5MB).
+                              </p>
+                            </div>
+
+                            {proofUrlTemp && (
+                              <div className="relative border-2 border-dashed border-ink/20 rounded-lg p-3 bg-muted/10 flex flex-col items-center gap-3">
+                                <img
+                                  src={resolveImageUrl(proofUrlTemp)}
+                                  alt="Bukti Transfer"
+                                  className="max-h-48 rounded object-contain border border-ink/10 bg-white"
+                                />
+                                <div className="flex gap-2 w-full">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="flex-1 border-2 border-ink bg-white text-ink hover:bg-cream text-xs font-bold uppercase tracking-wider h-10 cursor-pointer"
+                                  >
+                                    Pilih Foto Lain
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    onClick={handleSubmitProof}
+                                    disabled={submittingProof}
+                                    className="flex-1 bg-ink text-white hover:bg-brand-orange text-xs font-bold uppercase tracking-wider h-10 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                                  >
+                                    {submittingProof ? (
+                                      <>
+                                        <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+                                        Mengirim...
+                                      </>
+                                    ) : (
+                                      "Kirim Bukti"
+                                    )}
+                                  </Button>
+                                </div>
+                              </div>
                             )}
                           </div>
-                          <input
-                            ref={fileInputRef}
-                            id="payment-proof-upload"
-                            type="file"
-                            accept="image/*"
-                            onChange={handleUploadProof}
-                            disabled={uploadingProof || submittingProof}
-                            className="flex h-10 w-full rounded-md border-2 border-ink bg-background px-3 py-2 text-xs ring-offset-background file:border-0 file:bg-transparent file:text-xs file:font-semibold cursor-pointer disabled:opacity-50"
-                          />
-                          <p className="text-[10px] text-muted-foreground">
-                            Unggah file bukti transfer Anda (format PNG, JPG, atau WEBP, max 5MB).
-                          </p>
-                        </div>
-
-                        {proofUrlTemp && (
-                          <div className="relative border-2 border-dashed border-ink/20 rounded-lg p-3 bg-muted/10 flex flex-col items-center gap-3">
-                            <img
-                              src={proofUrlTemp}
-                              alt="Bukti Transfer"
-                              className="max-h-48 rounded object-contain border border-ink/10 bg-white"
-                            />
-                            <div className="flex gap-2 w-full">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => fileInputRef.current?.click()}
-                                className="flex-1 border-2 border-ink bg-white text-ink hover:bg-cream text-xs font-bold uppercase tracking-wider h-10 cursor-pointer"
-                              >
-                                Pilih Foto Lain
-                              </Button>
-                              <Button
-                                type="button"
-                                onClick={handleSubmitProof}
-                                disabled={submittingProof}
-                                className="flex-1 bg-ink text-white hover:bg-brand-orange text-xs font-bold uppercase tracking-wider h-10 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-                              >
-                                {submittingProof ? (
-                                  <>
-                                    <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                                    Mengirim...
-                                  </>
-                                ) : (
-                                  "Kirim Bukti"
-                                )}
-                              </Button>
-                            </div>
-                          </div>
                         )}
                       </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
+                    </CardContent>
+                  </Card>
+                );
+              }
 
-            {/* Online Payment button if pending */}
-            {order?.payment_type !== "manual_qris" && (pStatus === "unpaid" || pStatus === "pending") && oStatus !== "cancelled" && (
-              <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
-                <CardHeader className="bg-cream/40 border-b-2 border-ink py-3.5">
-                  <CardTitle className="display text-sm tracking-wider uppercase text-ink flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-brand-orange" />
-                    Pembayaran Online
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-4 space-y-2">
-                  {order.snap_token && (
-                    <Button
-                      onClick={() => handlePayNow(false)}
-                      disabled={isRegenerating}
-                      className="w-full h-12 bg-emerald-600 text-white hover:bg-emerald-600/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <CreditCard className="w-4 h-4" />
-                      Lanjutkan Pembayaran
-                    </Button>
-                  )}
-                  <Button
-                    onClick={() => handlePayNow(true)}
-                    disabled={isRegenerating}
-                    className="w-full h-12 bg-brand-orange text-white hover:bg-brand-orange/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isRegenerating ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CreditCard className="w-4 h-4" />
+              // Online Payment Mayar Mode
+              return (
+                <Card className="border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
+                  <CardHeader className="bg-cream/40 border-b-2 border-ink py-3.5">
+                    <CardTitle className="display text-sm tracking-wider uppercase text-ink flex items-center gap-2">
+                      <CreditCard className="w-4 h-4 text-brand-orange" />
+                      Pembayaran Online — Mayar
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-3">
+                    <p className="text-xs text-muted-foreground leading-relaxed font-medium">
+                      Gunakan tombol di bawah untuk membuka portal pembayaran Mayar. Tersedia berbagai opsi Virtual Account, QRIS Dinamis, E-Wallet, dan Kartu Kredit.
+                    </p>
+                    {order?.snap_token && (
+                      <Button
+                        onClick={() => handlePayNow(false)}
+                        disabled={isRegenerating}
+                        className="w-full h-12 bg-emerald-600 text-white hover:bg-emerald-600/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      >
+                        <CreditCard className="w-4 h-4" />
+                        Lanjutkan Pembayaran
+                      </Button>
                     )}
-                    {isRegenerating
-                      ? "Memproses..."
-                      : order.snap_token
-                        ? "Ubah Metode Pembayaran"
-                        : "Lanjutkan Pembayaran Sekarang"}
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
+                    <Button
+                      onClick={() => handlePayNow(true)}
+                      disabled={isRegenerating}
+                      className="w-full h-12 bg-brand-orange text-white hover:bg-brand-orange/90 font-bold uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {isRegenerating ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <CreditCard className="w-4 h-4" />
+                      )}
+                      {isRegenerating
+                        ? "Memproses..."
+                        : order?.snap_token
+                          ? "Ubah Metode Pembayaran"
+                          : "Lanjutkan Pembayaran Sekarang"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              );
+            })()}
           </div>
 
           {/* KOLOM KANAN: Rincian Transaksi, Action Buttons, & Seksi Bantuan */}
