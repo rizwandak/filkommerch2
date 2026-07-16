@@ -301,7 +301,7 @@ function OrderConfirmationPage() {
       {/* Main Content (2-Column Grid on Desktop) */}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
+
           {/* KOLOM KIRI (LEBIH BESAR): Status & Pembayaran QRIS / Upload Bukti */}
           <div className="lg:col-span-7 space-y-6">
             {/* Compact Status Header */}
@@ -330,7 +330,7 @@ function OrderConfirmationPage() {
                     <CardHeader className="bg-cream/40 border-b-2 border-ink py-3.5">
                       <CardTitle className="display text-sm tracking-wider uppercase text-ink flex items-center gap-2">
                         <CreditCard className="w-4 h-4 text-brand-orange" />
-                        Pembayaran QRIS Statis (Manual)
+                        Pembayaran QRIS
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-5 pt-5">

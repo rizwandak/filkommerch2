@@ -61,9 +61,9 @@ function AdminSettingsPage() {
         setSettings((prev) =>
           prev
             ? {
-                ...prev,
-                qris_static_url: data.url,
-              }
+              ...prev,
+              qris_static_url: data.url,
+            }
             : null,
         );
         toast.success("Foto QRIS berhasil diunggah");
@@ -99,7 +99,7 @@ function AdminSettingsPage() {
         qris_static_url: settings.qris_static_url || undefined,
         payment_mode: settings.payment_mode || "mayar",
         homepage_layout: settings.homepage_layout || undefined,
-        userRole: user?.role || user?.type || "admin",
+        userRole: user?.type === "admin" ? (user.role || "admin") : "admin",
         userId: String(user?.id || ""),
       },
     });
@@ -136,104 +136,104 @@ function AdminSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <fieldset disabled={isCashier} className="space-y-4 w-full border-0 p-0 m-0">
-          <div className="space-y-2">
-            <Label>Nama Toko</Label>
-            <Input
-              value={settings.store_name}
-              onChange={(e) => setSettings({ ...settings, store_name: e.target.value })}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Nama Toko</Label>
+              <Input
+                value={settings.store_name}
+                onChange={(e) => setSettings({ ...settings, store_name: e.target.value })}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Alamat</Label>
-            <Textarea
-              value={settings.address || ""}
-              onChange={(e) => setSettings({ ...settings, address: e.target.value })}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Alamat</Label>
+              <Textarea
+                value={settings.address || ""}
+                onChange={(e) => setSettings({ ...settings, address: e.target.value })}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Telepon</Label>
-            <Input
-              value={settings.phone || ""}
-              onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Telepon</Label>
+              <Input
+                value={settings.phone || ""}
+                onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Pajak (%)</Label>
-            <Input
-              type="number"
-              min={0}
-              max={100}
-              value={settings.tax_rate}
-              onChange={(e) =>
-                setSettings({ ...settings, tax_rate: parseFloat(e.target.value) || 0 })
-              }
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Pajak (%)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                value={settings.tax_rate}
+                onChange={(e) =>
+                  setSettings({ ...settings, tax_rate: parseFloat(e.target.value) || 0 })
+                }
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Metode Pembayaran Online Default</Label>
-            <Select
-              value={settings.payment_mode || "mayar"}
-              onValueChange={(val) => setSettings({ ...settings, payment_mode: val as any })}
+            <div className="space-y-2">
+              <Label>Metode Pembayaran Online Default</Label>
+              <Select
+                value={settings.payment_mode || "mayar"}
+                onValueChange={(val) => setSettings({ ...settings, payment_mode: val as any })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Pilih Metode Pembayaran" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mayar">Online Payment — Mayar (Otomatis)</SelectItem>
+                  <SelectItem value="manual_qris">QRIS Statis & Upload Bukti (Manual)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Tentukan apakah pembeli online melakukan transaksi otomatis via Mayar atau transfer manual dengan scan QRIS statis lalu mengunggah bukti pembayaran.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Foto QRIS Statis</Label>
+              {settings.qris_static_url ? (
+                <div className="relative border-2 border-dashed border-ink/30 rounded-lg p-4 bg-muted/30 flex flex-col items-center gap-3">
+                  <img
+                    src={settings.qris_static_url}
+                    alt="QRIS Statis"
+                    className="max-h-48 rounded object-contain border border-ink/20 bg-white"
+                  />
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => setSettings({ ...settings, qris_static_url: "" })}
+                    className="text-xs uppercase tracking-wider font-bold animate-fade-in"
+                  >
+                    Hapus QRIS
+                  </Button>
+                </div>
+              ) : (
+                <div className="grid w-full items-center gap-1.5">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleUploadQris}
+                    className="cursor-pointer"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Unggah file gambar QRIS Statis Anda (PNG, JPG, WEBP). Digunakan saat kasir memilih
+                    pembayaran QRIS Statis di POS.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <Button
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="display bg-ink text-white hover:bg-brand-orange transition-all duration-300 font-bold tracking-widest text-xs py-5 px-6"
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Pilih Metode Pembayaran" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mayar">Online Payment — Mayar (Otomatis)</SelectItem>
-                <SelectItem value="manual_qris">QRIS Statis & Upload Bukti (Manual)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Tentukan apakah pembeli online melakukan transaksi otomatis via Mayar atau transfer manual dengan scan QRIS statis lalu mengunggah bukti pembayaran.
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Foto QRIS Statis</Label>
-            {settings.qris_static_url ? (
-              <div className="relative border-2 border-dashed border-ink/30 rounded-lg p-4 bg-muted/30 flex flex-col items-center gap-3">
-                <img
-                  src={settings.qris_static_url}
-                  alt="QRIS Statis"
-                  className="max-h-48 rounded object-contain border border-ink/20 bg-white"
-                />
-                <Button
-                  type="button"
-                  variant="destructive"
-                  size="sm"
-                  onClick={() => setSettings({ ...settings, qris_static_url: "" })}
-                  className="text-xs uppercase tracking-wider font-bold animate-fade-in"
-                >
-                  Hapus QRIS
-                </Button>
-              </div>
-            ) : (
-              <div className="grid w-full items-center gap-1.5">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleUploadQris}
-                  className="cursor-pointer"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Unggah file gambar QRIS Statis Anda (PNG, JPG, WEBP). Digunakan saat kasir memilih
-                  pembayaran QRIS Statis di POS.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <Button
-            onClick={() => void handleSave()}
-            disabled={saving}
-            className="display bg-ink text-white hover:bg-brand-orange transition-all duration-300 font-bold tracking-widest text-xs py-5 px-6"
-          >
-            {saving ? "Menyimpan..." : "Simpan Pengaturan"}
-          </Button>
+              {saving ? "Menyimpan..." : "Simpan Pengaturan"}
+            </Button>
           </fieldset>
         </CardContent>
       </Card>
