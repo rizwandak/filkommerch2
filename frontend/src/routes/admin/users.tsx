@@ -59,7 +59,7 @@ const emptyForm = (): UserForm => ({
 });
 
 function AdminUsersPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isCashier = user?.type === "admin" && user.role === "cashier";
   const [users, setUsers] = useState<DbUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,8 +89,9 @@ function AdminUsersPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     void loadUsers();
-  }, []);
+  }, [authLoading]);
 
   const openCreate = () => {
     setForm(emptyForm());

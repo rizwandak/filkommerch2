@@ -39,6 +39,24 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const syncAuthCookies = (user: User | null) => {
+  if (typeof document === "undefined") return;
+
+  if (user) {
+    const role = user.type === "admin" ? user.role : "buyer";
+    const name = user.type === "admin" ? user.username : user.name;
+    const id = String(user.id || "");
+
+    document.cookie = `user_role=${role}; path=/; max-age=604800; SameSite=Lax`;
+    document.cookie = `user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
+    document.cookie = `user_id=${id}; path=/; max-age=604800; SameSite=Lax`;
+  } else {
+    document.cookie = "user_role=; path=/; max-age=0; SameSite=Lax";
+    document.cookie = "user_name=; path=/; max-age=0; SameSite=Lax";
+    document.cookie = "user_id=; path=/; max-age=0; SameSite=Lax";
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,7 +66,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const savedUser = localStorage.getItem("user");
     if (savedUser) {
       try {
-        setUser(JSON.parse(savedUser));
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+        syncAuthCookies(parsedUser);
       } catch (e) {
         console.error("Failed to load user:", e);
       }
@@ -59,19 +79,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Sync cookies whenever user changes (only after auth initialization completes)
   useEffect(() => {
     if (typeof document === "undefined" || loading) return;
-    if (user) {
-      const role = user.type === "admin" ? user.role : "buyer";
-      const name = user.type === "admin" ? user.username : user.name;
-      const id = String(user.id || "");
-
-      document.cookie = `user_role=${role}; path=/; max-age=604800; SameSite=Lax`;
-      document.cookie = `user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
-      document.cookie = `user_id=${id}; path=/; max-age=604800; SameSite=Lax`;
-    } else {
-      document.cookie = "user_role=; path=/; max-age=0; SameSite=Lax";
-      document.cookie = "user_name=; path=/; max-age=0; SameSite=Lax";
-      document.cookie = "user_id=; path=/; max-age=0; SameSite=Lax";
-    }
+    syncAuthCookies(user);
   }, [user, loading]);
 
   const loginAsAdmin = async (username: string, password: string) => {
@@ -82,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setUser(result.user);
     localStorage.setItem("user", JSON.stringify(result.user));
+    syncAuthCookies(result.user);
   };
 
   const loginAsGoogle = async (userInfo: Omit<BuyerUser, "type">) => {
@@ -104,12 +113,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     setUser(updatedUser);
     localStorage.setItem("user", JSON.stringify(updatedUser));
+    syncAuthCookies(updatedUser);
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem("user");
     localStorage.removeItem("cart");
+    syncAuthCookies(null);
     if (typeof window !== "undefined") {
       window.location.href = "/login";
     }

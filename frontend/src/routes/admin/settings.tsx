@@ -22,7 +22,7 @@ export const Route = createFileRoute("/admin/settings")({
 });
 
 function AdminSettingsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isCashier = user?.type === "admin" && user.role === "cashier";
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -78,10 +78,11 @@ function AdminSettingsPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     void getStoreSettings()
       .then((res) => setSettings(res.settings))
       .finally(() => setLoading(false));
-  }, []);
+  }, [authLoading]);
 
   const handleSave = async () => {
     if (isCashier) {

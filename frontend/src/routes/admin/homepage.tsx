@@ -317,7 +317,7 @@ function SortableSegmentItem({
 }
 
 function AdminHomepageEditorPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isCashier = (user as any)?.role === "cashier";
   const [settings, setSettings] = useState<StoreSettings | null>(null);
   const [segments, setSegments] = useState<HomepageSegment[]>([]);
@@ -400,8 +400,9 @@ function AdminHomepageEditorPage() {
   };
 
   useEffect(() => {
+    if (authLoading) return;
     void loadData();
-  }, []);
+  }, [authLoading]);
 
   const handleSave = async () => {
     if (isCashier) {
