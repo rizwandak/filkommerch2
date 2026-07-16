@@ -2181,8 +2181,8 @@ export const getDailySalesSummary = async (req: Request, res: Response) => {
 // Get top products sold
 export const getTopProducts = async (req: Request, res: Response) => {
   try {
-    const limit = parseInt(req.query.limit as string) || 10;
-    const days = parseInt(req.query.days as string) || 30;
+    const limit = Number.isFinite(Number(req.query.limit)) ? Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10))) : 10;
+    const days = Number.isFinite(Number(req.query.days)) ? Math.max(1, Math.min(365, parseInt(req.query.days as string, 10))) : 30;
     
     const products = await query<any>(
       `SELECT p.id, p.name,
@@ -2191,17 +2191,20 @@ export const getTopProducts = async (req: Request, res: Response) => {
        FROM order_items oi
        JOIN products p ON p.id = oi.product_id
        JOIN orders o ON o.order_id = oi.order_id
-       WHERE o.payment_status = 'paid' AND o.created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)
+       WHERE o.payment_status = 'paid' AND o.created_at >= DATE_SUB(NOW(), INTERVAL ${days} DAY)
        GROUP BY p.id, p.name
        ORDER BY total_quantity_sold DESC
-       LIMIT ?`,
-      [days, limit]
+       LIMIT ${limit}`
     );
 
     return res.json({ success: true, products });
   } catch (error: any) {
     console.error("Error fetching top products:", error);
-    return res.status(500).json({ success: false, products: [], error: "Failed to fetch products" });
+    return res.status(500).json({
+      success: false,
+      products: [],
+      error: error.message || "Failed to fetch products",
+    });
   }
 };
 

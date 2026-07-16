@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import React from "react";
 import { toast } from "sonner";
 import { Activity, Search, RefreshCw, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/lib/auth";
+import { getApiBaseUrl } from "@/lib/api-config";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Input } from "@frontend/components/ui/input";
@@ -14,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@frontend/components/ui/select";
-import { getActivityLogs, type ActivityLog } from "@backend/server-actions";
+import type { ActivityLog } from "@backend/server-actions";
 
 export const Route = createFileRoute("/admin/activity-logs")({
   component: AdminActivityLogsPage,
@@ -22,6 +24,8 @@ export const Route = createFileRoute("/admin/activity-logs")({
 });
 
 function AdminActivityLogsPage() {
+  const { user, loading: authLoading } = useAuth();
+  const API_BASE_URL = getApiBaseUrl().replace(/\/api\/?$/, "").replace(/\/$/, "");
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -29,26 +33,52 @@ function AdminActivityLogsPage() {
   const [entityFilter, setEntityFilter] = useState("all");
   const [expandedLogId, setExpandedLogId] = useState<number | null>(null);
 
+  const getAdminRequestHeaders = () => {
+    const role = user?.type === "admin" ? user.role : undefined;
+    const userId = user?.id ? String(user.id) : undefined;
+    const name = user?.type === "admin" ? user.username : user?.name;
+
+    const headers: Record<string, string> = {};
+    if (role) headers["x-user-role"] = role;
+    if (userId) headers["x-user-id"] = userId;
+    if (name) headers["x-user-name"] = name;
+    return headers;
+  };
+
+  const fetchJson = async <T,>(url: string) => {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: getAdminRequestHeaders(),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error || `HTTP ${res.status}`);
+    }
+
+    return data as T;
+  };
+
   const loadLogs = async () => {
     setLoading(true);
     try {
-      const res = await getActivityLogs();
-      if (res.logs) {
-        setLogs(res.logs);
-      } else if (res.error) {
-        toast.error(res.error);
-      }
+      const res = await fetchJson<{ logs: ActivityLog[] }>(
+        `${API_BASE_URL}/api/admin/activity-logs`,
+      );
+      setLogs(res.logs || []);
     } catch (err) {
       console.error(err);
       toast.error("Gagal mengambil log aktivitas");
+      setLogs([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (authLoading) return;
     void loadLogs();
-  }, []);
+  }, [authLoading]);
 
   // Filtering
   const filteredLogs = logs.filter((log) => {

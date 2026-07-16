@@ -24,6 +24,7 @@ import {
 } from "@frontend/components/ui/select";
 import { Eye, Pencil, Trash2, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+import { getApiBaseUrl } from "@/lib/api-config";
 import {
   getOnlineOrders,
   getOfflineSales,
@@ -51,8 +52,9 @@ const statusColor: Record<string, string> = {
 };
 
 function AdminTransactionsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isCashier = user?.type === "admin" && user.role === "cashier";
+  const API_BASE_URL = getApiBaseUrl().replace(/\/api\/?$/, "").replace(/\/$/, "");
   const [onlineOrders, setOnlineOrders] = useState<Order[]>([]);
   const [offlineSales, setOfflineSales] = useState<OfflineSale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,21 +74,58 @@ function AdminTransactionsPage() {
   const [editNotes, setEditNotes] = useState<string>("");
   const [savingStatus, setSavingStatus] = useState(false);
 
+  const getAdminRequestHeaders = () => {
+    const role = user?.type === "admin" ? user.role : undefined;
+    const userId = user?.id ? String(user.id) : undefined;
+    const name = user?.type === "admin" ? user.username : user?.name;
+
+    const headers: Record<string, string> = {};
+    if (role) headers["x-user-role"] = role;
+    if (userId) headers["x-user-id"] = userId;
+    if (name) headers["x-user-name"] = name;
+    return headers;
+  };
+
+  const fetchJson = async <T,>(url: string) => {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: getAdminRequestHeaders(),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error || `HTTP ${res.status}`);
+    }
+
+    return data as T;
+  };
+
   const loadTransactions = async () => {
     try {
-      const [online, offline] = await Promise.all([getOnlineOrders(), getOfflineSales()]);
+      const online = await fetchJson<{ orders: Order[] }>(`${API_BASE_URL}/api/admin/orders`);
       setOnlineOrders(online.orders || []);
+    } catch (error) {
+      console.error("Error fetching online orders:", error);
+      toast.error("Gagal memuat pesanan online");
+      setOnlineOrders([]);
+    }
+
+    try {
+      const offline = await fetchJson<{ sales: OfflineSale[] }>(`${API_BASE_URL}/api/sales`);
       setOfflineSales(offline.sales || []);
-    } catch {
-      toast.error("Gagal memuat transaksi");
+    } catch (error) {
+      console.error("Error fetching offline sales:", error);
+      toast.error("Gagal memuat penjualan POS");
+      setOfflineSales([]);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
+    if (authLoading) return;
     void loadTransactions();
-  }, []);
+  }, [authLoading, user]);
 
   const handleOpenDetail = async (id: string, type: "online" | "offline") => {
     setFetchingDetail(true);

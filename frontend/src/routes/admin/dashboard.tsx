@@ -1,5 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useAuth } from "@/lib/auth";
+import { getApiBaseUrl } from "@/lib/api-config";
 import {
   LineChart,
   Line,
@@ -15,9 +17,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
 import {
-  getDailySalesSummary,
-  getTopProducts,
-  getInventory,
   type DailySummary,
   type TopProduct,
   type InventoryItem,
@@ -35,29 +34,67 @@ export const Route = createFileRoute("/admin/dashboard")({
 });
 
 function AdminDashboardPage() {
+  const { user, loading: authLoading } = useAuth();
+  const API_BASE_URL = getApiBaseUrl().replace(/\/api\/?$/, "").replace(/\/$/, "");
   const [summary, setSummary] = useState<DailySummary | null>(null);
   const [topProducts, setTopProducts] = useState<TopProduct[]>([]);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const getAdminRequestHeaders = () => {
+    const role = user?.type === "admin" ? user.role : undefined;
+    const userId = user?.id ? String(user.id) : undefined;
+    const name = user?.type === "admin" ? user.username : user?.name;
+
+    const headers: Record<string, string> = {};
+    if (role) headers["x-user-role"] = role;
+    if (userId) headers["x-user-id"] = userId;
+    if (name) headers["x-user-name"] = name;
+    return headers;
+  };
+
+  const fetchJson = async <T,>(url: string) => {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: getAdminRequestHeaders(),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error || `HTTP ${res.status}`);
+    }
+
+    return data as T;
+  };
+
   useEffect(() => {
+    if (authLoading) return;
     const loadData = async () => {
       try {
         const today = new Date().toISOString().split("T")[0];
-        const [summaryResult, productsResult, inventoryResult] = await Promise.all([
-          getDailySalesSummary({ data: today }),
-          getTopProducts({ data: { limit: 10, days: 30 } }),
-          getInventory(),
-        ]);
+        const summaryResult = await fetchJson<{ summary: DailySummary | null }>(
+          `${API_BASE_URL}/api/analytics/daily?date=${encodeURIComponent(today)}`,
+        );
+        setSummary(summaryResult.summary);
 
-        if (summaryResult && "summary" in summaryResult && summaryResult.summary) {
-          setSummary(summaryResult.summary);
+        try {
+          const productsResult = await fetchJson<{ products: TopProduct[] }>(
+            `${API_BASE_URL}/api/analytics/top-products?limit=10&days=30`,
+          );
+          setTopProducts(productsResult.products || []);
+        } catch (error) {
+          console.error("Error loading top products:", error);
+          setTopProducts([]);
         }
-        if (productsResult && "products" in productsResult && productsResult.products) {
-          setTopProducts(productsResult.products);
-        }
-        if (inventoryResult && "inventory" in inventoryResult && inventoryResult.inventory) {
-          setInventory(inventoryResult.inventory);
+
+        try {
+          const inventoryResult = await fetchJson<{ inventory: InventoryItem[] }>(
+            `${API_BASE_URL}/api/analytics/inventory`,
+          );
+          setInventory(inventoryResult.inventory || []);
+        } catch (error) {
+          console.error("Error loading inventory:", error);
+          setInventory([]);
         }
       } catch (error) {
         console.error("Error loading dashboard data:", error);
@@ -68,7 +105,7 @@ function AdminDashboardPage() {
     };
 
     void loadData();
-  }, []);
+  }, [authLoading, user]);
 
   if (loading) {
     return (

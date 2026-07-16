@@ -60,6 +60,9 @@ app.use(
     allowedHeaders: [
       "Content-Type",
       "Authorization",
+      "x-user-role",
+      "x-user-id",
+      "x-user-name",
       "ngrok-skip-browser-warning",
       "bypass-tunnel-reminder",
       "Bypass-Tunnel-Reminder"

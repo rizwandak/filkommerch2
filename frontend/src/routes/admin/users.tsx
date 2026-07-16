@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Search, User } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
+import { getApiBaseUrl } from "@/lib/api-config";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Input } from "@frontend/components/ui/input";
@@ -23,10 +24,6 @@ import {
   SelectValue,
 } from "@frontend/components/ui/select";
 import {
-  getUsersAdmin,
-  createUserAdmin,
-  updateUserAdmin,
-  deleteUserAdmin,
   type DbUser,
 } from "@backend/server-actions";
 
@@ -72,6 +69,8 @@ function AdminUsersPage() {
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
   const [userNameToDelete, setUserNameToDelete] = useState("");
 
+  const API_BASE_URL = getApiBaseUrl();
+
   const getAdminRequestHeaders = () => {
     const role = user?.type === "admin" ? user.role : undefined;
     const id = user?.id ? String(user.id) : undefined;
@@ -84,17 +83,81 @@ function AdminUsersPage() {
     return headers;
   };
 
+  const fetchAdminUsers = async () => {
+    const res = await fetch(`${API_BASE_URL}/api/admin/users`, {
+      method: "GET",
+      headers: getAdminRequestHeaders(),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error || `Gagal memuat pengguna (HTTP ${res.status})`);
+    }
+
+    return data as { success: boolean; users: DbUser[]; error?: string };
+  };
+
+  const createAdminUser = async (payload: Record<string, unknown>) => {
+    const res = await fetch(`${API_BASE_URL}/api/admin/users`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAdminRequestHeaders(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error || `Gagal menyimpan pengguna (HTTP ${res.status})`);
+    }
+
+    return data as { success: boolean; error?: string };
+  };
+
+  const updateAdminUser = async (payload: Record<string, unknown>) => {
+    const res = await fetch(`${API_BASE_URL}/api/admin/users`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        ...getAdminRequestHeaders(),
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error || `Gagal menyimpan pengguna (HTTP ${res.status})`);
+    }
+
+    return data as { success: boolean; error?: string };
+  };
+
+  const deleteAdminUser = async (id: number) => {
+    const res = await fetch(`${API_BASE_URL}/api/admin/users/${id}`, {
+      method: "DELETE",
+      headers: getAdminRequestHeaders(),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error || `Gagal menghapus pengguna (HTTP ${res.status})`);
+    }
+
+    return data as { success: boolean; error?: string };
+  };
+
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const result = await getUsersAdmin({ headers: getAdminRequestHeaders() });
+      const result = await fetchAdminUsers();
       if (result.success) {
         setUsers(result.users);
       } else {
         toast.error(result.error || "Gagal memuat pengguna");
       }
-    } catch {
-      toast.error("Gagal memuat daftar pengguna");
+    } catch (error: any) {
+      toast.error(error?.message || "Gagal memuat daftar pengguna");
     } finally {
       setLoading(false);
     }
@@ -154,8 +217,8 @@ function AdminUsersPage() {
       };
 
       const result = form.id
-        ? await updateUserAdmin({ data: payload, headers: getAdminRequestHeaders() })
-        : await createUserAdmin({ data: payload, headers: getAdminRequestHeaders() });
+        ? await updateAdminUser(payload)
+        : await createAdminUser(payload);
 
       if (result.success) {
         toast.success(
@@ -195,7 +258,7 @@ function AdminUsersPage() {
     if (!userToDelete) return;
     setSaving(true);
     try {
-      const result = await deleteUserAdmin({ data: userToDelete, headers: getAdminRequestHeaders() });
+      const result = await deleteAdminUser(userToDelete);
       if (result.success) {
         toast.success("Pengguna berhasil dihapus");
         setDeleteConfirmOpen(false);

@@ -119,7 +119,7 @@ const formatDateForInput = (dateVal: any) => {
 };
 
 function AdminProductsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const isCashier = user?.type === "admin" && user.role === "cashier";
   const [products, setProducts] = useState<ProductWithVariants[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -230,18 +230,58 @@ function AdminProductsPage() {
   };
   const API_BASE_URL = getApiBaseUrl();
 
+  const getAdminRequestHeaders = () => {
+    const role = user?.type === "admin" ? user.role : undefined;
+    const userId = user?.id ? String(user.id) : undefined;
+    const name = user?.type === "admin" ? user.username : user?.name;
+
+    const headers: Record<string, string> = {};
+    if (role) headers["x-user-role"] = role;
+    if (userId) headers["x-user-id"] = userId;
+    if (name) headers["x-user-name"] = name;
+    return headers;
+  };
+
+  const fetchJson = async <T,>(url: string) => {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: getAdminRequestHeaders(),
+    });
+
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error || `HTTP ${res.status}`);
+    }
+
+    return data as T;
+  };
+
   const loadProducts = async () => {
-    const [productsRes, categoriesRes] = await Promise.all([
-      getAllProductsAdmin(),
-      getCategories(),
-    ]);
-    setProducts(productsRes.products);
-    setCategories(categoriesRes.categories);
+    try {
+      const productsRes = await fetchJson<{ products: ProductWithVariants[] }>(
+        `${API_BASE_URL}/api/admin/products`,
+      );
+      setProducts(productsRes.products || []);
+    } catch (error) {
+      console.error("Error fetching admin products:", error);
+      setProducts([]);
+    }
+
+    try {
+      const categoriesRes = await fetchJson<{ categories: Category[] }>(
+        `${API_BASE_URL}/api/categories`,
+      );
+      setCategories(categoriesRes.categories || []);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      setCategories([]);
+    }
   };
 
   useEffect(() => {
+    if (authLoading) return;
     void loadProducts().finally(() => setLoading(false));
-  }, []);
+  }, [authLoading, user]);
 
   const openCreate = () => {
     setForm(emptyForm());
