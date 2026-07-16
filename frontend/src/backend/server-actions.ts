@@ -1059,7 +1059,10 @@ export const getUsersAdmin = createServerFn({ method: "GET" }).handler(
   async (): Promise<{ success: boolean; users: DbUser[]; error?: string }> => {
     try {
       const res = await serverFetch(`${API_URL}/api/admin/users`);
-      if (!res.ok) throw new Error("Failed to fetch users");
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `Failed to fetch users (HTTP ${res.status})`);
+      }
       return res.json();
     } catch (error: any) {
       console.error("Error fetching users:", error);

@@ -72,10 +72,22 @@ function AdminUsersPage() {
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
   const [userNameToDelete, setUserNameToDelete] = useState("");
 
+  const getAdminRequestHeaders = () => {
+    const role = user?.type === "admin" ? user.role : undefined;
+    const id = user?.id ? String(user.id) : undefined;
+    const name = user?.type === "admin" ? user.username : user?.name;
+
+    const headers: Record<string, string> = {};
+    if (role) headers["x-user-role"] = role;
+    if (id) headers["x-user-id"] = id;
+    if (name) headers["x-user-name"] = name;
+    return headers;
+  };
+
   const loadUsers = async () => {
     setLoading(true);
     try {
-      const result = await getUsersAdmin();
+      const result = await getUsersAdmin({ headers: getAdminRequestHeaders() });
       if (result.success) {
         setUsers(result.users);
       } else {
@@ -142,8 +154,8 @@ function AdminUsersPage() {
       };
 
       const result = form.id
-        ? await updateUserAdmin({ data: payload })
-        : await createUserAdmin({ data: payload });
+        ? await updateUserAdmin({ data: payload, headers: getAdminRequestHeaders() })
+        : await createUserAdmin({ data: payload, headers: getAdminRequestHeaders() });
 
       if (result.success) {
         toast.success(
@@ -183,7 +195,7 @@ function AdminUsersPage() {
     if (!userToDelete) return;
     setSaving(true);
     try {
-      const result = await deleteUserAdmin({ data: userToDelete });
+      const result = await deleteUserAdmin({ data: userToDelete, headers: getAdminRequestHeaders() });
       if (result.success) {
         toast.success("Pengguna berhasil dihapus");
         setDeleteConfirmOpen(false);
