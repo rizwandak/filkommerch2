@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestHeader } from "@tanstack/react-start/server";
 import { getApiBaseUrl } from "@/lib/api-config";
 
 // Helper to resolve API base URL across SSR, client, and fallback envs
@@ -8,8 +9,15 @@ export const getApiUrl = (): string => {
 
 const API_URL = getApiUrl();
 
-// Helper to get auth headers from incoming request cookies
-const getAuthHeaders = () => {
+const getCookieValue = (cookieHeader: string | undefined, name: string) => {
+  if (!cookieHeader) return undefined;
+
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match ? decodeURIComponent(match[1]) : undefined;
+};
+
+// Helper to get auth headers from browser cookies or SSR request cookies
+const getAuthHeaders = async () => {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
@@ -53,6 +61,19 @@ const getAuthHeaders = () => {
     if (role) headers["x-user-role"] = decodeURIComponent(role);
     if (id) headers["x-user-id"] = decodeURIComponent(id);
     if (name) headers["x-user-name"] = decodeURIComponent(name);
+  } else {
+    try {
+      const cookieHeader = getRequestHeader("cookie");
+      const role = getCookieValue(cookieHeader, "user_role");
+      const id = getCookieValue(cookieHeader, "user_id");
+      const name = getCookieValue(cookieHeader, "user_name");
+
+      if (role) headers["x-user-role"] = role;
+      if (id) headers["x-user-id"] = id;
+      if (name) headers["x-user-name"] = name;
+    } catch (e) {
+      console.warn("Could not read auth cookies from SSR request:", e);
+    }
   }
 
   return headers;
@@ -60,7 +81,7 @@ const getAuthHeaders = () => {
 
 // Wrapper around fetch to automatically include auth headers when executed on server
 const serverFetch = async (url: string, init?: RequestInit) => {
-  const authHeaders = getAuthHeaders();
+  const authHeaders = await getAuthHeaders();
   let finalUrl = url;
   if (url.startsWith("http://127.0.0.1:8080") || url.startsWith("http://localhost:8080")) {
     const baseUrl = getApiUrl();
