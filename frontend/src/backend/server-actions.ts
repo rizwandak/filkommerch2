@@ -68,6 +68,26 @@ const serverFetch = async (url: string, init?: RequestInit) => {
   });
 };
 
+const executeApiCall = async (
+  endpoint: string,
+  method: string = "POST",
+  bodyData?: any
+) => {
+  const baseUrl = getApiUrl();
+  const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const fullUrl = `${baseUrl}${cleanEndpoint}`;
+  const res = await serverFetch(fullUrl, {
+    method,
+    headers: bodyData ? { "Content-Type": "application/json" } : undefined,
+    body: bodyData ? JSON.stringify(bodyData) : undefined,
+  });
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(errorText || `HTTP ${res.status}`);
+  }
+  return res.json();
+};
+
 // ============ INTERFACES ============
 
 export interface Product {
@@ -425,22 +445,11 @@ export const checkDatabaseConnection = createServerFn({ method: "GET" }).handler
 );
 
 // Create order and payment (Online Checkout)
-export const createOrderAndPayment = createServerFn({ method: "POST" })
+const createOrderAndPaymentServerFn = createServerFn({ method: "POST" })
   .validator((d: TransactionDetails) => d)
   .handler(async ({ data: details }) => {
     try {
-      const res = await serverFetch(`${API_URL}/api/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(details),
-      });
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || `HTTP ${res.status}`);
-      }
-      return res.json();
+      return await executeApiCall("/api/orders", "POST", details);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error("Error creating order:", error);
@@ -451,23 +460,23 @@ export const createOrderAndPayment = createServerFn({ method: "POST" })
     }
   });
 
+export const createOrderAndPayment = async (opts: { data: TransactionDetails }) => {
+  if (typeof window !== "undefined") {
+    try {
+      return await executeApiCall("/api/orders", "POST", opts.data);
+    } catch (e: any) {
+      console.warn("Direct client API call failed for createOrderAndPayment, falling back:", e);
+    }
+  }
+  return createOrderAndPaymentServerFn(opts as any);
+};
+
 // Regenerate payment token
-export const regeneratePaymentToken = createServerFn({ method: "POST" })
+const regeneratePaymentTokenServerFn = createServerFn({ method: "POST" })
   .validator((d: { orderId: string }) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await serverFetch(`${API_URL}/api/payment/regenerate-token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(input),
-      });
-      if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || `HTTP ${res.status}`);
-      }
-      return res.json();
+      return await executeApiCall("/api/payment/regenerate-token", "POST", input);
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
       console.error("Error regenerating payment token:", error);
@@ -478,23 +487,43 @@ export const regeneratePaymentToken = createServerFn({ method: "POST" })
     }
   });
 
+export const regeneratePaymentToken = async (opts: { data: { orderId: string } }) => {
+  if (typeof window !== "undefined") {
+    try {
+      return await executeApiCall("/api/payment/regenerate-token", "POST", opts.data);
+    } catch (e: any) {
+      console.warn("Direct client API call for regeneratePaymentToken failed, falling back:", e);
+    }
+  }
+  return regeneratePaymentTokenServerFn(opts as any);
+};
+
 // Get order by ID
-export const getOrderById = createServerFn({ method: "GET" })
+const getOrderByIdServerFn = createServerFn({ method: "GET" })
   .validator((orderId: string) => orderId)
   .handler(
     async ({
       data: orderId,
     }): Promise<{ success: boolean; order?: Order; items?: OrderItem[]; error?: string }> => {
       try {
-        const res = await serverFetch(`${API_URL}/api/orders/${orderId}`);
-        if (!res.ok) throw new Error("Failed to fetch order");
-        return res.json();
+        return await executeApiCall(`/api/orders/${orderId}`, "GET");
       } catch (error) {
         console.error("Error fetching order:", error);
         return { success: false, error: "Failed to fetch order" };
       }
     },
   );
+
+export const getOrderById = async (opts: { data: string }): Promise<{ success: boolean; order?: Order; items?: OrderItem[]; error?: string }> => {
+  if (typeof window !== "undefined") {
+    try {
+      return await executeApiCall(`/api/orders/${opts.data}`, "GET");
+    } catch (e: any) {
+      console.warn("Direct client API call for getOrderById failed, falling back:", e);
+    }
+  }
+  return getOrderByIdServerFn(opts as any);
+};
 
 // Get payment methods
 export const getPaymentMethods = createServerFn({ method: "GET" }).handler(
