@@ -62,16 +62,43 @@ const executeApiCall = async (
   const baseUrl = getApiUrl();
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const fullUrl = `${baseUrl}${cleanEndpoint}`;
-  const res = await serverFetch(fullUrl, {
-    method,
-    headers: bodyData ? { "Content-Type": "application/json" } : undefined,
-    body: bodyData ? JSON.stringify(bodyData) : undefined,
-  });
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(errorText || `HTTP ${res.status}`);
+
+  try {
+    const res = await serverFetch(fullUrl, {
+      method,
+      headers: bodyData ? { "Content-Type": "application/json" } : undefined,
+      body: bodyData ? JSON.stringify(bodyData) : undefined,
+    });
+
+    const contentType = res.headers.get("content-type") || "";
+    if (!res.ok) {
+      if (contentType.includes("application/json")) {
+        const jsonError = await res.json();
+        throw new Error(jsonError.error || jsonError.message || `HTTP Error ${res.status}`);
+      } else {
+        const rawText = await res.text();
+        console.error(`Backend ${fullUrl} returned non-JSON HTTP ${res.status}:`, rawText);
+        throw new Error(`Server Backend (cPanel Node.js) tidak merespons (HTTP ${res.status}). Silakan klik 'Restart Application' di cPanel.`);
+      }
+    }
+
+    if (contentType.includes("application/json")) {
+      return await res.json();
+    } else {
+      const textData = await res.text();
+      try {
+        return JSON.parse(textData);
+      } catch {
+        throw new Error(`Respon server tidak valid. Status HTTP: ${res.status}`);
+      }
+    }
+  } catch (err: any) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("<!doctype") || message.includes("This page didn't load") || message.includes("<html")) {
+      throw new Error("Server Backend (cPanel Node.js) belum aktif/merespons. Silakan klik 'Restart Application' di cPanel.");
+    }
+    throw err;
   }
-  return res.json();
 };
 
 // ============ INTERFACES ============
