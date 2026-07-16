@@ -24,9 +24,31 @@ const getAuthHeaders = () => {
       if (parts.length === 2) return parts.pop()?.split(";").shift();
       return undefined;
     };
-    const role = getCookie("user_role");
-    const id = getCookie("user_id");
-    const name = getCookie("user_name");
+    let role = getCookie("user_role");
+    let id = getCookie("user_id");
+    let name = getCookie("user_name");
+
+    // Fallback to localStorage if cookies are missing or expired
+    if (!role || !id) {
+      try {
+        const storedUserJson = localStorage.getItem("user");
+        if (storedUserJson) {
+          const u = JSON.parse(storedUserJson);
+          if (u) {
+            role = role || (u.type === "admin" ? (u.role || "admin") : "buyer");
+            id = id || String(u.id || "");
+            name = name || (u.type === "admin" ? u.username : u.name) || "";
+
+            // Re-sync missing cookies for consistency
+            if (role) document.cookie = `user_role=${role}; path=/; max-age=604800; SameSite=Lax`;
+            if (id) document.cookie = `user_id=${id}; path=/; max-age=604800; SameSite=Lax`;
+            if (name) document.cookie = `user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
+          }
+        }
+      } catch (e) {
+        console.warn("Could not parse user from localStorage:", e);
+      }
+    }
 
     if (role) headers["x-user-role"] = decodeURIComponent(role);
     if (id) headers["x-user-id"] = decodeURIComponent(id);
