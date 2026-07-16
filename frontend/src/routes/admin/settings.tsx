@@ -99,6 +99,8 @@ function AdminSettingsPage() {
         qris_static_url: settings.qris_static_url || undefined,
         payment_mode: settings.payment_mode || "mayar",
         homepage_layout: settings.homepage_layout || undefined,
+        userRole: user?.role || user?.type || "admin",
+        userId: String(user?.id || ""),
       },
     });
     setSaving(false);

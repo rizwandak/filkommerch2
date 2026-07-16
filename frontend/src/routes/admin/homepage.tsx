@@ -421,6 +421,7 @@ function AdminHomepageEditorPage() {
           tax_rate: settings.tax_rate,
           qris_static_url: settings.qris_static_url || undefined,
           homepage_layout: layoutJson,
+          userRole: "admin",
         },
       });
 

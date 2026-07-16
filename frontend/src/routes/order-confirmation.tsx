@@ -236,11 +236,29 @@ function OrderConfirmationPage() {
   const pStatus = order?.payment_status || "unpaid";
   const oStatus = order?.order_status || "pending_payment";
 
+  // Determine payment mode
+  const isManualQrisMode = order?.payment_type === "manual_qris" || storeSettings?.payment_mode === "manual_qris";
+
   let statusIcon = <Clock className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-amber-500" />;
   let statusTitle = "Menunggu Pembayaran";
   let statusDescription =
     "Pesanan Anda berhasil dibuat! Silakan lakukan pembayaran Anda sebelum batas waktu berakhir.";
   let statusBg = "bg-amber-50 border-amber-200 text-amber-900";
+
+  // Override for manual QRIS mode
+  if (isManualQrisMode && (pStatus === "unpaid" || pStatus === "pending")) {
+    if (proofUrl || order?.payment_proof_url) {
+      statusIcon = <Clock className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-blue-500" />;
+      statusTitle = "Pesanan Sedang Direview Admin";
+      statusDescription =
+        "Bukti pembayaran Anda telah diterima. Mohon tunggu, admin sedang memverifikasi pembayaran Anda.";
+      statusBg = "bg-blue-50 border-blue-200 text-blue-900";
+    } else {
+      statusTitle = "Pesanan Berhasil Dibuat";
+      statusDescription =
+        "Silakan scan QRIS di bawah dan unggah bukti pembayaran Anda. Admin akan memverifikasi pembayaran secara manual.";
+    }
+  }
 
   if (oStatus === "cancelled" || pStatus === "failed" || pStatus === "expired") {
     statusIcon = <XCircle className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-red-500" />;

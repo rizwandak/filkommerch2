@@ -240,8 +240,8 @@ function CheckoutPage() {
       const parsedId = Number(user?.id);
       const buyerUserId =
         Number.isInteger(parsedId) &&
-        parsedId > 0 &&
-        parsedId <= 2147483647
+          parsedId > 0 &&
+          parsedId <= 2147483647
           ? parsedId
           : undefined;
 
@@ -278,14 +278,9 @@ function CheckoutPage() {
         setMayarCheckoutUrl(result.checkoutUrl);
         setShowPaymentModal(true);
         setIsProcessing(false);
-      } else if (result.qrUrl) {
-        // Manual QRIS fallback
-        setQrUrl(result.qrUrl);
-        setCurrentStep(4);
-        toast.success("Pesanan berhasil dibuat! Silakan scan QRIS untuk membayar.");
-        setIsProcessing(false);
       } else {
-        // Fallback — navigate to order confirmation
+        // Manual QRIS or any other mode — navigate to order confirmation page
+        // The order-confirmation page handles QRIS display, upload bukti, and admin review
         toast.success("Pesanan berhasil dibuat! Silakan selesaikan pembayaran Anda.");
         void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
       }
@@ -352,20 +347,18 @@ function CheckoutPage() {
             {steps.map((s, index) => (
               <div key={s.step} className="flex items-center flex-1 min-w-0">
                 <div
-                  className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs sm:text-sm font-bold shrink-0 ${
-                    currentStep >= s.step
+                  className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs sm:text-sm font-bold shrink-0 ${currentStep >= s.step
                       ? "bg-primary text-primary-foreground shadow-sm"
                       : "bg-muted text-muted-foreground"
-                  }`}
+                    }`}
                 >
                   {s.step}
                 </div>
                 <div className="ml-2 hidden text-xs sm:text-sm font-bold sm:block truncate">{s.title}</div>
                 {index < steps.length - 1 && (
                   <div
-                    className={`ml-1.5 sm:ml-4 h-1 flex-1 rounded-full transition-colors ${
-                      currentStep > s.step ? "bg-primary" : "bg-muted"
-                    }`}
+                    className={`ml-1.5 sm:ml-4 h-1 flex-1 rounded-full transition-colors ${currentStep > s.step ? "bg-primary" : "bg-muted"
+                      }`}
                   />
                 )}
               </div>
@@ -564,208 +557,208 @@ function CheckoutPage() {
                     )
                   )}
 
-                {currentStep === 4 && (
-                  <div className="rounded-lg bg-green-50 p-3 text-xs text-green-900">
-                    <p className="font-semibold">✓ QR Code Ready</p>
-                    <p className="mt-1">Scan dengan aplikasi pembayaran pilihan Anda</p>
+                  {currentStep === 4 && (
+                    <div className="rounded-lg bg-green-50 p-3 text-xs text-green-900">
+                      <p className="font-semibold">✓ QR Code Ready</p>
+                      <p className="mt-1">Scan dengan aplikasi pembayaran pilihan Anda</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </div>
+
+        {/* Mobile Sticky Bottom Bar (Fixed at screen bottom for Mobile & Tablet <1024px) */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t-2 border-ink p-3 shadow-[0px_-4px_16px_rgba(0,0,0,0.15)]">
+          <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
+            {/* Price & Summary Drawer Toggle */}
+            <button
+              type="button"
+              onClick={() => setSummaryDrawerOpen(true)}
+              className="flex flex-col text-left cursor-pointer group pr-2 border-r border-ink/10 shrink-0"
+            >
+              <div className="flex items-center gap-1 text-[10px] font-black uppercase text-muted-foreground tracking-wider group-hover:text-brand-orange transition-colors">
+                <span>Rincian ({cartItems.reduce((s, i) => s + i.quantity, 0)})</span>
+                <ChevronUp className="w-3 h-3 text-brand-orange animate-bounce" />
+              </div>
+              <span className="text-sm sm:text-base font-black text-brand-orange leading-tight">
+                Rp {totalAmount.toLocaleString("id-ID")}
+              </span>
+            </button>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 flex-1 justify-end">
+              {currentStep > 1 && currentStep < 4 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentStep(currentStep - 1)}
+                  className="h-10 text-xs font-bold uppercase border-2 border-ink shrink-0 px-2.5 cursor-pointer hover:bg-cream"
+                >
+                  ←
+                </Button>
+              )}
+
+              {currentStep < 3 && (
+                <Button
+                  onClick={() => {
+                    if (validateStep()) {
+                      setCurrentStep(currentStep + 1);
+                    }
+                  }}
+                  className="flex-1 max-w-[200px] h-10 text-xs font-bold uppercase tracking-wider bg-ink text-white hover:bg-brand-orange shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                >
+                  Lanjut →
+                </Button>
+              )}
+
+              {currentStep === 3 && (
+                <Button
+                  onClick={handlePayment}
+                  disabled={isProcessing}
+                  className="flex-1 max-w-[220px] h-10 bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider text-xs shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      Memproses...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+                      Bayar Sekarang
+                    </>
+                  )}
+                </Button>
+              )}
+
+              {currentStep === 4 && (
+                <Button asChild className="flex-1 max-w-[180px] h-10 font-bold uppercase text-xs cursor-pointer">
+                  <a href="/">Selesai</a>
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Pop-Up Drawer Modal for Order Breakdown */}
+        {summaryDrawerOpen && (
+          <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div
+              className="fixed inset-0"
+              onClick={() => setSummaryDrawerOpen(false)}
+            />
+            <div className="relative w-full max-w-lg bg-card rounded-t-2xl border-t-2 border-x-2 border-ink p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl z-10 animate-in slide-in-from-bottom duration-300">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between border-b-2 border-ink pb-3">
+                <div>
+                  <h3 className="display text-xs uppercase tracking-wider text-ink font-bold">Rincian Pesanan</h3>
+                  <p className="text-[10px] text-muted-foreground font-semibold">
+                    {cartItems.reduce((s, i) => s + i.quantity, 0)} produk di keranjang
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSummaryDrawerOpen(false)}
+                  className="p-1.5 rounded-full border border-ink/20 hover:bg-muted text-ink cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Cart itemized list */}
+              <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
+                {cartItems.map((item) => (
+                  <div key={item.id} className="flex items-center gap-3 border-b border-muted pb-2.5 last:border-0 last:pb-0">
+                    <div className="w-12 h-14 bg-cream border border-ink rounded overflow-hidden shrink-0">
+                      {item.image_url || (item as any).img ? (
+                        <img src={resolveImageUrl(item.image_url || (item as any).img)} alt={item.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <ShoppingBag className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold text-ink leading-tight truncate">{item.name}</p>
+                      {item.size && (
+                        <span className="inline-block text-[9px] font-bold text-muted-foreground mt-0.5">
+                          Ukuran: {item.size}
+                        </span>
+                      )}
+                      <p className="text-[10px] text-muted-foreground">
+                        {item.quantity} × Rp {item.price.toLocaleString("id-ID")}
+                      </p>
+                    </div>
+                    <span className="font-extrabold text-xs text-brand-orange shrink-0">
+                      Rp {(item.price * item.quantity).toLocaleString("id-ID")}
+                    </span>
                   </div>
-                )}
-              </CardContent>
-            </Card>
+                ))}
+              </div>
+
+              {/* Delivery & Total */}
+              <div className="border-t-2 border-ink pt-3 space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground font-semibold">Pengiriman:</span>
+                  <span className="font-bold text-ink uppercase text-[10px]">
+                    {fulfillmentType === "pickup" ? "Ambil di Kampus (Gratis)" : "Kurir (Ada Ongkir)"}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center font-extrabold text-sm pt-2 border-t border-dashed border-ink/20">
+                  <span>Total Tagihan</span>
+                  <span className="text-base text-brand-orange font-black">
+                    Rp {totalAmount.toLocaleString("id-ID")}
+                  </span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                onClick={() => setSummaryDrawerOpen(false)}
+                className="w-full h-11 bg-ink text-white font-bold uppercase tracking-wider text-xs rounded-xl cursor-pointer"
+              >
+                Tutup Rincian
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Mayar Payment Gateway Modal */}
+        {showPaymentModal && mayarCheckoutUrl && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
+            <div className="relative w-full max-w-2xl bg-card rounded-2xl border-2 border-ink shadow-2xl overflow-hidden mx-4">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b-2 border-ink bg-cream/20">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-brand-orange" />
+                  <h3 className="font-bold text-xs sm:text-sm uppercase tracking-wider text-ink">
+                    Pembayaran Online — Mayar
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    toast.warning("Anda menutup popup pembayaran. Silakan selesaikan dari halaman pesanan.");
+                    void navigate({ to: "/order-confirmation", search: { orderId: orderId || "" } });
+                  }}
+                  className="p-1.5 rounded-full border border-ink/20 hover:bg-red-50 hover:border-red-300 text-ink hover:text-red-600 transition-all cursor-pointer"
+                  title="Tutup"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              {/* Mayar Iframe */}
+              <iframe
+                src={mayarCheckoutUrl}
+                className="w-full h-[600px] sm:h-[650px] border-none"
+                title="Mayar Payment Gateway"
+                allow="payment"
+              />
+            </div>
           </div>
         )}
       </div>
-
-      {/* Mobile Sticky Bottom Bar (Fixed at screen bottom for Mobile & Tablet <1024px) */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-card/95 backdrop-blur-md border-t-2 border-ink p-3 shadow-[0px_-4px_16px_rgba(0,0,0,0.15)]">
-        <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
-          {/* Price & Summary Drawer Toggle */}
-          <button
-            type="button"
-            onClick={() => setSummaryDrawerOpen(true)}
-            className="flex flex-col text-left cursor-pointer group pr-2 border-r border-ink/10 shrink-0"
-          >
-            <div className="flex items-center gap-1 text-[10px] font-black uppercase text-muted-foreground tracking-wider group-hover:text-brand-orange transition-colors">
-              <span>Rincian ({cartItems.reduce((s, i) => s + i.quantity, 0)})</span>
-              <ChevronUp className="w-3 h-3 text-brand-orange animate-bounce" />
-            </div>
-            <span className="text-sm sm:text-base font-black text-brand-orange leading-tight">
-              Rp {totalAmount.toLocaleString("id-ID")}
-            </span>
-          </button>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-1 justify-end">
-            {currentStep > 1 && currentStep < 4 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setCurrentStep(currentStep - 1)}
-                className="h-10 text-xs font-bold uppercase border-2 border-ink shrink-0 px-2.5 cursor-pointer hover:bg-cream"
-              >
-                ←
-              </Button>
-            )}
-
-            {currentStep < 3 && (
-              <Button
-                onClick={() => {
-                  if (validateStep()) {
-                    setCurrentStep(currentStep + 1);
-                  }
-                }}
-                className="flex-1 max-w-[200px] h-10 text-xs font-bold uppercase tracking-wider bg-ink text-white hover:bg-brand-orange shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-              >
-                Lanjut →
-              </Button>
-            )}
-
-            {currentStep === 3 && (
-              <Button
-                onClick={handlePayment}
-                disabled={isProcessing}
-                className="flex-1 max-w-[220px] h-10 bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider text-xs shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-              >
-                {isProcessing ? (
-                  <>
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    Memproses...
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="mr-1.5 h-3.5 w-3.5" />
-                    Bayar Sekarang
-                  </>
-                )}
-              </Button>
-            )}
-
-            {currentStep === 4 && (
-              <Button asChild className="flex-1 max-w-[180px] h-10 font-bold uppercase text-xs cursor-pointer">
-                <a href="/">Selesai</a>
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Pop-Up Drawer Modal for Order Breakdown */}
-      {summaryDrawerOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div
-            className="fixed inset-0"
-            onClick={() => setSummaryDrawerOpen(false)}
-          />
-          <div className="relative w-full max-w-lg bg-card rounded-t-2xl border-t-2 border-x-2 border-ink p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl z-10 animate-in slide-in-from-bottom duration-300">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b-2 border-ink pb-3">
-              <div>
-                <h3 className="display text-xs uppercase tracking-wider text-ink font-bold">Rincian Pesanan</h3>
-                <p className="text-[10px] text-muted-foreground font-semibold">
-                  {cartItems.reduce((s, i) => s + i.quantity, 0)} produk di keranjang
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSummaryDrawerOpen(false)}
-                className="p-1.5 rounded-full border border-ink/20 hover:bg-muted text-ink cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Cart itemized list */}
-            <div className="space-y-3 max-h-[45vh] overflow-y-auto pr-1">
-              {cartItems.map((item) => (
-                <div key={item.id} className="flex items-center gap-3 border-b border-muted pb-2.5 last:border-0 last:pb-0">
-                  <div className="w-12 h-14 bg-cream border border-ink rounded overflow-hidden shrink-0">
-                    {item.image_url || (item as any).img ? (
-                      <img src={resolveImageUrl(item.image_url || (item as any).img)} alt={item.name} className="w-full h-full object-cover" />
-                    ) : (
-                      <ShoppingBag className="w-4 h-4 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold text-ink leading-tight truncate">{item.name}</p>
-                    {item.size && (
-                      <span className="inline-block text-[9px] font-bold text-muted-foreground mt-0.5">
-                        Ukuran: {item.size}
-                      </span>
-                    )}
-                    <p className="text-[10px] text-muted-foreground">
-                      {item.quantity} × Rp {item.price.toLocaleString("id-ID")}
-                    </p>
-                  </div>
-                  <span className="font-extrabold text-xs text-brand-orange shrink-0">
-                    Rp {(item.price * item.quantity).toLocaleString("id-ID")}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Delivery & Total */}
-            <div className="border-t-2 border-ink pt-3 space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground font-semibold">Pengiriman:</span>
-                <span className="font-bold text-ink uppercase text-[10px]">
-                  {fulfillmentType === "pickup" ? "Ambil di Kampus (Gratis)" : "Kurir (Ada Ongkir)"}
-                </span>
-              </div>
-              <div className="flex justify-between items-center font-extrabold text-sm pt-2 border-t border-dashed border-ink/20">
-                <span>Total Tagihan</span>
-                <span className="text-base text-brand-orange font-black">
-                  Rp {totalAmount.toLocaleString("id-ID")}
-                </span>
-              </div>
-            </div>
-
-            <Button
-              type="button"
-              onClick={() => setSummaryDrawerOpen(false)}
-              className="w-full h-11 bg-ink text-white font-bold uppercase tracking-wider text-xs rounded-xl cursor-pointer"
-            >
-              Tutup Rincian
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Mayar Payment Gateway Modal */}
-      {showPaymentModal && mayarCheckoutUrl && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="relative w-full max-w-2xl bg-card rounded-2xl border-2 border-ink shadow-2xl overflow-hidden mx-4">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b-2 border-ink bg-cream/20">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-brand-orange" />
-                <h3 className="font-bold text-xs sm:text-sm uppercase tracking-wider text-ink">
-                  Pembayaran Online — Mayar
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPaymentModal(false);
-                  toast.warning("Anda menutup popup pembayaran. Silakan selesaikan dari halaman pesanan.");
-                  void navigate({ to: "/order-confirmation", search: { orderId: orderId || "" } });
-                }}
-                className="p-1.5 rounded-full border border-ink/20 hover:bg-red-50 hover:border-red-300 text-ink hover:text-red-600 transition-all cursor-pointer"
-                title="Tutup"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            {/* Mayar Iframe */}
-            <iframe
-              src={mayarCheckoutUrl}
-              className="w-full h-[600px] sm:h-[650px] border-none"
-              title="Mayar Payment Gateway"
-              allow="payment"
-            />
-          </div>
-        </div>
-      )}
-    </div>
     </div>
   );
 }
@@ -1006,7 +999,7 @@ function CustomerDetailsStep({
         .finally(() => setLoadingVill(false));
     }
   }, [distId]);
-  
+
   return (
     <Card className="border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] sm:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
       <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
@@ -1076,11 +1069,10 @@ function CustomerDetailsStep({
             <button
               type="button"
               onClick={() => onFulfillmentTypeChange("pickup")}
-              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${
-                fulfillmentType === "pickup"
+              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${fulfillmentType === "pickup"
                   ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
                   : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
-              }`}
+                }`}
             >
               <span className="font-extrabold text-sm text-ink">Ambil di FILKOM Merch</span>
               <span className="text-[10px] text-emerald-700 font-bold uppercase mt-1">GRATIS</span>
@@ -1092,11 +1084,10 @@ function CustomerDetailsStep({
             <button
               type="button"
               onClick={() => onFulfillmentTypeChange("shipping")}
-              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${
-                fulfillmentType === "shipping"
+              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${fulfillmentType === "shipping"
                   ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
                   : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
-              }`}
+                }`}
             >
               <span className="font-extrabold text-sm text-ink">Diantar (Kurir)</span>
               <span className="text-[10px] text-brand-orange font-bold uppercase mt-1">
@@ -1119,7 +1110,7 @@ function CustomerDetailsStep({
                 ⚠️ Sistem wilayah otomatis sedang offline, silakan isi alamat secara manual di bawah ini.
               </p>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="streetAddress" className="font-bold text-[10px] uppercase text-ink">
                 Nama Jalan / No Rumah *
@@ -1457,22 +1448,6 @@ function QrCodePaymentStep({ qrUrl, orderId, customerName }: QrCodePaymentStepPr
             </ol>
           </div>
 
-          {/* Payment Methods */}
-          <div className="w-full">
-            <p className="text-[10px] font-black uppercase tracking-wider text-muted-foreground mb-2.5">
-              Metode Pembayaran Diterima:
-            </p>
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-              {["GoPay", "OVO", "Dana", "ShopeePay", "BCA", "Mandiri"].map((method) => (
-                <div
-                  key={method}
-                  className="rounded-lg border-2 border-ink bg-white p-2 text-center text-[10px] font-extrabold uppercase text-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] truncate"
-                >
-                  {method}
-                </div>
-              ))}
-            </div>
-          </div>
         </CardContent>
       </Card>
 

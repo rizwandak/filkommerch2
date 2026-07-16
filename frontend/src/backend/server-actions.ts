@@ -848,16 +848,23 @@ export const updateStoreSettings = createServerFn({ method: "POST" })
       qris_static_url?: string;
       homepage_layout?: string;
       payment_mode?: "mayar" | "midtrans" | "manual_qris";
+      userRole?: string;
+      userId?: string;
     }) => d,
   )
   .handler(async ({ data: input }) => {
     try {
+      const { userRole, userId, ...payload } = input;
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (userRole) headers["x-user-role"] = userRole;
+      if (userId) headers["x-user-id"] = userId;
+
       const res = await serverFetch(`${API_URL}/api/settings`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(input),
+        headers,
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const errorText = await res.text();
