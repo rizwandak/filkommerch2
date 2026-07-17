@@ -110,6 +110,10 @@ export async function runMigration() {
       {
         name: "update_payment_mode_mayar",
         sql: "UPDATE store_settings SET payment_mode = 'mayar' WHERE payment_mode = 'midtrans' OR payment_mode IS NULL"
+      },
+      {
+        name: "orders.payment_proof_note",
+        sql: "ALTER TABLE orders ADD COLUMN payment_proof_note VARCHAR(255) DEFAULT NULL"
       }
     ];
 

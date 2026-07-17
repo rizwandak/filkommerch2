@@ -62,7 +62,8 @@ const getAuthHeaders = async () => {
     if (name) headers["x-user-name"] = decodeURIComponent(name);
   } else {
     try {
-      const cookieHeader = getGlobalStartContext()?.request?.headers.get("cookie") || undefined;
+      const ctx = getGlobalStartContext() as any;
+      const cookieHeader = ctx?.request?.headers?.get("cookie") || undefined;
       const role = getCookieValue(cookieHeader, "user_role");
       const id = getCookieValue(cookieHeader, "user_id");
       const name = getCookieValue(cookieHeader, "user_name");
@@ -276,6 +277,7 @@ export interface Order {
   midtrans_transaction_id: string | null;
   snap_token: string | null;
   payment_proof_url: string | null;
+  payment_proof_note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1152,6 +1154,27 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
     } catch (error: any) {
       console.error("Error updating order status:", error);
       return { success: false, error: error.message || "Failed to update order status" };
+    }
+  });
+
+// Verify QRIS payment proof
+export const verifyPaymentProof = createServerFn({ method: "POST" })
+  .validator((d: { id: string; isAccepted: boolean; note?: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/admin/orders/${input.id}/verify-payment`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isAccepted: input.isAccepted, note: input.note }),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error verifying payment proof:", error);
+      return { success: false, error: error.message || "Failed to verify payment proof" };
     }
   });
 

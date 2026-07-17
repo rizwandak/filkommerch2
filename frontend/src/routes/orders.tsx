@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   ShoppingBag,
   ArrowLeft,
@@ -24,10 +24,19 @@ import {
   X,
   LayoutDashboard,
   MonitorSmartphone,
+  Upload,
+  Image,
+  Eye,
+  RefreshCw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { getUserOrders, regeneratePaymentToken } from "@backend/server-actions";
+import {
+  getUserOrders,
+  regeneratePaymentToken,
+  getStoreSettings,
+  submitPaymentProof,
+} from "@backend/server-actions";
 import { Navbar } from "@/components/Navbar";
 import { resolveImageUrl } from "@/lib/image-resolver";
 
@@ -81,21 +90,30 @@ function UserOrdersPage() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
 
-
+  const [storeSettings, setStoreSettings] = useState<any>(null);
 
   const [mayarCheckoutUrl, setMayarCheckoutUrl] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  // Fetch orders
+  // Check if store is in manual QRIS mode
+  const isManualQrisMode = storeSettings?.payment_mode === "manual_qris";
+
+  // Fetch orders and store settings
   const fetchOrders = async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const result = await getUserOrders({ data: Number(user.id) });
+      const [result, settingsRes] = await Promise.all([
+        getUserOrders({ data: Number(user.id) }),
+        getStoreSettings(),
+      ]);
       if (result.success) {
         setOrders(result.orders);
       } else {
         toast.error(result.error || "Gagal memuat pesanan");
+      }
+      if (settingsRes.settings) {
+        setStoreSettings(settingsRes.settings);
       }
     } catch (error) {
       console.error("Error fetching user orders:", error);
@@ -175,6 +193,11 @@ function UserOrdersPage() {
     });
   }, [orders, activeTab, searchQuery]);
 
+  // Helper to check if an order uses manual QRIS payment
+  const isOrderManualQris = (order: any) => {
+    return order.payment_type === "manual_qris" || isManualQrisMode;
+  };
+
   const getStatusBadge = (order: any) => {
     const pStatus = order.payment_status;
     const oStatus = order.order_status;
@@ -184,6 +207,36 @@ function UserOrdersPage() {
         <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-red-100 text-red-700 px-2.5 py-1 rounded-full border border-red-200">
           <XCircle className="w-3 h-3" />
           Dibatalkan
+        </span>
+      );
+    }
+
+    // QRIS Static: proof rejected by admin
+    if (isOrderManualQris(order) && pStatus !== "paid" && order.payment_proof_note) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-red-100 text-red-700 px-2.5 py-1 rounded-full border border-red-200 animate-pulse">
+          <XCircle className="w-3 h-3" />
+          Bukti Ditolak
+        </span>
+      );
+    }
+
+    // QRIS Static: uploaded proof but not yet verified by admin
+    if (isOrderManualQris(order) && pStatus !== "paid" && order.payment_proof_url) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full border border-blue-200">
+          <Clock className="w-3 h-3 animate-pulse" />
+          Menunggu Verifikasi
+        </span>
+      );
+    }
+
+    // QRIS Static: not yet uploaded proof
+    if (isOrderManualQris(order) && pStatus !== "paid" && !order.payment_proof_url) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200">
+          <Upload className="w-3 h-3" />
+          Menunggu Upload Bukti
         </span>
       );
     }
@@ -311,6 +364,8 @@ function UserOrdersPage() {
             </div>
           </div>
         )}
+
+
 
         {/* Search Bar */}
         <div className="relative mb-6">
@@ -459,6 +514,23 @@ function UserOrdersPage() {
                   )}
                 </div>
 
+                {/* Rejection Note Warning Alert */}
+                {order.payment_proof_note && (
+                  <div className="px-5 py-3 bg-red-50 border-b-2 border-ink text-red-900 text-xs font-semibold flex flex-col gap-2">
+                    <div className="flex items-center gap-2 text-red-700 font-extrabold uppercase tracking-wider">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>Bukti Pembayaran QRIS Ditolak</span>
+                    </div>
+                    <div className="bg-white/80 border border-red-200 p-3 rounded-lg text-ink">
+                      <span className="font-extrabold text-[10px] text-red-800 uppercase block mb-1">Catatan Admin:</span>
+                      <p className="italic font-medium leading-snug">"{order.payment_proof_note}"</p>
+                    </div>
+                    <p className="text-[10px] text-red-600 font-bold leading-normal">
+                      * Silakan periksa kembali nominal/bukti transfer Anda, lalu klik tombol "Upload Bukti Pembayaran" di bawah untuk mengunggah ulang bukti transfer yang benar.
+                    </p>
+                  </div>
+                )}
+
                 {/* Card Footer */}
                 <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-cream/10">
                   <div className="text-xs space-y-1">
@@ -517,8 +589,50 @@ function UserOrdersPage() {
                         Hubungi Admin
                       </a>
 
-                      {/* Pay now button for pending payments */}
-                      {(order.payment_status === "unpaid" || order.payment_status === "pending") &&
+                      {/* QRIS Static: Show upload / re-upload / view proof buttons */}
+                      {isOrderManualQris(order) && order.order_status !== "cancelled" && (() => {
+                        const hasProof = !!order.payment_proof_url;
+                        const isPaid = order.payment_status === "paid";
+
+                        if (isPaid) return null; // Already verified, no action needed
+
+                        if (hasProof) {
+                          // Proof uploaded, waiting verification
+                          return (
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={() => window.open(resolveImageUrl(order.payment_proof_url), "_blank")}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 border-2 border-ink text-xs font-bold uppercase bg-blue-50 text-blue-700 hover:bg-blue-100 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                Lihat Bukti
+                              </button>
+                              <button
+                                onClick={() => navigate({ to: "/order-confirmation", search: { orderId: order.order_id } })}
+                                className="inline-flex items-center gap-1.5 px-3.5 py-2 border-2 border-ink text-xs font-bold uppercase bg-white hover:bg-cream rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"
+                              >
+                                <RefreshCw className="w-3.5 h-3.5 text-brand-orange" />
+                                Ganti Bukti
+                              </button>
+                            </div>
+                          );
+                        }
+
+                        // No proof yet, show upload button
+                        return (
+                          <button
+                            onClick={() => navigate({ to: "/order-confirmation", search: { orderId: order.order_id } })}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 border-2 border-ink text-xs font-extrabold uppercase bg-brand-orange text-white hover:bg-brand-orange/95 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"
+                          >
+                            <Upload className="w-3.5 h-3.5" />
+                            Upload Bukti Pembayaran
+                          </button>
+                        );
+                      })()}
+
+                      {/* Mayar: Pay now button for pending payments (non-QRIS) */}
+                      {!isOrderManualQris(order) &&
+                        (order.payment_status === "unpaid" || order.payment_status === "pending") &&
                         order.order_status !== "cancelled" && (
                           <div className="flex flex-wrap gap-2">
                             {order.snap_token && (

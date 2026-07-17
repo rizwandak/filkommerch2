@@ -29,6 +29,10 @@ export function resolveImageUrl(url: string | undefined): string | undefined {
   }
 
   if (url.startsWith("https://filkommerch.com")) {
+    // If local dev base url is active, keep production URL as-is so images load from production site
+    if (apiBase.startsWith("http://127.0.0.1") || apiBase.startsWith("http://localhost")) {
+      return url;
+    }
     const cleanPath = url.replace(/^https:\/\/filkommerch\.com/, "");
     return `${apiBase}${cleanPath}`;
   }

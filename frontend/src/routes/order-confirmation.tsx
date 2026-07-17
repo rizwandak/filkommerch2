@@ -300,7 +300,7 @@ function OrderConfirmationPage() {
 
       {/* Main Content (2-Column Grid on Desktop) */}
       <div className="mx-auto max-w-6xl px-4 sm:px-6 py-6 sm:py-10">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start pb-24 lg:pb-28">
 
           {/* KOLOM KIRI (LEBIH BESAR): Status & Pembayaran QRIS / Upload Bukti */}
           <div className="lg:col-span-7 space-y-6">
@@ -363,6 +363,17 @@ function OrderConfirmationPage() {
                         <h3 className="font-extrabold text-xs uppercase tracking-wider text-ink">
                           Unggah Bukti Pembayaran
                         </h3>
+
+                        {order?.payment_proof_note && (
+                          <div className="p-3 bg-red-50 border-2 border-red-300 rounded-lg text-red-900 text-xs font-semibold flex items-start gap-2 text-left shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] animate-fade-in">
+                            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-extrabold uppercase block text-[10px] text-red-800">Bukti Pembayaran Ditolak:</span>
+                              <p className="mt-0.5 text-[11px] font-semibold text-ink leading-snug">"{order.payment_proof_note}"</p>
+                              <p className="mt-1.5 text-[10px] text-red-600 font-bold">* Silakan upload ulang bukti transfer yang benar.</p>
+                            </div>
+                          </div>
+                        )}
 
                         {proofUrl && !isEditingProof ? (
                           <div className="space-y-3">
@@ -623,21 +634,7 @@ function OrderConfirmationPage() {
               </CardContent>
             </Card>
 
-            {/* Action Buttons */}
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <Button
-                asChild
-                className="flex-1 h-12 border-2 border-ink bg-white text-ink hover:bg-cream font-bold uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all"
-              >
-                <Link to="/">Lanjut Belanja</Link>
-              </Button>
-              <Button
-                asChild
-                className="flex-1 h-12 border-2 border-ink bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all"
-              >
-                <Link to="/orders">Lihat Pesanan Saya</Link>
-              </Button>
-            </div>
+            {/* Action Buttons placeholder - actual buttons are fixed at bottom */}
 
             {/* Seksi Butuh Bantuan (Di bawah Action Buttons) */}
             <div className="rounded-xl bg-emerald-50 border-2 border-ink p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]">
@@ -661,6 +658,24 @@ function OrderConfirmationPage() {
             </div>
           </div>
 
+        </div>
+      </div>
+
+      {/* Fixed Bottom Action Buttons */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t-2 border-ink px-4 sm:px-6 py-3 sm:py-4">
+        <div className="mx-auto max-w-6xl flex flex-col gap-2 sm:flex-row sm:gap-3">
+          <Button
+            asChild
+            className="flex-1 h-12 border-2 border-ink bg-white text-ink hover:bg-cream font-bold uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all"
+          >
+            <Link to="/">Lanjut Belanja</Link>
+          </Button>
+          <Button
+            asChild
+            className="flex-1 h-12 border-2 border-ink bg-ink text-white hover:bg-brand-orange font-bold uppercase tracking-wider shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all"
+          >
+            <Link to="/orders">Lihat Pesanan Saya</Link>
+          </Button>
         </div>
       </div>
 

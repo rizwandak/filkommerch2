@@ -22,9 +22,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@frontend/components/ui/select";
-import { Eye, Pencil, Trash2, ShieldAlert } from "lucide-react";
+import { Eye, Pencil, Trash2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
+import { resolveImageUrl } from "@/lib/image-resolver";
 import {
   getOnlineOrders,
   getOfflineSales,
@@ -33,6 +34,7 @@ import {
   updateOrderStatus,
   deleteOrder,
   deleteOfflineSale,
+  verifyPaymentProof,
   type Order,
   type OfflineSale,
 } from "@backend/server-actions";
@@ -73,6 +75,12 @@ function AdminTransactionsPage() {
   const [editShippingAddress, setEditShippingAddress] = useState<string>("");
   const [editNotes, setEditNotes] = useState<string>("");
   const [savingStatus, setSavingStatus] = useState(false);
+
+  // Verification Modal States
+  const [verificationOpen, setVerificationOpen] = useState(false);
+  const [verifyingOrder, setVerifyingOrder] = useState<Order | null>(null);
+  const [verificationNote, setVerificationNote] = useState<string>("");
+  const [submittingVerification, setSubmittingVerification] = useState(false);
 
   const getAdminRequestHeaders = () => {
     const role = user?.type === "admin" ? user.role : undefined;
@@ -198,6 +206,55 @@ function AdminTransactionsPage() {
       toast.error("Gagal melakukan aksi pembaruan");
     } finally {
       setSavingStatus(false);
+    }
+  };
+
+  const handleOpenVerification = (order: Order) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan memverifikasi pembayaran.");
+      return;
+    }
+    setVerifyingOrder(order);
+    setVerificationNote("");
+    setVerificationOpen(true);
+  };
+
+  const handleVerify = async (isAccepted: boolean) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan memverifikasi pembayaran.");
+      return;
+    }
+    if (!verifyingOrder) return;
+
+    if (!isAccepted && !verificationNote.trim()) {
+      toast.error("Catatan wajib diisi jika bukti pembayaran ditolak.");
+      return;
+    }
+
+    setSubmittingVerification(true);
+    try {
+      const result = await verifyPaymentProof({
+        data: {
+          id: verifyingOrder.order_id,
+          isAccepted,
+          note: isAccepted ? undefined : verificationNote.trim(),
+        },
+      });
+      if (result.success) {
+        toast.success(
+          isAccepted
+            ? "Pembayaran berhasil diverifikasi & dikonfirmasi (Status: Sedang Diproses)"
+            : "Bukti pembayaran ditolak & catatan terkirim ke pembeli"
+        );
+        setVerificationOpen(false);
+        await loadTransactions();
+      } else {
+        toast.error(result.error || "Gagal memproses verifikasi");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Gagal memproses verifikasi");
+    } finally {
+      setSubmittingVerification(false);
     }
   };
 
@@ -352,6 +409,17 @@ function AdminTransactionsPage() {
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
+                              {order.payment_type === "manual_qris" && order.payment_proof_url && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleOpenVerification(order)}
+                                  className="hover:bg-blue-50 text-blue-600"
+                                  title="Verifikasi Pembayaran"
+                                >
+                                  <ShieldCheck className="h-4 w-4" />
+                                </Button>
+                              )}
                               {!isCashier && (
                                 <Button
                                   variant="ghost"
@@ -736,6 +804,102 @@ function AdminTransactionsPage() {
             <Button onClick={() => void handleSaveStatus()} disabled={savingStatus}>
               {savingStatus ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* dialog modal verifikasi pembayaran qris */}
+      <Dialog open={verificationOpen} onOpenChange={setVerificationOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="display text-lg tracking-wide text-ink uppercase">
+              Verifikasi Pembayaran QRIS
+            </DialogTitle>
+          </DialogHeader>
+
+          {verifyingOrder && (
+            <div className="space-y-4 py-2">
+              <div className="bg-[#FCFAF7] border border-border p-4 rounded-lg text-xs space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">ID Pesanan:</span>
+                  <span className="font-mono font-bold text-brand-blue">{verifyingOrder.order_id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Nama Pelanggan:</span>
+                  <span className="font-bold text-ink uppercase">{verifyingOrder.customer_name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Total Transfer:</span>
+                  <span className="font-extrabold text-brand-orange text-sm">
+                    Rp {Number(verifyingOrder.gross_amount).toLocaleString("id-ID")}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Status Pembayaran:</span>
+                  <Badge variant="outline" className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
+                    {verifyingOrder.payment_status}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-bold text-ink uppercase tracking-wider">Bukti Pembayaran</Label>
+                <div className="border-2 border-ink rounded-xl overflow-hidden bg-white shadow-sm flex items-center justify-center p-2">
+                  {verifyingOrder.payment_proof_url ? (
+                    <div className="relative group w-full max-h-64 overflow-hidden flex justify-center">
+                      <img
+                        src={resolveImageUrl(verifyingOrder.payment_proof_url)}
+                        alt="Bukti Transfer"
+                        className="max-h-64 object-contain rounded cursor-zoom-in hover:scale-105 transition-transform duration-200"
+                        onClick={() => window.open(resolveImageUrl(verifyingOrder.payment_proof_url), "_blank")}
+                      />
+                    </div>
+                  ) : (
+                    <p className="p-4 text-xs text-muted-foreground text-center">Tidak ada bukti pembayaran</p>
+                  )}
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center">
+                  * Klik gambar untuk melihat ukuran penuh di tab baru.
+                </p>
+              </div>
+
+              <div className="space-y-1.5 pt-2">
+                <Label className="text-xs font-bold text-ink uppercase tracking-wider">Catatan Penolakan (Hanya jika Ditolak)</Label>
+                <Textarea
+                  value={verificationNote}
+                  onChange={(e) => setVerificationNote(e.target.value)}
+                  placeholder="Contoh: Bukti transfer terpotong / nominal tidak sesuai."
+                  rows={2}
+                  className="text-xs"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex sm:justify-between gap-2 mt-4">
+            <Button
+              variant="outline"
+              onClick={() => setVerificationOpen(false)}
+              className="border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 px-4"
+            >
+              Batal
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => void handleVerify(false)}
+                disabled={submittingVerification}
+                className="bg-red-600 hover:bg-red-700 text-white border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 px-4 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+              >
+                Tolak
+              </Button>
+              <Button
+                onClick={() => void handleVerify(true)}
+                disabled={submittingVerification}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 px-4 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+              >
+                {submittingVerification ? "Memproses..." : "Terima"}
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>

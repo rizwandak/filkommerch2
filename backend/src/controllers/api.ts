@@ -1575,6 +1575,125 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
   }
 };
 
+// Verify QRIS payment proof (Admin)
+export const verifyPaymentProof = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const { id } = req.params;
+    const { isAccepted, note } = req.body;
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
+
+    await connection.beginTransaction();
+
+    // Lock the order for update
+    const [orderRows] = await connection.execute(
+      "SELECT payment_status, order_status, fulfillment_status FROM orders WHERE order_id = ? FOR UPDATE",
+      [id]
+    );
+    const order = (orderRows as any[])[0];
+
+    if (!order) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, error: "Order tidak ditemukan" });
+    }
+
+    if (isAccepted) {
+      const wasUnpaid = order.payment_status !== "paid";
+
+      await connection.execute(
+        `UPDATE orders 
+         SET transaction_status = 'settlement', 
+             payment_status = 'paid', 
+             order_status = 'processing', 
+             fulfillment_status = 'processing',
+             payment_proof_note = NULL 
+         WHERE order_id = ?`,
+        [id]
+      );
+
+      // Trigger stock deduction if transitioning to paid manually
+      if (wasUnpaid) {
+        const [items] = await connection.execute(
+          "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
+          [id]
+        );
+        for (const item of items as any[]) {
+          if (item.variant_id) {
+            // Deduct stock, release reservation, log movements
+            await connection.execute(
+              "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
+              [item.quantity, item.variant_id]
+            );
+            await connection.execute(
+              "UPDATE product_variants SET stock_reserved = GREATEST(0, CAST(stock_reserved AS SIGNED) - ?) WHERE id = ?",
+              [item.quantity, item.variant_id]
+            );
+            // Log movements manually using locks
+            const [vRows] = await connection.execute(
+              "SELECT stock FROM product_variants WHERE id = ? FOR UPDATE",
+              [item.variant_id]
+            );
+            const curStock = (vRows as any)[0]?.stock || 0;
+            await connection.execute(
+              `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
+               VALUES (?, 'reservation_release', ?, ?, ?, 'order', ?, 'Pelepasan reservasi stok (verifikasi QRIS)')`,
+              [item.variant_id, -item.quantity, curStock, curStock, id]
+            );
+            await connection.execute(
+              `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
+               VALUES (?, 'sale', ?, ?, ?, 'order', ?, 'Penjualan selesai (verifikasi QRIS)')`,
+              [item.variant_id, -item.quantity, curStock + item.quantity, curStock, id]
+            );
+          }
+        }
+      }
+
+      await logActivity(
+        userId,
+        userName,
+        userRole,
+        "verify_payment_accept",
+        "order",
+        id,
+        `Pembayaran QRIS untuk Order ID ${id} diterima dan pesanan mulai diproses oleh ${userName || 'Sistem'}`
+      );
+    } else {
+      // Reject: set payment status to unpaid, order status to pending_payment, clear payment_proof_url, and set payment_proof_note
+      await connection.execute(
+        `UPDATE orders 
+         SET transaction_status = 'pending', 
+             payment_status = 'pending', 
+             order_status = 'pending_payment', 
+             payment_proof_url = NULL, 
+             payment_proof_note = ? 
+         WHERE order_id = ?`,
+        [note || "Bukti pembayaran tidak sesuai", id]
+      );
+
+      await logActivity(
+        userId,
+        userName,
+        userRole,
+        "verify_payment_reject",
+        "order",
+        id,
+        `Pembayaran QRIS untuk Order ID ${id} ditolak dengan catatan: "${note}" oleh ${userName || 'Sistem'}`
+      );
+    }
+
+    await connection.commit();
+    return res.json({ success: true });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error verifying payment proof:", error);
+    return res.status(500).json({ success: false, error: error.message || "Failed to verify payment proof" });
+  } finally {
+    connection.release();
+  }
+};
+
 // Delete order (Admin)
 export const deleteOrder = async (req: Request, res: Response) => {
   const connection = await getConnection();
@@ -2289,7 +2408,7 @@ export const submitPaymentProof = async (req: Request, res: Response) => {
     }
 
     await execute(
-      "UPDATE orders SET payment_proof_url = ?, transaction_status = 'pending' WHERE order_id = ?",
+      "UPDATE orders SET payment_proof_url = ?, transaction_status = 'pending', payment_status = 'pending', payment_proof_note = NULL WHERE order_id = ?",
       [paymentProofUrl, id]
     );
 
@@ -2750,4 +2869,210 @@ export const regeneratePaymentToken = async (req: Request, res: Response) => {
     connection.release();
   }
 };
+
+// Get unified orders summary for dashboard (sales, products, variants, sizes, buyers)
+export const getOrdersSummary = async (req: Request, res: Response) => {
+  try {
+    const days = req.query.days as string || "30";
+    
+    let dateConstraint = "created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+    
+    if (days === "today") {
+      dateConstraint = "created_at >= CURDATE()";
+    } else if (days === "7") {
+      dateConstraint = "created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+    } else if (days === "30") {
+      dateConstraint = "created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+    } else if (days === "365") {
+      dateConstraint = "created_at >= DATE_SUB(NOW(), INTERVAL 365 DAY)";
+    } else if (days === "all") {
+      dateConstraint = "1=1";
+    }
+
+    // 1. General financial and order summary
+    const summary = await queryOne<any>(
+      `SELECT 
+        COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) AS total_orders,
+        COUNT(CASE WHEN payment_status = 'paid' AND channel = 'online' THEN 1 END) AS online_orders,
+        COUNT(CASE WHEN payment_status = 'paid' AND channel = 'pos' THEN 1 END) AS pos_orders,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN gross_amount ELSE 0 END), 0) AS total_revenue,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' AND channel = 'online' THEN gross_amount ELSE 0 END), 0) AS online_revenue,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' AND channel = 'pos' THEN gross_amount ELSE 0 END), 0) AS pos_revenue,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN discount_amount ELSE 0 END), 0) AS total_discount,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN tax_amount ELSE 0 END), 0) AS total_tax,
+        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN subtotal ELSE 0 END), 0) AS total_subtotal
+       FROM orders
+       WHERE ${dateConstraint}`
+    );
+
+    // 2. Product and Variant Sales Breakdown
+    const productRows = await query<any>(
+      `SELECT 
+        oi.product_id,
+        oi.product_name,
+        oi.variant_id,
+        oi.size,
+        oi.color,
+        SUM(oi.quantity) AS total_quantity,
+        SUM(oi.subtotal) AS total_revenue
+       FROM order_items oi
+       JOIN orders o ON o.order_id = oi.order_id
+       WHERE o.payment_status = 'paid' AND o.${dateConstraint}
+       GROUP BY oi.product_id, oi.product_name, oi.variant_id, oi.size, oi.color
+       ORDER BY total_quantity DESC`
+    );
+
+    // Group product breakdown in JavaScript
+    const productMap = new Map();
+    for (const row of productRows) {
+      const pid = row.product_id || 0;
+      if (!productMap.has(pid)) {
+        productMap.set(pid, {
+          product_id: pid,
+          product_name: row.product_name || "Produk Tidak Dikenal",
+          total_quantity: 0,
+          total_revenue: 0,
+          variants: [],
+          sizes: {},
+          colors: {}
+        });
+      }
+      const prod = productMap.get(pid);
+      prod.total_quantity += Number(row.total_quantity);
+      prod.total_revenue += Number(row.total_revenue);
+
+      prod.variants.push({
+        variant_id: row.variant_id,
+        size: row.size,
+        color: row.color || "Default",
+        quantity: Number(row.total_quantity),
+        revenue: Number(row.total_revenue)
+      });
+
+      if (row.size) {
+        prod.sizes[row.size] = (prod.sizes[row.size] || 0) + Number(row.total_quantity);
+      }
+      if (row.color) {
+        prod.colors[row.color] = (prod.colors[row.color] || 0) + Number(row.total_quantity);
+      }
+    }
+    const productsSummary = Array.from(productMap.values());
+
+    // 3. Buyer Purchase Summary
+    const buyerRows = await query<any>(
+      `SELECT 
+        customer_name,
+        customer_email,
+        customer_phone,
+        customer_nim,
+        COUNT(id) AS total_orders,
+        SUM(gross_amount) AS total_spent
+       FROM orders
+       WHERE payment_status = 'paid' AND ${dateConstraint}
+       GROUP BY customer_email, customer_name, customer_phone, customer_nim
+       ORDER BY total_spent DESC`
+    );
+
+    const buyerItemRows = await query<any>(
+      `SELECT 
+        o.customer_email,
+        o.customer_name,
+        oi.product_name,
+        oi.size,
+        oi.color,
+        SUM(oi.quantity) AS total_quantity,
+        SUM(oi.subtotal) AS total_spent
+       FROM orders o
+       JOIN order_items oi ON o.order_id = oi.order_id
+       WHERE o.payment_status = 'paid' AND o.${dateConstraint}
+       GROUP BY o.customer_email, o.customer_name, oi.product_name, oi.size, oi.color`
+    );
+
+    const buyerMap = new Map();
+    for (const row of buyerRows) {
+      const email = row.customer_email || "guest@filkommerch.com";
+      const name = row.customer_name || "Pelanggan";
+      const key = `${email.toLowerCase()}_${name.toLowerCase()}`;
+      buyerMap.set(key, {
+        customer_name: name,
+        customer_email: email,
+        customer_phone: row.customer_phone,
+        customer_nim: row.customer_nim,
+        total_orders: Number(row.total_orders),
+        total_spent: Number(row.total_spent),
+        items: []
+      });
+    }
+
+    for (const row of buyerItemRows) {
+      const email = row.customer_email || "guest@filkommerch.com";
+      const name = row.customer_name || "Pelanggan";
+      const key = `${email.toLowerCase()}_${name.toLowerCase()}`;
+      if (buyerMap.has(key)) {
+        buyerMap.get(key).items.push({
+          product_name: row.product_name,
+          size: row.size,
+          color: row.color,
+          quantity: Number(row.total_quantity),
+          total_spent: Number(row.total_spent)
+        });
+      }
+    }
+    const buyersSummary = Array.from(buyerMap.values());
+
+    // 4. Sales Trend (grouped by Date)
+    let trendRows: any[] = [];
+    if (days === "today") {
+      trendRows = await query<any>(
+        `SELECT 
+          HOUR(created_at) AS hour,
+          DATE_FORMAT(created_at, '%H:00') AS label,
+          COALESCE(SUM(gross_amount), 0) AS revenue,
+          COUNT(id) AS orders_count
+         FROM orders
+         WHERE payment_status = 'paid' AND created_at >= CURDATE()
+         GROUP BY HOUR(created_at), DATE_FORMAT(created_at, '%H:00')
+         ORDER BY hour ASC`
+      );
+    } else {
+      trendRows = await query<any>(
+        `SELECT 
+          DATE(created_at) AS date,
+          DATE_FORMAT(created_at, '%d %b') AS label,
+          COALESCE(SUM(gross_amount), 0) AS revenue,
+          COUNT(id) AS orders_count
+         FROM orders
+         WHERE payment_status = 'paid' AND ${dateConstraint}
+         GROUP BY DATE(created_at), DATE_FORMAT(created_at, '%d %b')
+         ORDER BY date ASC`
+      );
+    }
+
+    return res.json({
+      success: true,
+      summary: {
+        total_orders: summary?.total_orders || 0,
+        online_orders: summary?.online_orders || 0,
+        pos_orders: summary?.pos_orders || 0,
+        total_revenue: Number(summary?.total_revenue || 0),
+        online_revenue: Number(summary?.online_revenue || 0),
+        pos_revenue: Number(summary?.pos_revenue || 0),
+        total_discount: Number(summary?.total_discount || 0),
+        total_tax: Number(summary?.total_tax || 0),
+        total_subtotal: Number(summary?.total_subtotal || 0),
+      },
+      products: productsSummary,
+      buyers: buyersSummary,
+      sales_trend: trendRows.map(row => ({
+        label: row.label,
+        revenue: Number(row.revenue),
+        orders_count: Number(row.orders_count)
+      }))
+    });
+  } catch (error: any) {
+    console.error("Error fetching orders summary:", error);
+    return res.status(500).json({ success: false, error: error.message || "Failed to fetch orders summary" });
+  }
+};
+
 

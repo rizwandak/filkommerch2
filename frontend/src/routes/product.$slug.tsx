@@ -23,6 +23,7 @@ import {
   User as UserIcon,
   LayoutDashboard,
   MonitorSmartphone,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getProductBySlug } from "@backend/server-actions";
@@ -474,48 +475,47 @@ function ProductDetailPage() {
       <Navbar />
 
       {/* Main Container */}
-      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8 flex-1 w-full">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-8 flex-1 w-full pb-24 md:pb-8">
         {/* 3-Column Layout: Left (Fixed Sticky Photo) | Middle (Details & Tabs) | Right (Fixed Sticky Buy Card) */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-8 items-start">
           {/* COLUMN 1: LEFT STICKY GALLERY (4 Cols - Fixed Anchored) */}
-          <div className="md:col-span-4 md:sticky md:top-28 self-start space-y-4">
-            {/* Main Rigid 1:1 Aspect-Square Image Box */}
-            <div
-              onClick={() => setIsZoomOpen(true)}
-              className="aspect-square w-full bg-cream border-2 border-ink rounded-2xl overflow-hidden relative cursor-zoom-in group/img shadow-[5px_5px_0px_0px_rgba(27,27,27,1)]"
-            >
-              <img
-                src={resolveImageUrl(activeImage)}
-                alt={product.name}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
-              />
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setIsZoomOpen(true);
-                }}
-                className="absolute bottom-3.5 right-3.5 p-2 bg-white/95 rounded-full shadow border-2 border-ink hover:scale-105 transition-transform z-10 cursor-pointer"
-                aria-label="Zoom image"
-              >
-                <Search className="w-4 h-4 text-ink" />
-              </button>
-            </div>
-
-            {/* Thumbnails Row */}
-            <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-none">
-              {images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setActiveImage(img)}
-                  className={`w-16 h-16 aspect-square rounded-xl border-2 overflow-hidden bg-cream shrink-0 transition-all cursor-pointer ${
-                    activeImage === img
-                      ? "border-brand-orange scale-95 shadow-sm ring-2 ring-brand-orange/30"
-                      : "border-ink/25 hover:border-ink"
-                  }`}
-                >
-                  <img src={resolveImageUrl(img)} alt="thumb" className="w-full h-full object-cover" />
-                </button>
-              ))}
+          <div className="md:col-span-4 md:sticky md:top-28 self-start">
+            {/* Horizontal Swipe Carousel */}
+            <div className="relative w-full overflow-hidden">
+              <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-4">
+                {images.map((img, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => {
+                      setActiveImage(img);
+                      setIsZoomOpen(true);
+                    }}
+                    className="w-[85%] md:w-full shrink-0 snap-center aspect-square bg-cream border-2 border-ink rounded-2xl overflow-hidden relative cursor-zoom-in group/img shadow-[5px_5px_0px_0px_rgba(27,27,27,1)]"
+                  >
+                    <img
+                      src={resolveImageUrl(img)}
+                      alt={`${product.name} - ${idx + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
+                    />
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveImage(img);
+                        setIsZoomOpen(true);
+                      }}
+                      className="absolute bottom-3.5 right-3.5 p-2 bg-white/95 rounded-full shadow border-2 border-ink hover:scale-105 transition-transform z-10 cursor-pointer"
+                      aria-label="Zoom image"
+                    >
+                      <Search className="w-4 h-4 text-ink" />
+                    </button>
+                    {images.length > 1 && (
+                      <div className="absolute top-3.5 right-3.5 px-2.5 py-1 bg-black/60 border border-white/20 rounded-lg text-[10px] text-white font-bold select-none">
+                        {idx + 1} / {images.length}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -534,9 +534,28 @@ function ProductDetailPage() {
                 )}
               </div>
 
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-ink uppercase tracking-tight leading-tight">
-                {product.name}
-              </h1>
+              <div className="flex items-center justify-between gap-3">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-ink uppercase tracking-tight leading-tight">
+                  {product.name}
+                </h1>
+                <button
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({
+                        title: product.name,
+                        url: window.location.href,
+                      });
+                    } else {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.success("Tautan produk berhasil disalin!");
+                    }
+                  }}
+                  className="shrink-0 p-2 rounded-xl border-2 border-ink bg-white hover:bg-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer"
+                  aria-label="Bagikan produk"
+                >
+                  <Share2 className="w-4 h-4 text-ink" />
+                </button>
+              </div>
             </div>
 
             {/* Price Section */}
@@ -735,6 +754,46 @@ function ProductDetailPage() {
                     </div>
                   </div>
                 )}
+
+                {/* Quantity Selector + Stock Info */}
+                <div className="space-y-2 pt-3 border-t border-border mt-3">
+                  <p className="text-xs font-extrabold uppercase text-ink">Jumlah</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center border-2 border-ink rounded-xl bg-cream/20 overflow-hidden">
+                      <button
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        className="p-2 border-r-2 border-ink hover:bg-cream active:scale-95 transition-all cursor-pointer"
+                        aria-label="Decrease quantity"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="w-12 text-center text-xs font-black">{quantity}</span>
+                      <button
+                        onClick={() => setQuantity(Math.min(currentStock, quantity + 1))}
+                        disabled={currentStock <= 0}
+                        className="p-2 border-l-2 border-ink hover:bg-cream active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                        aria-label="Increase quantity"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    <div className="text-right text-xs">
+                      {product.sale_type === "preorder" ? (
+                        <span className="text-brand-orange font-black uppercase tracking-wider text-[11px] bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/30">
+                          ⚡ Pre-Order Open
+                        </span>
+                      ) : (
+                        <>
+                          <span className="text-muted-foreground font-bold">Stok: </span>
+                          <span className={currentStock <= 3 ? "text-red-600 font-black animate-pulse" : "text-ink font-black"}>
+                            {currentStock}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -845,12 +904,7 @@ function ProductDetailPage() {
                         {product.aplikasi || "High Precision Bordir Komputer & DTF Print"}
                       </span>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 py-2">
-                      <span className="font-extrabold text-ink uppercase text-[11px]">Produsen/Asal</span>
-                      <span className="col-span-2 text-muted-foreground font-semibold">
-                        {product.asal || "BEM FILKOM UB Creative Merchandise Division"}
-                      </span>
-                    </div>
+
                   </div>
                 )}
 
@@ -885,111 +939,26 @@ function ProductDetailPage() {
           {/* COLUMN 3: RIGHT STICKY CHECKOUT SIDEBAR BOX (3 Cols - Fixed Anchored) */}
           <div className="md:col-span-3 md:sticky md:top-28 self-start space-y-5">
             <div className="bg-white border-2 border-ink rounded-2xl p-5 shadow-[6px_6px_0px_0px_rgba(27,27,27,1)] space-y-5">
-              <h3 className="font-extrabold text-ink text-xs uppercase tracking-wider pb-2.5 border-b-2 border-ink flex items-center justify-between">
-                <span>Atur jumlah dan catatan</span>
-              </h3>
-
-              {/* Selected Variant Summary Card */}
-              <div className="flex items-center gap-3 p-2.5 bg-cream/40 rounded-xl border border-ink/20">
-                <img
-                  src={resolveImageUrl(activeImage)}
-                  alt="selected"
-                  className="w-11 h-11 object-cover rounded-lg border border-ink shrink-0"
-                />
-                <div className="min-w-0 flex-1 leading-tight">
-                  <p className="font-extrabold text-ink text-xs uppercase truncate">
-                    {product.name}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground font-bold uppercase mt-0.5">
-                    {[selectedSize, selectedColor].filter(Boolean).join(", ") || "Default Fit"}
-                  </p>
-                </div>
-              </div>
-
-              {/* Quantity Selector + Stock Info */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center border-2 border-ink rounded-xl bg-cream/20 overflow-hidden">
-                    <button
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      className="p-2 border-r-2 border-ink hover:bg-cream active:scale-95 transition-all cursor-pointer"
-                      aria-label="Decrease quantity"
-                    >
-                      <Minus className="w-3.5 h-3.5" />
-                    </button>
-                    <span className="w-12 text-center text-xs font-black">{quantity}</span>
-                    <button
-                      onClick={() => setQuantity(Math.min(currentStock, quantity + 1))}
-                      disabled={currentStock <= 0}
-                      className="p-2 border-l-2 border-ink hover:bg-cream active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
-                      aria-label="Increase quantity"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-
-                  <div className="text-right text-xs">
-                    {product.sale_type === "preorder" ? (
-                      <span className="text-brand-orange font-black uppercase tracking-wider text-[11px] bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/30">
-                        ⚡ Pre-Order Open
-                      </span>
-                    ) : (
-                      <>
-                        <span className="text-muted-foreground font-bold">Stok: </span>
-                        <span className={currentStock <= 3 ? "text-red-600 font-black animate-pulse" : "text-ink font-black"}>
-                          {currentStock}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Subtotal Display */}
-              <div className="pt-3 border-t border-border flex items-baseline justify-between">
-                <span className="text-xs font-bold text-muted-foreground">Subtotal</span>
-                <span className="text-xl sm:text-2xl font-black text-brand-orange tracking-tight">
-                  Rp {(currentPrice * quantity).toLocaleString("id-ID")}
-                </span>
-              </div>
 
               {/* Primary Action Buttons */}
-              <div className="space-y-2.5 pt-1">
+              <div className="hidden md:grid grid-cols-2 gap-2.5">
                 <button
                   onClick={() => handleAddToCart(false)}
                   disabled={currentStock <= 0}
-                  className="w-full py-3 px-4 bg-brand-orange hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-200"
+                  className="py-3 px-3 bg-brand-orange hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-200"
                 >
-                  <Plus className="w-4 h-4" /> {currentStock <= 0 ? "Stok Habis" : "+ Keranjang"}
+                  <ShoppingBag className="w-4 h-4" /> {currentStock <= 0 ? "Habis" : "Masuk Bag"}
                 </button>
                 <button
                   onClick={() => handleAddToCart(true)}
                   disabled={currentStock <= 0}
-                  className="w-full py-3 px-4 bg-white hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-100"
+                  className="py-3 px-3 bg-ink hover:bg-ink/80 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,0.4)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300"
                 >
-                  {currentStock <= 0 ? "Stok Habis" : "Beli Langsung"}
+                  <Zap className="w-4 h-4" /> {currentStock <= 0 ? "Habis" : "Beli Sekarang"}
                 </button>
               </div>
 
-              {/* Action Utilities Footer */}
-              <div className="pt-3 border-t border-border flex items-center justify-center text-[11px] font-bold text-muted-foreground">
-                <button
-                  onClick={() => {
-                    if (navigator.share) {
-                      navigator.share({
-                        title: product.name,
-                        url: window.location.href,
-                      });
-                    } else {
-                      navigator.clipboard.writeText(window.location.href);
-                      toast.success("Tautan produk berhasil disalin!");
-                    }
-                  }}
-                  className="flex items-center justify-center gap-1.5 hover:text-ink transition-colors cursor-pointer py-1 px-3 rounded-lg hover:bg-cream/50"
-                >
-                  <Share2 className="w-3.5 h-3.5 text-brand-orange" /> Bagikan Produk (Share)
-                </button>
-              </div>
+
             </div>
           </div>
         </div>
@@ -1098,6 +1067,25 @@ function ProductDetailPage() {
           </div>
         </div>
       )}
+      {/* Sticky Bottom Dock for Mobile */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t-2 border-ink p-3 md:hidden shadow-[0_-4px_15px_rgba(0,0,0,0.08)]">
+        <div className="grid grid-cols-2 gap-2.5">
+          <button
+            onClick={() => handleAddToCart(false)}
+            disabled={currentStock <= 0}
+            className="py-3 px-3 bg-brand-orange hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <ShoppingBag className="w-4 h-4" /> {currentStock <= 0 ? "Habis" : "Masuk Bag"}
+          </button>
+          <button
+            onClick={() => handleAddToCart(true)}
+            disabled={currentStock <= 0}
+            className="py-3 px-3 bg-ink hover:bg-ink/80 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,0.4)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Zap className="w-4 h-4" /> {currentStock <= 0 ? "Habis" : "Beli Sekarang"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

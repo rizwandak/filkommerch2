@@ -1112,7 +1112,7 @@ function Index() {
                           {!canSeeProducts ? (
                             <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
                           ) : (
-                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
+                            <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                               {heroProductsToRender.map((p) => {
                                 let discountText = null;
                                 if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
@@ -1130,7 +1130,7 @@ function Index() {
                                 return (
                                   <div
                                     key={p.id}
-                                    className="group flex flex-col border-2 border-ink bg-neutral-900 text-cream rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(255,107,0,085)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(255,107,0,1)] transition-all duration-200 w-full sm:w-[260px] md:w-[290px] shrink-0"
+                                    className="group flex flex-col border-2 border-ink bg-neutral-900 text-cream rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(255,107,0,085)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(255,107,0,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[260px] md:w-[290px] shrink-0"
                                   >
                                     {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
                                     <Link
@@ -1760,11 +1760,11 @@ function Index() {
                         {!canSeeProducts ? (
                           <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
                         ) : (
-                          <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
+                          <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                             {bundlesToRender.map((bundle: any, bIdx: number) => (
                             <div
                               key={bIdx}
-                              className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-full sm:w-[260px] md:w-[290px] shrink-0"
+                              className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[260px] md:w-[290px] shrink-0"
                             >
                               {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
                               <div className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden group">

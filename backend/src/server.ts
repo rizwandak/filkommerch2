@@ -349,6 +349,7 @@ app.put("/api/admin/products", checkRole(["admin"]), (req, res, next) => { clear
 app.delete("/api/admin/products/:id", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.deleteProduct);
 app.get("/api/admin/orders", checkRole(["admin", "cashier"]), apiControllers.getOnlineOrders);
 app.put("/api/admin/orders/:id/status", checkRole(["admin", "cashier"]), apiControllers.updateOrderStatus);
+app.put("/api/admin/orders/:id/verify-payment", checkRole(["admin", "cashier"]), apiControllers.verifyPaymentProof);
 app.delete("/api/admin/orders/:id", checkRole(["admin"]), apiControllers.deleteOrder);
 app.get("/api/admin/activity-logs", checkRole(["admin", "cashier"]), apiControllers.getActivityLogs);
 
@@ -374,6 +375,7 @@ app.delete("/api/pre-order-campaigns/:id", checkRole(["admin"]), apiControllers.
 app.get("/api/analytics/daily", checkRole(["admin", "cashier"]), apiControllers.getDailySalesSummary);
 app.get("/api/analytics/top-products", checkRole(["admin", "cashier"]), apiControllers.getTopProducts);
 app.get("/api/analytics/inventory", checkRole(["admin", "cashier"]), apiControllers.getInventory);
+app.get("/api/analytics/orders-summary", checkRole(["admin", "cashier"]), apiControllers.getOrdersSummary);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
