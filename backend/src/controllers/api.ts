@@ -1261,8 +1261,8 @@ export const createProduct = async (req: Request, res: Response) => {
     // Insert variants
     for (const variant of input.variants) {
       await execute(
-        "INSERT INTO product_variants (product_id, size, color, stock, filkom_price) VALUES (?, ?, ?, ?, ?)",
-        [productId, variant.size || "One Size", variant.color || "", variant.stock || 0, variant.filkom_price || null]
+        "INSERT INTO product_variants (product_id, size, color, stock, filkom_price, image_url) VALUES (?, ?, ?, ?, ?, ?)",
+        [productId, variant.size || "One Size", variant.color || "", variant.stock || 0, variant.filkom_price || null, variant.image_url || null]
       );
     }
 
@@ -1363,13 +1363,13 @@ export const updateProduct = async (req: Request, res: Response) => {
 
       if (existing) {
         await execute(
-          "UPDATE product_variants SET stock = ?, filkom_price = ?, is_active = TRUE WHERE id = ?",
-          [variant.stock || 0, variant.filkom_price || null, existing.id]
+          "UPDATE product_variants SET stock = ?, filkom_price = ?, image_url = ?, is_active = TRUE WHERE id = ?",
+          [variant.stock || 0, variant.filkom_price || null, variant.image_url || null, existing.id]
         );
       } else {
         await execute(
-          "INSERT INTO product_variants (product_id, size, color, stock, filkom_price, is_active) VALUES (?, ?, ?, ?, ?, TRUE)",
-          [input.id, variant.size || "One Size", variant.color || "", variant.stock || 0, variant.filkom_price || null]
+          "INSERT INTO product_variants (product_id, size, color, stock, filkom_price, image_url, is_active) VALUES (?, ?, ?, ?, ?, ?, TRUE)",
+          [input.id, variant.size || "One Size", variant.color || "", variant.stock || 0, variant.filkom_price || null, variant.image_url || null]
         );
       }
     }

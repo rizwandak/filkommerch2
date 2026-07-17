@@ -69,7 +69,7 @@ interface ProductForm {
   aplikasi: string;
   size_chart_url: string;
   images: string[];
-  variants: Array<{ size: string; color: string; stock: string; filkom_price: string }>;
+  variants: Array<{ size: string; color: string; stock: string; filkom_price: string; image_url?: string }>;
   component_ids: number[];
   is_active: boolean;
 }
@@ -160,6 +160,7 @@ function AdminProductsPage() {
           color,
           stock: existing ? String(existing.stock) : "0",
           filkom_price: existing ? String(existing.filkom_price) : "",
+          image_url: existing ? (existing.image_url || "") : "",
         });
       }
     }
@@ -226,6 +227,7 @@ function AdminProductsPage() {
   const [newCategoryName, setNewCategoryName] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
   const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
+  const [activeImagePickerIndex, setActiveImagePickerIndex] = useState<number | null>(null);
   const [cropperOpen, setCropperOpen] = useState(false);
   const [cropperImageSrc, setCropperImageSrc] = useState("");
   const editFileInputRef = useRef<HTMLInputElement>(null);
@@ -394,6 +396,7 @@ function AdminProductsPage() {
       color: v.color || "",
       stock: String(v.stock),
       filkom_price: v.filkom_price ? String(v.filkom_price) : "",
+      image_url: v.image_url || "",
     }));
 
     const isMultiple = editVariants.length > 1 || (editVariants.length === 1 && editVariants[0].size !== "One Size" && editVariants[0].size !== "All Size" && editVariants[0].size !== "" && editVariants[0].size !== undefined);
@@ -646,6 +649,7 @@ function AdminProductsPage() {
         color: v.color || "",
         stock: form.sale_type === "pre_order" ? 999 : (parseInt(v.stock) || 0),
         filkom_price: v.filkom_price ? parseFloat(v.filkom_price) : null,
+        image_url: v.image_url || null,
       })),
       component_ids: form.product_type === "bundle" ? form.component_ids : [],
       is_active: form.is_active,
@@ -958,7 +962,10 @@ function AdminProductsPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl sm:max-w-4xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-8 border-2 border-ink rounded-2xl shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] bg-background">
+        <DialogContent 
+          onPointerDownOutside={(e) => e.preventDefault()}
+          className="max-w-4xl sm:max-w-4xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-8 border-2 border-ink rounded-2xl shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] bg-background"
+        >
           <DialogHeader className="border-b border-border pb-3">
             <DialogTitle className="display text-xl sm:text-2xl text-ink uppercase tracking-wide flex items-center justify-between">
               <span>{form.id ? "Edit Produk Merchandise" : "Tambah Produk Baru"}</span>
@@ -1601,8 +1608,9 @@ function AdminProductsPage() {
                     </Label>
                     
                     <div className="grid grid-cols-12 gap-2 text-[9px] font-black uppercase text-muted-foreground px-1 border-b pb-1">
-                      <div className="col-span-3">Ukuran</div>
-                      <div className="col-span-3">Warna</div>
+                      <div className="col-span-2">Ukuran</div>
+                      <div className="col-span-2">Warna</div>
+                      <div className="col-span-2 text-center">Foto Varian</div>
                       <div className="col-span-2 text-center">Stok (Pcs)</div>
                       <div className="col-span-3">Add-on Harga (Rp)</div>
                       <div className="col-span-1 text-center">Hapus</div>
@@ -1611,11 +1619,25 @@ function AdminProductsPage() {
                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                       {form.variants.map((v, i) => (
                         <div key={i} className="grid grid-cols-12 gap-2 items-center bg-cream/10 p-2 rounded-xl border border-ink/20">
-                          <div className="col-span-3">
+                          <div className="col-span-2">
                             <span className="text-xs font-black uppercase text-ink">{v.size}</span>
                           </div>
-                          <div className="col-span-3">
+                          <div className="col-span-2">
                             <span className="text-xs font-bold text-muted-foreground uppercase">{v.color || "-"}</span>
+                          </div>
+                          <div className="col-span-2 flex justify-center">
+                            <button
+                              type="button"
+                              onClick={() => setActiveImagePickerIndex(i)}
+                              className="w-10 h-10 rounded-lg border-2 border-dashed border-ink/20 hover:border-brand-orange bg-white overflow-hidden flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 group relative"
+                              title="Pilih foto untuk varian ini"
+                            >
+                              {v.image_url ? (
+                                <img src={resolveImageUrl(v.image_url)} className="w-full h-full object-cover" alt="varian" />
+                              ) : (
+                                <span className="text-[10px] text-muted-foreground font-extrabold group-hover:text-brand-orange">+ Foto</span>
+                              )}
+                            </button>
                           </div>
                           <div className="col-span-2">
                             {form.sale_type === "pre_order" ? (
@@ -1642,10 +1664,10 @@ function AdminProductsPage() {
                               placeholder="+0"
                               value={v.filkom_price}
                               onChange={(e) => {
-                                const variants = [...form.variants];
-                                variants[i] = { ...variants[i], filkom_price: e.target.value };
-                                setForm({ ...form, variants });
-                              }}
+                                  const variants = [...form.variants];
+                                  variants[i] = { ...variants[i], filkom_price: e.target.value };
+                                  setForm({ ...form, variants });
+                                }}
                               className="text-xs border-ink/30 font-bold"
                             />
                           </div>
@@ -1786,6 +1808,88 @@ function AdminProductsPage() {
           setEditingImageIndex(null);
         }}
       />
+
+      {/* Nested Radix Dialog for Variant Image Picker (automatically handled inside standard portals) */}
+      <Dialog
+        open={activeImagePickerIndex !== null}
+        onOpenChange={(open) => {
+          if (!open) setActiveImagePickerIndex(null);
+        }}
+      >
+        <DialogContent className="max-w-md w-full bg-white border-2 border-ink p-5 rounded-2xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] border-ink text-ink font-sans">
+          <DialogHeader className="border-b-2 border-ink/10 pb-3">
+            <DialogTitle className="font-extrabold text-sm uppercase text-ink">
+              Pilih Foto Varian
+            </DialogTitle>
+          </DialogHeader>
+
+          {activeImagePickerIndex !== null && (() => {
+            const availableImages = Array.from(new Set([form.image_url, ...form.images].filter(Boolean) as string[]));
+            return (
+              <div className="space-y-4 pt-2">
+                {availableImages.length === 0 ? (
+                  <div className="text-center py-6">
+                    <p className="text-xs text-muted-foreground italic font-medium">Belum ada foto produk yang diunggah.</p>
+                    <p className="text-[10px] text-muted-foreground/80 mt-1">Silakan unggah foto di bagian galeri/foto utama produk terlebih dahulu.</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-4 gap-2.5 max-h-[220px] overflow-y-auto p-1">
+                    {availableImages.map((imgUrl, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => {
+                          const variants = [...form.variants];
+                          variants[activeImagePickerIndex] = {
+                            ...variants[activeImagePickerIndex],
+                            image_url: imgUrl
+                          };
+                          setForm({ ...form, variants });
+                          setActiveImagePickerIndex(null);
+                        }}
+                        className={`aspect-square border-2 rounded-xl overflow-hidden hover:border-brand-orange hover:scale-105 transition cursor-pointer ${
+                          form.variants[activeImagePickerIndex]?.image_url === imgUrl
+                            ? "border-brand-orange ring-4 ring-brand-orange/10 scale-95"
+                            : "border-ink/20"
+                        }`}
+                      >
+                        <img src={resolveImageUrl(imgUrl)} className="w-full h-full object-cover" alt="pilihan" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-4 border-t border-ink/10 mt-3">
+                  {form.variants[activeImagePickerIndex]?.image_url && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const variants = [...form.variants];
+                        variants[activeImagePickerIndex] = {
+                          ...variants[activeImagePickerIndex],
+                          image_url: ""
+                        };
+                        setForm({ ...form, variants });
+                        setActiveImagePickerIndex(null);
+                      }}
+                      className="text-xs font-bold text-red-600 hover:underline cursor-pointer"
+                    >
+                      Hapus Foto Varian
+                    </button>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={() => setActiveImagePickerIndex(null)}
+                    className="bg-ink hover:bg-brand-orange text-white border-2 border-ink text-xs font-bold uppercase py-1.5 px-4 ml-auto cursor-pointer"
+                  >
+                    Tutup
+                  </Button>
+                </div>
+              </div>
+            );
+          })()}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

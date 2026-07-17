@@ -202,6 +202,7 @@ export interface ProductVariant {
   color_hex: string | null;
   price_override: number | null;
   filkom_price: number | null;
+  image_url?: string | null;
 }
 
 export interface ProductWithVariants extends Product {
@@ -447,6 +448,7 @@ export interface CreateProductInput {
     color?: string | null;
     stock: number;
     filkom_price?: number | null;
+    image_url?: string | null;
   }>;
   component_ids?: number[];
 }

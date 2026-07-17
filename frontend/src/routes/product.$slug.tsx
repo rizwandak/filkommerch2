@@ -172,17 +172,6 @@ function ProductDetailPage() {
       if (product.image_url) {
         setActiveImage(product.image_url);
       }
-
-      // Extract unique colors and sizes from variants
-      const colors = Array.from(new Set(product.variants.map((v) => v.color).filter(Boolean)));
-      const sizes = Array.from(new Set(product.variants.map((v) => v.size).filter(Boolean)));
-
-      if (colors.length > 0) {
-        setSelectedColor(colors[0] as string);
-      }
-      if (sizes.length > 0) {
-        setSelectedSize(sizes[0] as string);
-      }
     }
   }, [product]);
 
@@ -335,6 +324,50 @@ function ProductDetailPage() {
     product.images && product.images.length > 0
       ? product.images
       : ([product.image_url].filter(Boolean) as string[]);
+
+  // Automatically switch active image based on color / variant selection
+  useEffect(() => {
+    if (!product || images.length <= 1) return;
+
+    // Only query variant if the user has made all necessary selections
+    const isSizeSelected = sizes.length === 0 || !!selectedSize;
+    const isColorSelected = colors.length === 0 || !!selectedColor;
+
+    if (isSizeSelected && isColorSelected) {
+      const matchedVariant = product.variants.find((v) => {
+        const sizeMatches = sizes.length === 0 || (v.size || "One Size") === selectedSize;
+        const colorMatches = colors.length === 0 || (v.color || "") === selectedColor;
+        return sizeMatches && colorMatches && v.is_active;
+      });
+
+      if (matchedVariant && matchedVariant.image_url) {
+        setActiveImage(matchedVariant.image_url);
+        return; // Success, stop here!
+      }
+    }
+
+    // 2. Fallback to smart color name search
+    if (selectedColor) {
+      // Normalize color name (e.g. "Navy (DP)" -> "navy")
+      const cleanColor = selectedColor.toLowerCase().replace(/\(dp\)|\(lunas\)/gi, "").trim();
+      if (cleanColor) {
+        const matchedImage = images.find((img) => {
+          const filename = img.toLowerCase().split("/").pop() || "";
+          return filename.includes(cleanColor) || img.toLowerCase().includes(cleanColor);
+        });
+
+        if (matchedImage) {
+          setActiveImage(matchedImage);
+          return; // Success, stop here!
+        }
+      }
+    }
+
+    // 3. Fallback to main product image if no variant image or color match is found
+    if (product.image_url) {
+      setActiveImage(product.image_url);
+    }
+  }, [selectedSize, selectedColor, product, images, sizes, colors]);
 
   const handleAddToCart = (buyNow = false) => {
     if (!selectedSize && sizes.length > 0) {
@@ -490,6 +523,11 @@ function ProductDetailPage() {
           <div className="md:col-span-4 md:sticky md:top-28 self-start">
             {/* ===== MOBILE: Horizontal Swipe Carousel (unchanged) ===== */}
             <div className="md:hidden relative w-full overflow-hidden">
+              {([selectedSize, selectedColor].filter(Boolean).length > 0) && (
+                <div className="absolute bottom-6 left-3 bg-white text-ink border-2 border-ink px-2.5 py-1 text-[9px] font-black uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] z-20 animate-fade-in">
+                  {[selectedSize, selectedColor].filter(Boolean).join(" - ")}
+                </div>
+              )}
               <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-4">
                 {images.map((img, idx) => (
                   <div
@@ -533,6 +571,11 @@ function ProductDetailPage() {
                 onClick={() => setIsZoomOpen(true)}
                 className="w-full aspect-square bg-cream border-2 border-ink rounded-2xl overflow-hidden relative cursor-zoom-in group/img shadow-[5px_5px_0px_0px_rgba(27,27,27,1)]"
               >
+                {([selectedSize, selectedColor].filter(Boolean).length > 0) && (
+                  <div className="absolute bottom-3.5 left-3.5 bg-white text-ink border-2 border-ink px-2.5 py-1 text-[10px] font-black uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] z-20 animate-fade-in">
+                    {[selectedSize, selectedColor].filter(Boolean).join(" - ")}
+                  </div>
+                )}
                 <img
                   src={resolveImageUrl(activeImage || images[0])}
                   alt={product.name}

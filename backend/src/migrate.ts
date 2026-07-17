@@ -114,6 +114,10 @@ export async function runMigration() {
       {
         name: "orders.payment_proof_note",
         sql: "ALTER TABLE orders ADD COLUMN payment_proof_note VARCHAR(255) DEFAULT NULL"
+      },
+      {
+        name: "product_variants.image_url",
+        sql: "ALTER TABLE product_variants ADD COLUMN image_url VARCHAR(255) DEFAULT NULL"
       }
     ];
 
