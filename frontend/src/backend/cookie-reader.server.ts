@@ -1,10 +1,11 @@
+import { createServerOnlyFn } from "@tanstack/react-start";
 import { getCookies } from "@tanstack/react-start/server";
 
-export function getServerCookies(): Record<string, string | undefined> {
+export const getServerCookies = createServerOnlyFn(() => {
   try {
-    return getCookies();
+    return getCookies() as Record<string, string | undefined>;
   } catch (e) {
     console.warn("getServerCookies failed:", e);
-    return {};
+    return {} as Record<string, string | undefined>;
   }
-}
+});
