@@ -118,6 +118,8 @@ export const Route = createFileRoute("/")({
         bundle_components: product.bundle_components || [],
         rawPrice: product.price || 0,
         rawOriginalPrice: product.original_price || null,
+        filkom_price: (product as any).filkom_price || null,
+        promo_price: (product as any).promo_price || null,
       };
     });
 
@@ -179,6 +181,8 @@ type ProductCard = {
   bundle_components?: any[];
   rawPrice?: number;
   rawOriginalPrice?: number | null;
+  filkom_price?: number | null;
+  promo_price?: number | null;
 };
 
 const FALLBACK_PRODUCTS: ProductCard[] = [
@@ -286,6 +290,18 @@ function parsePrice(p: any): number {
 
 function formatRp(n: number) {
   return "Rp " + n.toLocaleString("id-ID");
+}
+
+// Determine active price based on user verification status (same logic as products.tsx)
+function getActivePriceForCard(p: ProductCard, user: any): string {
+  const isUb = user?.is_filkom_verified === 1;
+  if (p.promo_price && Number(p.promo_price) > 0) {
+    return formatRp(Number(p.promo_price));
+  }
+  if (isUb && p.filkom_price && Number(p.filkom_price) > 0) {
+    return formatRp(Number(p.filkom_price));
+  }
+  return p.price;
 }
 
 function scrollToId(id: string) {
@@ -1179,11 +1195,11 @@ function Index() {
                                       <div className="pt-2 border-t border-neutral-800 flex items-baseline justify-between gap-1">
                                         <div>
                                           <span className="text-base sm:text-lg font-black text-brand-orange tracking-tight block leading-none">
-                                            {p.price}
+                                            {getActivePriceForCard(p, user)}
                                           </span>
-                                          {p.was && (
+                                          {(p.was || (p.filkom_price && user?.is_filkom_verified === 1 && Number(p.filkom_price) < (p.rawPrice || 0))) && (
                                             <span className="text-[10px] font-extrabold text-red-500 line-through block mt-0.5">
-                                              {p.was}
+                                              {p.was || p.price}
                                             </span>
                                           )}
                                         </div>
@@ -1302,11 +1318,11 @@ function Index() {
                                       <div className="pt-2 border-t border-ink/10 flex items-baseline justify-between gap-1">
                                         <div>
                                           <span className="text-base sm:text-lg font-black text-ink tracking-tight block leading-none">
-                                            {p.price}
+                                            {getActivePriceForCard(p, user)}
                                           </span>
-                                          {p.was && (
+                                          {(p.was || (p.filkom_price && user?.is_filkom_verified === 1 && Number(p.filkom_price) < (p.rawPrice || 0))) && (
                                             <span className="text-[10px] font-extrabold text-red-500 line-through block mt-0.5">
-                                              {p.was}
+                                              {p.was || p.price}
                                             </span>
                                           )}
                                         </div>
@@ -2057,10 +2073,10 @@ function Index() {
                 </h3>
 
                 <div className="flex items-baseline gap-2 mb-4">
-                  <span className="text-xl font-extrabold text-ink">{quickViewProduct.price}</span>
-                  {quickViewProduct.was && (
+                  <span className="text-xl font-extrabold text-ink">{getActivePriceForCard(quickViewProduct, user)}</span>
+                  {(quickViewProduct.was || (quickViewProduct.filkom_price && user?.is_filkom_verified === 1 && Number(quickViewProduct.filkom_price) < (quickViewProduct.rawPrice || 0))) && (
                     <span className="text-sm text-muted-foreground line-through font-bold">
-                      {quickViewProduct.was}
+                      {quickViewProduct.was || quickViewProduct.price}
                     </span>
                   )}
                 </div>

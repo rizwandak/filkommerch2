@@ -3083,4 +3083,142 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
   }
 };
 
+// Create Pelunasan (balance payment) order automatically linked to a DP order (Zero DB Schema change)
+export const createPelunasanOrder = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params; // Original Order ID
+
+    // 1. Fetch original order
+    const originalOrder = await queryOne<any>("SELECT * FROM orders WHERE order_id = ?", [id]);
+    if (!originalOrder) {
+      return res.status(404).json({ success: false, error: "Pesanan asal tidak ditemukan" });
+    }
+
+    // Check if already paid
+    if (originalOrder.payment_status !== "paid") {
+      return res.status(400).json({ success: false, error: "Pesanan asal belum lunas DP" });
+    }
+
+    // Check if pelunasan order already exists (not cancelled)
+    const existingPelunasan = await queryOne<any>(
+      "SELECT order_id FROM orders WHERE notes LIKE ? AND order_status != 'cancelled' LIMIT 1",
+      [`%Pelunasan untuk Order: ${id}%`]
+    );
+    if (existingPelunasan) {
+      return res.status(400).json({
+        success: false,
+        error: "Pesanan pelunasan untuk order ini sudah dibuat sebelumnya",
+        orderId: existingPelunasan.order_id
+      });
+    }
+
+    // 2. Fetch original order items
+    const originalItems = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [id]);
+    if (!originalItems || originalItems.length === 0) {
+      return res.status(400).json({ success: false, error: "Item pesanan asal tidak ditemukan" });
+    }
+
+    let calculatedSubtotal = 0;
+    const resolvedItems: any[] = [];
+
+    // 3. Process each item to find Lunas counterpart and calculate sisa
+    for (const item of originalItems) {
+      const product = await queryOne<any>("SELECT * FROM products WHERE id = ?", [item.product_id]);
+      if (!product) {
+        return res.status(404).json({ success: false, error: `Produk ID ${item.product_id} tidak ditemukan` });
+      }
+
+      // Try to find the matching 'Lunas' variant
+      const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
+      let lunasVariant = await queryOne<any>(
+        "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
+        [item.product_id, item.size, lunasColor]
+      );
+
+      if (!lunasVariant) {
+        // Fallback to any variant with the same size and 'Lunas' in the color name
+        lunasVariant = await queryOne<any>(
+          "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
+          [item.product_id, item.size]
+        );
+      }
+
+      let lunasUnitPrice = product.price;
+      if (lunasVariant) {
+        lunasUnitPrice = lunasVariant.filkom_price || lunasVariant.price_override || product.price;
+      }
+
+      const sisa = Math.max(0, lunasUnitPrice - item.unit_price);
+      // Fallback if price calculation resolves to 0
+      const finalSisa = sisa > 0 ? sisa : item.unit_price;
+
+      const subtotal = finalSisa * item.quantity;
+      calculatedSubtotal += subtotal;
+
+      resolvedItems.push({
+        item,
+        sisa: finalSisa,
+        subtotal,
+        lunasVariantId: lunasVariant ? lunasVariant.id : item.variant_id,
+        lunasColor: lunasVariant ? lunasVariant.color : lunasColor,
+      });
+    }
+
+    // 4. Create new order ID
+    const newOrderId = `LNS-${id}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+    // 5. Insert new order (Pelunasan)
+    await execute(
+      `INSERT INTO orders (
+        order_id, channel, fulfillment_type, fulfillment_status, user_id, customer_name,
+        customer_nim, customer_email, customer_phone, shipping_address, subtotal,
+        discount_amount, service_fee, shipping_cost, tax_amount, gross_amount,
+        payment_status, order_status, notes, transaction_status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, 'unpaid', 'pending_payment', ?, 'pending')`,
+      [
+        newOrderId,
+        originalOrder.channel || "online",
+        originalOrder.fulfillment_type || "pickup",
+        "unfulfilled",
+        originalOrder.user_id || null,
+        originalOrder.customer_name,
+        originalOrder.customer_nim || null,
+        originalOrder.customer_email,
+        originalOrder.customer_phone,
+        originalOrder.shipping_address || null,
+        calculatedSubtotal,
+        calculatedSubtotal, // gross_amount
+        `Pelunasan untuk Order: ${id}`,
+      ]
+    );
+
+    // 6. Insert order items
+    for (const resItem of resolvedItems) {
+      const orig = resItem.item;
+      await execute(
+        `INSERT INTO order_items (
+          order_id, product_id, variant_id, product_name, size, color, quantity,
+          unit_price, discount_amount, subtotal, sku_snapshot
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, '')`,
+        [
+          newOrderId,
+          orig.product_id,
+          resItem.lunasVariantId,
+          `Pelunasan — ${orig.product_name}`,
+          orig.size,
+          resItem.lunasColor,
+          orig.quantity,
+          resItem.sisa,
+          resItem.subtotal
+        ]
+      );
+    }
+
+    return res.json({ success: true, orderId: newOrderId });
+  } catch (error: any) {
+    console.error("Error creating pelunasan order:", error);
+    return res.status(500).json({ success: false, error: error.message || "Failed to create pelunasan order" });
+  }
+};
+
 

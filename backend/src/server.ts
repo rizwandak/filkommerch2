@@ -335,6 +335,7 @@ app.post("/api/orders", checkoutLimiter, validateBody(createOrderSchema), (req, 
 app.get("/api/orders/:id", apiControllers.getOrderById);
 app.get("/api/orders/user/:userId", apiControllers.getUserOrders);
 app.post("/api/orders/:id/payment-proof", apiControllers.submitPaymentProof);
+app.post("/api/orders/:id/create-pelunasan", apiControllers.createPelunasanOrder);
 
 // Offline POS Sales API Routes
 app.post("/api/sales", (req, res, next) => { clearCache("/api/products"); next(); }, apiControllers.createSale);

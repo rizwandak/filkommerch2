@@ -210,6 +210,14 @@ function ProductDetailPage() {
     return Array.from(new Set(product.variants.map((v) => v.size).filter(Boolean))) as string[];
   }, [product]);
 
+  const isPreOrder = product?.sale_type === "preorder";
+  const isPreOrderClosed = useMemo(() => {
+    if (!product || product.sale_type !== "preorder") return false;
+    if (!product.preorder_end_at) return false;
+    const end = new Date(product.preorder_end_at);
+    return new Date() > end;
+  }, [product]);
+
   // Calculate dynamic stock based on selections
   const currentVariant = useMemo(() => {
     if (!product) return null;
@@ -227,7 +235,7 @@ function ProductDetailPage() {
 
     // Pre-order items do not rely on physical stock count
     if (product.sale_type === "preorder") {
-      return 999;
+      return isPreOrderClosed ? 0 : 999;
     }
 
     if (product.product_type === "bundle") {
@@ -480,8 +488,8 @@ function ProductDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-8 items-start">
           {/* COLUMN 1: LEFT STICKY GALLERY (4 Cols - Fixed Anchored) */}
           <div className="md:col-span-4 md:sticky md:top-28 self-start">
-            {/* Horizontal Swipe Carousel */}
-            <div className="relative w-full overflow-hidden">
+            {/* ===== MOBILE: Horizontal Swipe Carousel (unchanged) ===== */}
+            <div className="md:hidden relative w-full overflow-hidden">
               <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-4">
                 {images.map((img, idx) => (
                   <div
@@ -490,7 +498,7 @@ function ProductDetailPage() {
                       setActiveImage(img);
                       setIsZoomOpen(true);
                     }}
-                    className="w-[85%] md:w-full shrink-0 snap-center aspect-square bg-cream border-2 border-ink rounded-2xl overflow-hidden relative cursor-zoom-in group/img shadow-[5px_5px_0px_0px_rgba(27,27,27,1)]"
+                    className="w-[85%] shrink-0 snap-center aspect-square bg-cream border-2 border-ink rounded-2xl overflow-hidden relative cursor-zoom-in group/img shadow-[5px_5px_0px_0px_rgba(27,27,27,1)]"
                   >
                     <img
                       src={resolveImageUrl(img)}
@@ -516,6 +524,60 @@ function ProductDetailPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* ===== DESKTOP: Main Image + Thumbnail Strip ===== */}
+            <div className="hidden md:block space-y-3">
+              {/* Main Active Image */}
+              <div
+                onClick={() => setIsZoomOpen(true)}
+                className="w-full aspect-square bg-cream border-2 border-ink rounded-2xl overflow-hidden relative cursor-zoom-in group/img shadow-[5px_5px_0px_0px_rgba(27,27,27,1)]"
+              >
+                <img
+                  src={resolveImageUrl(activeImage || images[0])}
+                  alt={product.name}
+                  className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
+                />
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsZoomOpen(true);
+                  }}
+                  className="absolute bottom-3.5 right-3.5 p-2 bg-white/95 rounded-full shadow border-2 border-ink hover:scale-105 transition-transform z-10 cursor-pointer"
+                  aria-label="Zoom image"
+                >
+                  <Search className="w-4 h-4 text-ink" />
+                </button>
+                {images.length > 1 && (
+                  <div className="absolute top-3.5 right-3.5 px-2.5 py-1 bg-black/60 border border-white/20 rounded-lg text-[10px] text-white font-bold select-none">
+                    {images.indexOf(activeImage || images[0]) + 1} / {images.length}
+                  </div>
+                )}
+              </div>
+
+              {/* Thumbnail Strip */}
+              {images.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto scrollbar-none pb-1">
+                  {images.map((img, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setActiveImage(img)}
+                      className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-all cursor-pointer ${
+                        (activeImage || images[0]) === img
+                          ? "border-brand-orange shadow-[2px_2px_0px_0px_rgba(234,88,12,0.6)] ring-1 ring-brand-orange/40 scale-95"
+                          : "border-ink/30 hover:border-ink opacity-70 hover:opacity-100"
+                      }`}
+                      aria-label={`View image ${idx + 1}`}
+                    >
+                      <img
+                        src={resolveImageUrl(img)}
+                        alt={`${product.name} thumbnail ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -755,8 +817,8 @@ function ProductDetailPage() {
                   </div>
                 )}
 
-                {/* Quantity Selector + Stock Info */}
-                <div className="space-y-2 pt-3 border-t border-border mt-3">
+                {/* Quantity Selector + Stock Info (mobile only, desktop uses sidebar) */}
+                <div className="md:hidden space-y-2 pt-3 border-t border-border mt-3">
                   <p className="text-xs font-extrabold uppercase text-ink">Jumlah</p>
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center border-2 border-ink rounded-xl bg-cream/20 overflow-hidden">
@@ -885,49 +947,40 @@ function ProductDetailPage() {
               <div className="p-5 text-xs sm:text-sm space-y-4">
                 {activeTab === "detail" && (
                   <div className="space-y-3 leading-relaxed text-ink font-medium whitespace-pre-line">
-                    {product.description ||
-                      "Merchandise resmi Fakultas Ilmu Komputer Universitas Brawijaya. Diproduksi dengan standar kualitas kain premium yang nyaman dipakai untuk aktivitas perkuliahan maupun harian."}
+                    {product.description || ""}
                   </div>
                 )}
 
                 {activeTab === "spesifikasi" && (
                   <div className="space-y-2">
-                    <div className="grid grid-cols-3 gap-2 py-2 border-b border-border">
-                      <span className="font-extrabold text-ink uppercase text-[11px]">Bahan kain</span>
-                      <span className="col-span-2 text-muted-foreground font-semibold">
-                        {product.bahan || "Cotton Heavyweight 330GSM Premium"}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 py-2 border-b border-border">
-                      <span className="font-extrabold text-ink uppercase text-[11px]">Aplikasi Sablon/Bordir</span>
-                      <span className="col-span-2 text-muted-foreground font-semibold">
-                        {product.aplikasi || "High Precision Bordir Komputer & DTF Print"}
-                      </span>
-                    </div>
-
+                    {product.bahan && (
+                      <div className="grid grid-cols-3 gap-2 py-2 border-b border-border">
+                        <span className="font-extrabold text-ink uppercase text-[11px]">Bahan kain</span>
+                        <span className="col-span-2 text-muted-foreground font-semibold">
+                          {product.bahan}
+                        </span>
+                      </div>
+                    )}
+                    {product.aplikasi && (
+                      <div className="grid grid-cols-3 gap-2 py-2 border-b border-border">
+                        <span className="font-extrabold text-ink uppercase text-[11px]">Aplikasi Sablon/Bordir</span>
+                        <span className="col-span-2 text-muted-foreground font-semibold">
+                          {product.aplikasi}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {activeTab === "panduan" && (
                   <div className="space-y-4">
-                    {product.size_chart_url ? (
+                    {product.size_chart_url && (
                       <div className="border-2 border-ink rounded-xl overflow-hidden max-w-md bg-cream mx-auto">
                         <img
                           src={resolveImageUrl(product.size_chart_url)}
                           alt="Size Chart"
                           className="w-full h-auto object-contain"
                         />
-                      </div>
-                    ) : (
-                      <div className="bg-cream/40 p-4 border border-ink/20 rounded-xl space-y-2">
-                        <p className="font-extrabold text-ink uppercase text-xs">Chart Standar Ukuran (cm):</p>
-                        <ul className="space-y-1.5 text-xs text-ink font-semibold">
-                          <li className="flex justify-between py-1 border-b border-border"><span>S</span><span>Panjang 66 cm × Lebar 50 cm</span></li>
-                          <li className="flex justify-between py-1 border-b border-border"><span>M</span><span>Panjang 69 cm × Lebar 53 cm</span></li>
-                          <li className="flex justify-between py-1 border-b border-border"><span>L</span><span>Panjang 72 cm × Lebar 56 cm</span></li>
-                          <li className="flex justify-between py-1 border-b border-border"><span>XL</span><span>Panjang 75 cm × Lebar 59 cm</span></li>
-                          <li className="flex justify-between py-1"><span>XXL</span><span>Panjang 78 cm × Lebar 62 cm</span></li>
-                        </ul>
                       </div>
                     )}
                   </div>
@@ -937,28 +990,111 @@ function ProductDetailPage() {
           </div>
 
           {/* COLUMN 3: RIGHT STICKY CHECKOUT SIDEBAR BOX (3 Cols - Fixed Anchored) */}
-          <div className="md:col-span-3 md:sticky md:top-28 self-start space-y-5">
-            <div className="bg-white border-2 border-ink rounded-2xl p-5 shadow-[6px_6px_0px_0px_rgba(27,27,27,1)] space-y-5">
-
-              {/* Primary Action Buttons */}
-              <div className="hidden md:grid grid-cols-2 gap-2.5">
-                <button
-                  onClick={() => handleAddToCart(false)}
-                  disabled={currentStock <= 0}
-                  className="py-3 px-3 bg-brand-orange hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-200"
-                >
-                  <ShoppingBag className="w-4 h-4" /> {currentStock <= 0 ? "Habis" : "Masuk Bag"}
-                </button>
-                <button
-                  onClick={() => handleAddToCart(true)}
-                  disabled={currentStock <= 0}
-                  className="py-3 px-3 bg-ink hover:bg-ink/80 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,0.4)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300"
-                >
-                  <Zap className="w-4 h-4" /> {currentStock <= 0 ? "Habis" : "Beli Sekarang"}
-                </button>
+          <div className="md:col-span-3 md:sticky md:top-28 self-start hidden md:block">
+            <div className="bg-white border-2 border-ink rounded-2xl overflow-hidden shadow-[6px_6px_0px_0px_rgba(27,27,27,1)]">
+              {/* Header */}
+              <div className="bg-ink px-5 py-3">
+                <h3 className="text-white font-extrabold text-xs uppercase tracking-wider">
+                  Atur Jumlah dan Catatan
+                </h3>
               </div>
 
+              <div className="p-5 space-y-5">
+                {/* Product Mini Card */}
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 shrink-0 rounded-lg border-2 border-ink/20 overflow-hidden bg-cream">
+                    <img
+                      src={resolveImageUrl(product.image_url || images[0])}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-extrabold text-ink text-sm truncate uppercase">{product.name}</p>
+                    <p className="text-xs text-muted-foreground font-semibold">
+                      {[selectedColor, selectedSize].filter(Boolean).join(" — ") || "ONE SIZE"}
+                    </p>
+                  </div>
+                </div>
 
+                {/* Quantity + Stock Row */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center border-2 border-ink rounded-xl bg-cream/20 overflow-hidden">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="p-2 border-r-2 border-ink hover:bg-cream active:scale-95 transition-all cursor-pointer"
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="w-10 text-center text-xs font-black">{quantity}</span>
+                    <button
+                      onClick={() => setQuantity(Math.min(currentStock, quantity + 1))}
+                      disabled={currentStock <= 0}
+                      className="p-2 border-l-2 border-ink hover:bg-cream active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+                      aria-label="Increase quantity"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  <div className="text-right text-xs">
+                    {product.sale_type === "preorder" ? (
+                      <span className="text-brand-orange font-black uppercase tracking-wider text-[11px] bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/30">
+                        ⚡ Pre-Order
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-muted-foreground font-bold">Stok: </span>
+                        <span className={currentStock <= 3 ? "text-red-600 font-black animate-pulse" : "text-ink font-black"}>
+                          {currentStock}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Subtotal */}
+                <div className="flex items-center justify-between pt-3 border-t border-border">
+                  <span className="text-xs font-bold text-muted-foreground">Subtotal</span>
+                  <span className="text-xl font-black text-ink tracking-tight">
+                    Rp {(currentPrice * quantity).toLocaleString("id-ID")}
+                  </span>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="space-y-2.5">
+                  <button
+                    onClick={() => handleAddToCart(false)}
+                    disabled={currentStock <= 0 || isPreOrderClosed}
+                    className="w-full py-3 px-4 bg-brand-orange hover:bg-brand-orange/90 text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-200"
+                  >
+                    <Plus className="w-4 h-4" /> {isPreOrderClosed ? "Pre-Order Ditutup" : (currentStock <= 0 ? "Stok Habis" : "+ Keranjang")}
+                  </button>
+                  <button
+                    onClick={() => handleAddToCart(true)}
+                    disabled={currentStock <= 0 || isPreOrderClosed}
+                    className="w-full py-3 px-4 bg-white hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isPreOrderClosed ? "Pre-Order Ditutup" : (currentStock <= 0 ? "Stok Habis" : (isPreOrder ? "Pesan Sekarang" : "Beli Langsung"))}
+                  </button>
+                </div>
+
+                {/* Share Link */}
+                <button
+                  onClick={() => {
+                    if (navigator.share) {
+                      navigator.share({ title: product.name, url: window.location.href });
+                    } else {
+                      navigator.clipboard.writeText(window.location.href);
+                      toast.success("Tautan produk berhasil disalin!");
+                    }
+                  }}
+                  className="w-full text-center text-xs font-bold text-muted-foreground hover:text-ink flex items-center justify-center gap-1.5 transition-colors cursor-pointer pt-1"
+                >
+                  <Share2 className="w-3.5 h-3.5" /> Bagikan Produk (Share)
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1072,17 +1208,17 @@ function ProductDetailPage() {
         <div className="grid grid-cols-2 gap-2.5">
           <button
             onClick={() => handleAddToCart(false)}
-            disabled={currentStock <= 0}
-            className="py-3 px-3 bg-brand-orange hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+            disabled={currentStock <= 0 || isPreOrderClosed}
+            className="py-3 px-3 bg-brand-orange hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer text-center"
           >
-            <ShoppingBag className="w-4 h-4" /> {currentStock <= 0 ? "Habis" : "Masuk Bag"}
+            <ShoppingBag className="w-4 h-4" /> {isPreOrderClosed ? "Ditutup" : (currentStock <= 0 ? "Habis" : "Masuk Bag")}
           </button>
           <button
             onClick={() => handleAddToCart(true)}
-            disabled={currentStock <= 0}
-            className="py-3 px-3 bg-ink hover:bg-ink/80 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,0.4)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+            disabled={currentStock <= 0 || isPreOrderClosed}
+            className="py-3 px-3 bg-ink hover:bg-ink/80 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,0.4)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer text-center"
           >
-            <Zap className="w-4 h-4" /> {currentStock <= 0 ? "Habis" : "Beli Sekarang"}
+            <Zap className="w-4 h-4" /> {isPreOrderClosed ? "Ditutup" : (currentStock <= 0 ? "Habis" : (isPreOrder ? "Pesan Sekarang" : "Beli Sekarang"))}
           </button>
         </div>
       </div>

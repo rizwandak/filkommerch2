@@ -1508,3 +1508,23 @@ export const togglePreOrderCampaignActiveServerAction = createServerFn({ method:
     }
   });
 
+// Create Pelunasan Order (balance payment) linked to a DP order
+export const createPelunasanOrderServerAction = createServerFn({ method: "POST" })
+  .validator((d: { originalOrderId: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/orders/${input.originalOrderId}/create-pelunasan`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json() as Promise<{ success: boolean; orderId?: string; error?: string }>;
+    } catch (error: any) {
+      console.error("Error creating pelunasan order:", error);
+      return { success: false, error: error.message || "Failed to create pelunasan order" };
+    }
+  });
+

@@ -128,6 +128,101 @@ function AdminProductsPage() {
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [form, setForm] = useState<ProductForm>(emptyForm());
   const [saving, setSaving] = useState(false);
+  const [hasVariants, setHasVariants] = useState(false);
+  const [sizeOptions, setSizeOptions] = useState<string[]>([]);
+  const [colorOptions, setColorOptions] = useState<string[]>([]);
+  const [newSizeVal, setNewSizeVal] = useState("");
+  const [newColorVal, setNewColorVal] = useState("");
+
+  const generateVariantsFromOptions = (sizes: string[], colors: string[], currentVariants: any[], forceVariantsActive = false) => {
+    const isVarActive = forceVariantsActive;
+    if (!isVarActive) {
+      const prevDefault = currentVariants.find(v => v.size === "One Size" && !v.color) || currentVariants[0];
+      return [{
+        size: "One Size",
+        color: "",
+        stock: prevDefault ? String(prevDefault.stock) : "0",
+        filkom_price: prevDefault ? String(prevDefault.filkom_price) : "",
+      }];
+    }
+
+    const newVariants: any[] = [];
+    const sizesToUse = sizes.length > 0 ? sizes : ["One Size"];
+    const colorsToUse = colors.length > 0 ? colors : [""];
+
+    for (const size of sizesToUse) {
+      for (const color of colorsToUse) {
+        const existing = currentVariants.find(
+          (v) => (v.size || "One Size") === size && (v.color || "") === color
+        );
+        newVariants.push({
+          size,
+          color,
+          stock: existing ? String(existing.stock) : "0",
+          filkom_price: existing ? String(existing.filkom_price) : "",
+        });
+      }
+    }
+    return newVariants;
+  };
+
+  const handleToggleHasVariants = (val: boolean) => {
+    setHasVariants(val);
+    setForm((prev) => ({
+      ...prev,
+      variants: generateVariantsFromOptions(sizeOptions, colorOptions, prev.variants, val),
+    }));
+  };
+
+  const handleAddSizeOption = () => {
+    if (!newSizeVal.trim()) return;
+    const trimmed = newSizeVal.trim();
+    if (sizeOptions.includes(trimmed)) {
+      toast.error("Ukuran sudah ditambahkan!");
+      return;
+    }
+    const updated = [...sizeOptions, trimmed];
+    setSizeOptions(updated);
+    setNewSizeVal("");
+    setForm((prev) => ({
+      ...prev,
+      variants: generateVariantsFromOptions(updated, colorOptions, prev.variants, true),
+    }));
+  };
+
+  const handleRemoveSizeOption = (idx: number) => {
+    const updated = sizeOptions.filter((_, i) => i !== idx);
+    setSizeOptions(updated);
+    setForm((prev) => ({
+      ...prev,
+      variants: generateVariantsFromOptions(updated, colorOptions, prev.variants, true),
+    }));
+  };
+
+  const handleAddColorOption = () => {
+    if (!newColorVal.trim()) return;
+    const trimmed = newColorVal.trim();
+    if (colorOptions.includes(trimmed)) {
+      toast.error("Warna sudah ditambahkan!");
+      return;
+    }
+    const updated = [...colorOptions, trimmed];
+    setColorOptions(updated);
+    setNewColorVal("");
+    setForm((prev) => ({
+      ...prev,
+      variants: generateVariantsFromOptions(sizeOptions, updated, prev.variants, true),
+    }));
+  };
+
+  const handleRemoveColorOption = (idx: number) => {
+    const updated = colorOptions.filter((_, i) => i !== idx);
+    setColorOptions(updated);
+    setForm((prev) => ({
+      ...prev,
+      variants: generateVariantsFromOptions(sizeOptions, updated, prev.variants, true),
+    }));
+  };
   const [newCategoryName, setNewCategoryName] = useState("");
   const [savingCategory, setSavingCategory] = useState(false);
   const [editingImageIndex, setEditingImageIndex] = useState<number | null>(null);
@@ -285,10 +380,32 @@ function AdminProductsPage() {
 
   const openCreate = () => {
     setForm(emptyForm());
+    setHasVariants(false);
+    setSizeOptions([]);
+    setColorOptions([]);
+    setNewSizeVal("");
+    setNewColorVal("");
     setDialogOpen(true);
   };
 
   const openEdit = (product: ProductWithVariants) => {
+    const editVariants = product.variants.map((v) => ({
+      size: v.size,
+      color: v.color || "",
+      stock: String(v.stock),
+      filkom_price: v.filkom_price ? String(v.filkom_price) : "",
+    }));
+
+    const isMultiple = editVariants.length > 1 || (editVariants.length === 1 && editVariants[0].size !== "One Size" && editVariants[0].size !== "All Size" && editVariants[0].size !== "" && editVariants[0].size !== undefined);
+    const sizes = Array.from(new Set(editVariants.map(v => v.size).filter(s => s && s !== "One Size" && s !== "All Size")));
+    const colors = Array.from(new Set(editVariants.map(v => v.color).filter(c => c && c !== "" && c !== "Default" && c !== "All Color")));
+
+    setHasVariants(isMultiple);
+    setSizeOptions(sizes);
+    setColorOptions(colors);
+    setNewSizeVal("");
+    setNewColorVal("");
+
     setForm({
       id: product.id,
       category_id: String(product.category_id),
@@ -312,12 +429,7 @@ function AdminProductsPage() {
       aplikasi: product.aplikasi || "",
       size_chart_url: product.size_chart_url || "",
       images: product.images || (product.image_url ? [product.image_url] : []),
-      variants: product.variants.map((v) => ({
-        size: v.size,
-        color: v.color || "",
-        stock: String(v.stock),
-        filkom_price: v.filkom_price ? String(v.filkom_price) : "",
-      })),
+      variants: editVariants,
       component_ids: product.bundle_components ? product.bundle_components.map((c) => c.id) : [],
       is_active: product.is_active !== false,
     });
@@ -532,7 +644,7 @@ function AdminProductsPage() {
       variants: form.variants.map((v) => ({
         size: v.size || "One Size",
         color: v.color || "",
-        stock: parseInt(v.stock) || 0,
+        stock: form.sale_type === "pre_order" ? 999 : (parseInt(v.stock) || 0),
         filkom_price: v.filkom_price ? parseFloat(v.filkom_price) : null,
       })),
       component_ids: form.product_type === "bundle" ? form.component_ids : [],
@@ -1290,114 +1402,298 @@ function AdminProductsPage() {
               />
             </div>
 
-            {/* Section 6: Variants & Subvariants Management */}
-            <div className="space-y-3 border-2 border-ink p-4 rounded-xl bg-white shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b-2 border-ink pb-3">
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-ink flex items-center gap-2">
-                    🏷️ PENGATURAN VARIAN &amp; SUBVARIAN STOK
-                  </h4>
-                  <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-                    Atur Varian 1 (Warna), Subvarian 2 (Ukuran), Stok, &amp; Penambahan Harga (Rp) dari harga utama. Jika tanpa varian, biarkan 1 baris standar.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() =>
-                    setForm({
-                      ...form,
-                      variants: [
-                        ...form.variants,
-                        { size: "S", color: "", stock: "10", filkom_price: "" },
-                      ],
-                    })
-                  }
-                  className="bg-cream hover:bg-brand-orange hover:text-white border-2 border-ink font-black text-xs px-3 py-1.5 h-auto uppercase cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5 mr-1" /> Varian Baru
-                </Button>
+            {/* Section 6: Variants & Subvariants Management (Redesigned) */}
+            <div className="space-y-4 border-2 border-ink p-5 rounded-xl bg-white shadow-xs">
+              <div className="border-b-2 border-ink pb-3">
+                <h4 className="text-xs font-black uppercase tracking-wider text-ink flex items-center gap-2">
+                  🏷️ PENGATURAN VARIAN &amp; STOK PRODUK
+                </h4>
+                <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
+                  Tentukan apakah produk ini memiliki beberapa opsi pilihan (seperti ukuran, warna) atau hanya item tunggal.
+                </p>
               </div>
 
-              <div className="space-y-2.5">
-                {/* Variant Column Headers */}
-                <div className="grid grid-cols-12 gap-2 text-[10px] font-black uppercase text-muted-foreground px-1">
-                  <div className="col-span-3">Varian 1 (mis. Warna)</div>
-                  <div className="col-span-3">Subvarian 2 (mis. Ukuran)</div>
-                  <div className="col-span-2">Stok (Pcs)</div>
-                  <div className="col-span-3">Penambahan Harga / Add-on (Rp)</div>
-                  <div className="col-span-1 text-center">Hapus</div>
+              {/* Step 1: Toggle Varian */}
+              <div className="space-y-2">
+                <Label className="text-xs font-black uppercase text-ink">Apakah produk ini memiliki varian?</Label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleHasVariants(false)}
+                    className={`flex-1 py-3 px-4 rounded-xl border-2 border-ink text-xs font-extrabold uppercase transition-all shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer ${
+                      !hasVariants
+                        ? "bg-brand-orange text-ink font-black"
+                        : "bg-cream/40 text-muted-foreground hover:bg-cream/60"
+                    }`}
+                  >
+                    Tidak (Single Item / One Size)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleHasVariants(true)}
+                    className={`flex-1 py-3 px-4 rounded-xl border-2 border-ink text-xs font-extrabold uppercase transition-all shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] cursor-pointer ${
+                      hasVariants
+                        ? "bg-brand-orange text-ink font-black"
+                        : "bg-cream/40 text-muted-foreground hover:bg-cream/60"
+                    }`}
+                  >
+                    Ya, memiliki Varian (Ukuran / Warna)
+                  </button>
                 </div>
+              </div>
 
-                {form.variants.map((v, i) => (
-                  <div key={i} className="grid grid-cols-12 gap-2 items-center bg-cream/20 p-2 rounded-xl border border-ink/20">
-                    <div className="col-span-3">
-                      <Input
-                        placeholder="Navy, Black, dll"
-                        value={v.color}
-                        onChange={(e) => {
-                          const variants = [...form.variants];
-                          variants[i] = { ...variants[i], color: e.target.value };
-                          setForm({ ...form, variants });
-                        }}
-                        className="text-xs border-ink/30"
-                      />
+              {!hasVariants ? (
+                /* Single Item Simple Form */
+                <div className="bg-cream/20 p-4 rounded-xl border border-ink/20 space-y-3">
+                  <p className="text-[10px] text-muted-foreground font-semibold">
+                    Produk Anda akan memiliki 1 variasi default (&quot;One Size&quot;). Silakan tentukan stoknya di bawah ini:
+                  </p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-ink">Stok Ready (Pcs)</Label>
+                      {form.sale_type === "pre_order" ? (
+                        <div className="text-xs font-black text-brand-orange bg-brand-orange/10 border-2 border-dashed border-brand-orange/30 rounded-lg p-2 text-center uppercase">
+                          ⚡ Unlimited (Pre-Order)
+                        </div>
+                      ) : (
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={form.variants[0]?.stock || "0"}
+                          onChange={(e) => {
+                            const variants = [{
+                              size: "One Size",
+                              color: "",
+                              stock: e.target.value,
+                              filkom_price: form.variants[0]?.filkom_price || "",
+                            }];
+                            setForm({ ...form, variants });
+                          }}
+                          className="text-xs border-ink/30 font-extrabold"
+                        />
+                      )}
                     </div>
-                    <div className="col-span-3">
-                      <Input
-                        placeholder="S, M, L, XL, All Size"
-                        value={v.size}
-                        onChange={(e) => {
-                          const variants = [...form.variants];
-                          variants[i] = { ...variants[i], size: e.target.value };
-                          setForm({ ...form, variants });
-                        }}
-                        className="text-xs border-ink/30"
-                      />
-                    </div>
-                    <div className="col-span-2">
+                    <div className="space-y-1.5">
+                      <Label className="text-[10px] font-black uppercase text-ink">Harga Khusus / Add-on (Rp)</Label>
                       <Input
                         type="number"
-                        placeholder="Stok"
-                        value={v.stock}
+                        placeholder="+0"
+                        value={form.variants[0]?.filkom_price || ""}
                         onChange={(e) => {
-                          const variants = [...form.variants];
-                          variants[i] = { ...variants[i], stock: e.target.value };
-                          setForm({ ...form, variants });
-                        }}
-                        className="text-xs border-ink/30 text-center font-extrabold"
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <Input
-                        type="number"
-                        placeholder="+0 (mis. 10000 untuk XXL)"
-                        value={v.filkom_price}
-                        onChange={(e) => {
-                          const variants = [...form.variants];
-                          variants[i] = { ...variants[i], filkom_price: e.target.value };
+                          const variants = [{
+                            size: "One Size",
+                            color: "",
+                            stock: form.variants[0]?.stock || "0",
+                            filkom_price: e.target.value,
+                          }];
                           setForm({ ...form, variants });
                         }}
                         className="text-xs border-ink/30 font-bold"
                       />
                     </div>
-                    <div className="col-span-1 flex justify-center">
+                  </div>
+                </div>
+              ) : (
+                /* Multi Variant Options Form */
+                <div className="space-y-5">
+                  {/* Step 2: Define Options (Sizes) */}
+                  <div className="bg-cream/10 p-4 rounded-xl border border-ink/10 space-y-3">
+                    <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase text-ink">Opsi Ukuran (Size)</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Contoh: S, M, L, XL, atau All Size"
+                          value={newSizeVal}
+                          onChange={(e) => setNewSizeVal(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddSizeOption();
+                            }
+                          }}
+                          className="text-xs border-ink/30"
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleAddSizeOption}
+                          className="bg-ink hover:bg-brand-orange text-white border-2 border-ink text-xs font-bold uppercase px-3 cursor-pointer"
+                        >
+                          Tambah
+                        </Button>
+                      </div>
+                      {/* Badge options list */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {sizeOptions.length === 0 ? (
+                          <span className="text-[9px] text-muted-foreground font-semibold italic">Belum ada pilihan ukuran. Default: One Size</span>
+                        ) : (
+                          sizeOptions.map((sz, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-ink text-white text-[10px] font-bold rounded-lg uppercase"
+                            >
+                              {sz}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveSizeOption(idx)}
+                                className="hover:text-brand-orange ml-0.5 text-xs focus:outline-none"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Step 2: Define Options (Colors) */}
+                    <div className="space-y-2 pt-3 border-t border-ink/10">
+                      <Label className="text-[10px] font-black uppercase text-ink">Opsi Warna (Color)</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Contoh: Putih, Hitam, Merah, Navy"
+                          value={newColorVal}
+                          onChange={(e) => setNewColorVal(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddColorOption();
+                            }
+                          }}
+                          className="text-xs border-ink/30"
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleAddColorOption}
+                          className="bg-ink hover:bg-brand-orange text-white border-2 border-ink text-xs font-bold uppercase px-3 cursor-pointer"
+                        >
+                          Tambah
+                        </Button>
+                      </div>
+                      {/* Badge options list */}
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {colorOptions.length === 0 ? (
+                          <span className="text-[9px] text-muted-foreground font-semibold italic">Belum ada pilihan warna.</span>
+                        ) : (
+                          colorOptions.map((col, idx) => (
+                            <span
+                              key={idx}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 bg-brand-orange text-ink text-[10px] font-black rounded-lg uppercase border border-ink"
+                            >
+                              {col}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveColorOption(idx)}
+                                className="hover:text-red-500 ml-0.5 text-xs focus:outline-none"
+                              >
+                                &times;
+                              </button>
+                            </span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Step 3: Combination Table */}
+                  <div className="space-y-2.5">
+                    <Label className="text-[10px] font-black uppercase text-ink block">
+                      📋 TABEL KOMBINASI VARIAN &amp; STOK ({form.variants.length} Kombinasi)
+                    </Label>
+                    
+                    <div className="grid grid-cols-12 gap-2 text-[9px] font-black uppercase text-muted-foreground px-1 border-b pb-1">
+                      <div className="col-span-3">Ukuran</div>
+                      <div className="col-span-3">Warna</div>
+                      <div className="col-span-2 text-center">Stok (Pcs)</div>
+                      <div className="col-span-3">Add-on Harga (Rp)</div>
+                      <div className="col-span-1 text-center">Hapus</div>
+                    </div>
+
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
+                      {form.variants.map((v, i) => (
+                        <div key={i} className="grid grid-cols-12 gap-2 items-center bg-cream/10 p-2 rounded-xl border border-ink/20">
+                          <div className="col-span-3">
+                            <span className="text-xs font-black uppercase text-ink">{v.size}</span>
+                          </div>
+                          <div className="col-span-3">
+                            <span className="text-xs font-bold text-muted-foreground uppercase">{v.color || "-"}</span>
+                          </div>
+                          <div className="col-span-2">
+                            {form.sale_type === "pre_order" ? (
+                              <span className="text-[10px] text-brand-orange bg-brand-orange/10 border border-brand-orange/30 font-black rounded px-1.5 py-0.5 text-center block uppercase">
+                                Unlimited
+                              </span>
+                            ) : (
+                              <Input
+                                type="number"
+                                placeholder="0"
+                                value={v.stock}
+                                onChange={(e) => {
+                                  const variants = [...form.variants];
+                                  variants[i] = { ...variants[i], stock: e.target.value };
+                                  setForm({ ...form, variants });
+                                }}
+                                className="text-xs border-ink/30 text-center font-extrabold"
+                              />
+                            )}
+                          </div>
+                          <div className="col-span-3">
+                            <Input
+                              type="number"
+                              placeholder="+0"
+                              value={v.filkom_price}
+                              onChange={(e) => {
+                                const variants = [...form.variants];
+                                variants[i] = { ...variants[i], filkom_price: e.target.value };
+                                setForm({ ...form, variants });
+                              }}
+                              className="text-xs border-ink/30 font-bold"
+                            />
+                          </div>
+                          <div className="col-span-1 flex justify-center">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:bg-red-50 hover:text-destructive h-7 w-7 rounded-lg cursor-pointer"
+                              onClick={() => {
+                                const variants = form.variants.filter((_, idx) => idx !== i);
+                                setForm({
+                                  ...form,
+                                  variants: variants.length > 0 ? variants : [{ size: "One Size", color: "", stock: "0", filkom_price: "" }],
+                                });
+                              }}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex justify-between items-center bg-yellow-50/50 p-2 rounded-lg border border-yellow-200/50">
+                      <span className="text-[9px] text-yellow-800 font-semibold">
+                        💡 Kombinasi di-generate otomatis saat pilihan ukuran/warna diubah.
+                      </span>
                       <Button
                         type="button"
                         variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:bg-red-50 hover:text-destructive h-8 w-8 rounded-lg cursor-pointer"
                         onClick={() => {
-                          const variants = form.variants.filter((_, idx) => idx !== i);
-                          setForm({ ...form, variants: variants.length > 0 ? variants : [{ size: "One Size", color: "", stock: "0", filkom_price: "" }] });
+                          setForm({
+                            ...form,
+                            variants: [
+                              ...form.variants,
+                              { size: "One Size", color: "", stock: "0", filkom_price: "" }
+                            ]
+                          });
                         }}
+                        className="text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/10 px-2 py-1 h-auto cursor-pointer"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        + Baris Kustom
                       </Button>
                     </div>
                   </div>
-                ))}
-              </div>
+                </div>
+              )}
             </div>
           </div>
 

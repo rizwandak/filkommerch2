@@ -36,6 +36,7 @@ import {
   regeneratePaymentToken,
   getStoreSettings,
   submitPaymentProof,
+  createPelunasanOrderServerAction,
 } from "@backend/server-actions";
 import { Navbar } from "@/components/Navbar";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -158,6 +159,44 @@ function UserOrdersPage() {
     }
   };
 
+  const [creatingPelunasanId, setCreatingPelunasanId] = useState<string | null>(null);
+
+  const handleCreatePelunasan = async (originalOrderId: string) => {
+    try {
+      setCreatingPelunasanId(originalOrderId);
+      const res = await createPelunasanOrderServerAction({ data: { originalOrderId } });
+
+      if (res.success && res.orderId) {
+        toast.success("Pesanan pelunasan berhasil dibuat!");
+        await fetchOrders();
+        navigate({ to: "/order-confirmation", search: { orderId: res.orderId } });
+      } else {
+        toast.error(res.error || "Gagal membuat pesanan pelunasan");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Gagal memproses pelunasan");
+    } finally {
+      setCreatingPelunasanId(null);
+    }
+  };
+
+  const isDpOrder = (order: any) => {
+    if (!order.items || order.items.length === 0) return false;
+    return order.items.some((item: any) => {
+      const colorStr = String(item.color || "").toUpperCase();
+      const sizeStr = String(item.size || "").toUpperCase();
+      const nameStr = String(item.product_name || "").toUpperCase();
+      return colorStr.includes("DP") || sizeStr.includes("DP") || nameStr.includes("DP");
+    });
+  };
+
+  const getLinkedPelunasan = (orderId: string) => {
+    return orders.find(
+      (o) => o.notes && o.notes.includes(`Pelunasan untuk Order: ${orderId}`) && o.order_status !== "cancelled"
+    );
+  };
+
   // Filter orders by active tab and search query
   const filteredOrders = useMemo(() => {
     return orders.filter((order) => {
@@ -273,6 +312,40 @@ function UserOrdersPage() {
         <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200">
           <CheckCircle className="w-3 h-3" />
           Selesai
+        </span>
+      );
+    }
+
+    if (pStatus === "paid" && isDpOrder(order)) {
+      const lns = getLinkedPelunasan(order.order_id);
+      if (!lns) {
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-200">
+            <Clock className="w-3 h-3 animate-pulse" />
+            Menunggu Pelunasan
+          </span>
+        );
+      }
+      if (lns.payment_status === "paid") {
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200">
+            <CheckCircle className="w-3 h-3" />
+            Lunas Terbayar
+          </span>
+        );
+      }
+      if (lns.payment_proof_url) {
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full border border-blue-200">
+            <Clock className="w-3 h-3 animate-pulse" />
+            Verifikasi Pelunasan
+          </span>
+        );
+      }
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-50 text-amber-700 px-2.5 py-1 rounded-full border border-amber-200">
+          <Clock className="w-3 h-3 animate-pulse" />
+          Menunggu Pelunasan
         </span>
       );
     }
@@ -589,12 +662,46 @@ function UserOrdersPage() {
                         Hubungi Admin
                       </a>
 
-                      {/* QRIS Static: Show upload / re-upload / view proof buttons */}
                       {isOrderManualQris(order) && order.order_status !== "cancelled" && (() => {
                         const hasProof = !!order.payment_proof_url;
                         const isPaid = order.payment_status === "paid";
 
-                        if (isPaid) return null; // Already verified, no action needed
+                        if (isPaid) {
+                          if (isDpOrder(order)) {
+                            const linkedLns = getLinkedPelunasan(order.order_id);
+                            if (linkedLns) {
+                              if (linkedLns.payment_status === "paid") {
+                                return (
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 text-emerald-700 font-extrabold border-2 border-emerald-500/20 rounded-xl text-xs uppercase">
+                                    <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                    Pelunasan Lunas
+                                  </span>
+                                );
+                              }
+                              const linkedHasProof = !!linkedLns.payment_proof_url;
+                              return (
+                                <button
+                                  onClick={() => navigate({ to: "/order-confirmation", search: { orderId: linkedLns.order_id } })}
+                                  className="inline-flex items-center gap-1.5 px-4 py-2 border-2 border-ink text-xs font-extrabold uppercase bg-brand-orange text-white hover:bg-brand-orange/95 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"
+                                >
+                                  <Upload className="w-3.5 h-3.5" />
+                                  {linkedHasProof ? "Tinjau Bukti Pelunasan" : "Upload Bukti Pelunasan"}
+                                </button>
+                              );
+                            }
+                            return (
+                              <button
+                                onClick={() => handleCreatePelunasan(order.order_id)}
+                                disabled={creatingPelunasanId === order.order_id}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 border-2 border-ink text-xs font-extrabold uppercase bg-brand-orange text-white hover:bg-brand-orange/95 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer disabled:opacity-50"
+                              >
+                                <Plus className="w-3.5 h-3.5" />
+                                {creatingPelunasanId === order.order_id ? "Memproses..." : "Bayar Pelunasan"}
+                              </button>
+                            );
+                          }
+                          return null; // Already verified, no action needed
+                        }
 
                         if (hasProof) {
                           // Proof uploaded, waiting verification
