@@ -804,7 +804,7 @@ function ProductDetailPage() {
                         <button
                           key={size}
                           onClick={() => setSelectedSize(size)}
-                          className={`w-12 h-10 flex items-center justify-center text-xs font-extrabold border-2 transition rounded-xl cursor-pointer ${
+                          className={`min-w-12 h-10 px-4 flex items-center justify-center text-xs font-extrabold border-2 transition rounded-xl cursor-pointer ${
                             selectedSize === size
                               ? "bg-brand-orange text-ink border-ink shadow-sm scale-95 font-black"
                               : "bg-white text-ink border-border hover:border-ink"
