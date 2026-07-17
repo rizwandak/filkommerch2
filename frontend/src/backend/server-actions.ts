@@ -62,17 +62,30 @@ const getAuthHeaders = async () => {
     if (name) headers["x-user-name"] = decodeURIComponent(name);
   } else {
     try {
-      const ctx = getGlobalStartContext() as any;
-      const cookieHeader = ctx?.request?.headers?.get("cookie") || undefined;
-      const role = getCookieValue(cookieHeader, "user_role");
-      const id = getCookieValue(cookieHeader, "user_id");
-      const name = getCookieValue(cookieHeader, "user_name");
+      const { getServerCookies } = await import("./cookie-reader.server");
+      const cookies = getServerCookies();
+      const role = cookies.user_role;
+      const id = cookies.user_id;
+      const name = cookies.user_name;
 
       if (role) headers["x-user-role"] = role;
       if (id) headers["x-user-id"] = id;
       if (name) headers["x-user-name"] = name;
     } catch (e) {
-      console.warn("Could not read auth cookies from SSR request:", e);
+      console.warn("Could not read auth cookies using cookie-reader.server:", e);
+      try {
+        const ctx = getGlobalStartContext() as any;
+        const cookieHeader = ctx?.request?.headers?.get("cookie") || undefined;
+        const role = getCookieValue(cookieHeader, "user_role");
+        const id = getCookieValue(cookieHeader, "user_id");
+        const name = getCookieValue(cookieHeader, "user_name");
+
+        if (role) headers["x-user-role"] = role;
+        if (id) headers["x-user-id"] = id;
+        if (name) headers["x-user-name"] = name;
+      } catch (innerError) {
+        console.warn("Could not read auth cookies from SSR request context fallback:", innerError);
+      }
     }
   }
 

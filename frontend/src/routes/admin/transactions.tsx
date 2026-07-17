@@ -51,6 +51,8 @@ const statusColor: Record<string, string> = {
   expire: "bg-red-100 text-red-800",
   cancel: "bg-gray-100 text-gray-600",
   completed: "bg-green-100 text-green-800",
+  ready_for_pickup: "bg-teal-100 text-teal-800",
+  shipped: "bg-blue-100 text-blue-800",
 };
 
 function AdminTransactionsPage() {
@@ -81,6 +83,7 @@ function AdminTransactionsPage() {
   const [verifyingOrder, setVerifyingOrder] = useState<Order | null>(null);
   const [verificationNote, setVerificationNote] = useState<string>("");
   const [submittingVerification, setSubmittingVerification] = useState(false);
+  const [showRejectReason, setShowRejectReason] = useState(false);
 
   const getAdminRequestHeaders = () => {
     const role = user?.type === "admin" ? user.role : undefined;
@@ -216,6 +219,7 @@ function AdminTransactionsPage() {
     }
     setVerifyingOrder(order);
     setVerificationNote("");
+    setShowRejectReason(false);
     setVerificationOpen(true);
   };
 
@@ -766,6 +770,8 @@ function AdminTransactionsPage() {
                 <SelectContent>
                   <SelectItem value="pending">PENDING (Belum Bayar)</SelectItem>
                   <SelectItem value="settlement">SETTLEMENT (Lunas)</SelectItem>
+                  <SelectItem value="ready_for_pickup">SIAP DIAMBIL (Ambil di Toko)</SelectItem>
+                  <SelectItem value="shipped">SIAP DIANTAR / DIKIRIM (Kurir)</SelectItem>
                   <SelectItem value="expire">EXPIRE (Kadaluarsa)</SelectItem>
                   <SelectItem value="cancel">CANCEL (Dibatalkan)</SelectItem>
                   <SelectItem value="completed">COMPLETED (Pesanan Selesai)</SelectItem>
@@ -809,7 +815,13 @@ function AdminTransactionsPage() {
       </Dialog>
 
       {/* dialog modal verifikasi pembayaran qris */}
-      <Dialog open={verificationOpen} onOpenChange={setVerificationOpen}>
+      <Dialog open={verificationOpen} onOpenChange={(open) => {
+        setVerificationOpen(open);
+        if (!open) {
+          setShowRejectReason(false);
+          setVerificationNote("");
+        }
+      }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="display text-lg tracking-wide text-ink uppercase">
@@ -848,10 +860,10 @@ function AdminTransactionsPage() {
                   {verifyingOrder.payment_proof_url ? (
                     <div className="relative group w-full max-h-64 overflow-hidden flex justify-center">
                       <img
-                        src={resolveImageUrl(verifyingOrder.payment_proof_url)}
+                        src={resolveImageUrl(verifyingOrder.payment_proof_url || undefined)}
                         alt="Bukti Transfer"
                         className="max-h-64 object-contain rounded cursor-zoom-in hover:scale-105 transition-transform duration-200"
-                        onClick={() => window.open(resolveImageUrl(verifyingOrder.payment_proof_url), "_blank")}
+                        onClick={() => window.open(resolveImageUrl(verifyingOrder.payment_proof_url || undefined), "_blank")}
                       />
                     </div>
                   ) : (
@@ -863,42 +875,59 @@ function AdminTransactionsPage() {
                 </p>
               </div>
 
-              <div className="space-y-1.5 pt-2">
-                <Label className="text-xs font-bold text-ink uppercase tracking-wider">Catatan Penolakan (Hanya jika Ditolak)</Label>
-                <Textarea
-                  value={verificationNote}
-                  onChange={(e) => setVerificationNote(e.target.value)}
-                  placeholder="Contoh: Bukti transfer terpotong / nominal tidak sesuai."
-                  rows={2}
-                  className="text-xs"
-                />
-              </div>
+              {showRejectReason && (
+                <div className="space-y-1.5 pt-2">
+                  <Label className="text-xs font-bold text-ink uppercase tracking-wider">Catatan Penolakan (Wajib Diisi)</Label>
+                  <Textarea
+                    value={verificationNote}
+                    onChange={(e) => setVerificationNote(e.target.value)}
+                    placeholder="Contoh: Bukti transfer terpotong / nominal tidak sesuai."
+                    rows={2}
+                    className="text-xs"
+                    autoFocus
+                  />
+                </div>
+              )}
             </div>
           )}
 
           <DialogFooter className="flex sm:justify-between gap-2 mt-4">
             <Button
               variant="outline"
-              onClick={() => setVerificationOpen(false)}
+              onClick={() => {
+                if (showRejectReason) {
+                  setShowRejectReason(false);
+                } else {
+                  setVerificationOpen(false);
+                }
+              }}
               className="border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 px-4"
             >
-              Batal
+              {showRejectReason ? "Kembali" : "Batal"}
             </Button>
             <div className="flex gap-2">
               <Button
-                onClick={() => void handleVerify(false)}
+                onClick={() => {
+                  if (!showRejectReason) {
+                    setShowRejectReason(true);
+                  } else {
+                    void handleVerify(false);
+                  }
+                }}
                 disabled={submittingVerification}
                 className="bg-red-600 hover:bg-red-700 text-white border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 px-4 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
               >
-                Tolak
+                {showRejectReason ? "Konfirmasi Tolak" : "Tolak"}
               </Button>
-              <Button
-                onClick={() => void handleVerify(true)}
-                disabled={submittingVerification}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 px-4 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
-              >
-                {submittingVerification ? "Memproses..." : "Terima"}
-              </Button>
+              {!showRejectReason && (
+                <Button
+                  onClick={() => void handleVerify(true)}
+                  disabled={submittingVerification}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 px-4 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                >
+                  {submittingVerification ? "Memproses..." : "Terima"}
+                </Button>
+              )}
             </div>
           </DialogFooter>
         </DialogContent>

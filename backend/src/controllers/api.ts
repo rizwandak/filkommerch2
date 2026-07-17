@@ -1484,7 +1484,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: "Order tidak ditemukan" });
     }
 
-    const isNowPaid = status === "settlement" || status === "completed";
+    const isNowPaid = status === "settlement" || status === "completed" || status === "ready_for_pickup" || status === "shipped";
     const wasUnpaid = order.payment_status !== "paid";
 
     let paymentStatus = order.payment_status;
@@ -1497,6 +1497,14 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     } else if (status === "settlement" || status === "capture") {
       paymentStatus = "paid";
       orderStatus = "paid";
+    } else if (status === "ready_for_pickup") {
+      paymentStatus = "paid";
+      orderStatus = "ready_for_pickup";
+      fulfillmentStatus = "ready_for_pickup";
+    } else if (status === "shipped") {
+      paymentStatus = "paid";
+      orderStatus = "shipped";
+      fulfillmentStatus = "shipped";
     } else if (status === "completed") {
       paymentStatus = "paid";
       orderStatus = "completed";

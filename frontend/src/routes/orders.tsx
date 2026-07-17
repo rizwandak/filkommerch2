@@ -263,7 +263,7 @@ function UserOrdersPage() {
       return (
         <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full border border-blue-200">
           <CheckCircle className="w-3 h-3" />
-          Dikirim
+          Siap Diantar / Dikirim
         </span>
       );
     }

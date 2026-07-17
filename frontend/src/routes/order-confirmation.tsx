@@ -251,7 +251,7 @@ function OrderConfirmationPage() {
       statusIcon = <Clock className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-blue-500" />;
       statusTitle = "Pesanan Sedang Direview Admin";
       statusDescription =
-        "Bukti pembayaran Anda telah diterima. Mohon tunggu, admin sedang memverifikasi pembayaran Anda.";
+        "Bukti pembayaran Anda telah diterima. Sembari menunggu, anda bisa melihat-lihat produk lain dengan klik \"Lanjut Belanja\".";
       statusBg = "bg-blue-50 border-blue-200 text-blue-900";
     } else {
       statusTitle = "Pesanan Berhasil Dibuat";
@@ -265,12 +265,23 @@ function OrderConfirmationPage() {
     statusTitle = "Transaksi Gagal / Dibatalkan";
     statusDescription = "Maaf, pesanan Anda telah dibatalkan atau waktu pembayaran telah habis.";
     statusBg = "bg-red-50 border-red-200 text-red-900";
+  } else if (oStatus === "ready_for_pickup") {
+    statusIcon = <CheckCircle2 className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-teal-500" />;
+    statusTitle = "Siap Diambil!";
+    statusDescription =
+      "Pesanan Anda telah dikonfirmasi dan sudah siap diambil di Store FILKOM Merch UB. Tunjukkan halaman ini atau kode pengambilan Anda.";
+    statusBg = "bg-teal-50 border-teal-200 text-teal-900";
+  } else if (oStatus === "shipped") {
+    statusIcon = <CheckCircle2 className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-blue-500" />;
+    statusTitle = "Siap Diantar / Dikirim!";
+    statusDescription =
+      "Pesanan Anda sedang diantar kurir atau telah diserahkan ke jasa pengiriman. Info resi/pengiriman akan dihubungi via WhatsApp.";
+    statusBg = "bg-blue-50 border-blue-200 text-blue-900";
   } else if (
     pStatus === "paid" ||
     oStatus === "paid" ||
     oStatus === "processing" ||
-    oStatus === "completed" ||
-    oStatus === "ready_for_pickup"
+    oStatus === "completed"
   ) {
     statusIcon = <CheckCircle2 className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-green-500" />;
     statusTitle = "Pembayaran Berhasil!";
@@ -388,7 +399,7 @@ function OrderConfirmationPage() {
                               </span>
                             </div>
                             <p className="text-[11px] text-muted-foreground text-center font-semibold uppercase tracking-wide">
-                              Mohon tunggu admin memverifikasi pembayaran Anda.
+                              Sembari menunggu, anda bisa melihat-lihat produk lain dengan klik "Lanjut Belanja"
                             </p>
                             {order?.notes && (
                               <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg text-amber-900 text-xs font-semibold flex items-start gap-2 text-left">
