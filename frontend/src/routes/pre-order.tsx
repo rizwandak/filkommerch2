@@ -293,6 +293,8 @@ function PreOrderPage() {
         sale_type: product.sale_type,
         product_type: product.product_type,
         variants: product.variants || [],
+        category_name: product.category_name,
+        category_slug: product.category_slug,
       };
     });
   }, [dbProducts]);
@@ -475,12 +477,14 @@ function PreOrderPage() {
           <div className="space-y-16">
             {/* 1. SEGMEN OUR MAIN HERO (Full Width Container) */}
             {(() => {
-              const heroProducts = filteredPreOrders.filter(
-                (p) =>
-                  (p.tag === "LIMITED" || p.tag === "BEST SELLER" || p.sale_type === "pre_order") &&
-                  p.cat?.toUpperCase() !== "BUNDLE" &&
-                  p.product_type !== "bundle"
-              );
+              const heroProducts = filteredPreOrders.filter((p) => {
+                const catName = (p.category_name || "").toLowerCase();
+                const catSlug = (p.category_slug || "").toLowerCase();
+                return (
+                  p.product_type !== "bundle" &&
+                  (catName === "main hero" || catSlug === "main-hero")
+                );
+              });
               if (heroProducts.length === 0) return null;
 
               return (
