@@ -259,6 +259,7 @@ function PreOrderPage() {
 
   // Format products lists
   const products = useMemo(() => {
+    const isUb = user?.is_filkom_verified === 1;
     const list = dbProducts.length > 0 ? dbProducts : [];
     return list.map((product: ProductWithVariants) => {
       const productName = product.name.toLowerCase();
@@ -273,14 +274,24 @@ function PreOrderPage() {
                 ? "TEE"
                 : "ACCESSORIES";
 
+      // Determine active price based on verification
+      let activePrice = Number(product.price);
+      if (product.promo_price && Number(product.promo_price) > 0) {
+        activePrice = Number(product.promo_price);
+      } else if (isUb && product.filkom_price && Number(product.filkom_price) > 0) {
+        activePrice = Number(product.filkom_price);
+      }
+
       return {
         id: product.slug || `product-${product.id}`,
         img: product.image_url || pVarsity,
         name: product.name,
-        price: `Rp ${product.price.toLocaleString("id-ID")}`,
-        was: product.original_price
+        price: `Rp ${activePrice.toLocaleString("id-ID")}`,
+        was: product.original_price && product.original_price > activePrice
           ? `Rp ${product.original_price.toLocaleString("id-ID")}`
-          : undefined,
+          : Number(product.price) > activePrice
+            ? `Rp ${Number(product.price).toLocaleString("id-ID")}`
+            : undefined,
         tag: product.is_best_seller
           ? "BEST SELLER"
           : product.is_limited
@@ -297,7 +308,7 @@ function PreOrderPage() {
         category_slug: product.category_slug,
       };
     });
-  }, [dbProducts]);
+  }, [dbProducts, user]);
 
   // Filter only PRE-ORDER items (No dummy data!)
   const preOrderProducts = useMemo(() => {
@@ -604,43 +615,53 @@ function PreOrderPage() {
                     {bundleProducts.map((p) => (
                       <div
                         key={p.id}
-                        className="group flex flex-col border-2 border-ink bg-cream rounded-xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-2px] transition-all duration-300 w-full sm:w-[320px] md:w-[350px] shrink-0"
+                        className="group flex flex-col border-2 border-ink bg-cream rounded-lg overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-2px] transition-all duration-300 w-[calc(50%-8px)] sm:w-[200px] md:w-[230px] shrink-0"
                       >
-                        <div className="aspect-square bg-secondary relative overflow-hidden border-b-2 border-ink">
+                        <Link
+                          to="/product/$slug"
+                          params={{ slug: p.id }}
+                          className="relative aspect-square overflow-hidden block border-b-2 border-ink bg-secondary"
+                        >
                           <img
                             src={resolveImageUrl(p.img)}
                             alt={p.name}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                           />
-                          <span className="absolute top-2 left-2 bg-brand-orange text-cream text-[9px] font-black tracking-widest px-2.5 py-0.5 rounded-full border border-ink uppercase">
+                          <span className="absolute top-2 left-2 text-[8px] font-bold tracking-widest px-2 py-0.5 bg-brand-orange text-cream rounded-full uppercase border border-ink shadow-xs">
                             BUNDLE
                           </span>
-                        </div>
+                        </Link>
 
-                        <div className="p-4 flex flex-col justify-between flex-1 space-y-3">
-                          <div>
-                            <div className="text-[9px] font-bold text-brand-orange tracking-widest uppercase mb-0.5">
-                              PAKET HEMAT BATCH
-                            </div>
-                            <h4 className="text-sm sm:text-base font-extrabold text-ink uppercase tracking-wide line-clamp-1">
-                              {p.name}
-                            </h4>
+                        <div className="p-3 flex flex-col flex-1">
+                          <div className="text-[9px] font-bold tracking-widest text-brand-orange uppercase mb-0.5">
+                            PAKET HEMAT
                           </div>
+                          <Link
+                            to="/product/$slug"
+                            params={{ slug: p.id }}
+                            className="hover:text-brand-orange transition-colors"
+                          >
+                            <h3 className="text-xs font-bold text-ink leading-snug tracking-wide line-clamp-1 mb-1.5">
+                              {p.name}
+                            </h3>
+                          </Link>
 
-                          <div className="pt-2.5 border-t border-ink/10 flex items-center justify-between gap-2">
+                          <div className="mt-auto pt-2 border-t border-ink/10 flex items-center justify-between">
                             <div>
-                              <span className="text-base sm:text-lg font-black text-ink">{p.price}</span>
+                              <span className="text-xs font-black text-ink">{p.price}</span>
                               {p.was && (
-                                <span className="ml-1.5 text-[10px] text-muted-foreground line-through font-bold">
+                                <span className="block text-[9px] text-muted-foreground line-through font-bold">
                                   {p.was}
                                 </span>
                               )}
                             </div>
+
                             <button
                               onClick={() => addToCart(p)}
-                              className="bg-ink text-cream hover:bg-brand-orange font-extrabold text-[10px] py-2 px-3 rounded-lg border border-ink transition-colors uppercase flex items-center gap-1 cursor-pointer shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)]"
+                              className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
+                              title="Tambah ke bag"
                             >
-                              <ShoppingBag className="w-3 h-3" /> + BAG
+                              <ShoppingBag className="w-3 h-3" />
                             </button>
                           </div>
                         </div>
