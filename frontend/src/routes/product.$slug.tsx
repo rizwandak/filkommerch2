@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import {
   ShoppingBag,
   ArrowLeft,
@@ -123,6 +123,7 @@ function ProductDetailPage() {
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [activeImage, setActiveImage] = useState<string>("");
+  const mobileCarouselRef = useRef<HTMLDivElement>(null);
 
   const [selectedBundleVariants, setSelectedBundleVariants] = useState<Record<number, any>>({});
   const [isZoomOpen, setIsZoomOpen] = useState(false);
@@ -252,27 +253,16 @@ function ProductDetailPage() {
     if (!product) return 0;
     const isUb = user?.is_filkom_verified === 1;
 
+    // 1. Determine base price (harga asli)
+    let basePrice = Number(product.price);
     if (product.promo_price && Number(product.promo_price) > 0) {
-      return Number(product.promo_price);
+      basePrice = Number(product.promo_price);
+    } else if (isUb && product.filkom_price && Number(product.filkom_price) > 0) {
+      basePrice = Number(product.filkom_price);
     }
 
-    if (isUb) {
-      if (selectedSize || selectedColor) {
-        const matchingVariant = product.variants?.find(
-          (v: any) =>
-            v.is_active &&
-            (!selectedSize || v.size === selectedSize) &&
-            (!selectedColor || v.color === selectedColor),
-        );
-        if (matchingVariant?.filkom_price && Number(matchingVariant.filkom_price) > 0) {
-          return Number(matchingVariant.filkom_price);
-        }
-      }
-      if (product.filkom_price && Number(product.filkom_price) > 0) {
-        return Number(product.filkom_price);
-      }
-    }
-
+    // 2. Add variant add-on if a variant is matched
+    let addon = 0;
     if (selectedSize || selectedColor) {
       const matchingVariant = product.variants?.find(
         (v: any) =>
@@ -280,26 +270,55 @@ function ProductDetailPage() {
           (!selectedSize || v.size === selectedSize) &&
           (!selectedColor || v.color === selectedColor),
       );
-      if (matchingVariant?.price_override && Number(matchingVariant.price_override) > 0) {
-        return Number(matchingVariant.price_override);
+      if (matchingVariant) {
+        if (matchingVariant.filkom_price && Number(matchingVariant.filkom_price) > 0) {
+          addon = Number(matchingVariant.filkom_price);
+        } else if (matchingVariant.price_override && Number(matchingVariant.price_override) > 0) {
+          addon = Number(matchingVariant.price_override);
+        }
       }
     }
 
-    return Number(product.price);
+    return basePrice + addon;
   }, [product, user, selectedSize, selectedColor]);
 
   // Dynamic original price (for strike-through display)
   const originalPrice = useMemo(() => {
     if (!product) return null;
+
+    // 1. Determine base original price
+    let baseOriginalPrice = null;
     if (product.original_price && Number(product.original_price) > 0) {
-      return Number(product.original_price);
+      baseOriginalPrice = Number(product.original_price);
+    } else {
+      const basePrice = Number(product.price);
+      if (currentPrice < basePrice) {
+        baseOriginalPrice = basePrice;
+      }
     }
-    const basePrice = Number(product.price);
-    if (currentPrice < basePrice) {
-      return basePrice;
+
+    if (baseOriginalPrice === null) return null;
+
+    // 2. Add variant add-on if a variant is matched
+    let addon = 0;
+    if (selectedSize || selectedColor) {
+      const matchingVariant = product.variants?.find(
+        (v: any) =>
+          v.is_active &&
+          (!selectedSize || v.size === selectedSize) &&
+          (!selectedColor || v.color === selectedColor),
+      );
+      if (matchingVariant) {
+        if (matchingVariant.filkom_price && Number(matchingVariant.filkom_price) > 0) {
+          addon = Number(matchingVariant.filkom_price);
+        } else if (matchingVariant.price_override && Number(matchingVariant.price_override) > 0) {
+          addon = Number(matchingVariant.price_override);
+        }
+      }
     }
-    return null;
-  }, [product, currentPrice]);
+
+    return baseOriginalPrice + addon;
+  }, [product, currentPrice, selectedSize, selectedColor]);
 
   if (error || !product) {
     return (
@@ -368,6 +387,20 @@ function ProductDetailPage() {
       setActiveImage(product.image_url);
     }
   }, [selectedSize, selectedColor, product, images, sizes, colors]);
+
+  // Auto-scroll mobile carousel to activeImage when variant selection changes
+  useEffect(() => {
+    if (!activeImage || !mobileCarouselRef.current) return;
+    const idx = images.indexOf(activeImage);
+    if (idx < 0) return;
+
+    const container = mobileCarouselRef.current;
+    const targetChild = container.querySelector(`[data-image-index="${idx}"]`) as HTMLElement | null;
+    if (targetChild) {
+      const scrollLeft = targetChild.offsetLeft - (container.offsetWidth - targetChild.offsetWidth) / 2;
+      container.scrollTo({ left: Math.max(0, scrollLeft), behavior: "smooth" });
+    }
+  }, [activeImage, images]);
 
   const handleAddToCart = (buyNow = false) => {
     if (!selectedSize && sizes.length > 0) {
@@ -521,28 +554,33 @@ function ProductDetailPage() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-8 items-start">
           {/* COLUMN 1: LEFT STICKY GALLERY (4 Cols - Fixed Anchored) */}
           <div className="md:col-span-4 md:sticky md:top-28 self-start">
-            {/* ===== MOBILE: Horizontal Swipe Carousel (unchanged) ===== */}
+            {/* ===== MOBILE: Horizontal Swipe Carousel with Variant Scroll ===== */}
             <div className="md:hidden relative w-full overflow-hidden">
-              {([selectedSize, selectedColor].filter(Boolean).length > 0) && (
-                <div className="absolute bottom-6 left-3 bg-white text-ink border-2 border-ink px-2.5 py-1 text-[9px] font-black uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] z-20 animate-fade-in">
-                  {[selectedSize, selectedColor].filter(Boolean).join(" - ")}
-                </div>
-              )}
-              <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-4">
+              <div ref={mobileCarouselRef} className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-none pb-4">
                 {images.map((img, idx) => (
                   <div
                     key={idx}
+                    data-image-index={idx}
                     onClick={() => {
                       setActiveImage(img);
                       setIsZoomOpen(true);
                     }}
-                    className="w-[85%] shrink-0 snap-center aspect-square bg-cream border-2 border-ink rounded-2xl overflow-hidden relative cursor-zoom-in group/img shadow-[5px_5px_0px_0px_rgba(27,27,27,1)]"
+                    className={`w-[85%] shrink-0 snap-center aspect-square bg-cream border-2 rounded-2xl overflow-hidden relative cursor-zoom-in group/img transition-all duration-300 ${
+                      activeImage === img
+                        ? "border-brand-orange shadow-[5px_5px_0px_0px_rgba(234,88,12,0.6)] ring-2 ring-brand-orange/40"
+                        : "border-ink shadow-[5px_5px_0px_0px_rgba(27,27,27,1)]"
+                    }`}
                   >
                     <img
                       src={resolveImageUrl(img)}
                       alt={`${product.name} - ${idx + 1}`}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover/img:scale-105"
                     />
+                    {([selectedSize, selectedColor].filter(Boolean).length > 0) && (
+                      <div className="absolute bottom-3.5 left-3.5 bg-white text-ink border-2 border-ink px-2.5 py-1 text-[9px] font-black uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] z-20 animate-fade-in">
+                        {[selectedSize, selectedColor].filter(Boolean).join(" - ")}
+                      </div>
+                    )}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

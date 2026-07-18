@@ -11,6 +11,7 @@ interface ImageCropperModalProps {
   onClose: () => void;
   onCropComplete: (croppedFile: File) => void;
   onUploadOriginal: () => void;
+  aspectRatio?: number;
 }
 
 export function ImageCropperModal({
@@ -19,6 +20,7 @@ export function ImageCropperModal({
   onClose,
   onCropComplete,
   onUploadOriginal,
+  aspectRatio = 1,
 }: ImageCropperModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -67,14 +69,15 @@ export function ImageCropperModal({
 
     setImgDim({ width: dispW, height: dispH });
 
-    const maxSquare = Math.min(dispW, dispH);
-    const initX = (dispW - maxSquare) / 2;
-    const initY = (dispH - maxSquare) / 2;
+    const maxW = Math.min(dispW, dispH * aspectRatio);
+    const maxH = maxW / aspectRatio;
+    const initX = (dispW - maxW) / 2;
+    const initY = (dispH - maxH) / 2;
 
     setCropBox({
       x: initX,
       y: initY,
-      size: maxSquare,
+      size: maxW,
     });
     setImgLoaded(true);
   };
@@ -129,28 +132,29 @@ export function ImageCropperModal({
     let { x, y, size } = startCrop;
 
     if (mode === "move") {
+      const boxHeight = size / aspectRatio;
       x = Math.max(0, Math.min(w - size, startCrop.x + dx));
-      y = Math.max(0, Math.min(h - size, startCrop.y + dy));
+      y = Math.max(0, Math.min(h - boxHeight, startCrop.y + dy));
     } else if (mode === "bottom-right") {
-      const delta = (dx + dy) / 2;
-      const maxSize = Math.min(w - startCrop.x, h - startCrop.y);
+      const delta = (dx + dy * aspectRatio) / 2;
+      const maxSize = Math.min(w - startCrop.x, (h - startCrop.y) * aspectRatio);
       size = Math.max(minSize, Math.min(maxSize, startCrop.size + delta));
     } else if (mode === "bottom-left") {
-      const delta = (-dx + dy) / 2;
-      const maxSize = Math.min(startCrop.x + startCrop.size, h - startCrop.y);
+      const delta = (-dx + dy * aspectRatio) / 2;
+      const maxSize = Math.min(startCrop.x + startCrop.size, (h - startCrop.y) * aspectRatio);
       size = Math.max(minSize, Math.min(maxSize, startCrop.size + delta));
       x = startCrop.x + (startCrop.size - size);
     } else if (mode === "top-right") {
-      const delta = (dx - dy) / 2;
-      const maxSize = Math.min(w - startCrop.x, startCrop.y + startCrop.size);
+      const delta = (dx - dy * aspectRatio) / 2;
+      const maxSize = Math.min(w - startCrop.x, startCrop.y * aspectRatio + startCrop.size);
       size = Math.max(minSize, Math.min(maxSize, startCrop.size + delta));
-      y = startCrop.y + (startCrop.size - size);
+      y = startCrop.y + (startCrop.size - size) / aspectRatio;
     } else if (mode === "top-left") {
-      const delta = (-dx - dy) / 2;
-      const maxSize = Math.min(startCrop.x + startCrop.size, startCrop.y + startCrop.size);
+      const delta = (-dx - dy * aspectRatio) / 2;
+      const maxSize = Math.min(startCrop.x + startCrop.size, startCrop.y * aspectRatio + startCrop.size);
       size = Math.max(minSize, Math.min(maxSize, startCrop.size + delta));
       x = startCrop.x + (startCrop.size - size);
-      y = startCrop.y + (startCrop.size - size);
+      y = startCrop.y + (startCrop.size - size) / aspectRatio;
     }
 
     setCropBox({ x, y, size });
@@ -183,7 +187,7 @@ export function ImageCropperModal({
         x: cropBox.x * scaleX,
         y: cropBox.y * scaleY,
         width: cropBox.size * scaleX,
-        height: cropBox.size * scaleY,
+        height: (cropBox.size / aspectRatio) * scaleY,
       };
 
       const croppedBlob = await getCroppedImg(imageSrc, pixelCrop);
@@ -205,9 +209,11 @@ export function ImageCropperModal({
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-[640px] bg-cream border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] text-ink p-6 max-h-[92vh] overflow-y-auto z-[9999]">
         <DialogHeader className="border-b border-ink/10 pb-3">
-          <DialogTitle className="display text-lg uppercase font-black">Potong Foto 1:1 Square ✂️</DialogTitle>
+          <DialogTitle className="display text-lg uppercase font-black">
+            Potong Foto {aspectRatio === 1 ? "1:1 Square" : "5:6 (Hero Banner)"} ✂️
+          </DialogTitle>
           <p className="text-[11px] text-muted-foreground font-medium">
-            Geser kotak foto untuk mengatur posisi, dan **tarik 4 pegangan sudut bundar** untuk memperbesar/memperkecil kotak crop 1:1 (terkunci otomatis tepat di batas tepi fisik foto).
+            Geser kotak foto untuk mengatur posisi, dan **tarik 4 pegangan sudut bundar** untuk memperbesar/memperkecil kotak crop {aspectRatio === 1 ? "1:1" : "5:6"} (terkunci otomatis tepat di batas tepi fisik foto).
           </p>
         </DialogHeader>
 
@@ -243,7 +249,7 @@ export function ImageCropperModal({
                 className="w-full h-full block object-fill pointer-events-none"
               />
 
-              {/* Bounded 1:1 Crop Box Overlay */}
+              {/* Bounded Crop Box Overlay */}
               {cropBox.size > 0 && (
                 <div
                   className="absolute cursor-grab active:cursor-grabbing border-2 border-brand-orange ring-1 ring-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.65)]"
@@ -251,7 +257,7 @@ export function ImageCropperModal({
                     left: `${cropBox.x}px`,
                     top: `${cropBox.y}px`,
                     width: `${cropBox.size}px`,
-                    height: `${cropBox.size}px`,
+                    height: `${cropBox.size / aspectRatio}px`,
                   }}
                   onPointerDown={(e) => handlePointerDown(e, "move")}
                 >

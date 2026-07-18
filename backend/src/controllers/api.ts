@@ -24,26 +24,25 @@ export const isUbEmail = (email?: string | null): boolean => {
  * Priority: promo_price -> filkom_price (if UB email) -> fallback price (variant override or base product price).
  */
 export const determinePrice = (variant: any, isFilkomVerified: boolean): number => {
-  // 1. Promo price (product-level promo price takes priority)
+  // 1. Determine base price (harga asli)
+  let basePrice = Number(variant.product_price);
   if (variant.product_promo_price !== undefined && variant.product_promo_price !== null && Number(variant.product_promo_price) > 0) {
-    return Number(variant.product_promo_price);
-  }
-  
-  // 2. FILKOM Civitas price (requires isFilkomVerified = true)
-  if (isFilkomVerified) {
-    if (variant.filkom_price !== undefined && variant.filkom_price !== null && Number(variant.filkom_price) > 0) {
-      return Number(variant.filkom_price);
-    }
+    basePrice = Number(variant.product_promo_price);
+  } else if (isFilkomVerified) {
     if (variant.product_filkom_price !== undefined && variant.product_filkom_price !== null && Number(variant.product_filkom_price) > 0) {
-      return Number(variant.product_filkom_price);
+      basePrice = Number(variant.product_filkom_price);
     }
   }
-  
-  // 3. Fallback to public price (variant override or product price)
-  if (variant.price_override !== undefined && variant.price_override !== null && Number(variant.price_override) > 0) {
-    return Number(variant.price_override);
+
+  // 2. Determine variant add-on price
+  let addon = 0;
+  if (variant.filkom_price !== undefined && variant.filkom_price !== null && Number(variant.filkom_price) > 0) {
+    addon = Number(variant.filkom_price);
+  } else if (variant.price_override !== undefined && variant.price_override !== null && Number(variant.price_override) > 0) {
+    addon = Number(variant.price_override);
   }
-  return Number(variant.product_price);
+
+  return basePrice + addon;
 };
 
 /**
@@ -3145,7 +3144,22 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
 
       let lunasUnitPrice = product.price;
       if (lunasVariant) {
-        lunasUnitPrice = lunasVariant.filkom_price || lunasVariant.price_override || product.price;
+        const isUb = isUbEmail(originalOrder.customer_email);
+        let basePrice = Number(product.price);
+        if (product.promo_price && Number(product.promo_price) > 0) {
+          basePrice = Number(product.promo_price);
+        } else if (isUb && product.filkom_price && Number(product.filkom_price) > 0) {
+          basePrice = Number(product.filkom_price);
+        }
+
+        let addon = 0;
+        if (lunasVariant.filkom_price !== undefined && lunasVariant.filkom_price !== null && Number(lunasVariant.filkom_price) > 0) {
+          addon = Number(lunasVariant.filkom_price);
+        } else if (lunasVariant.price_override !== undefined && lunasVariant.price_override !== null && Number(lunasVariant.price_override) > 0) {
+          addon = Number(lunasVariant.price_override);
+        }
+
+        lunasUnitPrice = basePrice + addon;
       }
 
       const sisa = Math.max(0, lunasUnitPrice - item.unit_price);

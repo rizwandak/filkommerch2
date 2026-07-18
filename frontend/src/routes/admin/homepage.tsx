@@ -2593,6 +2593,7 @@ function AdminHomepageEditorPage() {
         isOpen={cropperOpen}
         imageSrc={cropperImageSrc}
         elementType={cropperContext?.elementType || ""}
+        aspectRatio={cropperContext?.elementType === "hero_banner" ? 5 / 6 : 1}
         onClose={() => {
           if (cropperImageSrc) {
             URL.revokeObjectURL(cropperImageSrc);
