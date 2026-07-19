@@ -228,7 +228,7 @@ function PreOrderPage() {
       if (savedWishlist) setWishlist(JSON.parse(savedWishlist));
       const savedCart = localStorage.getItem("cart");
       if (savedCart) setCart(JSON.parse(savedCart));
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   const [query, setQuery] = useState("");
@@ -364,7 +364,7 @@ function PreOrderPage() {
     try {
       const saved = localStorage.getItem("indexCart");
       if (saved) currentCart = JSON.parse(saved);
-    } catch (e) {}
+    } catch (e) { }
 
     const existingIdx = currentCart.findIndex((i) => i.id === itemId);
     if (existingIdx !== -1) {
@@ -611,7 +611,7 @@ function PreOrderPage() {
                     </h2>
                   </div>
 
-                  <div className="flex flex-wrap justify-center items-stretch gap-6 max-w-full mx-auto">
+                  <div className="flex flex-wrap justify-center items-stretch gap-4 sm:gap-6 max-w-full mx-auto">
                     {bundleProducts.map((p) => (
                       <div
                         key={p.id}
@@ -673,74 +673,88 @@ function PreOrderPage() {
             })()}
 
             {/* 3. SEGMEN SEMUA KATALOG PRODUK PRE-ORDER (Full Width Grid) */}
-            <section id="all-products" className="scroll-mt-32 space-y-6 w-full">
-              <div className="flex flex-col items-center text-center mb-6 gap-1">
-                <div className="text-[11px] tracking-[0.35em] text-brand-orange font-extrabold uppercase">
-                  03 — ALL PRODUCTS
-                </div>
-                <h2 className="display text-3xl sm:text-5xl text-ink font-bold uppercase tracking-wide">
-                  ALL PRE-ORDER PRODUCTS
-                </h2>
-              </div>
+            {(() => {
+              const allOthers = filteredPreOrders.filter((p) => {
+                const catName = (p.category_name || "").toLowerCase();
+                const catSlug = (p.category_slug || "").toLowerCase();
+                const isHero = p.product_type !== "bundle" && (catName === "main hero" || catSlug === "main-hero");
+                const isBundle = p.cat?.toUpperCase() === "BUNDLE" || p.product_type === "bundle";
+                return !isHero && !isBundle;
+              });
 
-              <div className="flex flex-wrap justify-center items-stretch gap-4 max-w-full mx-auto">
-                {filteredPreOrders.map((p) => (
-                  <div
-                    key={p.id}
-                    className="group flex flex-col border-2 border-ink bg-cream rounded-lg overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-2px] transition-all duration-300 w-[calc(50%-8px)] sm:w-[200px] md:w-[230px] shrink-0"
-                  >
-                    <Link
-                      to="/product/$slug"
-                      params={{ slug: p.id }}
-                      className="relative aspect-square overflow-hidden block border-b-2 border-ink bg-secondary"
-                    >
-                      <img
-                        src={resolveImageUrl(p.img)}
-                        alt={p.name}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
-                      <span className="absolute top-2 left-2 text-[8px] font-bold tracking-widest px-2 py-0.5 bg-brand-orange text-cream rounded-full uppercase border border-ink shadow-xs">
-                        PO
-                      </span>
-                    </Link>
+              if (allOthers.length === 0) return null;
 
-                    <div className="p-3 flex flex-col flex-1">
-                      <div className="text-[9px] font-bold tracking-widest text-brand-orange uppercase mb-0.5">
-                        {p.cat}
-                      </div>
-                      <Link
-                        to="/product/$slug"
-                        params={{ slug: p.id }}
-                        className="hover:text-brand-orange transition-colors"
-                      >
-                        <h3 className="text-xs font-bold text-ink leading-snug tracking-wide line-clamp-1 mb-1.5">
-                          {p.name}
-                        </h3>
-                      </Link>
-
-                      <div className="mt-auto pt-2 border-t border-ink/10 flex items-center justify-between">
-                        <div>
-                          <span className="text-xs font-black text-ink">{p.price}</span>
-                          {p.was && (
-                            <span className="block text-[9px] text-muted-foreground line-through font-bold">
-                              {p.was}
-                            </span>
-                          )}
-                        </div>
-
-                        <button
-                          onClick={() => addToCart(p)}
-                          className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
-                          title="Tambah ke bag"
-                        >
-                          <ShoppingBag className="w-3 h-3" />
-                        </button>
-                      </div>
+              return (
+                <section id="all-products" className="scroll-mt-32 space-y-6 w-full">
+                  <div className="flex flex-col items-center text-center mb-6 gap-1">
+                    <div className="text-[11px] tracking-[0.35em] text-brand-orange font-extrabold uppercase">
+                      03 — ALL PRODUCTS
                     </div>
+                    <h2 className="display text-3xl sm:text-5xl text-ink font-bold uppercase tracking-wide">
+                      ALL PRE-ORDER PRODUCTS
+                    </h2>
                   </div>
-                ))}
-              </div>
-            </section>
+
+                  <div className="flex flex-wrap justify-center items-stretch gap-4 max-w-full mx-auto">
+                    {allOthers.map((p) => (
+                      <div
+                        key={p.id}
+                        className="group flex flex-col border-2 border-ink bg-cream rounded-lg overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-y-[-2px] transition-all duration-300 w-[calc(50%-8px)] sm:w-[200px] md:w-[230px] shrink-0"
+                      >
+                        <Link
+                          to="/product/$slug"
+                          params={{ slug: p.id }}
+                          className="relative aspect-square overflow-hidden block border-b-2 border-ink bg-secondary"
+                        >
+                          <img
+                            src={resolveImageUrl(p.img)}
+                            alt={p.name}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                          />
+                          <span className="absolute top-2 left-2 text-[8px] font-bold tracking-widest px-2 py-0.5 bg-brand-orange text-cream rounded-full uppercase border border-ink shadow-xs">
+                            PO
+                          </span>
+                        </Link>
+
+                        <div className="p-3 flex flex-col flex-1">
+                          <div className="text-[9px] font-bold tracking-widest text-brand-orange uppercase mb-0.5">
+                            {p.cat}
+                          </div>
+                          <Link
+                            to="/product/$slug"
+                            params={{ slug: p.id }}
+                            className="hover:text-brand-orange transition-colors"
+                          >
+                            <h3 className="text-xs font-bold text-ink leading-snug tracking-wide line-clamp-1 mb-1.5">
+                              {p.name}
+                            </h3>
+                          </Link>
+
+                          <div className="mt-auto pt-2 border-t border-ink/10 flex items-center justify-between">
+                            <div>
+                              <span className="text-xs font-black text-ink">{p.price}</span>
+                              {p.was && (
+                                <span className="block text-[9px] text-muted-foreground line-through font-bold">
+                                  {p.was}
+                                </span>
+                              )}
+                            </div>
+
+                            <button
+                              onClick={() => addToCart(p)}
+                              className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
+                              title="Tambah ke bag"
+                            >
+                              <ShoppingBag className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
           </div>
         )}
       </section>
