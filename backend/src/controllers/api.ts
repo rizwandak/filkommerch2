@@ -818,6 +818,28 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         throw new Error(`Minimal pembelian untuk menggunakan voucher ini adalah Rp ${voucher.min_purchase.toLocaleString("id-ID")}`);
       }
 
+      if (voucher.target_nim_prefix) {
+        const orderUserId = details.userId;
+        if (!orderUserId) {
+          throw new Error("Login dibutuhkan untuk menggunakan voucher ini");
+        }
+
+        const [uRows] = await connection.execute(
+          "SELECT is_filkom_verified, nim FROM users WHERE id = ?",
+          [orderUserId]
+        );
+        const user = (uRows as any[])[0];
+
+        if (!user || user.is_filkom_verified !== 1) {
+          throw new Error("Voucher ini khusus untuk mahasiswa FILKOM yang sudah terverifikasi");
+        }
+
+        const cleanNim = (user.nim || "").trim();
+        if (!cleanNim.startsWith(voucher.target_nim_prefix)) {
+          throw new Error(`Voucher ini hanya berlaku untuk mahasiswa angkatan 20${voucher.target_nim_prefix}`);
+        }
+      }
+
       if (voucher.discount_type === "percentage") {
         let calcDiscount = Math.round((calculatedSubtotal * voucher.discount_amount) / 100);
         if (voucher.max_discount !== null && voucher.max_discount > 0) {
@@ -3299,7 +3321,7 @@ export const getAllVouchers = async (req: Request, res: Response) => {
 
 export const createVoucher = async (req: Request, res: Response) => {
   try {
-    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount } = req.body;
+    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix } = req.body;
     if (!code || discount_amount === undefined || !start_date || !end_date) {
       return res.status(400).json({ success: false, error: "Kode, nominal diskon, tanggal mulai, dan tanggal selesai wajib diisi" });
     }
@@ -3313,8 +3335,8 @@ export const createVoucher = async (req: Request, res: Response) => {
     }
 
     const result = await execute(
-      `INSERT INTO vouchers (code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO vouchers (code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         normalizedCode,
         Number(discount_amount) || 0,
@@ -3324,7 +3346,8 @@ export const createVoucher = async (req: Request, res: Response) => {
         end_date,
         is_active !== undefined ? (is_active ? 1 : 0) : 1,
         discount_type || "fixed",
-        max_discount !== undefined && max_discount !== null ? Number(max_discount) : null
+        max_discount !== undefined && max_discount !== null ? Number(max_discount) : null,
+        target_nim_prefix ? String(target_nim_prefix).trim() : null
       ]
     );
 
@@ -3338,7 +3361,7 @@ export const createVoucher = async (req: Request, res: Response) => {
 export const updateVoucher = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount } = req.body;
+    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix } = req.body;
 
     if (!code || discount_amount === undefined || !start_date || !end_date) {
       return res.status(400).json({ success: false, error: "Kode, nominal diskon, tanggal mulai, dan tanggal selesai wajib diisi" });
@@ -3354,7 +3377,7 @@ export const updateVoucher = async (req: Request, res: Response) => {
 
     await execute(
       `UPDATE vouchers 
-       SET code = ?, discount_amount = ?, min_purchase = ?, stock = ?, start_date = ?, end_date = ?, is_active = ?, discount_type = ?, max_discount = ?
+       SET code = ?, discount_amount = ?, min_purchase = ?, stock = ?, start_date = ?, end_date = ?, is_active = ?, discount_type = ?, max_discount = ?, target_nim_prefix = ?
        WHERE id = ?`,
       [
         normalizedCode,
@@ -3366,6 +3389,7 @@ export const updateVoucher = async (req: Request, res: Response) => {
         is_active !== undefined ? (is_active ? 1 : 0) : 1,
         discount_type || "fixed",
         max_discount !== undefined && max_discount !== null ? Number(max_discount) : null,
+        target_nim_prefix ? String(target_nim_prefix).trim() : null,
         id
       ]
     );
@@ -3430,6 +3454,27 @@ export const validateVoucher = async (req: Request, res: Response) => {
       });
     }
 
+    // Validate target nim prefix if applicable
+    if (voucher.target_nim_prefix) {
+      const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+      if (!userId) {
+        return res.status(401).json({ success: false, error: "Silakan login terlebih dahulu untuk menggunakan voucher khusus ini" });
+      }
+
+      const user = await queryOne<any>("SELECT is_filkom_verified, nim FROM users WHERE id = ?", [userId]);
+      if (!user || user.is_filkom_verified !== 1) {
+        return res.status(400).json({ success: false, error: "Voucher ini khusus untuk mahasiswa FILKOM yang sudah terverifikasi" });
+      }
+
+      const cleanNim = (user.nim || "").trim();
+      if (!cleanNim.startsWith(voucher.target_nim_prefix)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: `Voucher ini hanya berlaku untuk mahasiswa angkatan 20${voucher.target_nim_prefix}` 
+        });
+      }
+    }
+
     return res.json({
       success: true,
       voucher: {
@@ -3438,7 +3483,8 @@ export const validateVoucher = async (req: Request, res: Response) => {
         discount_amount: voucher.discount_amount,
         min_purchase: voucher.min_purchase,
         discount_type: voucher.discount_type,
-        max_discount: voucher.max_discount
+        max_discount: voucher.max_discount,
+        target_nim_prefix: voucher.target_nim_prefix
       }
     });
   } catch (error: any) {

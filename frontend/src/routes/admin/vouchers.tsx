@@ -39,6 +39,7 @@ function AdminVouchersPage() {
   const [isActive, setIsActive] = useState(true);
   const [discountType, setDiscountType] = useState<"fixed" | "percentage">("fixed");
   const [maxDiscount, setMaxDiscount] = useState<number | null>(null);
+  const [targetNimPrefix, setTargetNimPrefix] = useState("");
 
   // Fetch vouchers
   const { data: vouchersRes, isLoading, refetch } = useQuery({
@@ -173,6 +174,7 @@ function AdminVouchersPage() {
     setIsActive(true);
     setDiscountType("fixed");
     setMaxDiscount(null);
+    setTargetNimPrefix("");
     setIsModalOpen(true);
   };
 
@@ -187,6 +189,7 @@ function AdminVouchersPage() {
     setIsActive(v.is_active === 1);
     setDiscountType(v.discount_type || "fixed");
     setMaxDiscount(v.max_discount || null);
+    setTargetNimPrefix(v.target_nim_prefix || "");
     setIsModalOpen(true);
   };
 
@@ -218,6 +221,7 @@ function AdminVouchersPage() {
       is_active: isActive ? 1 : 0,
       discount_type: discountType,
       max_discount: discountType === "percentage" && maxDiscount ? Number(maxDiscount) : null,
+      target_nim_prefix: targetNimPrefix.trim() || null,
     };
 
     if (editingVoucher) {
@@ -296,10 +300,17 @@ function AdminVouchersPage() {
               <tbody className="divide-y border-ink/10">
                 {vouchers.map((v) => (
                   <tr key={v.id} className="hover:bg-cream/40 transition-colors">
-                    <td className="p-4 font-bold text-ink text-sm">
-                      <span className="bg-cream border-2 border-ink border-dashed px-2.5 py-1 text-xs tracking-wider rounded">
-                        {v.code}
-                      </span>
+                    <td className="p-4 font-bold text-ink text-sm space-y-1.5">
+                      <div className="flex items-center">
+                        <span className="bg-cream border-2 border-ink border-dashed px-2.5 py-1 text-xs tracking-wider rounded">
+                          {v.code}
+                        </span>
+                      </div>
+                      {v.target_nim_prefix && (
+                        <div className="text-[10px] bg-brand-orange/10 text-brand-orange border border-brand-orange/20 px-2 py-0.5 rounded-md inline-block font-extrabold uppercase tracking-wide">
+                          🎓 Angkatan 20{v.target_nim_prefix}
+                        </div>
+                      )}
                     </td>
                     <td className="p-4 font-bold text-brand-orange text-sm">
                       {v.discount_type === "percentage" ? (
@@ -462,19 +473,36 @@ function AdminVouchersPage() {
                 </div>
               )}
 
-              <div>
-                <label className="block text-xs font-bold text-ink uppercase mb-1">
-                  Stok Voucher *
-                </label>
-                <input
-                  type="number"
-                  value={stock || ""}
-                  onChange={(e) => setStock(Number(e.target.value))}
-                  placeholder="Contoh: 100"
-                  className="w-full px-3 py-2.5 border-2 border-ink rounded-xl text-xs font-medium focus:outline-none bg-cream/30"
-                  min="0"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-ink uppercase mb-1">
+                    Stok Voucher *
+                  </label>
+                  <input
+                    type="number"
+                    value={stock || ""}
+                    onChange={(e) => setStock(Number(e.target.value))}
+                    placeholder="Contoh: 100"
+                    className="w-full px-3 py-2.5 border-2 border-ink rounded-xl text-xs font-medium focus:outline-none bg-cream/30"
+                    min="0"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-ink uppercase mb-1 flex flex-col">
+                    <span>Batasi Angkatan</span>
+                    <span className="text-[8px] font-medium text-muted-foreground font-sans leading-tight mt-0.5">(Prefix NIM, kosongkan jika umum)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={targetNimPrefix}
+                    onChange={(e) => setTargetNimPrefix(e.target.value.replace(/\D/g, "").slice(0, 2))}
+                    placeholder="Contoh: 26"
+                    className="w-full px-3 py-2.5 border-2 border-ink rounded-xl text-xs font-medium focus:outline-none bg-cream/30"
+                    maxLength={2}
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

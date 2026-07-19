@@ -132,6 +132,7 @@ export async function runMigration() {
           is_active TINYINT(1) DEFAULT 1,
           discount_type VARCHAR(20) NOT NULL DEFAULT 'fixed',
           max_discount INT DEFAULT NULL,
+          target_nim_prefix VARCHAR(10) DEFAULT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )`
@@ -147,6 +148,10 @@ export async function runMigration() {
       {
         name: "vouchers.max_discount",
         sql: "ALTER TABLE vouchers ADD COLUMN max_discount INT DEFAULT NULL"
+      },
+      {
+        name: "vouchers.target_nim_prefix",
+        sql: "ALTER TABLE vouchers ADD COLUMN target_nim_prefix VARCHAR(10) DEFAULT NULL"
       }
     ];
 

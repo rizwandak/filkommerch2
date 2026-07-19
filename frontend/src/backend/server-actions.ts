@@ -1543,6 +1543,7 @@ export interface Voucher {
   is_active: number;
   discount_type: "fixed" | "percentage";
   max_discount: number | null;
+  target_nim_prefix: string | null;
   created_at?: string;
   updated_at?: string;
 }
