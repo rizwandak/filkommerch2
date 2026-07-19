@@ -196,6 +196,23 @@ export async function runMigration() {
       console.error("Error seeding homepage_layout:", err.message);
     }
 
+    // Drop old foreign keys on order_items if they exist and re-create them with ON DELETE SET NULL
+    try {
+      console.log("Migrating order_items foreign keys to ON DELETE SET NULL...");
+      try {
+        await connection.query("ALTER TABLE order_items DROP FOREIGN KEY order_items_ibfk_2");
+      } catch (e: any) {}
+      try {
+        await connection.query("ALTER TABLE order_items DROP FOREIGN KEY fk_order_items_variant");
+      } catch (e: any) {}
+      
+      await connection.query("ALTER TABLE order_items ADD CONSTRAINT order_items_ibfk_2 FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL");
+      await connection.query("ALTER TABLE order_items ADD CONSTRAINT fk_order_items_variant FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE SET NULL");
+      console.log("✅ Managed order_items foreign keys successfully!");
+    } catch (err: any) {
+      console.warn("Notice: order_items foreign keys migration status:", err.message);
+    }
+
     // Automatically execute db_sync.sql seed file if available
     try {
       const syncFilePath = path.join(__dirname, "../db_sync.sql");

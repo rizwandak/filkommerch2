@@ -1522,6 +1522,9 @@ export const deleteProduct = async (req: Request, res: Response) => {
     // 2. Delete product images
     await connection.execute("DELETE FROM product_images WHERE product_id = ?", [id]);
 
+    // 2.5. Delete stock movements referencing product variants
+    await connection.execute("DELETE FROM stock_movements WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = ?)", [id]);
+
     // 3. Delete product variants
     await connection.execute("DELETE FROM product_variants WHERE product_id = ?", [id]);
 
