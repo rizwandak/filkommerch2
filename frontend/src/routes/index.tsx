@@ -921,7 +921,7 @@ function Index() {
           itemId.includes("varsity-filkom") || itemId.includes("varsity-jacket")
             ? `${itemName} — Default`
             : itemName,
-        price: p.price,
+        price: getActivePriceForCard(p, user),
         img: p.img,
         qty: 1,
         product_id: p.product_id,
@@ -1758,16 +1758,27 @@ function Index() {
                   const bundlesToRender =
                     dbBundles.length > 0
                       ? dbBundles.map((p) => {
+                        const activePriceStr = getActivePriceForCard(p, user);
+                        const activePriceNum = parsePrice(activePriceStr);
+
+                        const originalPriceVal = p.rawOriginalPrice && p.rawOriginalPrice > activePriceNum
+                          ? formatRp(p.rawOriginalPrice)
+                          : p.rawPrice > activePriceNum
+                            ? formatRp(p.rawPrice)
+                            : p.was;
+
                         let saveText = "Save up to 15%";
-                        if (p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice) {
-                          const pct = Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100);
+                        const comparePrice = p.rawOriginalPrice || p.rawPrice;
+                        if (comparePrice && comparePrice > activePriceNum) {
+                          const pct = Math.round(((comparePrice - activePriceNum) / comparePrice) * 100);
                           saveText = `Save ${pct}%`;
                         }
+
                         return {
                           id: p.id,
                           name: p.name,
-                          price: p.price,
-                          originalPrice: p.was,
+                          price: activePriceStr,
+                          originalPrice: originalPriceVal,
                           description: p.description || "",
                           img: p.img,
                           bundleComponents: p.bundle_components || [],
