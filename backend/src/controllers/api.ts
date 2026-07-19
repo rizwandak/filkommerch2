@@ -704,7 +704,8 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       // Query variant details joined with product info
       const [rows] = await connection.execute(
         `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix,
-                p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price
+                p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price,
+                p.product_type AS product_type
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
@@ -725,7 +726,60 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       }
 
       // Determine correct price based on verified status
-      const price = determinePrice(variant, isFilkomVerified);
+      let price = determinePrice(variant, isFilkomVerified);
+      if (variant.product_type === 'bundle') {
+        if (item.bundle_selections && Array.isArray(item.bundle_selections)) {
+          let bundleAddon = 0;
+          for (const selection of item.bundle_selections) {
+            const [compRows] = await connection.execute(
+              `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix, p.product_type,
+                      p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price
+               FROM product_variants pv
+               JOIN products p ON p.id = pv.product_id
+               WHERE pv.id = ? AND pv.is_active = TRUE`,
+              [selection.variant_id]
+            );
+            const compVar = (compRows as any[])[0];
+            if (compVar) {
+              const [allCompVarsRows] = await connection.execute(
+                `SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE`,
+                [compVar.product_id]
+              );
+              const allCompVars = allCompVarsRows as any[];
+              
+              const hasLunas = allCompVars.some((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
+              let refVariant = null;
+              if (hasLunas) {
+                refVariant = allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS" && v.size && v.size.toUpperCase() === "S")
+                  || allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
+              } else {
+                refVariant = allCompVars.find((v: any) => v.size && v.size.toUpperCase() === "S")
+                  || allCompVars[0];
+              }
+
+              let refAddon = 0;
+              if (refVariant) {
+                if (isFilkomVerified && refVariant.filkom_price && Number(refVariant.filkom_price) > 0) {
+                  refAddon = Number(refVariant.filkom_price);
+                } else if (refVariant.price_override && Number(refVariant.price_override) > 0) {
+                  refAddon = Number(refVariant.price_override);
+                }
+              }
+
+              let selectedAddon = 0;
+              if (isFilkomVerified && compVar.filkom_price && Number(compVar.filkom_price) > 0) {
+                selectedAddon = Number(compVar.filkom_price);
+              } else if (compVar.price_override && Number(compVar.price_override) > 0) {
+                selectedAddon = Number(compVar.price_override);
+              }
+
+              bundleAddon += (selectedAddon - refAddon);
+            }
+          }
+          price += bundleAddon;
+        }
+      }
+      price = Math.max(0, price);
       const subtotalItem = price * item.quantity;
       calculatedSubtotal += subtotalItem;
 
@@ -1990,7 +2044,8 @@ export const createSale = async (req: Request, res: Response) => {
       // Query variant joined with product info
       const [rows] = await connection.execute(
         `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix,
-                p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price
+                p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price,
+                p.product_type AS product_type
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
@@ -2010,7 +2065,60 @@ export const createSale = async (req: Request, res: Response) => {
         }
       }
 
-      const price = determinePrice(variant, isUb);
+      let price = determinePrice(variant, isUb);
+      if (variant.product_type === 'bundle') {
+        if (item.bundle_selections && Array.isArray(item.bundle_selections)) {
+          let bundleAddon = 0;
+          for (const selection of item.bundle_selections) {
+            const [compRows] = await connection.execute(
+              `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix, p.product_type,
+                      p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price
+               FROM product_variants pv
+               JOIN products p ON p.id = pv.product_id
+               WHERE pv.id = ? AND pv.is_active = TRUE`,
+              [selection.variant_id]
+            );
+            const compVar = (compRows as any[])[0];
+            if (compVar) {
+              const [allCompVarsRows] = await connection.execute(
+                `SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE`,
+                [compVar.product_id]
+              );
+              const allCompVars = allCompVarsRows as any[];
+              
+              const hasLunas = allCompVars.some((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
+              let refVariant = null;
+              if (hasLunas) {
+                refVariant = allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS" && v.size && v.size.toUpperCase() === "S")
+                  || allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
+              } else {
+                refVariant = allCompVars.find((v: any) => v.size && v.size.toUpperCase() === "S")
+                  || allCompVars[0];
+              }
+
+              let refAddon = 0;
+              if (refVariant) {
+                if (isUb && refVariant.filkom_price && Number(refVariant.filkom_price) > 0) {
+                  refAddon = Number(refVariant.filkom_price);
+                } else if (refVariant.price_override && Number(refVariant.price_override) > 0) {
+                  refAddon = Number(refVariant.price_override);
+                }
+              }
+
+              let selectedAddon = 0;
+              if (isUb && compVar.filkom_price && Number(compVar.filkom_price) > 0) {
+                selectedAddon = Number(compVar.filkom_price);
+              } else if (compVar.price_override && Number(compVar.price_override) > 0) {
+                selectedAddon = Number(compVar.price_override);
+              }
+
+              bundleAddon += (selectedAddon - refAddon);
+            }
+          }
+          price += bundleAddon;
+        }
+      }
+      price = Math.max(0, price);
       const subtotalItem = price * item.quantity;
       calculatedSubtotal += subtotalItem;
 
@@ -3243,7 +3351,111 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
         return res.status(404).json({ success: false, error: `Produk ID ${item.product_id} tidak ditemukan` });
       }
 
-      // Try to find the matching 'Lunas' variant
+      // Check if it is a bundle component item
+      if (item.product_name && item.product_name.includes("[KOMPONEN BUNDLE]")) {
+        const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
+        let lunasVariant = await queryOne<any>(
+          "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
+          [item.product_id, item.size, lunasColor]
+        );
+
+        if (!lunasVariant) {
+          lunasVariant = await queryOne<any>(
+            "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
+            [item.product_id, item.size]
+          );
+        }
+
+        resolvedItems.push({
+          item,
+          sisa: 0,
+          subtotal: 0,
+          lunasVariantId: lunasVariant ? lunasVariant.id : item.variant_id,
+          lunasColor: lunasVariant ? lunasVariant.color : lunasColor,
+        });
+        continue;
+      }
+
+      // Check if it is the main Bundle product item
+      if (product.product_type === "bundle") {
+        let bundleSisa = 0;
+        
+        // Find all component items of this bundle from the originalItems list
+        const componentItems = originalItems.filter((oi: any) => oi.product_name && oi.product_name.includes("[KOMPONEN BUNDLE]"));
+        
+        for (const comp of componentItems) {
+          // We only calculate pelunasan for components that were paid via DP
+          if (comp.color && comp.color.toUpperCase().includes("DP")) {
+            const compProduct = await queryOne<any>("SELECT * FROM products WHERE id = ?", [comp.product_id]);
+            if (compProduct) {
+              const compLunasColor = comp.color.replace(/\bDP\b/i, "Lunas");
+              
+              // Find matching Lunas variant
+              let compLunasVar = await queryOne<any>(
+                "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
+                [comp.product_id, comp.size, compLunasColor]
+              );
+              if (!compLunasVar) {
+                compLunasVar = await queryOne<any>(
+                  "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
+                  [comp.product_id, comp.size]
+                );
+              }
+
+              // Find matching DP variant
+              const compDpVar = await queryOne<any>(
+                "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
+                [comp.product_id, comp.size, comp.color]
+              );
+
+              if (compLunasVar && compDpVar) {
+                const isUb = isUbEmail(originalOrder.customer_email);
+                let compBasePrice = Number(compProduct.price);
+                if (compProduct.promo_price && Number(compProduct.promo_price) > 0) {
+                  compBasePrice = Number(compProduct.promo_price);
+                } else if (isUb && compProduct.filkom_price && Number(compProduct.filkom_price) > 0) {
+                  compBasePrice = Number(compProduct.filkom_price);
+                }
+
+                // Full price for Lunas variant
+                let lunasAddon = 0;
+                if (compLunasVar.filkom_price !== undefined && compLunasVar.filkom_price !== null && Number(compLunasVar.filkom_price) > 0) {
+                  lunasAddon = Number(compLunasVar.filkom_price);
+                } else if (compLunasVar.price_override !== undefined && compLunasVar.price_override !== null && Number(compLunasVar.price_override) > 0) {
+                  lunasAddon = Number(compLunasVar.price_override);
+                }
+                const fullLunasPrice = compBasePrice + lunasAddon;
+
+                // Full price for DP variant
+                let dpAddon = 0;
+                if (compDpVar.filkom_price !== undefined && compDpVar.filkom_price !== null && Number(compDpVar.filkom_price) > 0) {
+                  dpAddon = Number(compDpVar.filkom_price);
+                } else if (compDpVar.price_override !== undefined && compDpVar.price_override !== null && Number(compDpVar.price_override) > 0) {
+                  dpAddon = Number(compDpVar.price_override);
+                }
+                const fullDpPrice = compBasePrice + dpAddon;
+
+                const compDiff = Math.max(0, fullLunasPrice - fullDpPrice);
+                bundleSisa += compDiff;
+              }
+            }
+          }
+        }
+
+        const subtotal = bundleSisa * item.quantity;
+        calculatedSubtotal += subtotal;
+
+        resolvedItems.push({
+          item,
+          sisa: bundleSisa,
+          subtotal,
+          lunasVariantId: item.variant_id,
+          lunasColor: item.color || "Default",
+        });
+        continue;
+      }
+
+      // Handling for regular single items
       const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
       let lunasVariant = await queryOne<any>(
         "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
@@ -3251,7 +3463,6 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       );
 
       if (!lunasVariant) {
-        // Fallback to any variant with the same size and 'Lunas' in the color name
         lunasVariant = await queryOne<any>(
           "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
           [item.product_id, item.size]
@@ -3279,7 +3490,6 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       }
 
       const sisa = Math.max(0, lunasUnitPrice - item.unit_price);
-      // Fallback if price calculation resolves to 0
       const finalSisa = sisa > 0 ? sisa : item.unit_price;
 
       const subtotal = finalSisa * item.quantity;

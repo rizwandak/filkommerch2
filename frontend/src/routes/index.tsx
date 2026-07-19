@@ -1757,11 +1757,11 @@ function Index() {
                   );
                   const bundlesToRender =
                     dbBundles.length > 0
-                      ? dbBundles.map((p) => {
-                        const activePriceStr = getActivePriceForCard(p, user);
+                      ? dbBundles.map((p: any) => {
+                          const activePriceStr = getActivePriceForCard(p, user);
                         const activePriceNum = parsePrice(activePriceStr);
 
-                        const originalPriceVal = p.rawOriginalPrice && p.rawOriginalPrice > activePriceNum
+                        const originalPriceVal = p.rawOriginalPrice !== null && p.rawOriginalPrice > activePriceNum
                           ? formatRp(p.rawOriginalPrice)
                           : p.rawPrice > activePriceNum
                             ? formatRp(p.rawPrice)
@@ -1815,7 +1815,7 @@ function Index() {
                             {bundlesToRender.map((bundle: any, bIdx: number) => (
                             <div
                               key={bIdx}
-                              className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[260px] md:w-[290px] shrink-0"
+                              className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[200px] md:w-[230px] shrink-0"
                             >
                               {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
                               <div className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden group">

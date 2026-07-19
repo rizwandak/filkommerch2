@@ -306,6 +306,7 @@ function PreOrderPage() {
         variants: product.variants || [],
         category_name: product.category_name,
         category_slug: product.category_slug,
+        bundle_components: product.bundle_components || [],
       };
     });
   }, [dbProducts, user]);
@@ -645,6 +646,39 @@ function PreOrderPage() {
                               {p.name}
                             </h3>
                           </Link>
+
+                          {/* Included Components Grid */}
+                          <div className="mt-2 space-y-1">
+                            <div className="text-[8.5px] font-black text-ink uppercase tracking-widest flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse" />
+                              PAKET BUNDLE:
+                            </div>
+
+                            {p.bundle_components && p.bundle_components.length > 0 ? (
+                              <div className="grid grid-cols-1 gap-1">
+                                {p.bundle_components.map((comp: any, compIdx: number) => (
+                                  <div
+                                    key={comp.id || compIdx}
+                                    className="flex items-center gap-1.5 p-1 bg-secondary/60 border border-ink/15 rounded-md shadow-2xs"
+                                  >
+                                    <img
+                                      src={resolveImageUrl(comp.image_url || comp.img || pTshirt)}
+                                      alt={comp.name}
+                                      className="w-6 h-6 object-cover rounded border border-ink/20 shrink-0"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = pTshirt;
+                                      }}
+                                    />
+                                    <div className="min-w-0 flex-1 leading-tight">
+                                      <p className="font-extrabold text-ink text-[9px] uppercase truncate">
+                                        {comp.name}
+                                      </p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
 
                           <div className="mt-auto pt-2 border-t border-ink/10 flex items-center justify-between">
                             <div>

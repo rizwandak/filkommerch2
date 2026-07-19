@@ -261,6 +261,47 @@ function ProductDetailPage() {
       basePrice = Number(product.filkom_price);
     }
 
+    if (product.product_type === "bundle") {
+      let bundleAddon = 0;
+      if (product.bundle_components) {
+        for (const comp of product.bundle_components) {
+          if (!comp.variants || comp.variants.length === 0) continue;
+          
+          const hasLunas = comp.variants.some((v: any) => v.color?.toUpperCase() === "LUNAS");
+          let refVariant = null;
+          if (hasLunas) {
+            refVariant = comp.variants.find((v: any) => v.color?.toUpperCase() === "LUNAS" && v.size?.toUpperCase() === "S")
+              || comp.variants.find((v: any) => v.color?.toUpperCase() === "LUNAS");
+          } else {
+            refVariant = comp.variants.find((v: any) => v.size?.toUpperCase() === "S")
+              || comp.variants[0];
+          }
+
+          let refAddon = 0;
+          if (refVariant) {
+            if (isUb && refVariant.filkom_price && Number(refVariant.filkom_price) > 0) {
+              refAddon = Number(refVariant.filkom_price);
+            } else if (refVariant.price_override && Number(refVariant.price_override) > 0) {
+              refAddon = Number(refVariant.price_override);
+            }
+          }
+
+          const selectedVar = selectedBundleVariants[comp.id];
+          let selectedAddon = 0;
+          if (selectedVar) {
+            if (isUb && selectedVar.filkom_price && Number(selectedVar.filkom_price) > 0) {
+              selectedAddon = Number(selectedVar.filkom_price);
+            } else if (selectedVar.price_override && Number(selectedVar.price_override) > 0) {
+              selectedAddon = Number(selectedVar.price_override);
+            }
+          }
+
+          bundleAddon += (selectedAddon - refAddon);
+        }
+      }
+      return basePrice + bundleAddon;
+    }
+
     // 2. Add variant add-on if a variant is matched
     let addon = 0;
     if (selectedSize || selectedColor) {
@@ -280,7 +321,7 @@ function ProductDetailPage() {
     }
 
     return basePrice + addon;
-  }, [product, user, selectedSize, selectedColor]);
+  }, [product, user, selectedSize, selectedColor, selectedBundleVariants]);
 
   // Dynamic original price (for strike-through display)
   const originalPrice = useMemo(() => {
@@ -297,7 +338,55 @@ function ProductDetailPage() {
       }
     }
 
-    if (baseOriginalPrice === null) return null;
+    if (baseOriginalPrice === null && product.product_type !== "bundle") return null;
+
+    const isUb = user?.is_filkom_verified === 1;
+
+    if (product.product_type === "bundle") {
+      let bundleAddon = 0;
+      if (product.bundle_components) {
+        for (const comp of product.bundle_components) {
+          if (!comp.variants || comp.variants.length === 0) continue;
+          
+          const hasLunas = comp.variants.some((v: any) => v.color?.toUpperCase() === "LUNAS");
+          let refVariant = null;
+          if (hasLunas) {
+            refVariant = comp.variants.find((v: any) => v.color?.toUpperCase() === "LUNAS" && v.size?.toUpperCase() === "S")
+              || comp.variants.find((v: any) => v.color?.toUpperCase() === "LUNAS");
+          } else {
+            refVariant = comp.variants.find((v: any) => v.size?.toUpperCase() === "S")
+              || comp.variants[0];
+          }
+
+          let refAddon = 0;
+          if (refVariant) {
+            if (isUb && refVariant.filkom_price && Number(refVariant.filkom_price) > 0) {
+              refAddon = Number(refVariant.filkom_price);
+            } else if (refVariant.price_override && Number(refVariant.price_override) > 0) {
+              refAddon = Number(refVariant.price_override);
+            }
+          }
+
+          const selectedVar = selectedBundleVariants[comp.id];
+          let selectedAddon = 0;
+          if (selectedVar) {
+            if (isUb && selectedVar.filkom_price && Number(selectedVar.filkom_price) > 0) {
+              selectedAddon = Number(selectedVar.filkom_price);
+            } else if (selectedVar.price_override && Number(selectedVar.price_override) > 0) {
+              selectedAddon = Number(selectedVar.price_override);
+            }
+          }
+
+          bundleAddon += (selectedAddon - refAddon);
+        }
+      }
+      
+      const finalOriginal = baseOriginalPrice !== null ? baseOriginalPrice : Number(product.price);
+      if (currentPrice < (finalOriginal + bundleAddon)) {
+        return finalOriginal + bundleAddon;
+      }
+      return null;
+    }
 
     // 2. Add variant add-on if a variant is matched
     let addon = 0;
@@ -318,7 +407,7 @@ function ProductDetailPage() {
     }
 
     return baseOriginalPrice + addon;
-  }, [product, currentPrice, selectedSize, selectedColor]);
+  }, [product, user, selectedSize, selectedColor, currentPrice, selectedBundleVariants]);
 
   if (error || !product) {
     return (
@@ -403,13 +492,24 @@ function ProductDetailPage() {
   }, [activeImage, images]);
 
   const handleAddToCart = (buyNow = false) => {
-    if (!selectedSize && sizes.length > 0) {
-      toast.error("Pilih ukuran terlebih dahulu!");
-      return;
-    }
-    if (!selectedColor && colors.length > 0) {
-      toast.error("Pilih warna terlebih dahulu!");
-      return;
+    if (product.product_type !== "bundle") {
+      if (!selectedSize && sizes.length > 0) {
+        toast.error("Pilih ukuran terlebih dahulu!");
+        return;
+      }
+      if (!selectedColor && colors.length > 0) {
+        toast.error("Pilih warna terlebih dahulu!");
+        return;
+      }
+    } else {
+      if (product.bundle_components) {
+        for (const comp of product.bundle_components) {
+          if (!selectedBundleVariants[comp.id]) {
+            toast.error(`Pilih variasi untuk komponen: ${comp.name}`);
+            return;
+          }
+        }
+      }
     }
     if (currentStock <= 0) {
       toast.error("Stok untuk variasi ini habis!");

@@ -55,6 +55,15 @@ export const createOrderSchema = z.object({
           .max(100, "quantity maksimal 100 per item"),
         name: z.string().optional(),
         product_name: z.string().optional(),
+        bundle_selections: z
+          .array(
+            z.object({
+              product_id: z.number().int().positive(),
+              variant_id: z.number().int().positive(),
+              quantity: z.number().int().positive().optional().default(1),
+            })
+          )
+          .optional(),
       })
     )
     .min(1, "Minimal 1 item dalam pesanan"),
