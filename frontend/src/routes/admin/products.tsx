@@ -731,10 +731,10 @@ function AdminProductsPage() {
       toast.error("Akses ditolak: Kasir tidak diizinkan menghapus produk.");
       return;
     }
-    if (!window.confirm("Nonaktifkan produk ini?")) return;
+    if (!window.confirm("Hapus produk ini secara permanen dari database?")) return;
     const result = await deleteProduct({ data: id });
     if (result.success) {
-      toast.success("Produk dinonaktifkan");
+      toast.success("Produk berhasil dihapus secara permanen");
       await loadProducts();
     } else {
       toast.error(result.error || "Gagal menghapus produk");

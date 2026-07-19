@@ -1507,13 +1507,28 @@ export const updateProduct = async (req: Request, res: Response) => {
 
 // Delete/deactivate product
 export const deleteProduct = async (req: Request, res: Response) => {
+  const connection = await getConnection();
   try {
     const { id } = req.params;
     const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
     const userName = req.header("x-user-name") || null;
     const userRole = req.header("x-user-role") || null;
 
-    await execute("UPDATE products SET is_active = FALSE WHERE id = ?", [id]);
+    await connection.beginTransaction();
+
+    // 1. Delete bundle item associations where this product is either the bundle itself or a component
+    await connection.execute("DELETE FROM bundle_items WHERE bundle_product_id = ? OR component_product_id = ?", [id, id]);
+
+    // 2. Delete product images
+    await connection.execute("DELETE FROM product_images WHERE product_id = ?", [id]);
+
+    // 3. Delete product variants
+    await connection.execute("DELETE FROM product_variants WHERE product_id = ?", [id]);
+
+    // 4. Delete the product itself
+    await connection.execute("DELETE FROM products WHERE id = ?", [id]);
+
+    await connection.commit();
 
     await logActivity(
       userId,
@@ -1522,16 +1537,28 @@ export const deleteProduct = async (req: Request, res: Response) => {
       "delete_product",
       "product",
       id,
-      `Produk ID ${id} dinonaktifkan oleh ${userName || 'Sistem'}`
+      `Produk ID ${id} dihapus permanen dari database oleh ${userName || 'Sistem'}`
     );
 
     return res.json({ success: true });
   } catch (error: any) {
+    await connection.rollback();
     console.error("Error deleting product:", error);
+
+    // Check for foreign key constraints violation (ordered/referenced product)
+    if (error.code === 'ER_ROW_IS_REFERENCED' || error.code === 'ER_ROW_IS_REFERENCED_2' || (error.message && error.message.includes('foreign key constraint fails'))) {
+      return res.status(400).json({
+        success: false,
+        error: "Produk tidak bisa dihapus permanen karena sudah memiliki riwayat order/transaksi. Silakan nonaktifkan (sembunyikan) produk saja.",
+      });
+    }
+
     return res.status(500).json({
       success: false,
       error: error.message || "Failed to delete product",
     });
+  } finally {
+    connection.release();
   }
 };
 
