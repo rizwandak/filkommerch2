@@ -24,6 +24,7 @@ import { Route as PosIndexRouteImport } from './routes/pos/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as ApiDbTestRouteImport } from './routes/api/db-test'
+import { Route as AdminVouchersRouteImport } from './routes/admin/vouchers'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminTransactionsRouteImport } from './routes/admin/transactions'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
@@ -109,6 +110,11 @@ const ApiDbTestRoute = ApiDbTestRouteImport.update({
   path: '/api/db-test',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminVouchersRoute = AdminVouchersRouteImport.update({
+  id: '/vouchers',
+  path: '/vouchers',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/vouchers': typeof AdminVouchersRoute
   '/api/db-test': typeof ApiDbTestRoute
   '/product/$slug': typeof ProductSlugRoute
   '/admin/': typeof AdminIndexRoute
@@ -200,6 +207,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/vouchers': typeof AdminVouchersRoute
   '/api/db-test': typeof ApiDbTestRoute
   '/product/$slug': typeof ProductSlugRoute
   '/admin': typeof AdminIndexRoute
@@ -227,6 +235,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/vouchers': typeof AdminVouchersRoute
   '/api/db-test': typeof ApiDbTestRoute
   '/product/$slug': typeof ProductSlugRoute
   '/admin/': typeof AdminIndexRoute
@@ -255,6 +264,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/transactions'
     | '/admin/users'
+    | '/admin/vouchers'
     | '/api/db-test'
     | '/product/$slug'
     | '/admin/'
@@ -279,6 +289,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/transactions'
     | '/admin/users'
+    | '/admin/vouchers'
     | '/api/db-test'
     | '/product/$slug'
     | '/admin'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/transactions'
     | '/admin/users'
+    | '/admin/vouchers'
     | '/api/db-test'
     | '/product/$slug'
     | '/admin/'
@@ -434,6 +446,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDbTestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/vouchers': {
+      id: '/admin/vouchers'
+      path: '/vouchers'
+      fullPath: '/admin/vouchers'
+      preLoaderRoute: typeof AdminVouchersRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
@@ -510,6 +529,7 @@ interface AdminRouteRouteChildren {
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminTransactionsRoute: typeof AdminTransactionsRoute
   AdminUsersRoute: typeof AdminUsersRoute
+  AdminVouchersRoute: typeof AdminVouchersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -523,6 +543,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminSettingsRoute: AdminSettingsRoute,
   AdminTransactionsRoute: AdminTransactionsRoute,
   AdminUsersRoute: AdminUsersRoute,
+  AdminVouchersRoute: AdminVouchersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
 

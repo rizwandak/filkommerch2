@@ -1530,3 +1530,104 @@ export const createPelunasanOrderServerAction = createServerFn({ method: "POST" 
     }
   });
 
+// ============ VOUCHER SERVER ACTIONS ============
+
+export interface Voucher {
+  id: number;
+  code: string;
+  discount_amount: number;
+  min_purchase: number;
+  stock: number;
+  start_date: string;
+  end_date: string;
+  is_active: number;
+  discount_type: "fixed" | "percentage";
+  max_discount: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Fetch All Vouchers
+export const getVouchersServerAction = createServerFn({ method: "GET" })
+  .handler(async () => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vouchers`);
+      if (!res.ok) return { success: false, data: [] };
+      return await res.json();
+    } catch (e) {
+      console.warn("getVouchersServerAction error:", e);
+      return { success: false, data: [] };
+    }
+  });
+
+// Create Voucher
+export const createVoucherServerAction = createServerFn({ method: "POST" })
+  .validator((data: Omit<Voucher, "id">) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vouchers`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("createVoucherServerAction error:", e);
+      return { success: false, error: e.message || "Failed to create voucher" };
+    }
+  });
+
+// Update Voucher
+export const updateVoucherServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number } & Partial<Voucher>) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vouchers/${data.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("updateVoucherServerAction error:", e);
+      return { success: false, error: e.message || "Failed to update voucher" };
+    }
+  });
+
+// Delete Voucher
+export const deleteVoucherServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vouchers/${data.id}`, {
+        method: "DELETE",
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("deleteVoucherServerAction error:", e);
+      return { success: false, error: e.message || "Failed to delete voucher" };
+    }
+  });
+
+// Validate Voucher
+export const validateVoucherServerAction = createServerFn({ method: "POST" })
+  .validator((data: { code: string; subtotal: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/vouchers/validate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("validateVoucherServerAction error:", e);
+      return { success: false, error: e.message || "Failed to validate voucher" };
+    }
+  });
+

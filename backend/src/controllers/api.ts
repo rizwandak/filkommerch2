@@ -787,10 +787,59 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       }
     }
 
+    // Validate voucher if provided
+    let verifiedDiscountAmount = 0;
+    let verifiedVoucherCode = null;
+
+    if (details.voucherCode) {
+      const normalizedCode = String(details.voucherCode).trim().toUpperCase();
+      const [vRows] = await connection.execute(
+        "SELECT * FROM vouchers WHERE code = ? FOR UPDATE",
+        [normalizedCode]
+      );
+      const voucher = (vRows as any[])[0];
+
+      if (!voucher) {
+        throw new Error("Kode voucher tidak ditemukan atau tidak valid");
+      }
+      if (voucher.is_active !== 1) {
+        throw new Error("Voucher ini sedang tidak aktif");
+      }
+      const now = new Date();
+      const start = new Date(voucher.start_date);
+      const end = new Date(voucher.end_date);
+      if (now < start || now > end) {
+        throw new Error("Voucher berada di luar periode masa berlaku");
+      }
+      if (voucher.stock <= 0) {
+        throw new Error("Stok voucher ini telah habis");
+      }
+      if (calculatedSubtotal < voucher.min_purchase) {
+        throw new Error(`Minimal pembelian untuk menggunakan voucher ini adalah Rp ${voucher.min_purchase.toLocaleString("id-ID")}`);
+      }
+
+      if (voucher.discount_type === "percentage") {
+        let calcDiscount = Math.round((calculatedSubtotal * voucher.discount_amount) / 100);
+        if (voucher.max_discount !== null && voucher.max_discount > 0) {
+          calcDiscount = Math.min(calcDiscount, voucher.max_discount);
+        }
+        verifiedDiscountAmount = Math.min(calcDiscount, calculatedSubtotal);
+      } else {
+        verifiedDiscountAmount = Math.min(voucher.discount_amount, calculatedSubtotal);
+      }
+      verifiedVoucherCode = voucher.code;
+
+      // Decrement stock
+      await connection.execute(
+        "UPDATE vouchers SET stock = stock - 1 WHERE id = ?",
+        [voucher.id]
+      );
+    }
+
     const shippingCost = Number(details.shippingCost) || 0;
     const serviceFee = Number(details.serviceFee) || 0;
     const taxAmount = Number(details.taxAmount) || 0;
-    const discountAmount = Number(details.discountAmount) || 0;
+    const discountAmount = verifiedVoucherCode ? verifiedDiscountAmount : (Number(details.discountAmount) || 0);
     const grossAmount = calculatedSubtotal - discountAmount + shippingCost + serviceFee + taxAmount;
 
     // 1. Insert order to database
@@ -799,8 +848,8 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         order_id, channel, fulfillment_type, fulfillment_status, user_id, customer_name,
         customer_nim, customer_email, customer_phone, shipping_address, subtotal,
         discount_amount, service_fee, shipping_cost, tax_amount, gross_amount,
-        payment_status, order_status, notes, transaction_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        payment_status, order_status, notes, transaction_status, voucher_code
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         details.orderId,
         details.channel || "online",
@@ -821,7 +870,8 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         "unpaid",
         "pending_payment",
         details.notes || null,
-        "pending"
+        "pending",
+        verifiedVoucherCode
       ]
     );
 
@@ -3232,6 +3282,168 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error creating pelunasan order:", error);
     return res.status(500).json({ success: false, error: error.message || "Failed to create pelunasan order" });
+  }
+};
+
+// ============ VOUCHER CRUD CONTROLLERS ============
+
+export const getAllVouchers = async (req: Request, res: Response) => {
+  try {
+    const vouchers = await query("SELECT * FROM vouchers ORDER BY id DESC");
+    return res.json({ success: true, data: vouchers || [] });
+  } catch (error: any) {
+    console.error("Error fetching vouchers:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const createVoucher = async (req: Request, res: Response) => {
+  try {
+    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount } = req.body;
+    if (!code || discount_amount === undefined || !start_date || !end_date) {
+      return res.status(400).json({ success: false, error: "Kode, nominal diskon, tanggal mulai, dan tanggal selesai wajib diisi" });
+    }
+
+    const normalizedCode = String(code).trim().toUpperCase();
+
+    // Check if code already exists
+    const existing = await queryOne<any>("SELECT id FROM vouchers WHERE code = ?", [normalizedCode]);
+    if (existing) {
+      return res.status(400).json({ success: false, error: "Kode voucher sudah digunakan" });
+    }
+
+    const result = await execute(
+      `INSERT INTO vouchers (code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        normalizedCode,
+        Number(discount_amount) || 0,
+        Number(min_purchase) || 0,
+        Number(stock) || 0,
+        start_date,
+        end_date,
+        is_active !== undefined ? (is_active ? 1 : 0) : 1,
+        discount_type || "fixed",
+        max_discount !== undefined && max_discount !== null ? Number(max_discount) : null
+      ]
+    );
+
+    return res.json({ success: true, id: (result as any).insertId, message: "Voucher berhasil dibuat" });
+  } catch (error: any) {
+    console.error("Error creating voucher:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const updateVoucher = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount } = req.body;
+
+    if (!code || discount_amount === undefined || !start_date || !end_date) {
+      return res.status(400).json({ success: false, error: "Kode, nominal diskon, tanggal mulai, dan tanggal selesai wajib diisi" });
+    }
+
+    const normalizedCode = String(code).trim().toUpperCase();
+
+    // Check if code already exists in other rows
+    const existing = await queryOne<any>("SELECT id FROM vouchers WHERE code = ? AND id != ?", [normalizedCode, id]);
+    if (existing) {
+      return res.status(400).json({ success: false, error: "Kode voucher sudah digunakan oleh voucher lain" });
+    }
+
+    await execute(
+      `UPDATE vouchers 
+       SET code = ?, discount_amount = ?, min_purchase = ?, stock = ?, start_date = ?, end_date = ?, is_active = ?, discount_type = ?, max_discount = ?
+       WHERE id = ?`,
+      [
+        normalizedCode,
+        Number(discount_amount) || 0,
+        Number(min_purchase) || 0,
+        Number(stock) || 0,
+        start_date,
+        end_date,
+        is_active !== undefined ? (is_active ? 1 : 0) : 1,
+        discount_type || "fixed",
+        max_discount !== undefined && max_discount !== null ? Number(max_discount) : null,
+        id
+      ]
+    );
+
+    return res.json({ success: true, message: "Voucher berhasil diperbarui" });
+  } catch (error: any) {
+    console.error("Error updating voucher:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const deleteVoucher = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await execute("DELETE FROM vouchers WHERE id = ?", [id]);
+    return res.json({ success: true, message: "Voucher berhasil dihapus" });
+  } catch (error: any) {
+    console.error("Error deleting voucher:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const validateVoucher = async (req: Request, res: Response) => {
+  try {
+    const { code, subtotal } = req.body;
+    if (!code) {
+      return res.status(400).json({ success: false, error: "Kode voucher wajib diisi" });
+    }
+
+    const normalizedCode = String(code).trim().toUpperCase();
+    const orderSubtotal = Number(subtotal) || 0;
+
+    const voucher = await queryOne<any>("SELECT * FROM vouchers WHERE code = ?", [normalizedCode]);
+    if (!voucher) {
+      return res.status(404).json({ success: false, error: "Kode voucher tidak valid atau tidak ditemukan" });
+    }
+
+    if (voucher.is_active !== 1) {
+      return res.status(400).json({ success: false, error: "Voucher ini sedang tidak aktif" });
+    }
+
+    const now = new Date();
+    const startDate = new Date(voucher.start_date);
+    const endDate = new Date(voucher.end_date);
+
+    if (now < startDate) {
+      return res.status(400).json({ success: false, error: "Voucher ini belum mulai berlaku" });
+    }
+
+    if (now > endDate) {
+      return res.status(400).json({ success: false, error: "Voucher ini sudah kadaluarsa" });
+    }
+
+    if (voucher.stock <= 0) {
+      return res.status(400).json({ success: false, error: "Stok voucher ini telah habis" });
+    }
+
+    if (orderSubtotal < voucher.min_purchase) {
+      return res.status(400).json({ 
+        success: false, 
+        error: `Minimal pembelian untuk menggunakan voucher ini adalah Rp ${voucher.min_purchase.toLocaleString("id-ID")}` 
+      });
+    }
+
+    return res.json({
+      success: true,
+      voucher: {
+        id: voucher.id,
+        code: voucher.code,
+        discount_amount: voucher.discount_amount,
+        min_purchase: voucher.min_purchase,
+        discount_type: voucher.discount_type,
+        max_discount: voucher.max_discount
+      }
+    });
+  } catch (error: any) {
+    console.error("Error validating voucher:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 

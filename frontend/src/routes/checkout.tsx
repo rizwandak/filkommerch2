@@ -1,10 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ShoppingBag, ArrowLeft, Loader2, QrCode, Copy, Check, CreditCard, ChevronUp, ChevronDown, X } from "lucide-react";
+import { ShoppingBag, ArrowLeft, Loader2, QrCode, Copy, Check, CreditCard, ChevronUp, ChevronDown, X, Ticket } from "lucide-react";
 import { useState, useEffect } from "react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { createOrderAndPayment, getStoreSettings } from "@backend/server-actions";
+import { createOrderAndPayment, getStoreSettings, validateVoucherServerAction } from "@backend/server-actions";
 import { Button } from "@frontend/components/ui/button";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Input } from "@frontend/components/ui/input";
@@ -79,6 +79,70 @@ function CheckoutPage() {
   const [mayarCheckoutUrl, setMayarCheckoutUrl] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
+  const [appliedVoucher, setAppliedVoucher] = useState<{
+    id: number;
+    code: string;
+    discount_amount: number;
+    min_purchase: number;
+    discount_type: "fixed" | "percentage";
+    max_discount: number | null;
+  } | null>(null);
+  const [isValidatingVoucher, setIsValidatingVoucher] = useState(false);
+
+  const subtotalAmount = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const discountAmount = appliedVoucher ? (
+    appliedVoucher.discount_type === "percentage"
+      ? Math.min(
+          Math.round((subtotalAmount * appliedVoucher.discount_amount) / 100),
+          appliedVoucher.max_discount && appliedVoucher.max_discount > 0 ? appliedVoucher.max_discount : Infinity
+        )
+      : appliedVoucher.discount_amount
+  ) : 0;
+  const totalAmount = Math.max(0, subtotalAmount - discountAmount);
+
+  // If subtotal drops below minimum purchase due to cart items modifications, remove voucher
+  useEffect(() => {
+    if (appliedVoucher && subtotalAmount < appliedVoucher.min_purchase) {
+      setAppliedVoucher(null);
+      toast.warning("Voucher dihapus karena minimal pembelian tidak terpenuhi");
+    }
+  }, [subtotalAmount, appliedVoucher]);
+
+  const [voucherInput, setVoucherInput] = useState("");
+
+  const handleApplyVoucher = async () => {
+    if (!voucherInput.trim()) return;
+    setIsValidatingVoucher(true);
+    try {
+      const res = await validateVoucherServerAction({
+        data: {
+          code: voucherInput.trim().toUpperCase(),
+          subtotal: subtotalAmount,
+        },
+      });
+
+      if (res?.success && res.voucher) {
+        setAppliedVoucher(res.voucher);
+        toast.success(`Voucher ${res.voucher.code} berhasil digunakan!`);
+      } else {
+        toast.error(res?.error || "Gagal menggunakan voucher");
+        setAppliedVoucher(null);
+      }
+    } catch (e: any) {
+      console.error(e);
+      toast.error("Gagal memverifikasi voucher");
+      setAppliedVoucher(null);
+    } finally {
+      setIsValidatingVoucher(false);
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setAppliedVoucher(null);
+    setVoucherInput("");
+    toast.info("Voucher dihapus");
+  };
+
   const steps: CheckoutStep[] = [
     { step: 1, title: "Review Cart" },
     { step: 2, title: "Customer Details" },
@@ -136,7 +200,7 @@ function CheckoutPage() {
     );
   }
 
-  const totalAmount = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
 
   const formattedAddress = [
     streetAddress.trim(),
@@ -252,6 +316,8 @@ function CheckoutPage() {
       const transactionDetails = {
         orderId: newOrderId,
         grossAmount: totalAmount,
+        discountAmount: discountAmount,
+        voucherCode: appliedVoucher?.code || undefined,
         customerName: finalName,
         customerNim: finalNim || undefined,
         customerEmail: finalEmail,
@@ -348,8 +414,8 @@ function CheckoutPage() {
               <div key={s.step} className="flex items-center flex-1 min-w-0">
                 <div
                   className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs sm:text-sm font-bold shrink-0 ${currentStep >= s.step
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "bg-muted text-muted-foreground"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-muted text-muted-foreground"
                     }`}
                 >
                   {s.step}
@@ -502,6 +568,48 @@ function CheckoutPage() {
                     </div>
                   ))}
 
+                  {/* Voucher Input */}
+                  <div className="border-t-2 border-ink pt-4 pb-2">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-ink uppercase tracking-widest flex items-center gap-1">
+                        <Ticket className="w-3 h-3 text-brand-orange" /> Kode Voucher
+                      </label>
+                      <div className="flex gap-1.5">
+                        <Input
+                          placeholder="Masukkan kode"
+                          value={voucherInput}
+                          onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
+                          disabled={!!appliedVoucher}
+                          className="h-8 uppercase text-[10px] border-2 border-ink font-bold tracking-wider rounded-lg"
+                        />
+                        {appliedVoucher ? (
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            onClick={handleRemoveVoucher}
+                            className="h-8 text-[10px] font-bold px-2.5 shrink-0 rounded-lg cursor-pointer"
+                          >
+                            Hapus
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            onClick={handleApplyVoucher}
+                            disabled={!voucherInput.trim() || isValidatingVoucher}
+                            className="h-8 text-[10px] font-bold bg-ink text-white hover:bg-brand-orange px-3 shrink-0 rounded-lg cursor-pointer"
+                          >
+                            {isValidatingVoucher ? "..." : "Pakai"}
+                          </Button>
+                        )}
+                      </div>
+                      {appliedVoucher && (
+                        <p className="text-[10px] text-emerald-600 font-bold">
+                          ✓ Diskon {appliedVoucher.discount_type === "percentage" ? `${appliedVoucher.discount_amount}%` : `Rp ${appliedVoucher.discount_amount.toLocaleString("id-ID")}`} berhasil diterapkan
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
                   <div className="border-t-2 border-ink pt-4 space-y-2">
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground font-semibold">Metode Pengiriman:</span>
@@ -520,6 +628,21 @@ function CheckoutPage() {
                         <span className="font-bold">GRATIS</span>
                       </div>
                     )}
+
+                    {/* Subtotal + Discount breakdown */}
+                    {appliedVoucher && (
+                      <div className="space-y-1.5 pt-2">
+                        <div className="flex justify-between text-[11px]">
+                          <span className="text-muted-foreground">Subtotal:</span>
+                          <span className="font-bold text-ink">Rp {subtotalAmount.toLocaleString("id-ID")}</span>
+                        </div>
+                        <div className="flex justify-between text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                          <span className="flex items-center gap-1"><Ticket className="w-3 h-3" /> Voucher ({appliedVoucher.code}):</span>
+                          <span className="font-bold">- Rp {discountAmount.toLocaleString("id-ID")}</span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex justify-between font-semibold pt-4 border-t border-dashed border-ink/20">
                       <span className="text-xs uppercase font-extrabold text-ink">Total</span>
                       <div className="text-right">
@@ -537,7 +660,7 @@ function CheckoutPage() {
 
                   {currentStep === 3 && (
                     storeSettings?.payment_mode === "manual_qris" ? (
-                      <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-950 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] space-y-1.5">
+                      <div className="hidden rounded-lg bg-amber-50 p-3 text-xs text-amber-950 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] space-y-1.5">
                         <p className="font-extrabold uppercase text-[10px] text-amber-900">
                           📷 Pembayaran QRIS Statis (Manual)
                         </p>
@@ -545,6 +668,7 @@ function CheckoutPage() {
                           Scan kode QRIS statis dan upload foto bukti transfer. Pembayaran akan diverifikasi secara manual oleh admin toko.
                         </p>
                       </div>
+
                     ) : (
                       <div className="rounded-lg bg-[#FCFAF7] p-3 text-xs text-ink border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] space-y-1.5">
                         <p className="font-extrabold uppercase text-[10px] text-brand-orange">
@@ -696,6 +820,48 @@ function CheckoutPage() {
                 ))}
               </div>
 
+              {/* Voucher Input (Mobile) */}
+              <div className="border-t-2 border-ink pt-3 pb-1">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-ink uppercase tracking-widest flex items-center gap-1">
+                    <Ticket className="w-3 h-3 text-brand-orange" /> Kode Voucher
+                  </label>
+                  <div className="flex gap-1.5">
+                    <Input
+                      placeholder="Masukkan kode"
+                      value={voucherInput}
+                      onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
+                      disabled={!!appliedVoucher}
+                      className="h-8 uppercase text-[10px] border-2 border-ink font-bold tracking-wider rounded-lg"
+                    />
+                    {appliedVoucher ? (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        onClick={handleRemoveVoucher}
+                        className="h-8 text-[10px] font-bold px-2.5 shrink-0 rounded-lg cursor-pointer"
+                      >
+                        Hapus
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        onClick={handleApplyVoucher}
+                        disabled={!voucherInput.trim() || isValidatingVoucher}
+                        className="h-8 text-[10px] font-bold bg-ink text-white hover:bg-brand-orange px-3 shrink-0 rounded-lg cursor-pointer"
+                      >
+                        {isValidatingVoucher ? "..." : "Pakai"}
+                      </Button>
+                    )}
+                  </div>
+                  {appliedVoucher && (
+                    <p className="text-[10px] text-emerald-600 font-bold">
+                      ✓ Diskon {appliedVoucher.discount_type === "percentage" ? `${appliedVoucher.discount_amount}%` : `Rp ${appliedVoucher.discount_amount.toLocaleString("id-ID")}`} berhasil diterapkan
+                    </p>
+                  )}
+                </div>
+              </div>
+
               {/* Delivery & Total */}
               <div className="border-t-2 border-ink pt-3 space-y-2 text-xs">
                 <div className="flex justify-between">
@@ -704,6 +870,21 @@ function CheckoutPage() {
                     {fulfillmentType === "pickup" ? "Ambil di Kampus (Gratis)" : "Kurir (Ada Ongkir)"}
                   </span>
                 </div>
+
+                {/* Subtotal + Discount breakdown (Mobile) */}
+                {appliedVoucher && (
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-muted-foreground">Subtotal:</span>
+                      <span className="font-bold text-ink">Rp {subtotalAmount.toLocaleString("id-ID")}</span>
+                    </div>
+                    <div className="flex justify-between text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-200">
+                      <span className="flex items-center gap-1"><Ticket className="w-3 h-3" /> Voucher ({appliedVoucher.code}):</span>
+                      <span className="font-bold">- Rp {discountAmount.toLocaleString("id-ID")}</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex justify-between items-center font-extrabold text-sm pt-2 border-t border-dashed border-ink/20">
                   <span>Total Tagihan</span>
                   <span className="text-base text-brand-orange font-black">
@@ -1070,8 +1251,8 @@ function CustomerDetailsStep({
               type="button"
               onClick={() => onFulfillmentTypeChange("pickup")}
               className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${fulfillmentType === "pickup"
-                  ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
-                  : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
+                ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
+                : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
                 }`}
             >
               <span className="font-extrabold text-sm text-ink">Ambil di FILKOM Merch</span>
@@ -1085,8 +1266,8 @@ function CustomerDetailsStep({
               type="button"
               onClick={() => onFulfillmentTypeChange("shipping")}
               className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${fulfillmentType === "shipping"
-                  ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
-                  : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
+                ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
+                : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
                 }`}
             >
               <span className="font-extrabold text-sm text-ink">Diantar (Kurir)</span>

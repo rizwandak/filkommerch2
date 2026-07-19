@@ -336,6 +336,7 @@ app.get("/api/orders/:id", apiControllers.getOrderById);
 app.get("/api/orders/user/:userId", apiControllers.getUserOrders);
 app.post("/api/orders/:id/payment-proof", apiControllers.submitPaymentProof);
 app.post("/api/orders/:id/create-pelunasan", apiControllers.createPelunasanOrder);
+app.post("/api/vouchers/validate", apiControllers.validateVoucher);
 
 // Offline POS Sales API Routes
 app.post("/api/sales", (req, res, next) => { clearCache("/api/products"); next(); }, apiControllers.createSale);
@@ -353,6 +354,12 @@ app.put("/api/admin/orders/:id/status", checkRole(["admin", "cashier"]), apiCont
 app.put("/api/admin/orders/:id/verify-payment", checkRole(["admin", "cashier"]), apiControllers.verifyPaymentProof);
 app.delete("/api/admin/orders/:id", checkRole(["admin"]), apiControllers.deleteOrder);
 app.get("/api/admin/activity-logs", checkRole(["admin", "cashier"]), apiControllers.getActivityLogs);
+
+// Admin Voucher API Routes
+app.get("/api/admin/vouchers", checkRole(["admin", "cashier"]), apiControllers.getAllVouchers);
+app.post("/api/admin/vouchers", checkRole(["admin"]), apiControllers.createVoucher);
+app.put("/api/admin/vouchers/:id", checkRole(["admin"]), apiControllers.updateVoucher);
+app.delete("/api/admin/vouchers/:id", checkRole(["admin"]), apiControllers.deleteVoucher);
 
 // Admin User CRUD API Routes
 app.get("/api/admin/users", checkRole(["admin", "cashier"]), apiControllers.getAllUsersAdmin);

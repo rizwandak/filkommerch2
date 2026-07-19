@@ -118,6 +118,35 @@ export async function runMigration() {
       {
         name: "product_variants.image_url",
         sql: "ALTER TABLE product_variants ADD COLUMN image_url VARCHAR(255) DEFAULT NULL"
+      },
+      {
+        name: "vouchers",
+        sql: `CREATE TABLE IF NOT EXISTS vouchers (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          code VARCHAR(50) NOT NULL UNIQUE,
+          discount_amount INT NOT NULL,
+          min_purchase INT NOT NULL DEFAULT 0,
+          stock INT NOT NULL DEFAULT 0,
+          start_date DATETIME NOT NULL,
+          end_date DATETIME NOT NULL,
+          is_active TINYINT(1) DEFAULT 1,
+          discount_type VARCHAR(20) NOT NULL DEFAULT 'fixed',
+          max_discount INT DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )`
+      },
+      {
+        name: "orders.voucher_code",
+        sql: "ALTER TABLE orders ADD COLUMN voucher_code VARCHAR(50) DEFAULT NULL"
+      },
+      {
+        name: "vouchers.discount_type",
+        sql: "ALTER TABLE vouchers ADD COLUMN discount_type VARCHAR(20) NOT NULL DEFAULT 'fixed'"
+      },
+      {
+        name: "vouchers.max_discount",
+        sql: "ALTER TABLE vouchers ADD COLUMN max_discount INT DEFAULT NULL"
       }
     ];
 
