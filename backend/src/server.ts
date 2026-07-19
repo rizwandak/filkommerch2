@@ -360,6 +360,7 @@ app.get("/api/admin/vouchers", checkRole(["admin", "cashier"]), apiControllers.g
 app.post("/api/admin/vouchers", checkRole(["admin"]), apiControllers.createVoucher);
 app.put("/api/admin/vouchers/:id", checkRole(["admin"]), apiControllers.updateVoucher);
 app.delete("/api/admin/vouchers/:id", checkRole(["admin"]), apiControllers.deleteVoucher);
+app.get("/api/admin/vouchers/:id/history", checkRole(["admin", "cashier"]), apiControllers.getVoucherHistory);
 
 // Admin User CRUD API Routes
 app.get("/api/admin/users", checkRole(["admin", "cashier"]), apiControllers.getAllUsersAdmin);

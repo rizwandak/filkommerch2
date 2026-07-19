@@ -1544,6 +1544,9 @@ export interface Voucher {
   discount_type: "fixed" | "percentage";
   max_discount: number | null;
   target_nim_prefix: string | null;
+  usage_limit_per_user: number;
+  usage_count?: number;
+  total_discount_given?: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -1629,6 +1632,20 @@ export const validateVoucherServerAction = createServerFn({ method: "POST" })
     } catch (e: any) {
       console.warn("validateVoucherServerAction error:", e);
       return { success: false, error: e.message || "Failed to validate voucher" };
+    }
+  });
+
+// Fetch Voucher Usage History
+export const getVoucherHistoryServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vouchers/${data.id}/history`);
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getVoucherHistoryServerAction error:", e);
+      return { success: false, error: e.message || "Failed to fetch voucher history" };
     }
   });
 

@@ -10,12 +10,14 @@ import {
   CheckCircle2,
   AlertCircle,
   RefreshCw,
+  BarChart2,
 } from "lucide-react";
 import {
   getVouchersServerAction,
   createVoucherServerAction,
   updateVoucherServerAction,
   deleteVoucherServerAction,
+  getVoucherHistoryServerAction,
   type Voucher,
 } from "@backend/server-actions";
 
@@ -40,6 +42,13 @@ function AdminVouchersPage() {
   const [discountType, setDiscountType] = useState<"fixed" | "percentage">("fixed");
   const [maxDiscount, setMaxDiscount] = useState<number | null>(null);
   const [targetNimPrefix, setTargetNimPrefix] = useState("");
+  const [usageLimitPerUser, setUsageLimitPerUser] = useState(1);
+
+  // History states
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [historyVoucher, setHistoryVoucher] = useState<Voucher | null>(null);
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
   // Fetch vouchers
   const { data: vouchersRes, isLoading, refetch } = useQuery({
@@ -175,6 +184,7 @@ function AdminVouchersPage() {
     setDiscountType("fixed");
     setMaxDiscount(null);
     setTargetNimPrefix("");
+    setUsageLimitPerUser(1);
     setIsModalOpen(true);
   };
 
@@ -190,6 +200,7 @@ function AdminVouchersPage() {
     setDiscountType(v.discount_type || "fixed");
     setMaxDiscount(v.max_discount || null);
     setTargetNimPrefix(v.target_nim_prefix || "");
+    setUsageLimitPerUser(v.usage_limit_per_user !== undefined ? v.usage_limit_per_user : 1);
     setIsModalOpen(true);
   };
 
@@ -222,12 +233,32 @@ function AdminVouchersPage() {
       discount_type: discountType,
       max_discount: discountType === "percentage" && maxDiscount ? Number(maxDiscount) : null,
       target_nim_prefix: targetNimPrefix.trim() || null,
+      usage_limit_per_user: Number(usageLimitPerUser) || 1,
     };
 
     if (editingVoucher) {
       updateMutation.mutate({ id: editingVoucher.id, data: payload });
     } else {
       createMutation.mutate(payload);
+    }
+  };
+
+  const handleOpenHistory = async (v: Voucher) => {
+    setHistoryVoucher(v);
+    setIsHistoryLoading(true);
+    setIsHistoryOpen(true);
+    try {
+      const res = await getVoucherHistoryServerAction({ data: { id: v.id } });
+      if (res?.success) {
+        setHistoryData(res.data || []);
+      } else {
+        alert("Gagal memuat riwayat: " + (res?.error || "Unknown error"));
+      }
+    } catch (e: any) {
+      console.error(e);
+      alert("Gagal memuat riwayat penggunaan");
+    } finally {
+      setIsHistoryLoading(false);
     }
   };
 
@@ -291,6 +322,7 @@ function AdminVouchersPage() {
                   <th className="p-4">Kode Voucher</th>
                   <th className="p-4">Nominal Diskon</th>
                   <th className="p-4">Min. Pembelian</th>
+                  <th className="p-4">Pemakaian (Limit)</th>
                   <th className="p-4">Stok</th>
                   <th className="p-4">Periode Berlaku</th>
                   <th className="p-4">Status</th>
@@ -329,9 +361,22 @@ function AdminVouchersPage() {
                       ) : (
                         <span>Rp {v.discount_amount.toLocaleString("id-ID")}</span>
                       )}
+                      {v.total_discount_given && v.total_discount_given > 0 ? (
+                        <div className="text-[10px] text-emerald-600 font-extrabold mt-1 uppercase tracking-wide">
+                          Total Diskon: Rp {v.total_discount_given.toLocaleString("id-ID")}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="p-4 font-medium text-ink">
                       Rp {v.min_purchase.toLocaleString("id-ID")}
+                    </td>
+                    <td className="p-4 font-medium text-ink space-y-0.5">
+                      <div className="font-bold text-ink">
+                        {v.usage_count || 0}x dipakai
+                      </div>
+                      <div className="text-[9px] text-emerald-700 font-extrabold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded inline-block uppercase">
+                        Limit: {v.usage_limit_per_user || 1}x / user
+                      </div>
                     </td>
                     <td className="p-4 font-bold text-ink">
                       {v.stock}
@@ -342,7 +387,14 @@ function AdminVouchersPage() {
                     </td>
                     <td className="p-4">{getVoucherStatusBadge(v)}</td>
                     <td className="p-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenHistory(v)}
+                          className="p-1.5 rounded-lg border border-ink bg-amber-50 hover:bg-brand-orange hover:text-cream transition-all cursor-pointer"
+                          title="Riwayat Pemakaian"
+                        >
+                          <BarChart2 className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => openEditModal(v)}
                           className="p-1.5 rounded-lg border border-ink bg-cream hover:bg-brand-orange hover:text-cream transition-all cursor-pointer"
@@ -505,6 +557,21 @@ function AdminVouchersPage() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-bold text-ink uppercase mb-1 flex flex-col">
+                  <span>Batas Pemakaian per User *</span>
+                  <span className="text-[8px] font-medium text-muted-foreground font-sans leading-tight mt-0.5">(Berapa kali satu akun/user boleh memakai voucher ini)</span>
+                </label>
+                <input
+                  type="number"
+                  value={usageLimitPerUser}
+                  onChange={(e) => setUsageLimitPerUser(Number(e.target.value))}
+                  className="w-full px-3 py-2.5 border-2 border-ink rounded-xl text-xs font-medium focus:outline-none bg-cream/30"
+                  min="1"
+                  required
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-ink uppercase mb-1">
@@ -565,6 +632,96 @@ function AdminVouchersPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* History Usage Modal */}
+      {isHistoryOpen && historyVoucher && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/70 backdrop-blur-xs animate-fade-in">
+          <div className="bg-background border-4 border-ink rounded-2xl w-full max-w-2xl p-6 space-y-5 shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] relative">
+            <div className="flex justify-between items-center border-b-2 border-ink pb-3">
+              <h2 className="text-xl font-extrabold text-ink uppercase tracking-wide">
+                Riwayat Pemakaian: <span className="bg-cream border border-ink border-dashed px-2 py-0.5 rounded text-sm text-brand-orange">{historyVoucher.code}</span>
+              </h2>
+              <button
+                onClick={() => setIsHistoryOpen(false)}
+                className="text-xs font-bold text-ink hover:text-rose-600 uppercase transition-colors"
+              >
+                Tutup
+              </button>
+            </div>
+
+            {isHistoryLoading ? (
+              <div className="p-12 text-center text-muted-foreground text-xs font-bold animate-pulse">
+                Memuat riwayat pemakaian...
+              </div>
+            ) : historyData.length === 0 ? (
+              <div className="p-12 text-center text-muted-foreground space-y-3">
+                <Ticket className="w-10 h-10 text-brand-orange mx-auto opacity-50" />
+                <div className="text-sm font-bold text-ink uppercase">Belum Pernah Dipakai</div>
+                <p className="text-xs max-w-md mx-auto">
+                  Voucher ini belum pernah digunakan pada transaksi aktif pembeli.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-y-auto max-h-96 border-2 border-ink rounded-xl overflow-hidden">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-secondary/40 border-b-2 border-ink text-ink font-extrabold uppercase">
+                      <th className="p-3">Order ID</th>
+                      <th className="p-3">Pelanggan</th>
+                      <th className="p-3">Kontak</th>
+                      <th className="p-3">Potongan Diskon</th>
+                      <th className="p-3">Tanggal</th>
+                      <th className="p-3">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y border-ink/10">
+                    {historyData.map((usage) => (
+                      <tr key={usage.order_id} className="hover:bg-cream/40 transition-colors">
+                        <td className="p-3 font-bold text-ink">
+                          {usage.order_id}
+                        </td>
+                        <td className="p-3 font-bold text-ink text-sm">
+                          {usage.customer_name}
+                        </td>
+                        <td className="p-3 text-muted-foreground">
+                          <div>{usage.customer_email}</div>
+                          <div>{usage.customer_phone}</div>
+                        </td>
+                        <td className="p-3 font-bold text-brand-orange">
+                          Rp {usage.discount_amount.toLocaleString("id-ID")}
+                        </td>
+                        <td className="p-3 text-muted-foreground">
+                          {formatDateTime(usage.created_at)}
+                        </td>
+                        <td className="p-3">
+                          <span className={`inline-flex items-center text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
+                            usage.payment_status === "paid"
+                              ? "bg-emerald-100 text-emerald-800"
+                              : usage.payment_status === "pending"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-neutral-100 text-neutral-600"
+                          }`}>
+                            {usage.payment_status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-4 border-t-2 border-ink">
+              <button
+                onClick={() => setIsHistoryOpen(false)}
+                className="px-5 py-2 bg-brand-orange hover:bg-ink text-cream border-2 border-ink font-bold text-xs uppercase tracking-wider rounded-xl shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"
+              >
+                OK
+              </button>
+            </div>
           </div>
         </div>
       )}

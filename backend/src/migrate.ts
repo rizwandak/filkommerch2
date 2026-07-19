@@ -133,6 +133,7 @@ export async function runMigration() {
           discount_type VARCHAR(20) NOT NULL DEFAULT 'fixed',
           max_discount INT DEFAULT NULL,
           target_nim_prefix VARCHAR(10) DEFAULT NULL,
+          usage_limit_per_user INT NOT NULL DEFAULT 1,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         )`
@@ -152,6 +153,10 @@ export async function runMigration() {
       {
         name: "vouchers.target_nim_prefix",
         sql: "ALTER TABLE vouchers ADD COLUMN target_nim_prefix VARCHAR(10) DEFAULT NULL"
+      },
+      {
+        name: "vouchers.usage_limit_per_user",
+        sql: "ALTER TABLE vouchers ADD COLUMN usage_limit_per_user INT NOT NULL DEFAULT 1"
       }
     ];
 

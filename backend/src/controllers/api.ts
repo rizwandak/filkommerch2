@@ -840,6 +840,20 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         }
       }
 
+      if (voucher.usage_limit_per_user && voucher.usage_limit_per_user > 0) {
+        const orderUserId = details.userId;
+        if (orderUserId) {
+          const [usageRows] = await connection.execute(
+            "SELECT COUNT(*) AS count FROM orders WHERE user_id = ? AND voucher_code = ? AND order_status != 'cancelled'",
+            [orderUserId, voucher.code]
+          );
+          const usageCount = (usageRows as any[])[0]?.count || 0;
+          if (usageCount >= voucher.usage_limit_per_user) {
+            throw new Error(`Anda sudah melebihi batas penggunaan voucher ini (Maks ${voucher.usage_limit_per_user} kali)`);
+          }
+        }
+      }
+
       if (voucher.discount_type === "percentage") {
         let calcDiscount = Math.round((calculatedSubtotal * voucher.discount_amount) / 100);
         if (voucher.max_discount !== null && voucher.max_discount > 0) {
@@ -3311,7 +3325,15 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
 
 export const getAllVouchers = async (req: Request, res: Response) => {
   try {
-    const vouchers = await query("SELECT * FROM vouchers ORDER BY id DESC");
+    const vouchers = await query(
+      `SELECT v.*, 
+              COUNT(CASE WHEN o.order_status != 'cancelled' THEN o.id END) AS usage_count,
+              COALESCE(SUM(CASE WHEN o.order_status != 'cancelled' THEN o.discount_amount END), 0) AS total_discount_given
+       FROM vouchers v
+       LEFT JOIN orders o ON v.code COLLATE utf8mb4_general_ci = o.voucher_code COLLATE utf8mb4_general_ci
+       GROUP BY v.id
+       ORDER BY v.id DESC`
+    );
     return res.json({ success: true, data: vouchers || [] });
   } catch (error: any) {
     console.error("Error fetching vouchers:", error);
@@ -3321,7 +3343,7 @@ export const getAllVouchers = async (req: Request, res: Response) => {
 
 export const createVoucher = async (req: Request, res: Response) => {
   try {
-    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix } = req.body;
+    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix, usage_limit_per_user } = req.body;
     if (!code || discount_amount === undefined || !start_date || !end_date) {
       return res.status(400).json({ success: false, error: "Kode, nominal diskon, tanggal mulai, dan tanggal selesai wajib diisi" });
     }
@@ -3335,8 +3357,8 @@ export const createVoucher = async (req: Request, res: Response) => {
     }
 
     const result = await execute(
-      `INSERT INTO vouchers (code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO vouchers (code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix, usage_limit_per_user)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         normalizedCode,
         Number(discount_amount) || 0,
@@ -3347,7 +3369,8 @@ export const createVoucher = async (req: Request, res: Response) => {
         is_active !== undefined ? (is_active ? 1 : 0) : 1,
         discount_type || "fixed",
         max_discount !== undefined && max_discount !== null ? Number(max_discount) : null,
-        target_nim_prefix ? String(target_nim_prefix).trim() : null
+        target_nim_prefix ? String(target_nim_prefix).trim() : null,
+        usage_limit_per_user !== undefined ? Number(usage_limit_per_user) : 1
       ]
     );
 
@@ -3361,7 +3384,7 @@ export const createVoucher = async (req: Request, res: Response) => {
 export const updateVoucher = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix } = req.body;
+    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix, usage_limit_per_user } = req.body;
 
     if (!code || discount_amount === undefined || !start_date || !end_date) {
       return res.status(400).json({ success: false, error: "Kode, nominal diskon, tanggal mulai, dan tanggal selesai wajib diisi" });
@@ -3377,7 +3400,7 @@ export const updateVoucher = async (req: Request, res: Response) => {
 
     await execute(
       `UPDATE vouchers 
-       SET code = ?, discount_amount = ?, min_purchase = ?, stock = ?, start_date = ?, end_date = ?, is_active = ?, discount_type = ?, max_discount = ?, target_nim_prefix = ?
+       SET code = ?, discount_amount = ?, min_purchase = ?, stock = ?, start_date = ?, end_date = ?, is_active = ?, discount_type = ?, max_discount = ?, target_nim_prefix = ?, usage_limit_per_user = ?
        WHERE id = ?`,
       [
         normalizedCode,
@@ -3390,6 +3413,7 @@ export const updateVoucher = async (req: Request, res: Response) => {
         discount_type || "fixed",
         max_discount !== undefined && max_discount !== null ? Number(max_discount) : null,
         target_nim_prefix ? String(target_nim_prefix).trim() : null,
+        usage_limit_per_user !== undefined ? Number(usage_limit_per_user) : 1,
         id
       ]
     );
@@ -3475,6 +3499,24 @@ export const validateVoucher = async (req: Request, res: Response) => {
       }
     }
 
+    // Validate usage limit per user
+    if (voucher.usage_limit_per_user && voucher.usage_limit_per_user > 0) {
+      const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+      if (userId) {
+        const usageRow = await queryOne<any>(
+          "SELECT COUNT(*) AS count FROM orders WHERE user_id = ? AND voucher_code = ? AND order_status != 'cancelled'",
+          [userId, voucher.code]
+        );
+        const usageCount = usageRow?.count || 0;
+        if (usageCount >= voucher.usage_limit_per_user) {
+          return res.status(400).json({ 
+            success: false, 
+            error: `Anda sudah melebihi batas penggunaan voucher ini (Maks ${voucher.usage_limit_per_user} kali)` 
+          });
+        }
+      }
+    }
+
     return res.json({
       success: true,
       voucher: {
@@ -3484,11 +3526,36 @@ export const validateVoucher = async (req: Request, res: Response) => {
         min_purchase: voucher.min_purchase,
         discount_type: voucher.discount_type,
         max_discount: voucher.max_discount,
-        target_nim_prefix: voucher.target_nim_prefix
+        target_nim_prefix: voucher.target_nim_prefix,
+        usage_limit_per_user: voucher.usage_limit_per_user
       }
     });
   } catch (error: any) {
     console.error("Error validating voucher:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get voucher usage history
+export const getVoucherHistory = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const voucher = await queryOne<any>("SELECT code FROM vouchers WHERE id = ?", [id]);
+    if (!voucher) {
+      return res.status(404).json({ success: false, error: "Voucher tidak ditemukan" });
+    }
+
+    const usages = await query<any>(
+      `SELECT o.order_id, o.customer_name, o.customer_email, o.customer_phone, o.discount_amount, o.created_at, o.order_status, o.payment_status
+       FROM orders o
+       WHERE o.voucher_code = ?
+       ORDER BY o.created_at DESC`,
+      [voucher.code]
+    );
+
+    return res.json({ success: true, data: usages || [] });
+  } catch (error: any) {
+    console.error("Error fetching voucher history:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
