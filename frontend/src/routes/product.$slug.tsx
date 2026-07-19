@@ -833,7 +833,7 @@ function ProductDetailPage() {
                                   }));
                                 }
                               }}
-                              className={`w-9 h-8 flex items-center justify-center text-[11px] font-bold border-2 transition rounded-lg cursor-pointer ${
+                              className={`min-w-9 h-8 px-2 flex items-center justify-center text-[11px] font-bold border-2 transition rounded-lg cursor-pointer ${
                                 currentSize === size
                                   ? "bg-brand-orange text-ink border-ink scale-95"
                                   : "bg-white text-ink border-border hover:border-ink"
