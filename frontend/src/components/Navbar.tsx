@@ -423,7 +423,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                           <span className="inline-block mt-1 px-2 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-900 rounded">
                             {user.type === "admin" ? "ADMIN" : "BUYER"}
                           </span>
-                          {user && (
+                          {user && user.email?.endsWith("@ub.ac.id") && (
                             <div className="mt-1.5">
                               {user.is_filkom_verified === 1 ? (
                                 <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-800 rounded">
@@ -570,7 +570,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                             <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold bg-blue-100 text-blue-900 rounded uppercase">
                               {user.type === "admin" ? "ADMIN" : "BUYER"}
                             </span>
-                            {user.is_filkom_verified === 1 ? (
+                            {user.email?.endsWith("@ub.ac.id") && (user.is_filkom_verified === 1 ? (
                               <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold bg-emerald-100 text-emerald-800 rounded uppercase">
                                 ✓ VERIFIED
                               </span>
@@ -584,7 +584,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                               >
                                 Verifikasi NIM
                               </button>
-                            )}
+                            ))}
                           </div>
                         </div>
 

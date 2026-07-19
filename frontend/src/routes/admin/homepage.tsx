@@ -80,6 +80,7 @@ const getElementTemplate = (type: SegmentType): any => {
         image: "",
         showCountdown: false,
         countdownEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19),
+        showVerifyBtn: false,
       };
     case "marquee":
       return { text: "" };
@@ -1097,6 +1098,19 @@ function AdminHomepageEditorPage() {
                                         </div>
                                       </div>
                                     )}
+
+                                    <div className="flex items-center gap-2 pt-2 border-t border-ink/10">
+                                      <input
+                                        type="checkbox"
+                                        id={`showVerifyBtn-${el.id}`}
+                                        checked={el.config.showVerifyBtn || false}
+                                        onChange={(e) => updateElementConfig(activeSegment.id, el.id, { showVerifyBtn: e.target.checked })}
+                                        className="w-4 h-4 rounded border-ink text-brand-orange focus:ring-brand-orange cursor-pointer"
+                                      />
+                                      <Label htmlFor={`showVerifyBtn-${el.id}`} className="cursor-pointer font-bold text-xs">
+                                        Tampilkan Tombol Verifikasi / Login
+                                      </Label>
+                                    </div>
 
                                     <div className="space-y-3 pt-2 border-t border-ink/10">
                                       <Label className="font-bold text-xs uppercase tracking-wider text-brand-orange">

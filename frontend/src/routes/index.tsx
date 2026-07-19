@@ -1045,6 +1045,30 @@ function Index() {
                                 {el.config.lookbookBtnText || "LOOKBOOK"}
                               </button>
                             )}
+                            {el.config.showVerifyBtn && (() => {
+                              if (!user) {
+                                return (
+                                  <button
+                                    onClick={() => navigate({ to: "/login" })}
+                                    className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] bg-cream text-ink border-2 border-ink hover:bg-brand-orange hover:text-cream hover:border-brand-orange transition-all duration-300 shadow-[3px_3px_0px_0px_rgba(27,27,27,0.15)] active:translate-y-0.5 cursor-pointer uppercase"
+                                  >
+                                    <ShieldCheck className="w-4 h-4" /> YUK LOGIN DULU
+                                  </button>
+                                );
+                              }
+                              const isUbEmail = user.email?.endsWith("@ub.ac.id");
+                              if (isUbEmail && user.is_filkom_verified !== 1) {
+                                return (
+                                  <button
+                                    onClick={() => window.dispatchEvent(new Event("open-verification"))}
+                                    className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] bg-cream text-ink border-2 border-ink hover:bg-brand-orange hover:text-cream hover:border-brand-orange transition-all duration-300 shadow-[3px_3px_0px_0px_rgba(27,27,27,0.15)] active:translate-y-0.5 cursor-pointer uppercase animate-pulse"
+                                  >
+                                    <ShieldCheck className="w-4 h-4" /> VERIFIKASI NIM-MU!
+                                  </button>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         </div>
 

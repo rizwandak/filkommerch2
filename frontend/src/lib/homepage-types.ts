@@ -42,6 +42,7 @@ export interface HeroBannerConfig {
   showLookbookBtn?: boolean;
   lookbookBtnText?: string;
   lookbookBtnLink?: string;
+  showVerifyBtn?: boolean;
 }
 
 export interface MarqueeConfig {
@@ -354,7 +355,8 @@ export function getDefaultSegments(): HomepageSegment[] {
             countdownLabel: "PRE-ORDER BATCH BERAKHIR DALAM:",
             showLookbookBtn: true,
             lookbookBtnText: "LOOKBOOK",
-            lookbookBtnLink: "#shop"
+            lookbookBtnLink: "#shop",
+            showVerifyBtn: true
           }
         }
       ]
