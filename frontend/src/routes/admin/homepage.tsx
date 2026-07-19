@@ -68,113 +68,87 @@ export const Route = createFileRoute("/admin/homepage")({
   head: () => ({ meta: [{ title: "Tata Letak — Admin Panel" }] }),
 });
 
-// Element templates generator
 const getElementTemplate = (type: SegmentType): any => {
   switch (type) {
     case "hero_banner":
       return {
-        title: "Wear\nYour\nFaculty.",
-        subtitle: "Koleksi merchandise resmi mahasiswa FILKOM UB. Dibuat premium dan limited stock.",
-        subLabel: "FILKOM MERCH 2026",
-        btnText: "SHOP THE DROP",
+        title: "",
+        subtitle: "",
+        subLabel: "",
+        btnText: "",
         btnLink: "",
         image: "",
         showCountdown: false,
         countdownEnd: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19),
       };
     case "marquee":
-      return { text: "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN" };
+      return { text: "" };
     case "countdown":
       return {
-        title: "Pre-Order Varsity Selesai Dalam:",
-        subtitle: "Pastikan Anda memesan sebelum waktu berakhir agar tidak kehabisan.",
+        title: "",
+        subtitle: "",
         targetDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19),
         style: "full",
       };
     case "product_grid":
       return {
-        title: "Koleksi Terbaru",
-        subtitle: "NEW ARRIVAL",
+        title: "",
+        subtitle: "",
         source: "all",
         slugs: "",
         maxItems: 3,
       };
     case "category_showcase":
-      return { title: "Pick your fit" };
+      return { title: "" };
     case "image_banner":
       return {
         image: "",
-        alt: "Banner promo",
+        alt: "",
         link: "/#shop",
         height: "md",
       };
     case "text_block":
       return {
-        title: "Cerita Kami",
-        subtitle: "MADE IN MALANG",
-        body: "Didesain dengan sepenuh hati oleh mahasiswa Fakultas Ilmu Komputer Universitas Brawijaya.",
+        title: "",
+        subtitle: "",
+        body: "",
         alignment: "center",
       };
     case "value_props":
       return {
-        items: [
-          { title: "Desain Orisinal", description: "Dirancang eksklusif oleh mahasiswa FILKOM." },
-          { title: "Kualitas Premium", description: "Bahan katun fleece tebal dan jahitan kuat." },
-        ],
+        items: [],
       };
     case "faq":
       return {
-        items: [
-          { id: `faq-${Date.now()}`, q: "Apakah ini official?", a: "Ya, bekerjasama langsung dengan BEM FILKOM UB." },
-        ],
+        items: [],
       };
     case "limited_drop":
       return {
-        title: "Varsity FILKOM Edition",
-        subtitle: "Varsity premium dengan bordir komputer timbul super tebal.",
-        productSlug: "varsity-filkom",
+        title: "",
+        subtitle: "",
+        productSlug: "",
         image: "",
         countdownEnd: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 19),
         stockMax: 100,
-        stockCurrent: 80,
+        stockCurrent: 0,
       };
     case "bundle_recommendation":
       return {
-        title: "Exclusive Bundles",
-        subtitle: "SPECIAL SAVINGS PACKS",
-        items: [
-          {
-            name: "Freshman Starter Pack",
-            price: "Rp 120.000",
-            originalPrice: "Rp 145.000",
-            image: "",
-            description: "Paket lengkap maba untuk tampil keren di kampus baru.",
-            itemsList: "Kaos Premium, Totebag Canvas, Sticker Pack",
-            link: "/products"
-          }
-        ]
+        title: "",
+        subtitle: "",
+        items: [],
       };
     case "gallery":
       return {
-        title: "Campus Lookbook",
-        subtitle: "@FILKOMMERCH",
-        items: [
-          { id: `gal-${Date.now()}-1`, image: "", caption: "Varsity jacket di gazebo" },
-          { id: `gal-${Date.now()}-2`, image: "", caption: "Ngoding pake hoodie premium" }
-        ]
+        title: "",
+        subtitle: "",
+        items: [],
       };
     case "testimonial":
       return {
-        title: "Campus Voices",
-        subtitle: "TESTIMONIALS",
-        items: [
-          {
-            id: `test-${Date.now()}-1`,
-            name: "Rizwan Dak",
-            role: "Informatika 2024",
-            content: "Varsity-nya tebal banget, bordirannya rapi pol. Nyaman buat dipake kuliah."
-          }
-        ]
+        title: "",
+        subtitle: "",
+        items: [],
       };
   }
 };
