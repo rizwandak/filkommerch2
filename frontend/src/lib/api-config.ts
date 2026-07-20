@@ -11,13 +11,11 @@
 export type BackendTargetMode = "AUTO" | "LOCAL" | "LIVE";
 
 export const BACKEND_TARGET: BackendTargetMode = "AUTO";
+// export const BACKEND_TARGET: BackendTargetMode = "LOCAL";
 
 export const LOCAL_BACKEND_URL = "http://127.0.0.1:8080";
 export const LIVE_BACKEND_URL = "https://filkommerch.com";
 
-/**
- * Resolves the primary base API URL based on BACKEND_TARGET setting and current runtime environment.
- */
 export const getApiBaseUrl = (): string => {
   const mode = BACKEND_TARGET as string;
 

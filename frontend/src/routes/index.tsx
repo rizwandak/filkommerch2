@@ -1796,167 +1796,234 @@ function Index() {
                       }));
 
                   return (
-                    <section key={el.id} className="bg-cream py-10 sm:py-16 border-b-2 border-ink animate-slide-up">
-                      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
-                        <div className="text-center mb-8">
-                          {el.config.subtitle && (
-                            <div className="text-[10px] sm:text-xs tracking-[0.3em] text-brand-orange font-bold mb-1.5 uppercase">
-                              {el.config.subtitle}
-                            </div>
-                          )}
-                          <h2 className="display text-2xl sm:text-4xl lg:text-5xl text-ink font-bold uppercase">
-                            {el.config.title || "Exclusive Bundles"}
-                          </h2>
-                        </div>
-                        {!canSeeProducts ? (
-                          <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
-                        ) : (
-                          <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
-                            {bundlesToRender.map((bundle: any, bIdx: number) => (
-                            <div
-                              key={bIdx}
-                              className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[200px] md:w-[230px] shrink-0"
-                            >
-                              {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
-                              <div className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden group">
-                                <img
-                                  src={resolveImageUrl(bundle.img || pTote)}
-                                  alt={bundle.name}
-                                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                />
-                                {bundle.saveText && (
-                                  <div className="absolute top-2 left-2 bg-brand-orange text-ink font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
-                                    🔥 {bundle.saveText}
-                                  </div>
-                                )}
+                    <div key={el.id}>
+                      <section className="bg-cream py-10 sm:py-16 border-b-2 border-ink animate-slide-up">
+                        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
+                          <div className="text-center mb-8">
+                            {el.config.subtitle && (
+                              <div className="text-[10px] sm:text-xs tracking-[0.3em] text-brand-orange font-bold mb-1.5 uppercase">
+                                {el.config.subtitle}
                               </div>
+                            )}
+                            <h2 className="display text-2xl sm:text-4xl lg:text-5xl text-ink font-bold uppercase">
+                              {el.config.title || "Exclusive Bundles"}
+                            </h2>
+                          </div>
+                          {!canSeeProducts ? (
+                            <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
+                          ) : (
+                            <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
+                              {bundlesToRender.map((bundle: any, bIdx: number) => (
+                              <div
+                                key={bIdx}
+                                className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[200px] md:w-[230px] shrink-0"
+                              >
+                                {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
+                                <div className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden group">
+                                  <img
+                                    src={resolveImageUrl(bundle.img || pTote)}
+                                    alt={bundle.name}
+                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                  />
+                                  {bundle.saveText && (
+                                    <div className="absolute top-2 left-2 bg-brand-orange text-ink font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
+                                      🔥 {bundle.saveText}
+                                    </div>
+                                  )}
+                                </div>
 
-                                {/* Details Content Body Below Image */}
-                              <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
-                                <div>
-                                  {/* Header: Title Only */}
-                                  <div className="pb-1.5 border-b border-border">
-                                    <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight">
-                                      {bundle.name}
-                                    </h3>
-                                  </div>
-
-                                  {/* Included Components Grid */}
-                                  <div className="mt-2 space-y-1">
-                                    <div className="text-[8.5px] font-black text-ink uppercase tracking-widest flex items-center gap-1">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse" />
-                                      PAKET BUNDLE:
+                                  {/* Details Content Body Below Image */}
+                                <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                                  <div>
+                                    {/* Header: Title Only */}
+                                    <div className="pb-1.5 border-b border-border">
+                                      <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight">
+                                        {bundle.name}
+                                      </h3>
                                     </div>
 
-                                    {bundle.bundleComponents && bundle.bundleComponents.length > 0 ? (
-                                      <div className="grid grid-cols-1 gap-1">
-                                        {bundle.bundleComponents.map((comp: any, compIdx: number) => (
-                                          <div
-                                            key={comp.id || compIdx}
-                                            className="flex items-center gap-1.5 p-1 bg-secondary/60 border border-ink/15 rounded-md shadow-2xs"
-                                          >
-                                            <img
-                                              src={resolveImageUrl(comp.image_url || comp.img || pTee2)}
-                                              alt={comp.name}
-                                              className="w-6 h-6 object-cover rounded border border-ink/20 shrink-0"
-                                            />
-                                            <div className="min-w-0 flex-1 leading-tight">
-                                              <p className="font-extrabold text-ink text-[9px] uppercase truncate">
-                                                {comp.name}
-                                              </p>
-                                            </div>
-                                          </div>
-                                        ))}
+                                    {/* Included Components Grid */}
+                                    <div className="mt-2 space-y-1">
+                                      <div className="text-[8.5px] font-black text-ink uppercase tracking-widest flex items-center gap-1">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse" />
+                                        PAKET BUNDLE:
                                       </div>
-                                    ) : bundle.itemsList ? (
-                                      <div className="grid grid-cols-1 gap-1">
-                                        {bundle.itemsList.split(",").map((it: string, itIdx: number) => {
-                                          const trimmedName = it.trim();
-                                          const matchProd = products.find(
-                                            (p) => p.name.toLowerCase().includes(trimmedName.toLowerCase())
-                                          );
-                                          const compImg = matchProd?.img || (itIdx % 2 === 0 ? pTshirt : pHoodie);
 
-                                          return (
+                                      {bundle.bundleComponents && bundle.bundleComponents.length > 0 ? (
+                                        <div className="grid grid-cols-1 gap-1">
+                                          {bundle.bundleComponents.map((comp: any, compIdx: number) => (
                                             <div
-                                              key={itIdx}
+                                              key={comp.id || compIdx}
                                               className="flex items-center gap-1.5 p-1 bg-secondary/60 border border-ink/15 rounded-md shadow-2xs"
                                             >
                                               <img
-                                                src={resolveImageUrl(compImg)}
-                                                alt={trimmedName}
+                                                src={resolveImageUrl(comp.image_url || comp.img || pTee2)}
+                                                alt={comp.name}
                                                 className="w-6 h-6 object-cover rounded border border-ink/20 shrink-0"
                                               />
                                               <div className="min-w-0 flex-1 leading-tight">
                                                 <p className="font-extrabold text-ink text-[9px] uppercase truncate">
-                                                  {trimmedName}
+                                                  {comp.name}
                                                 </p>
                                               </div>
                                             </div>
-                                          );
-                                        })}
-                                      </div>
-                                    ) : null}
-                                  </div>
+                                          ))}
+                                        </div>
+                                      ) : bundle.itemsList ? (
+                                        <div className="grid grid-cols-1 gap-1">
+                                          {bundle.itemsList.split(",").map((it: string, itIdx: number) => {
+                                            const trimmedName = it.trim();
+                                            const matchProd = products.find(
+                                              (p) => p.name.toLowerCase().includes(trimmedName.toLowerCase())
+                                            );
+                                            const compImg = matchProd?.img || (itIdx % 2 === 0 ? pTshirt : pHoodie);
 
-                                  {/* Price Below Bundle List */}
-                                  <div className="mt-2.5 pt-2 border-t border-border flex items-baseline justify-between">
-                                    {bundle.originalPrice && (
-                                      <span className="text-[10px] font-extrabold text-red-500 line-through leading-none">
-                                        {bundle.originalPrice}
+                                            return (
+                                              <div
+                                                key={itIdx}
+                                                className="flex items-center gap-1.5 p-1 bg-secondary/60 border border-ink/15 rounded-md shadow-2xs"
+                                              >
+                                                <img
+                                                  src={resolveImageUrl(compImg)}
+                                                  alt={trimmedName}
+                                                  className="w-6 h-6 object-cover rounded border border-ink/20 shrink-0"
+                                                />
+                                                <div className="min-w-0 flex-1 leading-tight">
+                                                  <p className="font-extrabold text-ink text-[9px] uppercase truncate">
+                                                    {trimmedName}
+                                                  </p>
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : null}
+                                    </div>
+
+                                    {/* Price Below Bundle List */}
+                                    <div className="mt-2.5 pt-2 border-t border-border flex items-baseline justify-between">
+                                      {bundle.originalPrice && (
+                                        <span className="text-[10px] font-extrabold text-red-500 line-through leading-none">
+                                          {bundle.originalPrice}
+                                        </span>
+                                      )}
+                                      <span className="text-base sm:text-lg font-black text-brand-orange leading-tight ml-auto">
+                                        {bundle.price}
                                       </span>
-                                    )}
-                                    <span className="text-base sm:text-lg font-black text-brand-orange leading-tight ml-auto">
-                                      {bundle.price}
-                                    </span>
+                                    </div>
                                   </div>
-                                </div>
 
-                                {/* Dual Icon Action Buttons - Below Components, Full Width Split 50/50 */}
-                                <div className="pt-2 border-t border-border flex items-center gap-1.5 w-full">
-                                  <button
-                                    onClick={() => {
-                                      if (bundle.isReal && bundle.rawProduct) {
-                                        addToCart(bundle.rawProduct);
-                                      } else {
-                                        addToCart({
-                                          id: `bundle-${bIdx}`,
-                                          name: bundle.name,
-                                          price: bundle.price,
-                                          img: bundle.img,
-                                          cat: "BUNDLE",
-                                        });
-                                      }
-                                    }}
-                                    title="Masuk Bag"
-                                    className="flex-1 h-8 rounded-lg bg-ink hover:bg-brand-orange text-cream border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
-                                  >
-                                    <ShoppingBag className="w-4 h-4 text-brand-orange" />
-                                  </button>
-
-                                  <button
-                                    onClick={() => {
-                                      if (bundle.isReal && bundle.rawProduct) {
-                                        navigate({ to: "/product/$slug", params: { slug: bundle.rawProduct.id } });
-                                      } else if (bundle.link) {
-                                        navigate({ to: bundle.link });
-                                      } else {
-                                        scrollToId("shop");
-                                      }
-                                    }}
-                                    title="Pesan Sekarang"
-                                    className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
-                                  >
-                                    <ArrowRight className="w-4 h-4" />
-                                  </button>
+                                  {/* Action Button - Redirect to Product Detail */}
+                                  <div className="pt-2 border-t border-border w-full">
+                                    <button
+                                      onClick={() => {
+                                        if (bundle.isReal && bundle.rawProduct) {
+                                          navigate({ to: "/product/$slug", params: { slug: bundle.rawProduct.id } });
+                                        } else if (bundle.link) {
+                                          navigate({ to: bundle.link });
+                                        } else {
+                                          scrollToId("shop");
+                                        }
+                                      }}
+                                      title="Pesan Sekarang"
+                                      className="w-full h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center gap-1.5 text-xs font-black uppercase"
+                                    >
+                                      <span>Detail Produk</span>
+                                      <ArrowRight className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            ))}
+                          </div>
+                          )}
                         </div>
-                        )}
-                      </div>
-                    </section>
+                      </section>
+
+                      {/* All Products Section */}
+                      {(() => {
+                        const allOthers = products.filter((p) => {
+                          const catName = (p.category_name || "").toLowerCase();
+                          const catSlug = (p.category_slug || "").toLowerCase();
+                          const isHero = p.product_type !== "bundle" && (catName === "main hero" || catSlug === "main-hero");
+                          const isBundle = p.cat?.toUpperCase() === "BUNDLE" || p.product_type === "bundle";
+                          return !isHero && !isBundle;
+                        });
+
+                        if (allOthers.length === 0) return null;
+
+                        return (
+                          <section id="all-products-homepage" className="bg-cream py-10 sm:py-16 border-b-2 border-ink animate-slide-up scroll-mt-32 w-full">
+                            <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
+                              <div className="flex flex-col items-center text-center mb-8 gap-1">
+                                <div className="text-[10px] sm:text-xs tracking-[0.3em] text-brand-orange font-bold mb-1.5 uppercase">
+                                  03 — ALL PRODUCTS
+                                </div>
+                                <h2 className="display text-2xl sm:text-4xl lg:text-5xl text-ink font-bold uppercase">
+                                  SEMUA KATALOG PRODUK
+                                </h2>
+                              </div>
+
+                              <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
+                                {allOthers.map((p) => (
+                                  <div
+                                    key={p.id}
+                                    className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[200px] md:w-[230px] shrink-0"
+                                  >
+                                    <Link
+                                      to="/product/$slug"
+                                      params={{ slug: p.id }}
+                                      className="relative aspect-square overflow-hidden block border-b-2 border-ink bg-secondary"
+                                    >
+                                      <img
+                                        src={resolveImageUrl(p.img)}
+                                        alt={p.name}
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                      />
+                                      <span className="absolute top-2 left-2 bg-brand-orange text-ink font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
+                                        PO
+                                      </span>
+                                    </Link>
+
+                                    <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                                      <div>
+                                        <div className="pb-1.5 border-b border-border">
+                                          <div className="text-[9px] font-extrabold tracking-widest text-brand-orange uppercase mb-1">
+                                            {p.cat}
+                                          </div>
+                                          <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight">
+                                            {p.name}
+                                          </h3>
+                                        </div>
+                                      </div>
+
+                                      <div className="mt-auto pt-2 border-t border-ink/10 flex items-center justify-between">
+                                        <div>
+                                          <span className="text-xs font-black text-ink">{p.price}</span>
+                                          {p.was && (
+                                            <span className="block text-[9px] text-muted-foreground line-through font-bold">
+                                              {p.was}
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <button
+                                          onClick={() => addToCart(p)}
+                                          className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
+                                          title="Tambah ke bag"
+                                        >
+                                          <ShoppingBag className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </section>
+                        );
+                      })()}
+                    </div>
                   );
                 }
 

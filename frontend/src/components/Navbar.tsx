@@ -44,6 +44,11 @@ export interface CartItem {
   size?: string;
   color?: string;
   image_url?: string;
+  bundle_selections?: Array<{
+    product_id: number;
+    variant_id: number;
+    quantity: number;
+  }>;
 }
 
 function parsePrice(p: any): number {
@@ -235,6 +240,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
           : item.name.includes("Tee")
             ? "TEE"
             : "ACCESSORIES",
+      bundle_selections: item.bundle_selections,
     }));
 
     localStorage.setItem("cart", JSON.stringify(checkoutCart));

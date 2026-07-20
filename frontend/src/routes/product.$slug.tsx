@@ -880,7 +880,7 @@ function ProductDetailPage() {
                       </div>
 
                       {/* Colors */}
-                      {compColors.length > 0 && (
+                      {compColors.length > 1 && (
                         <div className="flex flex-wrap gap-1.5">
                           {compColors.map((color) => (
                             <button
@@ -913,7 +913,7 @@ function ProductDetailPage() {
                       )}
 
                       {/* Sizes */}
-                      {compSizes.length > 0 && (
+                      {compSizes.length > 1 && (
                         <div className="flex flex-wrap gap-1.5">
                           {compSizes.map((size) => (
                             <button
@@ -935,8 +935,8 @@ function ProductDetailPage() {
                               }}
                               className={`min-w-9 h-8 px-2 flex items-center justify-center text-[11px] font-bold border-2 transition rounded-lg cursor-pointer ${
                                 currentSize === size
-                                  ? "bg-brand-orange text-ink border-ink scale-95"
-                                  : "bg-white text-ink border-border hover:border-ink"
+                                    ? "bg-brand-orange text-ink border-ink scale-95"
+                                    : "bg-white text-ink border-border hover:border-ink"
                               }`}
                             >
                               {size}

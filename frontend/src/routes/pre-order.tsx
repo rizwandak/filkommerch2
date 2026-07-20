@@ -690,13 +690,14 @@ function PreOrderPage() {
                               )}
                             </div>
 
-                            <button
-                              onClick={() => addToCart(p)}
-                              className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
-                              title="Tambah ke bag"
+                            <Link
+                              to="/product/$slug"
+                              params={{ slug: p.id }}
+                              className="p-1.5 rounded bg-brand-orange text-ink hover:bg-cream transition-colors border border-ink cursor-pointer shadow-xs flex items-center justify-center"
+                              title="Lihat Detail"
                             >
-                              <ShoppingBag className="w-3 h-3" />
-                            </button>
+                              <ArrowRight className="w-3.5 h-3.5" />
+                            </Link>
                           </div>
                         </div>
                       </div>
