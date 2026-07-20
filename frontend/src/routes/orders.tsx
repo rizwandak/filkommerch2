@@ -183,11 +183,32 @@ function UserOrdersPage() {
 
   const isDpOrder = (order: any) => {
     if (!order.items || order.items.length === 0) return false;
+    if (order.notes && order.notes.includes("Pelunasan untuk Order:")) return false;
+
     return order.items.some((item: any) => {
       const colorStr = String(item.color || "").toUpperCase();
       const sizeStr = String(item.size || "").toUpperCase();
       const nameStr = String(item.product_name || "").toUpperCase();
-      return colorStr.includes("DP") || sizeStr.includes("DP") || nameStr.includes("DP");
+
+      const isExplicitLunas =
+        colorStr.includes("LUNAS") ||
+        sizeStr.includes("LUNAS") ||
+        colorStr.includes("FULL") ||
+        sizeStr.includes("FULL");
+
+      if (isExplicitLunas) {
+        return false;
+      }
+
+      if (colorStr.includes("DP") || sizeStr.includes("DP")) {
+        return true;
+      }
+
+      if (nameStr.includes("DP") && !nameStr.includes("LUNAS")) {
+        return true;
+      }
+
+      return false;
     });
   };
 

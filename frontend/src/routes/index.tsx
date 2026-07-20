@@ -176,6 +176,7 @@ type ProductCard = {
   variants?: any[];
   description?: string | null;
   category_id?: number | null;
+  category_name?: string | null;
   category_slug?: string | null;
   product_type?: string | null;
   bundle_components?: any[];

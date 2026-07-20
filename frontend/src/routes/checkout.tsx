@@ -177,8 +177,13 @@ function CheckoutPage() {
       return;
     }
 
+    const searchParams = new URLSearchParams(window.location.search);
+    const buyNowVal = (searchParams.get("buyNow") || "").replace(/"/g, "");
+    const isBuyNow = buyNowVal === "true";
+    const storageKey = isBuyNow ? "buyNowItem" : "cart";
+
     // Load cart from localStorage
-    const savedCart = localStorage.getItem("cart");
+    const savedCart = localStorage.getItem(storageKey);
     if (savedCart) {
       try {
         setCartItems(JSON.parse(savedCart));
@@ -215,17 +220,61 @@ function CheckoutPage() {
     .join(", ");
 
   const handleQuantityChange = (itemId: string, newQuantity: number) => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const buyNowVal = (searchParams.get("buyNow") || "").replace(/"/g, "");
+    const isBuyNow = buyNowVal === "true";
+    const storageKey = isBuyNow ? "buyNowItem" : "cart";
+
+    let updatedCart: CartItem[] = [];
     if (newQuantity <= 0) {
-      setCartItems(cartItems.filter((item) => item.id !== itemId));
+      updatedCart = cartItems.filter((item) => item.id !== itemId);
     } else {
-      setCartItems(
-        cartItems.map((item) => (item.id === itemId ? { ...item, quantity: newQuantity } : item)),
-      );
+      updatedCart = cartItems.map((item) => (item.id === itemId ? { ...item, quantity: newQuantity } : item));
+    }
+    setCartItems(updatedCart);
+    localStorage.setItem(storageKey, JSON.stringify(updatedCart));
+
+    if (!isBuyNow) {
+      try {
+        const indexSaved = localStorage.getItem("indexCart");
+        if (indexSaved) {
+          let indexCart = JSON.parse(indexSaved);
+          if (newQuantity <= 0) {
+            indexCart = indexCart.filter((i: any) => i.id !== itemId);
+          } else {
+            indexCart = indexCart.map((i: any) => i.id === itemId ? { ...i, qty: newQuantity } : i);
+          }
+          localStorage.setItem("indexCart", JSON.stringify(indexCart));
+          window.dispatchEvent(new Event("cart-updated"));
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
   const handleRemoveItem = (itemId: string) => {
-    setCartItems(cartItems.filter((item) => item.id !== itemId));
+    const searchParams = new URLSearchParams(window.location.search);
+    const buyNowVal = (searchParams.get("buyNow") || "").replace(/"/g, "");
+    const isBuyNow = buyNowVal === "true";
+    const storageKey = isBuyNow ? "buyNowItem" : "cart";
+
+    const updatedCart = cartItems.filter((item) => item.id !== itemId);
+    setCartItems(updatedCart);
+    localStorage.setItem(storageKey, JSON.stringify(updatedCart));
+
+    if (!isBuyNow) {
+      try {
+        const indexSaved = localStorage.getItem("indexCart");
+        if (indexSaved) {
+          const indexCart = JSON.parse(indexSaved).filter((i: any) => i.id !== itemId);
+          localStorage.setItem("indexCart", JSON.stringify(indexCart));
+          window.dispatchEvent(new Event("cart-updated"));
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
   };
 
   const validateStep = (): boolean => {
@@ -329,26 +378,57 @@ function CheckoutPage() {
         userId: buyerUserId,
       };
 
-      // Call server function untuk create order di database dan generate QRIS
-      const result = await createOrderAndPayment({ data: transactionDetails });
+      const isManualQris = storeSettings?.payment_mode === "manual_qris";
 
-      if (!result.success) {
-        throw new Error(result.error || "Failed to create payment");
-      }
+      if (isManualQris) {
+        // Save to localStorage as a pending order, don't create in database yet
+        localStorage.setItem(`pending_order_${newOrderId}`, JSON.stringify(transactionDetails));
 
-      // Clear cart dari localStorage
-      localStorage.removeItem("cart");
+        // Clear cart dari localStorage
+        const searchParams = new URLSearchParams(window.location.search);
+        const buyNowVal = (searchParams.get("buyNow") || "").replace(/"/g, "");
+        const isBuyNow = buyNowVal === "true";
 
-      if (result.checkoutUrl) {
-        // Mayar payment — show iframe modal
-        setMayarCheckoutUrl(result.checkoutUrl);
-        setShowPaymentModal(true);
-        setIsProcessing(false);
-      } else {
-        // Manual QRIS or any other mode — navigate to order confirmation page
-        // The order-confirmation page handles QRIS display, upload bukti, and admin review
-        toast.success("Pesanan berhasil dibuat! Silakan selesaikan pembayaran Anda.");
+        if (isBuyNow) {
+          localStorage.removeItem("buyNowItem");
+        } else {
+          localStorage.removeItem("cart");
+          localStorage.removeItem("indexCart");
+          window.dispatchEvent(new Event("cart-updated"));
+        }
+
+        toast.success("Pesanan berhasil disiapkan! Silakan lakukan pembayaran QRIS.");
         void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
+      } else {
+        // Call server function untuk create order di database dan generate QRIS
+        const result = await createOrderAndPayment({ data: transactionDetails });
+
+        if (!result.success) {
+          throw new Error(result.error || "Failed to create payment");
+        }
+
+        // Clear cart dari localStorage
+        const searchParams = new URLSearchParams(window.location.search);
+        const buyNowVal = (searchParams.get("buyNow") || "").replace(/"/g, "");
+        const isBuyNow = buyNowVal === "true";
+
+        if (isBuyNow) {
+          localStorage.removeItem("buyNowItem");
+        } else {
+          localStorage.removeItem("cart");
+          localStorage.removeItem("indexCart");
+          window.dispatchEvent(new Event("cart-updated"));
+        }
+
+        if (result.checkoutUrl) {
+          // Mayar payment — show iframe modal
+          setMayarCheckoutUrl(result.checkoutUrl);
+          setShowPaymentModal(true);
+          setIsProcessing(false);
+        } else {
+          toast.success("Pesanan berhasil dibuat!");
+          void navigate({ to: "/order-confirmation", search: { orderId: newOrderId } });
+        }
       }
     } catch (error) {
       console.error("Payment error:", error);

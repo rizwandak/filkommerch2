@@ -3490,7 +3490,7 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       }
 
       const sisa = Math.max(0, lunasUnitPrice - item.unit_price);
-      const finalSisa = sisa > 0 ? sisa : item.unit_price;
+      const finalSisa = sisa;
 
       const subtotal = finalSisa * item.quantity;
       calculatedSubtotal += subtotal;
@@ -3501,6 +3501,13 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
         subtotal,
         lunasVariantId: lunasVariant ? lunasVariant.id : item.variant_id,
         lunasColor: lunasVariant ? lunasVariant.color : lunasColor,
+      });
+    }
+
+    if (calculatedSubtotal <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Pesanan ini tidak memiliki sisa pembayaran pelunasan (sudah LUNAS)",
       });
     }
 

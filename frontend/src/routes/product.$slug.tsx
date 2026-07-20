@@ -406,7 +406,7 @@ function ProductDetailPage() {
       }
     }
 
-    return baseOriginalPrice + addon;
+    return (baseOriginalPrice !== null ? baseOriginalPrice : Number(product.price)) + addon;
   }, [product, user, selectedSize, selectedColor, currentPrice, selectedBundleVariants]);
 
   if (error || !product) {
@@ -567,28 +567,6 @@ function ProductDetailPage() {
       console.error(e);
     }
 
-    // Upsert indexCart (for homepage navbar bag)
-    const existingIndexIdx = indexCart.findIndex((i) => i.id === cartItemId);
-    const itemData = {
-      id: cartItemId,
-      name: cartItemName,
-      price: `Rp ${currentPrice.toLocaleString("id-ID")}`,
-      img: product.image_url || "",
-      qty: quantity,
-      product_id: product.id,
-      variant_id: currentVariant?.id || product.variants[0]?.id,
-      size: selectedSize || "One Size",
-      color: selectedColor || undefined,
-      bundle_selections: selectionsPayload.length > 0 ? selectionsPayload : undefined,
-    };
-
-    if (existingIndexIdx > -1) {
-      indexCart[existingIndexIdx].qty += quantity;
-    } else {
-      indexCart.push(itemData);
-    }
-    localStorage.setItem("indexCart", JSON.stringify(indexCart));
-
     // Format for checkout page cart structure
     const checkoutItem = {
       id: cartItemId,
@@ -605,35 +583,57 @@ function ProductDetailPage() {
       bundle_selections: selectionsPayload.length > 0 ? selectionsPayload : undefined,
     };
 
-    // Save to checkout cart (usually replaces or appends)
-    let checkoutCart: any[] = [];
-    try {
-      const saved = localStorage.getItem("cart");
-      if (saved) checkoutCart = JSON.parse(saved);
-    } catch (e) {
-      console.error(e);
-    }
-
-    const existingCheckIdx = checkoutCart.findIndex((i) => i.id === cartItemId);
-    if (existingCheckIdx > -1) {
-      checkoutCart[existingCheckIdx].quantity += quantity;
-    } else {
-      checkoutCart.push(checkoutItem);
-    }
-    localStorage.setItem("cart", JSON.stringify(checkoutCart));
-
-    // In handleAddToCart:
-    // Dispatch events to notify Navbar component
-    window.dispatchEvent(new Event("cart-updated"));
-
     if (buyNow) {
+      // For buy now: only store in buyNowItem, do NOT touch indexCart or cart
+      localStorage.setItem("buyNowItem", JSON.stringify([checkoutItem]));
       if (!user) {
         toast.info("Silakan login terlebih dahulu untuk checkout");
         navigate({ to: "/login" });
       } else {
-        navigate({ to: "/checkout" });
+        navigate({ to: "/checkout", search: { buyNow: "true" } });
       }
     } else {
+      // Upsert indexCart (for homepage navbar bag)
+      const existingIndexIdx = indexCart.findIndex((i) => i.id === cartItemId);
+      const itemData = {
+        id: cartItemId,
+        name: cartItemName,
+        price: `Rp ${currentPrice.toLocaleString("id-ID")}`,
+        img: product.image_url || "",
+        qty: quantity,
+        product_id: product.id,
+        variant_id: currentVariant?.id || product.variants[0]?.id,
+        size: selectedSize || "One Size",
+        color: selectedColor || undefined,
+        bundle_selections: selectionsPayload.length > 0 ? selectionsPayload : undefined,
+      };
+
+      if (existingIndexIdx > -1) {
+        indexCart[existingIndexIdx].qty += quantity;
+      } else {
+        indexCart.push(itemData);
+      }
+      localStorage.setItem("indexCart", JSON.stringify(indexCart));
+
+      // Save to checkout cart (usually replaces or appends)
+      let checkoutCart: any[] = [];
+      try {
+        const saved = localStorage.getItem("cart");
+        if (saved) checkoutCart = JSON.parse(saved);
+      } catch (e) {
+        console.error(e);
+      }
+
+      const existingCheckIdx = checkoutCart.findIndex((i) => i.id === cartItemId);
+      if (existingCheckIdx > -1) {
+        checkoutCart[existingCheckIdx].quantity += quantity;
+      } else {
+        checkoutCart.push(checkoutItem);
+      }
+      localStorage.setItem("cart", JSON.stringify(checkoutCart));
+
+      // Dispatch events to notify Navbar component
+      window.dispatchEvent(new Event("cart-updated"));
       window.dispatchEvent(new Event("open-cart"));
       toast.success("Berhasil ditambahkan ke Keranjang", {
         description: `${cartItemName} (${quantity} pcs)`,

@@ -19,7 +19,8 @@ import {
   getOrderById,
   regeneratePaymentToken,
   getStoreSettings,
-  submitPaymentProof
+  submitPaymentProof,
+  createOrderAndPayment
 } from "@backend/server-actions";
 import { toast } from "sonner";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -97,9 +98,13 @@ function OrderConfirmationPage() {
     try {
       setLoading(true);
       const [result, settingsRes] = await Promise.all([
-        getOrderById({ data: search.orderId }),
+        getOrderById({ data: search.orderId }).catch(() => ({ success: false, order: null, error: "" })),
         getStoreSettings(),
       ]);
+
+      if (settingsRes.settings) {
+        setStoreSettings(settingsRes.settings);
+      }
 
       if (result.success && result.order) {
         setOrder(result.order);
@@ -108,11 +113,44 @@ function OrderConfirmationPage() {
           setProofUrl(result.order.payment_proof_url);
         }
       } else {
-        toast.error(result.error || "Gagal mengambil data status pesanan");
-      }
-
-      if (settingsRes.settings) {
-        setStoreSettings(settingsRes.settings);
+        // Look for pending order in localStorage
+        const savedPending = localStorage.getItem(`pending_order_${search.orderId}`);
+        if (savedPending) {
+          try {
+            const pending = JSON.parse(savedPending);
+            setOrder({
+              order_id: pending.orderId,
+              customer_name: pending.customerName,
+              customer_email: pending.customerEmail,
+              customer_phone: pending.customerPhone,
+              customer_nim: pending.customerNim,
+              shipping_address: pending.shippingAddress,
+              fulfillment_type: pending.fulfillmentType,
+              payment_status: "unpaid",
+              order_status: "pending_payment",
+              payment_type: "manual_qris",
+              gross_amount: pending.grossAmount,
+              discount_amount: pending.discountAmount,
+              service_fee: 0,
+              shipping_cost: 0,
+              tax_amount: 0,
+              subtotal: pending.grossAmount,
+            });
+            setOrderItems(
+              (pending.items || []).map((item: any) => ({
+                ...item,
+                product_name: item.name || item.product_name,
+                unit_price: item.price,
+                subtotal: item.price * item.quantity,
+              }))
+            );
+          } catch (e) {
+            console.error("Error parsing pending order:", e);
+            toast.error("Gagal mengambil data status pesanan");
+          }
+        } else {
+          toast.error(result.error || "Gagal mengambil data status pesanan");
+        }
       }
     } catch (e) {
       console.error("Error fetching order confirmation details:", e);
@@ -164,6 +202,16 @@ function OrderConfirmationPage() {
 
     try {
       setSubmittingProof(true);
+
+      const savedPending = localStorage.getItem(`pending_order_${order.order_id}`);
+      if (savedPending) {
+        const pending = JSON.parse(savedPending);
+        const createRes = await createOrderAndPayment({ data: pending });
+        if (!createRes.success) {
+          throw new Error(createRes.error || "Gagal mendaftarkan transaksi ke server");
+        }
+      }
+
       const res = await submitPaymentProof({
         data: {
           orderId: order.order_id,
@@ -172,17 +220,20 @@ function OrderConfirmationPage() {
       });
 
       if (res.success) {
+        if (savedPending) {
+          localStorage.removeItem(`pending_order_${order.order_id}`);
+        }
         setProofUrl(proofUrlTemp);
         setProofUrlTemp("");
         setIsEditingProof(false);
-        toast.success("Bukti transfer berhasil diperbarui. Menunggu verifikasi admin.");
+        toast.success("Bukti transfer berhasil terkirim. Menunggu verifikasi admin.");
         void fetchOrderDetails();
       } else {
         toast.error(res.error || "Gagal mengirim bukti transfer");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      toast.error("Terjadi kesalahan mengirim bukti transfer");
+      toast.error(err.message || "Terjadi kesalahan mengirim bukti transfer");
     } finally {
       setSubmittingProof(false);
     }
