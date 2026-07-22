@@ -1169,85 +1169,24 @@ function AdminProductsPage() {
 
             {/* Conditional Parameters: Pre-Order */}
             {form.sale_type === "pre_order" && (
-              <div className="border-2 border-brand-orange bg-orange-50/40 p-4 rounded-xl space-y-3 shadow-xs">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-brand-orange flex items-center gap-1.5">
-                    🔥 HUBUNGKAN KE BATCH PRE-ORDER
-                  </h4>
-                  <span className="text-[10px] font-extrabold text-muted-foreground uppercase">
-                    Pilih Batch PO
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="font-extrabold text-xs uppercase text-ink">
-                    Pilih Batch Pre-Order *
-                  </Label>
-                  <Select
-                    value={form.pre_order_campaign_id ? String(form.pre_order_campaign_id) : (activePoCampaign ? String(activePoCampaign.id) : "")}
-                    onValueChange={(val) => {
-                      const batchId = val ? parseInt(val) : null;
-                      const selectedCampaign = allPoCampaigns.find((c) => c.id === batchId);
-                      setForm({
-                        ...form,
-                        pre_order_campaign_id: batchId,
-                        preorder_start_at: selectedCampaign?.start_date ? formatDateForInput(selectedCampaign.start_date) : form.preorder_start_at,
-                        preorder_end_at: selectedCampaign?.end_date ? formatDateForInput(selectedCampaign.end_date) : form.preorder_end_at,
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="border-2 border-brand-orange/60 font-extrabold text-ink bg-white">
-                      <SelectValue placeholder="-- Pilih Batch Pre-Order --" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allPoCampaigns.map((c) => (
-                        <SelectItem key={c.id} value={String(c.id)}>
-                          {c.batch_name} {c.is_active ? "(AKTIF)" : "(NONAKTIF)"}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Show details of selected batch */}
-                {(() => {
-                  const selectedId = form.pre_order_campaign_id || activePoCampaign?.id;
-                  const selectedCampaign = allPoCampaigns.find((c) => c.id === selectedId) || activePoCampaign;
-                  if (!selectedCampaign) {
-                    return (
-                      <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-3 text-xs text-amber-900 space-y-1">
-                        <p className="font-bold text-amber-950">⚠️ Belum Ada Batch PO Yang Dipilih</p>
-                        <p className="text-[11px]">
-                          Silakan buat atau pilih Batch Pre-Order terlebih dahulu di menu <strong>Pre-Order Batch</strong>.
-                        </p>
-                      </div>
-                    );
-                  }
-
-                  return (
-                    <div className="bg-white border-2 border-brand-orange/40 rounded-lg p-3 space-y-2 text-xs">
-                      <div className="flex items-center justify-between font-bold text-ink">
-                        <span className="text-sm font-extrabold text-brand-orange">{selectedCampaign.batch_name}</span>
-                        <span className={`px-2 py-0.5 text-[10px] rounded font-black ${selectedCampaign.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-200 text-neutral-700'}`}>
-                          {selectedCampaign.is_active ? 'AKTIF' : 'NONAKTIF'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-muted-foreground text-[11px] font-medium pt-1 border-t border-dashed">
-                        <div>
-                          <span className="font-bold text-ink block">Mulai PO:</span>
-                          {new Date(selectedCampaign.start_date).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
-                        </div>
-                        <div>
-                          <span className="font-bold text-ink block">Selesai PO:</span>
-                          {new Date(selectedCampaign.end_date).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-emerald-700 font-semibold pt-1">
-                        ✨ Produk ini akan secara otomatis terhubung ke Batch <strong>{selectedCampaign.batch_name}</strong> dan tercatat pada laporan analitik batch tersebut.
-                      </p>
+              <div className="border-2 border-brand-orange bg-orange-50/40 p-4 rounded-xl space-y-2 shadow-xs text-xs">
+                <h4 className="text-xs font-black uppercase tracking-wider text-brand-orange flex items-center gap-1.5">
+                  🔥 INFORMASI SKEMA PRE-ORDER
+                </h4>
+                <p className="text-[11px] text-ink font-medium leading-relaxed">
+                  Produk ini diset menggunakan skema <strong>Pre-Order</strong>. Seluruh transaksi pesanan untuk produk ber-skema Pre-Order pada rentang waktu Batch Pre-Order akan secara otomatis terakumulasi dalam <strong>Laporan Analitik Batch Pre-Order</strong>.
+                </p>
+                {activePoCampaign && (
+                  <div className="bg-white border border-brand-orange/40 rounded-lg p-2.5 mt-2 flex items-center justify-between text-[11px]">
+                    <div>
+                      <span className="font-bold text-ink">Batch Aktif Saat Ini: </span>
+                      <strong className="text-brand-orange font-extrabold">{activePoCampaign.batch_name}</strong>
                     </div>
-                  );
-                })()}
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded uppercase">
+                      BERJALAN
+                    </span>
+                  </div>
+                )}
               </div>
             )}
 

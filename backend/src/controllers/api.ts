@@ -2770,16 +2770,18 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: "Campaign Pre-Order tidak ditemukan" });
     }
 
-    // 1. Fetch connected products
+    // 1. Fetch connected products (all products with pre_order sale_type or product_type, or matched to this campaign)
     const connectedProducts = await query<any>(
       `SELECT p.*, c.name as category_name 
        FROM products p 
        LEFT JOIN categories c ON p.category_id = c.id 
-       WHERE p.pre_order_campaign_id = ?`,
+       WHERE p.sale_type = 'pre_order' OR p.product_type = 'preorder' OR p.pre_order_campaign_id = ?`,
       [id]
     );
 
-    // 2. Fetch all order items and orders linked to products of this campaign
+    const effectiveEndDate = campaign.extended_end_date || campaign.end_date;
+
+    // 2. Fetch all order items and orders for pre-order products within campaign date range
     const items = await query<any>(
       `SELECT 
         oi.*,
@@ -2805,9 +2807,10 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
        JOIN orders o ON oi.order_id = o.order_id
        JOIN products p ON oi.product_id = p.id
        LEFT JOIN users u ON o.user_id = u.id
-       WHERE p.pre_order_campaign_id = ? OR (p.sale_type = 'pre_order' AND o.created_at >= ? AND o.created_at <= ?)
+       WHERE (p.sale_type = 'pre_order' OR p.product_type = 'preorder' OR p.pre_order_campaign_id = ?)
+         AND (o.created_at >= ? AND o.created_at <= ?)
        ORDER BY o.created_at DESC`,
-      [id, campaign.start_date, campaign.end_date]
+      [id, campaign.start_date, effectiveEndDate]
     );
 
     // Group items by order_id
