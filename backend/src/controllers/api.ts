@@ -2781,7 +2781,23 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
 
     const effectiveEndDate = campaign.extended_end_date || campaign.end_date;
 
-    // 2. Fetch all order items and orders for pre-order products within campaign date range
+    const formatSqlDate = (d: any) => {
+      if (!d) return null;
+      try {
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return String(d);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+      } catch {
+        return String(d);
+      }
+    };
+
+    const startSql = formatSqlDate(campaign.start_date);
+    const endSql = formatSqlDate(effectiveEndDate);
+    const isCampaignActive = Boolean(campaign.is_active);
+
+    // 2. Fetch all order items and orders for pre-order products within campaign date range or active campaign
     const items = await query<any>(
       `SELECT 
         oi.*,
@@ -2794,21 +2810,22 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         o.order_status,
         o.payment_status,
         o.fulfillment_status,
-        o.payment_method,
+        o.payment_type as payment_method,
         o.payment_proof_url,
-        o.grand_total,
+        o.gross_amount as grand_total,
         p.name as connected_product_name,
         p.image_url as connected_product_image,
-        u.full_name as user_full_name,
+        u.name as user_full_name,
         u.email as user_email,
-        u.phone_number as user_phone,
-        u.student_id as user_nim
+        u.phone as user_phone,
+        u.nim as user_nim
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
        JOIN products p ON oi.product_id = p.id
        LEFT JOIN users u ON o.user_id = u.id
        WHERE (p.sale_type = 'pre_order' OR p.product_type = 'preorder' OR p.pre_order_campaign_id = ?)
-         AND (o.created_at >= ? AND o.created_at <= ?)
+         AND o.created_at >= ?
+         AND o.created_at <= ?
        ORDER BY o.created_at DESC`,
       [id, campaign.start_date, effectiveEndDate]
     );
@@ -2844,10 +2861,13 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
     const uniqueBuyersSet = new Set<string>();
 
     for (const item of items) {
-      const isPaidOrValid = item.payment_status === "paid" || item.payment_status === "settlement" || item.order_status === "completed" || item.order_status === "processing";
+      const isCancelled = item.order_status === "cancelled" || item.payment_status === "failed" || item.payment_status === "expired";
+      const isPaid = item.payment_status === "paid" || item.payment_status === "settlement" || item.order_status === "completed";
       
       const buyerId = item.customer_email || item.user_email || item.customer_phone || `order-${item.order_id}`;
-      uniqueBuyersSet.add(buyerId);
+      if (!isCancelled) {
+        uniqueBuyersSet.add(buyerId);
+      }
 
       if (!ordersMap[item.order_id]) {
         ordersMap[item.order_id] = {
@@ -2866,7 +2886,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           items: [],
         };
 
-        if (isPaidOrValid) {
+        if (isPaid) {
           totalRevenue += Number(item.grand_total || 0);
         }
       }
@@ -2896,12 +2916,12 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         };
       }
 
-      if (isPaidOrValid) {
+      if (!isCancelled) {
         totalUnitsSold += item.quantity;
         productSalesMap[pid].total_qty += item.quantity;
         productSalesMap[pid].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
 
-        const variantKey = [item.size, item.color].filter(Boolean).filter(x => x !== "-").join(" / ") || "Default";
+        const variantKey = [item.size, item.color].filter(Boolean).filter((x: string) => x !== "-").join(" / ") || "Default";
         productSalesMap[pid].variants[variantKey] = (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
       }
     }

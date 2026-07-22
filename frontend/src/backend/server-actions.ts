@@ -1511,7 +1511,7 @@ export const togglePreOrderCampaignActiveServerAction = createServerFn({ method:
   });
 
 // Fetch Pre-Order Campaign Stats & Reports
-export const getPreOrderCampaignStatsServerAction = createServerFn({ method: "GET" })
+export const getPreOrderCampaignStatsServerAction = createServerFn({ method: "POST" })
   .validator((data: { id: number }) => data)
   .handler(async ({ data }) => {
     try {
