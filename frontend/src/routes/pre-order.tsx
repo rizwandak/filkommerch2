@@ -259,7 +259,7 @@ function PreOrderPage() {
 
   // Format products lists
   const products = useMemo(() => {
-    const isUb = user?.is_filkom_verified === 1;
+    const isUb = Number(user?.is_filkom_verified) === 1;
     const list = dbProducts.length > 0 ? dbProducts : [];
     return list.map((product: ProductWithVariants) => {
       const productName = product.name.toLowerCase();

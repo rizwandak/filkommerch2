@@ -295,7 +295,7 @@ function formatRp(n: number) {
 
 // Determine active price based on user verification status (same logic as products.tsx)
 function getActivePriceForCard(p: ProductCard, user: any): string {
-  const isUb = user?.is_filkom_verified === 1;
+  const isUb = Number(user?.is_filkom_verified) === 1;
   if (p.promo_price && Number(p.promo_price) > 0) {
     return formatRp(Number(p.promo_price));
   }
@@ -1057,8 +1057,9 @@ function Index() {
                                   </button>
                                 );
                               }
-                              const isUbEmail = user.email?.endsWith("@ub.ac.id");
-                              if (isUbEmail && user.is_filkom_verified !== 1) {
+                              const isStudentUbEmail = user.email?.toLowerCase().endsWith("@student.ub.ac.id");
+                              const isVerified = Number(user.is_filkom_verified) === 1;
+                              if (isStudentUbEmail && !isVerified) {
                                 return (
                                   <button
                                     onClick={() => window.dispatchEvent(new Event("open-verification"))}
@@ -1222,7 +1223,7 @@ function Index() {
                                           <span className="text-base sm:text-lg font-black text-brand-orange tracking-tight block leading-none">
                                             {getActivePriceForCard(p, user)}
                                           </span>
-                                          {(p.was || (p.filkom_price && user?.is_filkom_verified === 1 && Number(p.filkom_price) < (p.rawPrice || 0))) && (
+                                          {(p.was || (p.filkom_price && Number(user?.is_filkom_verified) === 1 && Number(p.filkom_price) < (p.rawPrice || 0))) && (
                                             <span className="text-[10px] font-extrabold text-red-500 line-through block mt-0.5">
                                               {p.was || p.price}
                                             </span>
@@ -1345,7 +1346,7 @@ function Index() {
                                           <span className="text-base sm:text-lg font-black text-ink tracking-tight block leading-none">
                                             {getActivePriceForCard(p, user)}
                                           </span>
-                                          {(p.was || (p.filkom_price && user?.is_filkom_verified === 1 && Number(p.filkom_price) < (p.rawPrice || 0))) && (
+                                          {(p.was || (p.filkom_price && Number(user?.is_filkom_verified) === 1 && Number(p.filkom_price) < (p.rawPrice || 0))) && (
                                             <span className="text-[10px] font-extrabold text-red-500 line-through block mt-0.5">
                                               {p.was || p.price}
                                             </span>
@@ -2177,7 +2178,7 @@ function Index() {
 
                 <div className="flex items-baseline gap-2 mb-4">
                   <span className="text-xl font-extrabold text-ink">{getActivePriceForCard(quickViewProduct, user)}</span>
-                  {(quickViewProduct.was || (quickViewProduct.filkom_price && user?.is_filkom_verified === 1 && Number(quickViewProduct.filkom_price) < (quickViewProduct.rawPrice || 0))) && (
+                  {(quickViewProduct.was || (quickViewProduct.filkom_price && Number(user?.is_filkom_verified) === 1 && Number(quickViewProduct.filkom_price) < (quickViewProduct.rawPrice || 0))) && (
                     <span className="text-sm text-muted-foreground line-through font-bold">
                       {quickViewProduct.was || quickViewProduct.price}
                     </span>

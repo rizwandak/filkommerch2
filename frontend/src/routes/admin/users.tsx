@@ -407,7 +407,7 @@ function AdminUsersPage() {
                             <p className="font-semibold text-ink uppercase text-xs tracking-wide">
                               {user.name}
                             </p>
-                            {user.is_filkom_verified === 1 && (
+                            {Number(user.is_filkom_verified) === 1 && (
                               <span className="bg-green-100 text-green-800 text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider uppercase">
                                 VERIFIED
                               </span>

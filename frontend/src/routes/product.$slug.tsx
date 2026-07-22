@@ -251,7 +251,7 @@ function ProductDetailPage() {
   // Dynamic Price computation
   const currentPrice = useMemo(() => {
     if (!product) return 0;
-    const isUb = user?.is_filkom_verified === 1;
+    const isUb = Number(user?.is_filkom_verified) === 1;
 
     // 1. Determine base price (harga asli)
     let basePrice = Number(product.price);
@@ -340,7 +340,7 @@ function ProductDetailPage() {
 
     if (baseOriginalPrice === null && product.product_type !== "bundle") return null;
 
-    const isUb = user?.is_filkom_verified === 1;
+    const isUb = Number(user?.is_filkom_verified) === 1;
 
     if (product.product_type === "bundle") {
       let bundleAddon = 0;
@@ -814,7 +814,7 @@ function ProductDetailPage() {
                 )}
               </div>
 
-              {user?.is_filkom_verified === 1 ? (
+              {Number(user?.is_filkom_verified) === 1 ? (
                 <div className="text-xs font-bold text-brand-orange bg-brand-orange/10 border border-brand-orange/30 rounded-lg p-2.5 flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-brand-orange animate-pulse" />
                   🎉 Selamat kamu dapat harga khusus mahasiswa FILKOM!
@@ -822,20 +822,27 @@ function ProductDetailPage() {
               ) : product.filkom_price && Number(product.filkom_price) > 0 ? (
                 <div className="text-xs font-medium text-muted-foreground bg-slate-50 border border-slate-200 rounded-lg p-2">
                   {user ? (
-                    <span>
-                      💡{" "}
-                      <button
-                        onClick={() => window.dispatchEvent(new Event("open-verification"))}
-                        className="font-bold text-brand-orange hover:underline cursor-pointer"
-                      >
-                        Verifikasi NIM Anda
-                      </button>{" "}
-                      untuk klaim diskon Civitas Rp{" "}
-                      {Number(product.filkom_price).toLocaleString("id-ID")}
-                    </span>
+                    user.email?.toLowerCase().endsWith("@student.ub.ac.id") ? (
+                      <span>
+                        💡{" "}
+                        <button
+                          onClick={() => window.dispatchEvent(new Event("open-verification"))}
+                          className="font-bold text-brand-orange hover:underline cursor-pointer"
+                        >
+                          Verifikasi NIM Anda
+                        </button>{" "}
+                        untuk klaim diskon Civitas Rp{" "}
+                        {Number(product.filkom_price).toLocaleString("id-ID")}
+                      </span>
+                    ) : (
+                      <span>
+                        💡 Gunakan akun email <strong>@student.ub.ac.id</strong> &amp; verifikasi NIM untuk harga Civitas Rp{" "}
+                        {Number(product.filkom_price).toLocaleString("id-ID")}
+                      </span>
+                    )
                   ) : (
                     <span>
-                      💡 Login &amp; verifikasi NIM untuk harga Civitas Rp{" "}
+                      💡 Login dengan email @student.ub.ac.id &amp; verifikasi NIM untuk harga Civitas Rp{" "}
                       {Number(product.filkom_price).toLocaleString("id-ID")}
                     </span>
                   )}

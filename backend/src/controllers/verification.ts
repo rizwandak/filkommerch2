@@ -134,6 +134,14 @@ export const verifyFilkomUser = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: "User tidak ditemukan" });
     }
 
+    // 2. Validate that the user's email ends with @student.ub.ac.id
+    if (!dbUser.email || !dbUser.email.toLowerCase().endsWith("@student.ub.ac.id")) {
+      return res.status(400).json({
+        success: false,
+        error: "Akses ditolak: Verifikasi NIM hanya dapat dilakukan oleh akun dengan email berakhiran @student.ub.ac.id."
+      });
+    }
+
     // 2. Check if NIM is already linked to another account
     const existingNim = await queryOne<any>(
       "SELECT id FROM users WHERE nim = ? AND id != ?",

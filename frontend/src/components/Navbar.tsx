@@ -429,13 +429,13 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                           <span className="inline-block mt-1 px-2 py-0.5 text-[9px] font-bold bg-blue-100 text-blue-900 rounded">
                             {user.type === "admin" ? "ADMIN" : "BUYER"}
                           </span>
-                          {user && user.email?.endsWith("@ub.ac.id") && (
+                          {user && (
                             <div className="mt-1.5">
-                              {user.is_filkom_verified === 1 ? (
+                              {Number(user.is_filkom_verified) === 1 ? (
                                 <span className="inline-block px-2 py-0.5 text-[9px] font-bold bg-emerald-100 text-emerald-800 rounded">
                                   ✓ FILKOM VERIFIED
                                 </span>
-                              ) : (
+                              ) : user.email?.toLowerCase().endsWith("@student.ub.ac.id") ? (
                                 <button
                                   onClick={() => {
                                     setIsVerifyOpen(true);
@@ -445,7 +445,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                                 >
                                   Verifikasi NIM
                                 </button>
-                              )}
+                              ) : null}
                             </div>
                           )}
                         </div>
@@ -576,11 +576,11 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                             <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold bg-blue-100 text-blue-900 rounded uppercase">
                               {user.type === "admin" ? "ADMIN" : "BUYER"}
                             </span>
-                            {user.email?.endsWith("@ub.ac.id") && (user.is_filkom_verified === 1 ? (
+                            {user && (Number(user.is_filkom_verified) === 1 ? (
                               <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold bg-emerald-100 text-emerald-800 rounded uppercase">
                                 ✓ VERIFIED
                               </span>
-                            ) : (
+                            ) : user.email?.toLowerCase().endsWith("@student.ub.ac.id") ? (
                               <button
                                 onClick={() => {
                                   setIsVerifyOpen(true);
@@ -590,7 +590,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                               >
                                 Verifikasi NIM
                               </button>
-                            ))}
+                            ) : null)}
                           </div>
                         </div>
 

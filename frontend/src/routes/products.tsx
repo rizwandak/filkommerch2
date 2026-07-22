@@ -144,7 +144,7 @@ function ProductsCatalogPage() {
 
   // Determine active price helper
   const getActivePrice = (product: any) => {
-    const isUb = user?.is_filkom_verified === 1;
+    const isUb = Number(user?.is_filkom_verified) === 1;
     if (product.promo_price && Number(product.promo_price) > 0) {
       return Number(product.promo_price);
     }
