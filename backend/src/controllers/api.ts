@@ -1366,8 +1366,8 @@ export const createProduct = async (req: Request, res: Response) => {
         category_id, name, slug, description, price, original_price, filkom_price, promo_price,
         sale_type, product_type, low_stock_threshold, is_best_seller, is_limited,
         preorder_start_at, preorder_end_at, preorder_moq, production_eta_days,
-        image_url, is_active, bahan, asal, aplikasi, size_chart_url
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        image_url, is_active, bahan, asal, aplikasi, size_chart_url, pre_order_campaign_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.category_id,
         input.name,
@@ -1392,6 +1392,7 @@ export const createProduct = async (req: Request, res: Response) => {
         input.asal || null,
         input.aplikasi || null,
         input.size_chart_url || null,
+        input.pre_order_campaign_id || null,
       ]
     );
 
@@ -1461,7 +1462,7 @@ export const updateProduct = async (req: Request, res: Response) => {
        SET category_id = ?, name = ?, slug = ?, description = ?, price = ?, original_price = ?, filkom_price = ?, promo_price = ?,
            sale_type = ?, product_type = ?, low_stock_threshold = ?, is_best_seller = ?, is_limited = ?,
            preorder_start_at = ?, preorder_end_at = ?, preorder_moq = ?, production_eta_days = ?,
-           image_url = ?, is_active = ?, bahan = ?, asal = ?, aplikasi = ?, size_chart_url = ? 
+           image_url = ?, is_active = ?, bahan = ?, asal = ?, aplikasi = ?, size_chart_url = ?, pre_order_campaign_id = ?
        WHERE id = ?`,
       [
         input.category_id,
@@ -1487,6 +1488,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         input.asal || null,
         input.aplikasi || null,
         input.size_chart_url || null,
+        input.pre_order_campaign_id || null,
         input.id,
       ]
     );
@@ -2755,6 +2757,174 @@ export const deletePreOrderCampaign = async (req: Request, res: Response) => {
     return res.json({ success: true, message: "Campaign Pre-Order berhasil dihapus" });
   } catch (error: any) {
     console.error("Error deleting pre-order campaign:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const campaign = await queryOne<any>("SELECT * FROM pre_order_campaigns WHERE id = ?", [id]);
+
+    if (!campaign) {
+      return res.status(404).json({ success: false, error: "Campaign Pre-Order tidak ditemukan" });
+    }
+
+    // 1. Fetch connected products
+    const connectedProducts = await query<any>(
+      `SELECT p.*, c.name as category_name 
+       FROM products p 
+       LEFT JOIN categories c ON p.category_id = c.id 
+       WHERE p.pre_order_campaign_id = ?`,
+      [id]
+    );
+
+    // 2. Fetch all order items and orders linked to products of this campaign
+    const items = await query<any>(
+      `SELECT 
+        oi.*,
+        o.order_id,
+        o.customer_name,
+        o.customer_email,
+        o.customer_phone,
+        o.user_id,
+        o.created_at as order_created_at,
+        o.order_status,
+        o.payment_status,
+        o.fulfillment_status,
+        o.payment_method,
+        o.payment_proof_url,
+        o.grand_total,
+        p.name as connected_product_name,
+        p.image_url as connected_product_image,
+        u.full_name as user_full_name,
+        u.email as user_email,
+        u.phone_number as user_phone,
+        u.student_id as user_nim
+       FROM order_items oi
+       JOIN orders o ON oi.order_id = o.order_id
+       JOIN products p ON oi.product_id = p.id
+       LEFT JOIN users u ON o.user_id = u.id
+       WHERE p.pre_order_campaign_id = ? OR (p.sale_type = 'pre_order' AND o.created_at >= ? AND o.created_at <= ?)
+       ORDER BY o.created_at DESC`,
+      [id, campaign.start_date, campaign.end_date]
+    );
+
+    // Group items by order_id
+    const ordersMap: Record<string, any> = {};
+    let totalRevenue = 0;
+    let totalUnitsSold = 0;
+
+    const productSalesMap: Record<number, {
+      product_id: number;
+      name: string;
+      image_url: string | null;
+      unit_price: number;
+      total_qty: number;
+      total_subtotal: number;
+      variants: Record<string, number>;
+    }> = {};
+
+    // Initialize product map for connected products
+    for (const prod of connectedProducts) {
+      productSalesMap[prod.id] = {
+        product_id: prod.id,
+        name: prod.name,
+        image_url: prod.image_url,
+        unit_price: Number(prod.price),
+        total_qty: 0,
+        total_subtotal: 0,
+        variants: {},
+      };
+    }
+
+    const uniqueBuyersSet = new Set<string>();
+
+    for (const item of items) {
+      const isPaidOrValid = item.payment_status === "paid" || item.payment_status === "settlement" || item.order_status === "completed" || item.order_status === "processing";
+      
+      const buyerId = item.customer_email || item.user_email || item.customer_phone || `order-${item.order_id}`;
+      uniqueBuyersSet.add(buyerId);
+
+      if (!ordersMap[item.order_id]) {
+        ordersMap[item.order_id] = {
+          order_id: item.order_id,
+          customer_name: item.customer_name || item.user_full_name || "Guest",
+          customer_email: item.customer_email || item.user_email || "-",
+          customer_phone: item.customer_phone || item.user_phone || "-",
+          customer_nim: item.user_nim || "-",
+          created_at: item.order_created_at,
+          order_status: item.order_status,
+          payment_status: item.payment_status,
+          fulfillment_status: item.fulfillment_status,
+          payment_method: item.payment_method,
+          payment_proof_url: item.payment_proof_url,
+          grand_total: Number(item.grand_total || 0),
+          items: [],
+        };
+
+        if (isPaidOrValid) {
+          totalRevenue += Number(item.grand_total || 0);
+        }
+      }
+
+      ordersMap[item.order_id].items.push({
+        order_item_id: item.id || item.order_item_id,
+        product_id: item.product_id,
+        product_name: item.product_name || item.connected_product_name,
+        size: item.size || "-",
+        color: item.color || "-",
+        quantity: item.quantity,
+        unit_price: Number(item.unit_price),
+        subtotal: Number(item.subtotal || (item.quantity * item.unit_price)),
+      });
+
+      // Aggregate product sales
+      const pid = item.product_id;
+      if (!productSalesMap[pid]) {
+        productSalesMap[pid] = {
+          product_id: pid,
+          name: item.product_name || item.connected_product_name || `Product #${pid}`,
+          image_url: item.connected_product_image || null,
+          unit_price: Number(item.unit_price),
+          total_qty: 0,
+          total_subtotal: 0,
+          variants: {},
+        };
+      }
+
+      if (isPaidOrValid) {
+        totalUnitsSold += item.quantity;
+        productSalesMap[pid].total_qty += item.quantity;
+        productSalesMap[pid].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
+
+        const variantKey = [item.size, item.color].filter(Boolean).filter(x => x !== "-").join(" / ") || "Default";
+        productSalesMap[pid].variants[variantKey] = (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
+      }
+    }
+
+    const ordersList = Object.values(ordersMap);
+    const productBreakdown = Object.values(productSalesMap);
+
+    return res.json({
+      success: true,
+      data: {
+        campaign,
+        connected_products: connectedProducts,
+        summary: {
+          total_revenue: totalRevenue,
+          total_units_sold: totalUnitsSold,
+          total_orders: ordersList.length,
+          total_buyers: uniqueBuyersSet.size,
+          paid_orders_count: ordersList.filter(o => o.payment_status === 'paid' || o.payment_status === 'settlement' || o.order_status === 'completed').length,
+          pending_orders_count: ordersList.filter(o => o.payment_status === 'pending' || o.payment_status === 'unpaid').length,
+        },
+        product_breakdown: productBreakdown,
+        orders: ordersList,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error fetching pre-order campaign stats:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };

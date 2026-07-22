@@ -1510,6 +1510,21 @@ export const togglePreOrderCampaignActiveServerAction = createServerFn({ method:
     }
   });
 
+// Fetch Pre-Order Campaign Stats & Reports
+export const getPreOrderCampaignStatsServerAction = createServerFn({ method: "GET" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/pre-order-campaigns/${data.id}/stats`);
+      if (!res.ok) return { success: false, error: "Failed to fetch stats" };
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getPreOrderCampaignStatsServerAction error:", e);
+      return { success: false, error: e.message || "Failed to fetch pre-order campaign stats" };
+    }
+  });
+
 // Create Pelunasan Order (balance payment) linked to a DP order
 export const createPelunasanOrderServerAction = createServerFn({ method: "POST" })
   .validator((d: { originalOrderId: string }) => d)

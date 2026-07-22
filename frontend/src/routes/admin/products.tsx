@@ -34,8 +34,10 @@ import {
   uploadImagesServerAction,
   uploadSingleImageServerAction,
   getActivePreOrderCampaignServerAction,
+  getPreOrderCampaignsServerAction,
   type ProductWithVariants,
   type Category,
+  type PreOrderCampaign,
 } from "@backend/server-actions";
 import { useQuery } from "@tanstack/react-query";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -58,6 +60,7 @@ interface ProductForm {
   promo_price: string;
   sale_type: string;
   product_type: string;
+  pre_order_campaign_id?: number | null;
   low_stock_threshold: string;
   preorder_start_at: string;
   preorder_end_at: string;
@@ -85,6 +88,7 @@ const emptyForm = (): ProductForm => ({
   promo_price: "",
   sale_type: "ready_stock",
   product_type: "apparel",
+  pre_order_campaign_id: null,
   low_stock_threshold: "5",
   preorder_start_at: "",
   preorder_end_at: "",
@@ -237,6 +241,12 @@ function AdminProductsPage() {
     queryFn: () => getActivePreOrderCampaignServerAction(),
   });
   const activePoCampaign = activePoRes?.data || null;
+
+  const { data: allPoRes } = useQuery({
+    queryKey: ["adminPreOrderCampaigns"],
+    queryFn: () => getPreOrderCampaignsServerAction(),
+  });
+  const allPoCampaigns: PreOrderCampaign[] = allPoRes?.data || [];
 
   const handleOpenCropper = (idx: number) => {
     const imgUrl = form.images[idx];
@@ -421,6 +431,7 @@ function AdminProductsPage() {
       promo_price: product.promo_price ? String(product.promo_price) : "",
       sale_type: product.sale_type || "ready_stock",
       product_type: product.product_type === "bundle" ? "bundle" : "apparel",
+      pre_order_campaign_id: (product as any).pre_order_campaign_id || null,
       low_stock_threshold: product.low_stock_threshold ? String(product.low_stock_threshold) : "5",
       preorder_start_at: formatDateForInput(product.preorder_start_at),
       preorder_end_at: formatDateForInput(product.preorder_end_at),
@@ -633,6 +644,7 @@ function AdminProductsPage() {
       promo_price: form.promo_price ? parseFloat(form.promo_price) : null,
       sale_type: form.sale_type,
       product_type: form.product_type === "bundle" ? "bundle" : "apparel",
+      pre_order_campaign_id: form.pre_order_campaign_id || null,
       low_stock_threshold: form.low_stock_threshold ? parseInt(form.low_stock_threshold) : 5,
       preorder_start_at: form.preorder_start_at || null,
       preorder_end_at: form.preorder_end_at || null,
@@ -1156,41 +1168,86 @@ function AdminProductsPage() {
             </div>
 
             {/* Conditional Parameters: Pre-Order */}
-            {form.product_type === "preorder" && (
-              <div className="border-2 border-brand-orange bg-orange-50/40 p-4 rounded-xl space-y-3">
-                <h4 className="text-xs font-black uppercase tracking-wider text-brand-orange flex items-center gap-1.5">
-                  🔥 PRE-ORDER CAMPAIGN TERHUBUNG
-                </h4>
-                {activePoCampaign ? (
-                  <div className="bg-white border-2 border-brand-orange/40 rounded-lg p-3 space-y-2 text-xs">
-                    <div className="flex items-center justify-between font-bold text-ink">
-                      <span className="text-sm font-extrabold text-brand-orange">{activePoCampaign.batch_name}</span>
-                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] rounded font-black">
-                        AKTIF
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-muted-foreground text-[11px] font-medium pt-1 border-t border-dashed">
-                      <div>
-                        <span className="font-bold text-ink block">Mulai PO:</span>
-                        {new Date(activePoCampaign.start_date).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+            {form.sale_type === "pre_order" && (
+              <div className="border-2 border-brand-orange bg-orange-50/40 p-4 rounded-xl space-y-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase tracking-wider text-brand-orange flex items-center gap-1.5">
+                    🔥 HUBUNGKAN KE BATCH PRE-ORDER
+                  </h4>
+                  <span className="text-[10px] font-extrabold text-muted-foreground uppercase">
+                    Pilih Batch PO
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="font-extrabold text-xs uppercase text-ink">
+                    Pilih Batch Pre-Order *
+                  </Label>
+                  <Select
+                    value={form.pre_order_campaign_id ? String(form.pre_order_campaign_id) : (activePoCampaign ? String(activePoCampaign.id) : "")}
+                    onValueChange={(val) => {
+                      const batchId = val ? parseInt(val) : null;
+                      const selectedCampaign = allPoCampaigns.find((c) => c.id === batchId);
+                      setForm({
+                        ...form,
+                        pre_order_campaign_id: batchId,
+                        preorder_start_at: selectedCampaign?.start_date ? formatDateForInput(selectedCampaign.start_date) : form.preorder_start_at,
+                        preorder_end_at: selectedCampaign?.end_date ? formatDateForInput(selectedCampaign.end_date) : form.preorder_end_at,
+                      });
+                    }}
+                  >
+                    <SelectTrigger className="border-2 border-brand-orange/60 font-extrabold text-ink bg-white">
+                      <SelectValue placeholder="-- Pilih Batch Pre-Order --" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allPoCampaigns.map((c) => (
+                        <SelectItem key={c.id} value={String(c.id)}>
+                          {c.batch_name} {c.is_active ? "(AKTIF)" : "(NONAKTIF)"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Show details of selected batch */}
+                {(() => {
+                  const selectedId = form.pre_order_campaign_id || activePoCampaign?.id;
+                  const selectedCampaign = allPoCampaigns.find((c) => c.id === selectedId) || activePoCampaign;
+                  if (!selectedCampaign) {
+                    return (
+                      <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-3 text-xs text-amber-900 space-y-1">
+                        <p className="font-bold text-amber-950">⚠️ Belum Ada Batch PO Yang Dipilih</p>
+                        <p className="text-[11px]">
+                          Silakan buat atau pilih Batch Pre-Order terlebih dahulu di menu <strong>Pre-Order Batch</strong>.
+                        </p>
                       </div>
-                      <div>
-                        <span className="font-bold text-ink block">Selesai PO:</span>
-                        {new Date(activePoCampaign.end_date).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+                    );
+                  }
+
+                  return (
+                    <div className="bg-white border-2 border-brand-orange/40 rounded-lg p-3 space-y-2 text-xs">
+                      <div className="flex items-center justify-between font-bold text-ink">
+                        <span className="text-sm font-extrabold text-brand-orange">{selectedCampaign.batch_name}</span>
+                        <span className={`px-2 py-0.5 text-[10px] rounded font-black ${selectedCampaign.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-neutral-200 text-neutral-700'}`}>
+                          {selectedCampaign.is_active ? 'AKTIF' : 'NONAKTIF'}
+                        </span>
                       </div>
+                      <div className="grid grid-cols-2 gap-2 text-muted-foreground text-[11px] font-medium pt-1 border-t border-dashed">
+                        <div>
+                          <span className="font-bold text-ink block">Mulai PO:</span>
+                          {new Date(selectedCampaign.start_date).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+                        </div>
+                        <div>
+                          <span className="font-bold text-ink block">Selesai PO:</span>
+                          {new Date(selectedCampaign.end_date).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-emerald-700 font-semibold pt-1">
+                        ✨ Produk ini akan secara otomatis terhubung ke Batch <strong>{selectedCampaign.batch_name}</strong> dan tercatat pada laporan analitik batch tersebut.
+                      </p>
                     </div>
-                    <p className="text-[10px] text-emerald-700 font-semibold pt-1">
-                      ✨ Waktu PO produk ini otomatis mengikuti konfigurasi batch aktif di atas. Tidak perlu mengisi tanggal manual!
-                    </p>
-                  </div>
-                ) : (
-                  <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-3 text-xs text-amber-900 space-y-1">
-                    <p className="font-bold text-amber-950">⚠️ Belum Ada Batch PO Aktif Saat Ini</p>
-                    <p className="text-[11px]">
-                      Anda memilih tipe Pre-Order, namun belum ada Batch Pre-Order yang diaktifkan. Anda dapat membuat &amp; mengaktifkan Batch Pre-Order baru di menu <strong>Pre-Order Batch</strong>.
-                    </p>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 

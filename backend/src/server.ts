@@ -375,6 +375,7 @@ app.post("/api/settings", checkRole(["admin"]), (req, res, next) => { clearCache
 // Pre-Order Campaign API Routes
 app.get("/api/pre-order-campaigns/active", apiControllers.getActivePreOrderCampaign);
 app.get("/api/pre-order-campaigns", apiControllers.getAllPreOrderCampaigns);
+app.get("/api/pre-order-campaigns/:id/stats", checkRole(["admin"]), apiControllers.getPreOrderCampaignStats);
 app.post("/api/pre-order-campaigns", checkRole(["admin"]), apiControllers.createPreOrderCampaign);
 app.put("/api/pre-order-campaigns/:id", checkRole(["admin"]), apiControllers.updatePreOrderCampaign);
 app.patch("/api/pre-order-campaigns/:id/toggle-active", checkRole(["admin"]), apiControllers.togglePreOrderCampaignActive);

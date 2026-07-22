@@ -104,6 +104,10 @@ export async function runMigration() {
         sql: "ALTER TABLE products ADD COLUMN pre_order_campaign_id INT DEFAULT NULL"
       },
       {
+        name: "link_existing_preorder_products_to_active_campaign",
+        sql: "UPDATE products SET pre_order_campaign_id = (SELECT id FROM pre_order_campaigns WHERE is_active = 1 LIMIT 1) WHERE sale_type = 'pre_order' AND (pre_order_campaign_id IS NULL OR pre_order_campaign_id = 0)"
+      },
+      {
         name: "payments.provider_varchar",
         sql: "ALTER TABLE payments MODIFY COLUMN provider VARCHAR(50) NOT NULL"
       },
