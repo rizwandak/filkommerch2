@@ -156,7 +156,8 @@ export async function runMigration() {
         await connection.query(q.sql);
         console.log(`✅ ${q.name} migrated successfully!`);
       } catch (err: any) {
-        if (err.code === "ER_DUP_COLUMN_NAME") {
+        // Handle MySQL Duplicate Column Error safely
+        if (err.code === "ER_DUP_FIELDNAME" || err.errno === 1060 || err.code === "ER_DUP_COLUMN_NAME") {
           console.log(`ℹ️ Column ${q.name} already exists. Skipping.`);
         } else {
           console.error(`❌ Error migrating ${q.name}:`, err.message);
