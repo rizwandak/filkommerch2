@@ -292,6 +292,10 @@ export interface Order {
   snap_token: string | null;
   payment_proof_url: string | null;
   payment_proof_note: string | null;
+  voucher_code?: string | null;
+  fulfillment_proof_url?: string | null;
+  is_complained?: number;
+  complaint_notes?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -1153,13 +1157,18 @@ export const deleteUserAdmin = createServerFn({ method: "POST" })
 
 // Update order status
 export const updateOrderStatus = createServerFn({ method: "POST" })
-  .validator((d: { id: string; status: string; shipping_address?: string; notes?: string }) => d)
+  .validator((d: { id: string; status: string; shipping_address?: string; notes?: string; fulfillment_proof_url?: string }) => d)
   .handler(async ({ data: input }) => {
     try {
       const res = await serverFetch(`${API_URL}/api/admin/orders/${input.id}/status`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: input.status, shipping_address: input.shipping_address, notes: input.notes }),
+        body: JSON.stringify({
+          status: input.status,
+          shipping_address: input.shipping_address,
+          notes: input.notes,
+          fulfillment_proof_url: input.fulfillment_proof_url,
+        }),
       });
       if (!res.ok) {
         const errorText = await res.text();
@@ -1525,20 +1534,38 @@ export const getPreOrderCampaignStatsServerAction = createServerFn({ method: "PO
     }
   });
 
+// Get Pelunasan Info / Preview for a DP order
+export const getPelunasanInfoServerAction = createServerFn({ method: "POST" })
+  .validator((d: { originalOrderId: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/orders/${input.originalOrderId}/pelunasan-info`);
+      if (!res.ok) {
+        return { success: false, error: `HTTP ${res.status}` };
+      }
+      return await res.json() as { success: boolean; isExisting?: boolean; order?: any; items?: any[]; error?: string };
+    } catch (error: any) {
+      console.error("Error getting pelunasan info:", error);
+      return { success: false, error: error.message || "Failed to get pelunasan info" };
+    }
+  });
+
 // Create Pelunasan Order (balance payment) linked to a DP order
 export const createPelunasanOrderServerAction = createServerFn({ method: "POST" })
   .validator((d: { originalOrderId: string }) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await serverFetch(`${API_URL}/api/orders/${input.originalOrderId}/create-pelunasan`, {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/orders/${input.originalOrderId}/create-pelunasan`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const errorText = await res.text();
-        throw new Error(errorText || `HTTP ${res.status}`);
+        return { success: false, error: data.error || `HTTP ${res.status}`, orderId: data.orderId };
       }
-      return res.json() as Promise<{ success: boolean; orderId?: string; error?: string }>;
+      return data as { success: boolean; orderId?: string; error?: string; isExisting?: boolean };
     } catch (error: any) {
       console.error("Error creating pelunasan order:", error);
       return { success: false, error: error.message || "Failed to create pelunasan order" };
@@ -1661,6 +1688,42 @@ export const getVoucherHistoryServerAction = createServerFn({ method: "POST" })
     } catch (e: any) {
       console.warn("getVoucherHistoryServerAction error:", e);
       return { success: false, error: e.message || "Failed to fetch voucher history" };
+    }
+  });
+
+// Confirm Order Completion (Buyer)
+export const confirmOrderCompletionServerAction = createServerFn({ method: "POST" })
+  .validator((data: { orderId: string; fulfillment_proof_url?: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/orders/${data.orderId}/confirm-completion`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("confirmOrderCompletionServerAction error:", e);
+      return { success: false, error: e.message || "Failed to confirm order completion" };
+    }
+  });
+
+// Submit Order Complaint (Buyer)
+export const submitOrderComplaintServerAction = createServerFn({ method: "POST" })
+  .validator((data: { orderId: string; notes?: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/orders/${data.orderId}/complaint`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("submitOrderComplaintServerAction error:", e);
+      return { success: false, error: e.message || "Failed to submit order complaint" };
     }
   });
 

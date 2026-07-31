@@ -20,18 +20,22 @@ import {
   regeneratePaymentToken,
   getStoreSettings,
   submitPaymentProof,
-  createOrderAndPayment
+  createOrderAndPayment,
+  getPelunasanInfoServerAction,
+  createPelunasanOrderServerAction,
 } from "@backend/server-actions";
 import { toast } from "sonner";
 import { resolveImageUrl } from "@/lib/image-resolver";
 
 interface OrderConfirmationSearch {
   orderId?: string;
+  originalOrderId?: string;
 }
 
 export const Route = createFileRoute("/order-confirmation")({
   validateSearch: (search: Record<string, unknown>): OrderConfirmationSearch => ({
     orderId: search.orderId as string | undefined,
+    originalOrderId: search.originalOrderId as string | undefined,
   }),
   component: OrderConfirmationPage,
   head: () => ({
@@ -61,8 +65,8 @@ function OrderConfirmationPage() {
 
   // Auto poll order status while payment modal is open or pending
   useEffect(() => {
-    const orderId = search.orderId;
-    if (!orderId) return;
+    const targetId = search.orderId || order?.order_id;
+    if (!targetId || order?.is_preview) return;
 
     const pStatus = order?.payment_status;
 
@@ -75,7 +79,7 @@ function OrderConfirmationPage() {
     }
 
     const interval = setInterval(() => {
-      void getOrderById({ data: orderId }).then((result) => {
+      void getOrderById({ data: targetId }).then((result) => {
         if (result.success && result.order) {
           setOrder(result.order);
           if (result.items) setOrderItems(result.items);
@@ -88,68 +92,81 @@ function OrderConfirmationPage() {
     }, 3000);
 
     return () => clearInterval(interval);
-  }, [search.orderId, order?.payment_status, showPaymentModal]);
+  }, [search.orderId, order?.order_id, order?.payment_status, order?.is_preview, showPaymentModal]);
 
   const fetchOrderDetails = async () => {
-    if (!search.orderId) {
+    if (!search.orderId && !search.originalOrderId) {
       setLoading(false);
       return;
     }
     try {
       setLoading(true);
-      const [result, settingsRes] = await Promise.all([
-        getOrderById({ data: search.orderId }).catch(() => ({ success: false, order: null, error: "" })),
-        getStoreSettings(),
-      ]);
+      const [settingsRes] = await Promise.all([getStoreSettings()]);
 
       if (settingsRes.settings) {
         setStoreSettings(settingsRes.settings);
       }
 
-      if (result.success && result.order) {
-        setOrder(result.order);
-        setOrderItems(result.items || []);
-        if (result.order.payment_proof_url) {
-          setProofUrl(result.order.payment_proof_url);
+      if (search.originalOrderId) {
+        const pelunasanRes = await getPelunasanInfoServerAction({ data: { originalOrderId: search.originalOrderId } });
+        if (pelunasanRes.success && pelunasanRes.order) {
+          setOrder(pelunasanRes.order);
+          setOrderItems(pelunasanRes.items || []);
+          if (pelunasanRes.order.payment_proof_url) {
+            setProofUrl(pelunasanRes.order.payment_proof_url);
+          }
+          setLoading(false);
+          return;
         }
-      } else {
-        // Look for pending order in localStorage
-        const savedPending = localStorage.getItem(`pending_order_${search.orderId}`);
-        if (savedPending) {
-          try {
-            const pending = JSON.parse(savedPending);
-            setOrder({
-              order_id: pending.orderId,
-              customer_name: pending.customerName,
-              customer_email: pending.customerEmail,
-              customer_phone: pending.customerPhone,
-              customer_nim: pending.customerNim,
-              shipping_address: pending.shippingAddress,
-              fulfillment_type: pending.fulfillmentType,
-              payment_status: "unpaid",
-              order_status: "pending_payment",
-              payment_type: "manual_qris",
-              gross_amount: pending.grossAmount,
-              discount_amount: pending.discountAmount,
-              service_fee: 0,
-              shipping_cost: 0,
-              tax_amount: 0,
-              subtotal: pending.grossAmount,
-            });
-            setOrderItems(
-              (pending.items || []).map((item: any) => ({
-                ...item,
-                product_name: item.name || item.product_name,
-                unit_price: item.price,
-                subtotal: item.price * item.quantity,
-              }))
-            );
-          } catch (e) {
-            console.error("Error parsing pending order:", e);
-            toast.error("Gagal mengambil data status pesanan");
+      }
+
+      if (search.orderId) {
+        const result = await getOrderById({ data: search.orderId }).catch(() => ({ success: false, order: null, error: "" }));
+        if (result.success && result.order) {
+          setOrder(result.order);
+          setOrderItems(result.items || []);
+          if (result.order.payment_proof_url) {
+            setProofUrl(result.order.payment_proof_url);
           }
         } else {
-          toast.error(result.error || "Gagal mengambil data status pesanan");
+          // Look for pending order in localStorage
+          const savedPending = localStorage.getItem(`pending_order_${search.orderId}`);
+          if (savedPending) {
+            try {
+              const pending = JSON.parse(savedPending);
+              setOrder({
+                order_id: pending.orderId,
+                customer_name: pending.customerName,
+                customer_email: pending.customerEmail,
+                customer_phone: pending.customerPhone,
+                customer_nim: pending.customerNim,
+                shipping_address: pending.shippingAddress,
+                fulfillment_type: pending.fulfillmentType,
+                payment_status: "unpaid",
+                order_status: "pending_payment",
+                payment_type: "manual_qris",
+                gross_amount: pending.grossAmount,
+                discount_amount: pending.discountAmount,
+                service_fee: 0,
+                shipping_cost: 0,
+                tax_amount: 0,
+                subtotal: pending.grossAmount,
+              });
+              setOrderItems(
+                (pending.items || []).map((item: any) => ({
+                  ...item,
+                  product_name: item.name || item.product_name,
+                  unit_price: item.price,
+                  subtotal: item.price * item.quantity,
+                }))
+              );
+            } catch (e) {
+              console.error("Error parsing pending order:", e);
+              toast.error("Gagal mengambil data status pesanan");
+            }
+          } else {
+            toast.error(result.error || "Gagal mengambil data status pesanan");
+          }
         }
       }
     } catch (e) {
@@ -198,36 +215,56 @@ function OrderConfirmationPage() {
   };
 
   const handleSubmitProof = async () => {
-    if (!order?.order_id || !proofUrlTemp) return;
+    if (!order || !proofUrlTemp) return;
 
     try {
       setSubmittingProof(true);
 
-      const savedPending = localStorage.getItem(`pending_order_${order.order_id}`);
-      if (savedPending) {
-        const pending = JSON.parse(savedPending);
-        const createRes = await createOrderAndPayment({ data: pending });
-        if (!createRes.success) {
-          throw new Error(createRes.error || "Gagal mendaftarkan transaksi ke server");
+      let targetOrderId = order.order_id;
+
+      // Case A: Is a pelunasan preview (or originalOrderId in search)
+      if (order.is_preview || search.originalOrderId || order.original_order_id) {
+        const origId = search.originalOrderId || order.original_order_id;
+        const pelunasanRes = await createPelunasanOrderServerAction({ data: { originalOrderId: origId } });
+        if (!pelunasanRes.success && !pelunasanRes.orderId) {
+          throw new Error(pelunasanRes.error || "Gagal membuat pesanan pelunasan");
+        }
+        targetOrderId = pelunasanRes.orderId!;
+      }
+      // Case B: Regular checkout pending order in localStorage
+      else {
+        const savedPending = localStorage.getItem(`pending_order_${order.order_id}`);
+        if (savedPending) {
+          const pending = JSON.parse(savedPending);
+          const createRes = await createOrderAndPayment({ data: pending });
+          if (!createRes.success) {
+            throw new Error(createRes.error || "Gagal mendaftarkan transaksi ke server");
+          }
         }
       }
 
       const res = await submitPaymentProof({
         data: {
-          orderId: order.order_id,
+          orderId: targetOrderId,
           paymentProofUrl: proofUrlTemp,
         },
       });
 
       if (res.success) {
-        if (savedPending) {
+        if (localStorage.getItem(`pending_order_${order.order_id}`)) {
           localStorage.removeItem(`pending_order_${order.order_id}`);
         }
         setProofUrl(proofUrlTemp);
         setProofUrlTemp("");
         setIsEditingProof(false);
         toast.success("Bukti transfer berhasil terkirim. Menunggu verifikasi admin.");
-        void fetchOrderDetails();
+        
+        // Fetch updated order from DB
+        const updated = await getOrderById({ data: targetOrderId });
+        if (updated.success && updated.order) {
+          setOrder(updated.order);
+          if (updated.items) setOrderItems(updated.items);
+        }
       } else {
         toast.error(res.error || "Gagal mengirim bukti transfer");
       }
@@ -241,7 +278,7 @@ function OrderConfirmationPage() {
 
   useEffect(() => {
     void fetchOrderDetails();
-  }, [search.orderId]);
+  }, [search.orderId, search.originalOrderId]);
 
   const handlePayNow = async (shouldRegenerate: boolean = true) => {
     if (!order?.order_id) {

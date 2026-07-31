@@ -189,16 +189,30 @@ function ProductDetailPage() {
     }
   }, [product]);
 
+  // Detect single-variant product (e.g. "One Size" with no color options)
+  const isSingleVariant = useMemo(() => {
+    if (!product || product.product_type === "bundle") return false;
+    if (product.variants.length !== 1) return false;
+    const v = product.variants[0];
+    const sizeIsGeneric = !v.size || v.size === "One Size" || v.size === "All Size";
+    const colorIsEmpty = !v.color;
+    return sizeIsGeneric && colorIsEmpty;
+  }, [product]);
+
   // Extract color & size arrays for rendering
   const colors = useMemo(() => {
     if (!product) return [];
+    if (isSingleVariant) return [];
     return Array.from(new Set(product.variants.map((v) => v.color).filter(Boolean))) as string[];
-  }, [product]);
+  }, [product, isSingleVariant]);
 
   const sizes = useMemo(() => {
     if (!product) return [];
-    return Array.from(new Set(product.variants.map((v) => v.size).filter(Boolean))) as string[];
-  }, [product]);
+    if (isSingleVariant) return [];
+    return Array.from(new Set(
+      product.variants.map((v) => v.size).filter((s) => s && s !== "One Size" && s !== "All Size")
+    )) as string[];
+  }, [product, isSingleVariant]);
 
   const isPreOrder = product?.sale_type === "preorder";
   const isPreOrderClosed = useMemo(() => {
@@ -492,7 +506,7 @@ function ProductDetailPage() {
   }, [activeImage, images]);
 
   const handleAddToCart = (buyNow = false) => {
-    if (product.product_type !== "bundle") {
+    if (product.product_type !== "bundle" && !isSingleVariant) {
       if (!selectedSize && sizes.length > 0) {
         toast.error("Pilih ukuran terlebih dahulu!");
         return;
@@ -501,7 +515,7 @@ function ProductDetailPage() {
         toast.error("Pilih warna terlebih dahulu!");
         return;
       }
-    } else {
+    } else if (product.product_type === "bundle") {
       if (product.bundle_components) {
         for (const comp of product.bundle_components) {
           if (!selectedBundleVariants[comp.id]) {
@@ -955,7 +969,7 @@ function ProductDetailPage() {
                   );
                 })}
               </div>
-            ) : (
+            ) : !isSingleVariant && (colors.length > 0 || sizes.length > 0) ? (
               <div className="space-y-4 p-4 bg-white border-2 border-ink rounded-2xl shadow-sm">
                 {/* Selection: Colors */}
                 {colors.length > 0 && (
@@ -1045,7 +1059,7 @@ function ProductDetailPage() {
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {/* Pre-Order Banner if Preorder product */}
             {product.product_type === "preorder" && (

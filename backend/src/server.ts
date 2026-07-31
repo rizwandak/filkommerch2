@@ -335,7 +335,10 @@ app.post("/api/orders", checkoutLimiter, validateBody(createOrderSchema), (req, 
 app.get("/api/orders/:id", apiControllers.getOrderById);
 app.get("/api/orders/user/:userId", apiControllers.getUserOrders);
 app.post("/api/orders/:id/payment-proof", apiControllers.submitPaymentProof);
+app.get("/api/orders/:id/pelunasan-info", apiControllers.getPelunasanInfo);
 app.post("/api/orders/:id/create-pelunasan", apiControllers.createPelunasanOrder);
+app.post("/api/orders/:id/confirm-completion", apiControllers.confirmOrderCompletion);
+app.post("/api/orders/:id/complaint", apiControllers.submitOrderComplaint);
 app.post("/api/vouchers/validate", apiControllers.validateVoucher);
 
 // Offline POS Sales API Routes

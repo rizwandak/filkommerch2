@@ -662,6 +662,23 @@ function UserOrdersPage() {
                   </div>
 
                   <div className="flex flex-col items-end gap-3 shrink-0">
+                    {(order.voucher_code || order.discount_amount > 0) && (
+                      <div className="text-xs text-right space-y-0.5 -mb-2">
+                        {order.voucher_code && (
+                          <div className="text-muted-foreground flex items-center justify-end gap-1.5">
+                            <span className="font-bold text-brand-orange bg-brand-orange/10 px-1.5 py-0.5 rounded text-[10px] uppercase border border-brand-orange/30">
+                              Voucher Digunakan
+                            </span>
+                            <span className="font-mono font-extrabold text-ink">{order.voucher_code}</span>
+                          </div>
+                        )}
+                        {order.discount_amount > 0 && (
+                          <div className="text-brand-orange font-bold">
+                            Diskon: -Rp {Number(order.discount_amount).toLocaleString("id-ID")}
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-baseline gap-2">
                       <span className="text-xs text-muted-foreground uppercase font-bold tracking-wide">
                         Total Pesanan:

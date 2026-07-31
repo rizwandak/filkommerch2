@@ -1626,8 +1626,47 @@ export const deleteProduct = async (req: Request, res: Response) => {
 export const getOnlineOrders = async (req: Request, res: Response) => {
   try {
     const orders = await query<any>(
-      "SELECT * FROM orders WHERE channel = 'online' ORDER BY created_at DESC LIMIT 100"
+      "SELECT * FROM orders WHERE channel = 'online' ORDER BY created_at DESC LIMIT 150"
     );
+
+    if (orders && orders.length > 0) {
+      const orderIds = orders.map((o) => o.order_id);
+      const placeholders = orderIds.map(() => "?").join(",");
+      const allItems = await query<any>(
+        `SELECT order_id, product_name, size, color FROM order_items WHERE order_id IN (${placeholders})`,
+        orderIds
+      );
+
+      const itemsByOrder: Record<string, any[]> = {};
+      (allItems || []).forEach((item) => {
+        if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+        itemsByOrder[item.order_id].push(item);
+      });
+
+      orders.forEach((o) => {
+        const items = itemsByOrder[o.order_id] || [];
+        o.items = items;
+        const notes = String(o.notes || "").toUpperCase();
+        const isPelunasan = notes.includes("PELUNASAN");
+
+        const hasLunasVariant = items.some((i: any) => {
+          const c = String(i.color || "").toUpperCase();
+          const s = String(i.size || "").toUpperCase();
+          return c.includes("LUNAS") || s.includes("LUNAS") || c.includes("FULL") || s.includes("FULL");
+        });
+
+        const hasDpVariant = items.some((i: any) => {
+          const c = String(i.color || "").toUpperCase();
+          const s = String(i.size || "").toUpperCase();
+          return c.includes("DP") || s.includes("DP");
+        });
+
+        const isDpByNotes = notes.includes("DP") && !isPelunasan && !notes.includes("LUNAS");
+
+        o.is_dp = !isPelunasan && !hasLunasVariant && (hasDpVariant || isDpByNotes);
+      });
+    }
+
     return res.json({ orders });
   } catch (error: any) {
     console.error("Error fetching online orders:", error);
@@ -1698,6 +1737,10 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     if (notes !== undefined) {
       updateFields.push("notes = ?");
       updateParams.push(notes);
+    }
+    if (req.body.fulfillment_proof_url !== undefined) {
+      updateFields.push("fulfillment_proof_url = ?");
+      updateParams.push(req.body.fulfillment_proof_url);
     }
 
     updateParams.push(id);
@@ -2641,7 +2684,7 @@ export const submitPaymentProof = async (req: Request, res: Response) => {
     }
 
     await execute(
-      "UPDATE orders SET payment_proof_url = ?, transaction_status = 'pending', payment_status = 'pending', payment_proof_note = NULL WHERE order_id = ?",
+      "UPDATE orders SET payment_proof_url = ?, transaction_status = 'pending', payment_status = 'pending', payment_type = 'manual_qris', payment_proof_note = NULL WHERE order_id = ?",
       [paymentProofUrl, id]
     );
 
@@ -3521,10 +3564,10 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       [`%Pelunasan untuk Order: ${id}%`]
     );
     if (existingPelunasan) {
-      return res.status(400).json({
-        success: false,
-        error: "Pesanan pelunasan untuk order ini sudah dibuat sebelumnya",
-        orderId: existingPelunasan.order_id
+      return res.json({
+        success: true,
+        orderId: existingPelunasan.order_id,
+        isExisting: true
       });
     }
 
@@ -3713,8 +3756,8 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
         order_id, channel, fulfillment_type, fulfillment_status, user_id, customer_name,
         customer_nim, customer_email, customer_phone, shipping_address, subtotal,
         discount_amount, service_fee, shipping_cost, tax_amount, gross_amount,
-        payment_status, order_status, notes, transaction_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, 'unpaid', 'pending_payment', ?, 'pending')`,
+        payment_status, order_status, notes, transaction_status, payment_type
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, 0, ?, 'unpaid', 'pending_payment', ?, 'pending', 'manual_qris')`,
       [
         newOrderId,
         originalOrder.channel || "online",
@@ -3758,6 +3801,189 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error creating pelunasan order:", error);
     return res.status(500).json({ success: false, error: error.message || "Failed to create pelunasan order" });
+  }
+};
+
+export const getPelunasanInfo = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params; // Original Order ID
+
+    // 1. Check if pelunasan order ALREADY exists in database
+    const existingPelunasan = await queryOne<any>(
+      "SELECT * FROM orders WHERE notes LIKE ? AND order_status != 'cancelled' LIMIT 1",
+      [`%Pelunasan untuk Order: ${id}%`]
+    );
+    if (existingPelunasan) {
+      const items = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [existingPelunasan.order_id]);
+      return res.json({
+        success: true,
+        isExisting: true,
+        order: existingPelunasan,
+        items: items || []
+      });
+    }
+
+    // 2. Fetch original order
+    const originalOrder = await queryOne<any>("SELECT * FROM orders WHERE order_id = ?", [id]);
+    if (!originalOrder) {
+      return res.status(404).json({ success: false, error: "Pesanan asal tidak ditemukan" });
+    }
+
+    const originalItems = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [id]);
+    if (!originalItems || originalItems.length === 0) {
+      return res.status(400).json({ success: false, error: "Item pesanan asal tidak ditemukan" });
+    }
+
+    let calculatedSubtotal = 0;
+    const previewItems: any[] = [];
+
+    // 3. Process each item to find Lunas counterpart and calculate sisa
+    for (const item of originalItems) {
+      const product = await queryOne<any>("SELECT * FROM products WHERE id = ?", [item.product_id]);
+      if (!product) continue;
+
+      // Check if it is a bundle component item
+      if (item.product_name && item.product_name.includes("[KOMPONEN BUNDLE]")) {
+        const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
+        let lunasVariant = await queryOne<any>(
+          "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
+          [item.product_id, item.size, lunasColor]
+        );
+        if (!lunasVariant) {
+          lunasVariant = await queryOne<any>(
+            "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
+            [item.product_id, item.size]
+          );
+        }
+
+        previewItems.push({
+          id: item.id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          size: item.size,
+          color: lunasVariant ? lunasVariant.color : lunasColor,
+          quantity: item.quantity,
+          unit_price: 0,
+          subtotal: 0
+        });
+        continue;
+      }
+
+      // Check if it is the main Bundle product item
+      if (product.product_type === "bundle") {
+        let bundleSisa = 0;
+        const componentItems = originalItems.filter((oi: any) => oi.product_name && oi.product_name.includes("[KOMPONEN BUNDLE]"));
+        for (const comp of componentItems) {
+          if (comp.color && comp.color.toUpperCase().includes("DP")) {
+            const compProduct = await queryOne<any>("SELECT * FROM products WHERE id = ?", [comp.product_id]);
+            if (compProduct) {
+              const compLunasColor = comp.color.replace(/\bDP\b/i, "Lunas");
+              let compLunasVar = await queryOne<any>(
+                "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
+                [comp.product_id, comp.size, compLunasColor]
+              );
+              if (!compLunasVar) {
+                compLunasVar = await queryOne<any>(
+                  "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
+                  [comp.product_id, comp.size]
+                );
+              }
+              const compDpVar = await queryOne<any>(
+                "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
+                [comp.product_id, comp.size, comp.color]
+              );
+              if (compLunasVar && compDpVar) {
+                const isUb = isUbEmail(originalOrder.customer_email);
+                let compBasePrice = Number(compProduct.price);
+                if (compProduct.promo_price && Number(compProduct.promo_price) > 0) compBasePrice = Number(compProduct.promo_price);
+                else if (isUb && compProduct.filkom_price && Number(compProduct.filkom_price) > 0) compBasePrice = Number(compProduct.filkom_price);
+
+                let lunasAddon = Number(compLunasVar.filkom_price || compLunasVar.price_override || 0);
+                let dpAddon = Number(compDpVar.filkom_price || compDpVar.price_override || 0);
+                bundleSisa += Math.max(0, (compBasePrice + lunasAddon) - (compBasePrice + dpAddon));
+              }
+            }
+          }
+        }
+        const subtotal = bundleSisa * item.quantity;
+        calculatedSubtotal += subtotal;
+        previewItems.push({
+          id: item.id,
+          product_id: item.product_id,
+          product_name: `Pelunasan — ${item.product_name}`,
+          size: item.size,
+          color: item.color || "Default",
+          quantity: item.quantity,
+          unit_price: bundleSisa,
+          subtotal
+        });
+        continue;
+      }
+
+      // Regular items
+      const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
+      let lunasVariant = await queryOne<any>(
+        "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
+        [item.product_id, item.size, lunasColor]
+      );
+      if (!lunasVariant) {
+        lunasVariant = await queryOne<any>(
+          "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
+          [item.product_id, item.size]
+        );
+      }
+      let lunasUnitPrice = Number(product.price);
+      if (lunasVariant) {
+        const isUb = isUbEmail(originalOrder.customer_email);
+        let basePrice = Number(product.price);
+        if (product.promo_price && Number(product.promo_price) > 0) basePrice = Number(product.promo_price);
+        else if (isUb && product.filkom_price && Number(product.filkom_price) > 0) basePrice = Number(product.filkom_price);
+        let addon = Number(lunasVariant.filkom_price || lunasVariant.price_override || 0);
+        lunasUnitPrice = basePrice + addon;
+      }
+      const sisa = Math.max(0, lunasUnitPrice - Number(item.unit_price));
+      const subtotal = sisa * item.quantity;
+      calculatedSubtotal += subtotal;
+
+      previewItems.push({
+        id: item.id,
+        product_id: item.product_id,
+        product_name: `Pelunasan — ${item.product_name}`,
+        size: item.size,
+        color: lunasVariant ? lunasVariant.color : lunasColor,
+        quantity: item.quantity,
+        unit_price: sisa,
+        subtotal
+      });
+    }
+
+    const previewOrder = {
+      order_id: `LNS-${originalOrder.order_id}`,
+      original_order_id: originalOrder.order_id,
+      customer_name: originalOrder.customer_name,
+      customer_email: originalOrder.customer_email,
+      customer_phone: originalOrder.customer_phone,
+      customer_nim: originalOrder.customer_nim,
+      shipping_address: originalOrder.shipping_address,
+      fulfillment_type: originalOrder.fulfillment_type,
+      payment_status: "unpaid",
+      order_status: "pending_payment",
+      payment_type: "manual_qris",
+      gross_amount: calculatedSubtotal,
+      subtotal: calculatedSubtotal,
+      notes: `Pelunasan untuk Order: ${originalOrder.order_id}`,
+      is_preview: true
+    };
+
+    return res.json({
+      success: true,
+      isExisting: false,
+      order: previewOrder,
+      items: previewItems
+    });
+  } catch (error: any) {
+    console.error("Error getting pelunasan info:", error);
+    return res.status(500).json({ success: false, error: error.message || "Gagal mendapatkan info pelunasan" });
   }
 };
 
@@ -3997,6 +4223,62 @@ export const getVoucherHistory = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error fetching voucher history:", error);
     return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Ensure database columns for fulfillment proof & complaints
+const ensureOrderColumns = async () => {
+  try {
+    await execute("ALTER TABLE orders ADD COLUMN fulfillment_proof_url VARCHAR(500) NULL");
+  } catch {}
+  try {
+    await execute("ALTER TABLE orders ADD COLUMN is_complained TINYINT(1) DEFAULT 0");
+  } catch {}
+  try {
+    await execute("ALTER TABLE orders ADD COLUMN complaint_notes TEXT NULL");
+  } catch {}
+};
+ensureOrderColumns();
+
+// Confirm order completion (Buyer)
+export const confirmOrderCompletion = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { fulfillment_proof_url } = req.body;
+
+    if (fulfillment_proof_url) {
+      await execute(
+        "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed', fulfillment_proof_url = ? WHERE order_id = ? OR notes LIKE ?",
+        [fulfillment_proof_url, id, `%Pelunasan untuk Order: ${id}%`]
+      );
+    } else {
+      await execute(
+        "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed' WHERE order_id = ? OR notes LIKE ?",
+        [id, `%Pelunasan untuk Order: ${id}%`]
+      );
+    }
+    return res.json({ success: true, message: "Pesanan telah dikonfirmasi selesai." });
+  } catch (error: any) {
+    console.error("Error confirming order completion:", error);
+    return res.status(500).json({ success: false, error: "Gagal mengonfirmasi pesanan" });
+  }
+};
+
+// Submit order complaint (Buyer)
+export const submitOrderComplaint = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+    const complaintText = notes || "Pembeli mengajukan komplain kecacatan produk (defect).";
+
+    await execute(
+      "UPDATE orders SET is_complained = 1, complaint_notes = ? WHERE order_id = ? OR notes LIKE ?",
+      [complaintText, id, `%Pelunasan untuk Order: ${id}%`]
+    );
+    return res.json({ success: true, message: "Komplain berhasil dicatat." });
+  } catch (error: any) {
+    console.error("Error submitting order complaint:", error);
+    return res.status(500).json({ success: false, error: "Gagal mengajukan komplain" });
   }
 };
 

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
@@ -22,7 +22,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@frontend/components/ui/select";
-import { Eye, Trash2, ShieldAlert, Search, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  Eye,
+  Trash2,
+  ShieldAlert,
+  Search,
+  ChevronDown,
+  ChevronUp,
+  ShoppingBag,
+  Clock,
+  CheckCircle2,
+  CreditCard,
+  AlertCircle,
+  Filter,
+  Upload,
+} from "lucide-react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -55,7 +69,8 @@ const statusColor: Record<string, string> = {
   shipped: "bg-blue-100 text-blue-800",
 };
 
-const getStatusBadgeTextAndColor = (order: any) => {
+const getPaymentStatusBadge = (order: any, linkedLns?: any) => {
+  if (!order) return { text: "-", color: "" };
   const pStatus = order.payment_status;
   const oStatus = order.order_status || order.transaction_status;
 
@@ -63,39 +78,66 @@ const getStatusBadgeTextAndColor = (order: any) => {
     return { text: "Dibatalkan", color: "bg-red-100 text-red-800 border-red-200" };
   }
 
-  // QRIS Static: proof rejected by admin
-  if (order.payment_type === "manual_qris" && pStatus !== "paid" && order.payment_proof_note) {
+  const isManualQris =
+    order.payment_type === "manual_qris" ||
+    !!order.payment_proof_url ||
+    String(order.order_id || "").startsWith("LNS");
+
+  if (isManualQris && pStatus !== "paid" && order.payment_proof_note) {
     return { text: "Bukti Ditolak", color: "bg-red-100 text-red-800 border-red-200" };
   }
 
-  // QRIS Static: uploaded proof but not yet verified by admin
-  if (order.payment_type === "manual_qris" && pStatus !== "paid" && order.payment_proof_url) {
+  if (isManualQris && pStatus !== "paid" && order.payment_proof_url) {
     return { text: "Menunggu Verifikasi", color: "bg-blue-100 text-blue-800 border-blue-200" };
   }
 
-  // QRIS Static: not yet uploaded proof
-  if (order.payment_type === "manual_qris" && pStatus !== "paid" && !order.payment_proof_url) {
+  if (isManualQris && pStatus !== "paid" && !order.payment_proof_url) {
     return { text: "Menunggu Upload Bukti", color: "bg-amber-100 text-amber-800 border-amber-200" };
   }
 
-  if (pStatus === "unpaid" || pStatus === "pending" || oStatus === "pending") {
-    return { text: "Belum Dibayar", color: "bg-amber-100 text-amber-800 border-amber-200" };
+  const lnsPaid = linkedLns && (linkedLns.payment_status === "paid" || linkedLns.order_status === "completed");
+  const itemsList = order.items || [];
+  const isDp = order.is_dp || itemsList.some((i: any) => String(i.color || "").includes("DP") || String(i.size || "").includes("DP"));
+  const hasRegular = itemsList.some((i: any) => !String(i.color || "").includes("DP") && !String(i.size || "").includes("DP"));
+
+  if (isDp && !lnsPaid) {
+    if (hasRegular) {
+      return { text: "SEBAGIAN LUNAS", color: "bg-orange-100 text-orange-950 border-orange-300 font-extrabold" };
+    }
+    return { text: "SUDAH DP BELUM LUNAS", color: "bg-amber-100 text-amber-950 border-amber-300 font-extrabold" };
   }
 
-  if (oStatus === "ready_for_pickup") {
-    return { text: "Siap Diambil", color: "bg-teal-100 text-teal-800 border-teal-200" };
+  if (pStatus === "paid" || oStatus === "completed" || oStatus === "settlement") {
+    return { text: "Lunas Terbayar", color: "bg-emerald-100 text-emerald-800 border-emerald-200 font-bold" };
+  }
+
+  return { text: "Belum Dibayar", color: "bg-amber-100 text-amber-800 border-amber-200" };
+};
+
+const getFulfillmentStatusBadge = (order: any) => {
+  if (!order) return { text: "-", color: "" };
+  if (order.is_complained) {
+    return { text: "Ada Komplain", color: "bg-red-600 text-white border-red-700 font-black animate-pulse" };
+  }
+
+  const oStatus = order.order_status || order.fulfillment_status;
+
+  if (oStatus === "completed") {
+    return { text: "Selesai / Diterima", color: "bg-emerald-100 text-emerald-800 border-emerald-200 font-bold" };
   }
 
   if (oStatus === "shipped") {
-    return { text: "Siap Diantar / Dikirim", color: "bg-blue-100 text-blue-800 border-blue-200" };
+    return { text: "Sedang Diantar", color: "bg-blue-100 text-blue-800 border-blue-200 font-bold" };
   }
 
-  if (oStatus === "completed" || oStatus === "settlement" || oStatus === "capture" || pStatus === "paid") {
-    return { text: "Selesai", color: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+  if (oStatus === "ready_for_pickup") {
+    return { text: "Siap Diambil", color: "bg-teal-100 text-teal-800 border-teal-200 font-bold" };
   }
 
   return { text: "Sedang Diproses", color: "bg-indigo-100 text-indigo-800 border-indigo-200" };
 };
+
+const getStatusBadgeTextAndColor = getPaymentStatusBadge;
 
 function AdminTransactionsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -105,8 +147,9 @@ function AdminTransactionsPage() {
   const [offlineSales, setOfflineSales] = useState<OfflineSale[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Search state
+  // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "verifying" | "dp" | "unpaid">("all");
 
   // Collapsible Row States
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -123,6 +166,8 @@ function AdminTransactionsPage() {
   const [managedStatus, setManagedStatus] = useState<string>("");
   const [managedShippingAddress, setManagedShippingAddress] = useState<string>("");
   const [managedNotes, setManagedNotes] = useState<string>("");
+  const [managedFulfillmentProof, setManagedFulfillmentProof] = useState<string>("");
+  const [uploadingFulfillmentProof, setUploadingFulfillmentProof] = useState(false);
   const [savingManaged, setSavingManaged] = useState(false);
 
   const [verificationNote, setVerificationNote] = useState<string>("");
@@ -224,6 +269,7 @@ function AdminTransactionsPage() {
           setManagedStatus(result.order.transaction_status);
           setManagedShippingAddress(result.order.shipping_address || "");
           setManagedNotes(result.order.notes || "");
+          setManagedFulfillmentProof(result.order.fulfillment_proof_url || "");
         } else {
           toast.error("Gagal mengambil detail pesanan");
           setManagementOpen(false);
@@ -260,6 +306,7 @@ function AdminTransactionsPage() {
           status: managedStatus,
           shipping_address: managedShippingAddress || undefined,
           notes: managedNotes || undefined,
+          fulfillment_proof_url: managedFulfillmentProof || undefined,
         },
       });
       if (result.success) {
@@ -278,6 +325,31 @@ function AdminTransactionsPage() {
       toast.error("Gagal melakukan aksi pembaruan");
     } finally {
       setSavingManaged(false);
+    }
+  };
+
+  const handleUploadFulfillmentProofFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingFulfillmentProof(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${API_BASE_URL}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.url || data.path) {
+        setManagedFulfillmentProof(data.url || data.path);
+        toast.success("Foto bukti penyiapan/resi berhasil diunggah");
+      } else {
+        toast.error(data.error || "Gagal mengunggah file");
+      }
+    } catch {
+      toast.error("Gagal mengunggah foto bukti");
+    } finally {
+      setUploadingFulfillmentProof(false);
     }
   };
 
@@ -365,28 +437,153 @@ function AdminTransactionsPage() {
     } catch {
       toast.error("Aksi gagal");
     }
-  };  const filteredOnlineOrders = onlineOrders.filter((order) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      order.order_id.toLowerCase().includes(query) ||
-      (order.customer_name || "").toLowerCase().includes(query) ||
-      (order.customer_email || "").toLowerCase().includes(query) ||
-      (order.customer_phone || "").toLowerCase().includes(query) ||
-      (order.payment_type || "").toLowerCase().includes(query) ||
-      (order.transaction_status || "").toLowerCase().includes(query)
-    );
-  });
+  };
 
-  const filteredOfflineSales = offlineSales.filter((sale) => {
-    const query = searchQuery.toLowerCase();
-    return (
-      sale.sale_id.toLowerCase().includes(query) ||
-      (sale.customer_name || "").toLowerCase().includes(query) ||
-      (sale.cashier_name || "").toLowerCase().includes(query) ||
-      (sale.payment_method || "").toLowerCase().includes(query) ||
-      (sale.status || "").toLowerCase().includes(query)
-    );
-  });
+  const isDpOrder = (o: any) => {
+    if (!o) return false;
+    if (o.is_dp !== undefined && o.is_dp !== null) return !!o.is_dp;
+    const notes = String(o.notes || "").toUpperCase();
+    if (notes.includes("PELUNASAN") || notes.includes("LUNAS")) return false;
+    if (o.items && Array.isArray(o.items)) {
+      const hasLunasVariant = o.items.some((i: any) => {
+        const c = String(i?.color || "").toUpperCase();
+        const s = String(i?.size || "").toUpperCase();
+        return c.includes("LUNAS") || s.includes("LUNAS") || c.includes("FULL") || s.includes("FULL");
+      });
+      if (hasLunasVariant) return false;
+
+      const hasDpVariant = o.items.some((i: any) => {
+        const c = String(i?.color || "").toUpperCase();
+        const s = String(i?.size || "").toUpperCase();
+        return c.includes("DP") || s.includes("DP");
+      });
+      if (hasDpVariant) return true;
+    }
+    if (notes.includes("DP")) return true;
+    return false;
+  };
+
+  // Map LNS pelunasan orders by parent order ID
+  const dpPelunasanMap = useMemo(() => {
+    const map: Record<string, any> = {};
+    (onlineOrders || []).forEach((o) => {
+      if (String(o.order_id || "").startsWith("LNS") || (o.notes && o.notes.includes("Pelunasan untuk Order:"))) {
+        const match = o.notes && o.notes.match(/Pelunasan untuk Order:\s*([A-Za-z0-9-]+)/);
+        if (match && match[1]) {
+          map[match[1]] = o;
+        } else {
+          const parts = (o.order_id || "").split("-");
+          if (parts.length >= 3) {
+            const parentId = parts.slice(1, parts.length - 1).join("-");
+            map[parentId] = o;
+          }
+        }
+      }
+    });
+    return map;
+  }, [onlineOrders]);
+
+  const stats = useMemo(() => {
+    const ordersList = Array.isArray(onlineOrders) ? onlineOrders : [];
+    const total = ordersList.length;
+    let paidCount = 0;
+    let verifyingCount = 0;
+    let dpCount = 0;
+    let unpaidCount = 0;
+
+    ordersList.forEach((o) => {
+      if (!o) return;
+      const isPaid =
+        o.payment_status === "paid" ||
+        o.transaction_status === "settlement" ||
+        o.order_status === "completed";
+      const hasProof = !!o.payment_proof_url;
+      const linkedLns = dpPelunasanMap[o.order_id];
+      const lnsHasProof = linkedLns && !!linkedLns.payment_proof_url && linkedLns.payment_status !== "paid";
+
+      if (isPaid && (!linkedLns || linkedLns.payment_status === "paid")) {
+        paidCount++;
+      } else if (hasProof || lnsHasProof) {
+        verifyingCount++;
+      } else {
+        unpaidCount++;
+      }
+
+      if (isDpOrder(o)) {
+        dpCount++;
+      }
+    });
+
+    return { total, paidCount, verifyingCount, dpCount, unpaidCount };
+  }, [onlineOrders, dpPelunasanMap]);
+
+  const filteredOnlineOrders = useMemo(() => {
+    const ordersList = Array.isArray(onlineOrders) ? onlineOrders : [];
+    const parentIdsInList = new Set(ordersList.map((o) => o.order_id));
+
+    return ordersList.filter((order) => {
+      if (!order) return false;
+
+      // Hide standalone LNS orders if their parent DP order exists in list (it will be rendered as sub-row)
+      const isLns = String(order.order_id || "").startsWith("LNS") || (order.notes && order.notes.includes("Pelunasan untuk Order:"));
+      if (isLns) {
+        const match = order.notes && order.notes.match(/Pelunasan untuk Order:\s*([A-Za-z0-9-]+)/);
+        const parentId = match ? match[1] : order.order_id.split("-").slice(1, -1).join("-");
+        if (parentId && parentIdsInList.has(parentId) && !searchQuery) {
+          return false;
+        }
+      }
+
+      // 1. Search Query Filter
+      const query = (searchQuery || "").toLowerCase();
+      const linkedLns = dpPelunasanMap[order.order_id];
+      const matchesQuery =
+        !query ||
+        String(order.order_id || "").toLowerCase().includes(query) ||
+        String(order.customer_name || "").toLowerCase().includes(query) ||
+        String(order.customer_email || "").toLowerCase().includes(query) ||
+        String(order.customer_phone || "").toLowerCase().includes(query) ||
+        String(order.payment_type || "").toLowerCase().includes(query) ||
+        String(order.transaction_status || "").toLowerCase().includes(query) ||
+        (linkedLns && String(linkedLns.order_id || "").toLowerCase().includes(query));
+
+      if (!matchesQuery) return false;
+
+      // 2. Status Filter
+      if (statusFilter === "all") return true;
+
+      const isPaid =
+        order.payment_status === "paid" ||
+        order.transaction_status === "settlement" ||
+        order.order_status === "completed";
+      const hasProof = !!order.payment_proof_url;
+      const lnsHasProof = linkedLns && !!linkedLns.payment_proof_url && linkedLns.payment_status !== "paid";
+      const lnsIsPaid = linkedLns && linkedLns.payment_status === "paid";
+
+      if (statusFilter === "paid") return isPaid && (!linkedLns || lnsIsPaid);
+      if (statusFilter === "verifying") return (!isPaid && hasProof) || lnsHasProof;
+      if (statusFilter === "unpaid") return !isPaid && !hasProof;
+      if (statusFilter === "dp") return isDpOrder(order);
+
+      return true;
+    });
+  }, [onlineOrders, searchQuery, statusFilter, dpPelunasanMap]);
+
+  const filteredOfflineSales = useMemo(() => {
+    const salesList = Array.isArray(offlineSales) ? offlineSales : [];
+    return salesList.filter((sale) => {
+      if (!sale) return false;
+      const query = (searchQuery || "").toLowerCase();
+      return (
+        !query ||
+        String(sale.sale_id || "").toLowerCase().includes(query) ||
+        String(sale.customer_name || "").toLowerCase().includes(query) ||
+        String(sale.cashier_name || "").toLowerCase().includes(query) ||
+        String(sale.payment_method || "").toLowerCase().includes(query) ||
+        String(sale.status || "").toLowerCase().includes(query)
+      );
+    });
+  }, [offlineSales, searchQuery]);
 
   return (
     <div className="p-6 lg:p-8 space-y-6 bg-background min-h-screen">
@@ -394,7 +591,7 @@ function AdminTransactionsPage() {
         <div>
           <h1 className="display text-3xl text-ink tracking-wider">Manajemen Transaksi</h1>
           <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">
-            Pesanan online (Midtrans) dan penjualan offline (POS)
+            Pesanan website dan POS Kasir.
           </p>
         </div>
         <div className="relative w-full md:w-80">
@@ -407,6 +604,166 @@ function AdminTransactionsPage() {
           />
         </div>
       </div>
+
+      {/* Stat Cards / Interactive Status Filters */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {/* Total Semua */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter("all")}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "all"
+              ? "bg-ink text-white border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] scale-[1.02]"
+              : "bg-white text-ink border-ink/30 hover:border-ink hover:shadow-[3px_3px_0px_0px_rgba(27,27,27,0.8)]"
+            }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider opacity-80">
+              Total Semua
+            </span>
+            <ShoppingBag className="w-4 h-4 opacity-70" />
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none">
+              {stats.total}
+            </span>
+            <span className="text-[10px] font-bold block mt-1 opacity-70">
+              Semua Transaksi
+            </span>
+          </div>
+          {statusFilter === "all" && (
+            <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-brand-orange"></span>
+          )}
+        </button>
+
+        {/* Menunggu Verifikasi */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === "verifying" ? "all" : "verifying")}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "verifying"
+              ? "bg-blue-600 text-white border-blue-900 shadow-[4px_4px_0px_0px_rgba(30,58,138,1)] scale-[1.02]"
+              : "bg-blue-50/70 text-blue-950 border-blue-200 hover:border-blue-500 hover:shadow-[3px_3px_0px_0px_rgba(59,130,246,0.3)]"
+            }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              Butuh ACC Admin
+            </span>
+            <div className="relative">
+              <Clock className="w-4 h-4 text-blue-500" />
+              {stats.verifyingCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-blue-500 rounded-full animate-ping"></span>
+              )}
+            </div>
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none">
+              {stats.verifyingCount}
+            </span>
+            <span className="text-[10px] font-bold block mt-1 text-blue-700">
+              Menunggu Verifikasi
+            </span>
+          </div>
+        </button>
+
+        {/* Lunas / Selesai */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === "paid" ? "all" : "paid")}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "paid"
+              ? "bg-emerald-700 text-white border-emerald-950 shadow-[4px_4px_0px_0px_rgba(6,78,59,1)] scale-[1.02]"
+              : "bg-emerald-50/70 text-emerald-950 border-emerald-200 hover:border-emerald-500 hover:shadow-[3px_3px_0px_0px_rgba(16,185,129,0.3)]"
+            }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              Lunas Terbayar
+            </span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none">
+              {stats.paidCount}
+            </span>
+            <span className="text-[10px] font-bold block mt-1 text-emerald-700">
+              Lunas / Selesai
+            </span>
+          </div>
+        </button>
+
+        {/* Pesanan DP */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === "dp" ? "all" : "dp")}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "dp"
+              ? "bg-amber-600 text-white border-amber-950 shadow-[4px_4px_0px_0px_rgba(120,53,15,1)] scale-[1.02]"
+              : "bg-amber-50/70 text-amber-950 border-amber-200 hover:border-amber-500 hover:shadow-[3px_3px_0px_0px_rgba(245,158,11,0.3)]"
+            }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              Down Payment
+            </span>
+            <CreditCard className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none">
+              {stats.dpCount}
+            </span>
+            <span className="text-[10px] font-bold block mt-1 text-amber-800">
+              Pesanan DP
+            </span>
+          </div>
+        </button>
+
+        {/* Belum Dibayar */}
+        <button
+          type="button"
+          onClick={() => setStatusFilter(statusFilter === "unpaid" ? "all" : "unpaid")}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "unpaid"
+              ? "bg-rose-700 text-white border-rose-950 shadow-[4px_4px_0px_0px_rgba(136,19,55,1)] scale-[1.02]"
+              : "bg-rose-50/70 text-rose-950 border-rose-200 hover:border-rose-500 hover:shadow-[3px_3px_0px_0px_rgba(244,63,94,0.3)]"
+            }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              Belum Bayar
+            </span>
+            <AlertCircle className="w-4 h-4 text-rose-500" />
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none">
+              {stats.unpaidCount}
+            </span>
+            <span className="text-[10px] font-bold block mt-1 text-rose-700">
+              Menunggu Bukti / Transfer
+            </span>
+          </div>
+        </button>
+      </div>
+
+      {statusFilter !== "all" && (
+        <div className="flex items-center gap-2 bg-brand-orange/10 border border-brand-orange/30 px-3.5 py-2 rounded-xl text-xs text-brand-orange font-bold">
+          <Filter className="w-4 h-4" />
+          <span>
+            Filter Status Aktif:{" "}
+            <strong className="uppercase underline">
+              {statusFilter === "verifying"
+                ? "Menunggu Verifikasi"
+                : statusFilter === "paid"
+                  ? "Lunas / Selesai"
+                  : statusFilter === "dp"
+                    ? "Pesanan DP"
+                    : "Belum Dibayar"}
+            </strong>
+          </span>
+          <button
+            onClick={() => setStatusFilter("all")}
+            className="ml-auto text-[10px] uppercase bg-brand-orange text-white px-2.5 py-1 rounded hover:bg-brand-orange/90 font-black cursor-pointer"
+          >
+            Reset Filter (Tampilkan Semua)
+          </button>
+        </div>
+      )}
 
       <Tabs defaultValue="online">
         <TabsList>
@@ -439,11 +796,11 @@ function AdminTransactionsPage() {
                       <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
                         Total
                       </th>
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        Pembayaran
+                      <th className="p-3 text-center text-xs font-semibold tracking-wider text-ink uppercase">
+                        Status Pembayaran
                       </th>
                       <th className="p-3 text-center text-xs font-semibold tracking-wider text-ink uppercase">
-                        Status
+                        Status Penerimaan
                       </th>
                       <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
                         Tanggal
@@ -465,7 +822,11 @@ function AdminTransactionsPage() {
                         <>
                           <tr
                             key={order.order_id}
-                            className="border-t border-border hover:bg-cream/10 transition-colors"
+                            className={`border-t border-border transition-colors ${
+                              order.voucher_code || order.discount_amount > 0
+                                ? "bg-orange-50/50 hover:bg-orange-100/60"
+                                : "hover:bg-cream/10"
+                            }`}
                           >
                             <td className="p-3 text-center">
                               <Button
@@ -485,7 +846,19 @@ function AdminTransactionsPage() {
                               {idx + 1}
                             </td>
                             <td className="p-3 font-mono text-xs text-brand-blue font-bold">
-                              {order.order_id}
+                              <div>{order.order_id}</div>
+                              <div className="flex flex-wrap gap-1 mt-1">
+                                {isDpOrder(order) && (
+                                  <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[9px] px-1.5 py-0 uppercase font-black">
+                                    Pesanan DP
+                                  </Badge>
+                                )}
+                                {dpPelunasanMap[order.order_id] && (
+                                  <Badge className="bg-purple-100 text-purple-800 border-purple-300 text-[9px] px-1.5 py-0 uppercase font-black">
+                                    + Pelunasan
+                                  </Badge>
+                                )}
+                              </div>
                             </td>
                             <td className="p-3">
                               <p className="font-semibold text-ink uppercase text-xs tracking-wide">
@@ -498,17 +871,26 @@ function AdminTransactionsPage() {
                             <td className="p-3 text-right font-bold text-ink">
                               Rp {Number(order.gross_amount).toLocaleString("id-ID")}
                             </td>
-                            <td className="p-3 text-muted-foreground text-xs">
-                              {order.payment_type || "-"}
+                            <td className="p-3 text-center">
+                              {(() => {
+                                const payBadge = getPaymentStatusBadge(order, dpPelunasanMap[order.order_id]);
+                                return (
+                                  <Badge
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${payBadge.color}`}
+                                  >
+                                    {payBadge.text}
+                                  </Badge>
+                                );
+                              })()}
                             </td>
                             <td className="p-3 text-center">
                               {(() => {
-                                const badgeInfo = getStatusBadgeTextAndColor(order);
+                                const fulBadge = getFulfillmentStatusBadge(order);
                                 return (
                                   <Badge
-                                    className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${badgeInfo.color}`}
+                                    className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${fulBadge.color}`}
                                   >
-                                    {badgeInfo.text}
+                                    {fulBadge.text}
                                   </Badge>
                                 );
                               })()}
@@ -539,6 +921,49 @@ function AdminTransactionsPage() {
                               </div>
                             </td>
                           </tr>
+                          {dpPelunasanMap[order.order_id] && (() => {
+                            const linkedLns = dpPelunasanMap[order.order_id];
+                            const lnsBadge = getStatusBadgeTextAndColor(linkedLns);
+                            return (
+                              <tr className="bg-purple-50/80 border-b-2 border-purple-300">
+                                <td colSpan={9} className="p-2.5 px-6">
+                                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span className="px-2 py-0.5 bg-purple-700 text-white rounded font-black text-[10px] uppercase tracking-wider">
+                                        ↪ Transaksi Pelunasan Terhubung
+                                      </span>
+                                      <span className="font-mono font-black text-purple-950">
+                                        {linkedLns.order_id}
+                                      </span>
+                                      <span className="text-[10px] text-purple-700 font-medium">
+                                        ({new Date(linkedLns.created_at).toLocaleString("id-ID")})
+                                      </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-purple-800 text-[10px] font-bold">Sisa Pelunasan:</span>
+                                      <span className="font-bold text-purple-950 font-mono">
+                                        Rp {Number(linkedLns.gross_amount).toLocaleString("id-ID")}
+                                      </span>
+
+                                      <Badge className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${lnsBadge.color}`}>
+                                        {lnsBadge.text}
+                                      </Badge>
+
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => void handleOpenManagement(linkedLns.order_id, "online")}
+                                        className="border-2 border-purple-900 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[10px] uppercase tracking-wider h-7 shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] cursor-pointer"
+                                      >
+                                        Kelola Pelunasan ↗
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })()}
                           {expandedRows[order.order_id] && (
                             <tr className="bg-[#FCFAF7] border-b border-border">
                               <td colSpan={9} className="p-4 pl-12">
@@ -582,7 +1007,19 @@ function AdminTransactionsPage() {
                                         </tbody>
                                       </table>
                                     </div>
-                                    <div className="flex justify-between items-center pt-2 border-t border-dashed border-border text-xs font-bold">
+                                    { (order.voucher_code || order.discount_amount > 0) && (
+                                      <div className="flex justify-between items-center pt-2 text-xs font-bold text-brand-orange">
+                                        <span className="flex items-center gap-1.5">
+                                          {order.voucher_code ? (
+                                            <>Voucher <span className="bg-brand-orange/10 border border-brand-orange/30 px-1.5 py-0.5 rounded text-[10px] uppercase font-mono">{order.voucher_code}</span>:</>
+                                          ) : (
+                                            "Diskon:"
+                                          )}
+                                        </span>
+                                        <span>-Rp {Number(order.discount_amount || 0).toLocaleString("id-ID")}</span>
+                                      </div>
+                                    )}
+                                    <div className="flex justify-between items-center pt-2 border-t border-dashed border-border text-xs font-bold mt-2">
                                       <span className="text-muted-foreground">TOTAL PEMBAYARAN:</span>
                                       <span className="text-brand-orange text-sm font-extrabold">
                                         Rp {Number(order.gross_amount).toLocaleString("id-ID")}
@@ -803,7 +1240,7 @@ function AdminTransactionsPage() {
           ) : (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
+
                 {/* Left Column: buyer data and proof of payment */}
                 <div className="space-y-4">
                   <div className="bg-[#FCFAF7] border border-border p-4 rounded-lg text-xs space-y-3 shadow-sm">
@@ -826,7 +1263,7 @@ function AdminTransactionsPage() {
                         <p className="text-muted-foreground">{managedTransaction.customer_phone}</p>
                       )}
                     </div>
-                    
+
                     <div className="border-t border-dashed border-border pt-3">
                       <p className="font-bold uppercase tracking-wider text-muted-foreground mb-1 text-[10px]">
                         DETAIL STRUK
@@ -841,9 +1278,9 @@ function AdminTransactionsPage() {
                         Waktu: {new Date(managedTransaction.created_at).toLocaleString("id-ID")}
                       </p>
                       <p className="text-muted-foreground flex items-center gap-1.5 mt-0.5">
-                        Status: 
+                        Status:
                         {(() => {
-                          const badge = getStatusBadgeTextAndColor(managedTransaction);
+                          const badge = getPaymentStatusBadge(managedTransaction, dpPelunasanMap[managedTransaction.order_id]);
                           return (
                             <Badge className={`px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider ${badge.color}`}>
                               {badge.text}
@@ -864,138 +1301,141 @@ function AdminTransactionsPage() {
                   </div>
 
                   {/* Payment Verification Proof section (Online QRIS Manual) */}
-                  {managedType === "online" && managedTransaction.payment_type === "manual_qris" && (
-                    <div className="border border-border rounded-lg p-4 bg-white space-y-4 shadow-sm">
-                      <h4 className="text-xs font-bold text-ink uppercase tracking-wider">Verifikasi Bukti QRIS</h4>
-                      
-                      {managedTransaction.payment_proof_url ? (
-                        <div className="space-y-2">
-                          <div className="w-full max-h-48 border border-border rounded overflow-hidden flex items-center justify-center bg-gray-50">
-                            <img
-                              src={resolveImageUrl(managedTransaction.payment_proof_url)}
-                              alt="Bukti Transfer"
-                              className="max-h-48 object-contain cursor-zoom-in hover:scale-105 transition-transform"
-                              onClick={() => window.open(resolveImageUrl(managedTransaction.payment_proof_url), "_blank")}
-                            />
-                          </div>
-                          <a
-                            href={resolveImageUrl(managedTransaction.payment_proof_url)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-brand-blue font-semibold hover:underline block text-[10px] text-center"
-                          >
-                            Buka Bukti Pembayaran di Tab Baru ↗
-                          </a>
-                        </div>
-                      ) : (
-                        <p className="text-xs text-muted-foreground italic text-center p-4 border border-dashed rounded">
-                          Belum mengunggah bukti pembayaran.
-                        </p>
-                      )}
+                  {managedType === "online" &&
+                    (managedTransaction.payment_type === "manual_qris" ||
+                      !!managedTransaction.payment_proof_url ||
+                      String(managedTransaction.order_id || "").startsWith("LNS")) && (
+                      <div className="border border-border rounded-lg p-4 bg-white space-y-4 shadow-sm">
+                        <h4 className="text-xs font-bold text-ink uppercase tracking-wider">Verifikasi Bukti QRIS</h4>
 
-                      {/* Display current status and annul option */}
-                      {(managedTransaction.payment_status === "paid" || managedTransaction.transaction_status === "settlement") ? (
-                        <div className="space-y-3">
-                          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-lg text-xs flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-                            <span className="font-bold uppercase tracking-wider text-[10px]">Pembayaran Telah Diterima / Terverifikasi</span>
-                          </div>
-                          {!isCashier && (
-                            <div className="space-y-2">
-                              <p className="text-[10px] text-muted-foreground">
-                                Anda masih dapat menganulir status ini ke ditolak jika terjadi kesalahan.
-                              </p>
-                              {!showRejectReason ? (
-                                <Button
-                                  variant="outline"
-                                  onClick={() => setShowRejectReason(true)}
-                                  className="w-full text-xs font-bold text-red-600 border-red-200 hover:bg-red-50"
-                                >
-                                  Tolak & Batalkan Pembayaran
-                                </Button>
-                              ) : (
-                                <div className="space-y-2 pt-2 border-t">
-                                  <Label className="text-xs font-semibold text-ink">Catatan Penolakan (Wajib)</Label>
-                                  <Textarea
-                                    value={verificationNote}
-                                    onChange={(e) => setVerificationNote(e.target.value)}
-                                    placeholder="Contoh: Bukti transfer terpotong atau nominal salah."
-                                    rows={2}
-                                    className="text-xs"
-                                  />
-                                  <div className="flex gap-2 justify-end">
-                                    <Button size="sm" variant="outline" onClick={() => setShowRejectReason(false)}>
-                                      Batal
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      disabled={submittingVerification}
-                                      onClick={() => void handleVerifyManaged(false)}
-                                      className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
-                                    >
-                                      Konfirmasi Tolak
-                                    </Button>
-                                  </div>
-                                </div>
-                              )}
+                        {managedTransaction.payment_proof_url ? (
+                          <div className="space-y-2">
+                            <div className="w-full max-h-48 border border-border rounded overflow-hidden flex items-center justify-center bg-gray-50">
+                              <img
+                                src={resolveImageUrl(managedTransaction.payment_proof_url)}
+                                alt="Bukti Transfer"
+                                className="max-h-48 object-contain cursor-zoom-in hover:scale-105 transition-transform"
+                                onClick={() => window.open(resolveImageUrl(managedTransaction.payment_proof_url), "_blank")}
+                              />
                             </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="space-y-3">
-                          <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-xs font-semibold">
-                            ⚠️ Menunggu Verifikasi Pembayaran
+                            <a
+                              href={resolveImageUrl(managedTransaction.payment_proof_url)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-brand-blue font-semibold hover:underline block text-[10px] text-center"
+                            >
+                              Buka Bukti Pembayaran di Tab Baru ↗
+                            </a>
                           </div>
-                          {!isCashier && (
-                            <div className="space-y-3">
-                              {!showRejectReason ? (
-                                <div className="flex gap-2">
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic text-center p-4 border border-dashed rounded">
+                            Belum mengunggah bukti pembayaran.
+                          </p>
+                        )}
+
+                        {/* Display current status and annul option */}
+                        {(managedTransaction.payment_status === "paid" || managedTransaction.transaction_status === "settlement") ? (
+                          <div className="space-y-3">
+                            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-lg text-xs flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                              <span className="font-bold uppercase tracking-wider text-[10px]">Pembayaran Telah Diterima / Terverifikasi</span>
+                            </div>
+                            {!isCashier && (
+                              <div className="space-y-2">
+                                <p className="text-[10px] text-muted-foreground">
+                                  Anda masih dapat menganulir status ini ke ditolak jika terjadi kesalahan.
+                                </p>
+                                {!showRejectReason ? (
                                   <Button
-                                    onClick={() => void handleVerifyManaged(true)}
-                                    disabled={submittingVerification}
-                                    className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
-                                  >
-                                    {submittingVerification ? "Memproses..." : "Terima Pembayaran"}
-                                  </Button>
-                                  <Button
+                                    variant="outline"
                                     onClick={() => setShowRejectReason(true)}
-                                    disabled={submittingVerification}
-                                    className="bg-red-600 hover:bg-red-700 text-white border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                                    className="w-full text-xs font-bold text-red-600 border-red-200 hover:bg-red-50"
                                   >
-                                    Tolak
+                                    Tolak & Batalkan Pembayaran
                                   </Button>
-                                </div>
-                              ) : (
-                                <div className="space-y-2 pt-2 border-t">
-                                  <Label className="text-xs font-semibold text-ink">Catatan Penolakan (Wajib)</Label>
-                                  <Textarea
-                                    value={verificationNote}
-                                    onChange={(e) => setVerificationNote(e.target.value)}
-                                    placeholder="Contoh: Bukti transfer terpotong atau nominal salah."
-                                    rows={2}
-                                    className="text-xs"
-                                  />
-                                  <div className="flex gap-2 justify-end">
-                                    <Button size="sm" variant="outline" onClick={() => setShowRejectReason(false)}>
-                                      Batal
+                                ) : (
+                                  <div className="space-y-2 pt-2 border-t">
+                                    <Label className="text-xs font-semibold text-ink">Catatan Penolakan (Wajib)</Label>
+                                    <Textarea
+                                      value={verificationNote}
+                                      onChange={(e) => setVerificationNote(e.target.value)}
+                                      placeholder="Contoh: Bukti transfer terpotong atau nominal salah."
+                                      rows={2}
+                                      className="text-xs"
+                                    />
+                                    <div className="flex gap-2 justify-end">
+                                      <Button size="sm" variant="outline" onClick={() => setShowRejectReason(false)}>
+                                        Batal
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        disabled={submittingVerification}
+                                        onClick={() => void handleVerifyManaged(false)}
+                                        className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                                      >
+                                        Konfirmasi Tolak
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-xs font-semibold">
+                              ⚠️ Menunggu Verifikasi Pembayaran
+                            </div>
+                            {!isCashier && (
+                              <div className="space-y-3">
+                                {!showRejectReason ? (
+                                  <div className="flex gap-2">
+                                    <Button
+                                      onClick={() => void handleVerifyManaged(true)}
+                                      disabled={submittingVerification}
+                                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                                    >
+                                      {submittingVerification ? "Memproses..." : "Terima Pembayaran"}
                                     </Button>
                                     <Button
-                                      size="sm"
+                                      onClick={() => setShowRejectReason(true)}
                                       disabled={submittingVerification}
-                                      onClick={() => void handleVerifyManaged(false)}
-                                      className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                                      className="bg-red-600 hover:bg-red-700 text-white border-2 border-ink uppercase font-bold text-xs tracking-wider h-10 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
                                     >
-                                      Konfirmasi Tolak
+                                      Tolak
                                     </Button>
                                   </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
+                                ) : (
+                                  <div className="space-y-2 pt-2 border-t">
+                                    <Label className="text-xs font-semibold text-ink">Catatan Penolakan (Wajib)</Label>
+                                    <Textarea
+                                      value={verificationNote}
+                                      onChange={(e) => setVerificationNote(e.target.value)}
+                                      placeholder="Contoh: Bukti transfer terpotong atau nominal salah."
+                                      rows={2}
+                                      className="text-xs"
+                                    />
+                                    <div className="flex gap-2 justify-end">
+                                      <Button size="sm" variant="outline" onClick={() => setShowRejectReason(false)}>
+                                        Batal
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        disabled={submittingVerification}
+                                        onClick={() => void handleVerifyManaged(false)}
+                                        className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                                      >
+                                        Konfirmasi Tolak
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                 </div>
 
                 {/* Right Column: Items bought & Status updates */}
@@ -1039,13 +1479,21 @@ function AdminTransactionsPage() {
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Subtotal:</span>
                         <span className="font-semibold text-ink">
-                          Rp {Number(managedTransaction.gross_amount || managedTransaction.subtotal).toLocaleString("id-ID")}
+                          Rp {Number(managedTransaction.subtotal || managedTransaction.gross_amount).toLocaleString("id-ID")}
                         </span>
                       </div>
                       {managedTransaction.discount > 0 && (
                         <div className="flex justify-between text-yellow-600 font-semibold">
                           <span>Diskon POS:</span>
                           <span>-Rp {Number(managedTransaction.discount).toLocaleString("id-ID")}</span>
+                        </div>
+                      )}
+                      {managedTransaction.voucher_code && (
+                        <div className="flex justify-between text-brand-orange font-semibold">
+                          <span className="flex items-center gap-1.5">
+                            Voucher <span className="bg-brand-orange/10 border border-brand-orange/30 px-1.5 py-0.5 rounded text-[10px] uppercase font-mono">{managedTransaction.voucher_code}</span>:
+                          </span>
+                          <span>-Rp {Number(managedTransaction.discount_amount || 0).toLocaleString("id-ID")}</span>
                         </div>
                       )}
                       <div className="flex justify-between border-t border-border pt-2 text-sm font-extrabold">
@@ -1061,7 +1509,25 @@ function AdminTransactionsPage() {
                   {managedType === "online" && !isCashier && (
                     <div className="border border-border rounded-lg p-4 bg-white shadow-sm space-y-4">
                       <h4 className="text-xs font-bold text-ink uppercase tracking-wider">Pembaruan Status & Pengiriman</h4>
-                      
+
+                      {/* Complaint Warning Banner */}
+                      {managedTransaction?.is_complained === 1 && (
+                        <div className="rounded-lg bg-red-100 border-2 border-red-500 p-3 text-red-900 font-semibold text-xs space-y-1">
+                          <div className="flex items-center gap-2 font-black uppercase text-red-700">
+                            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                            PEMBELI MENGAJUKAN KOMPLAIN
+                          </div>
+                          <p className="text-[11px] leading-snug">
+                            Pembeli telah mengajukan komplain kecacatan produk (defect).
+                          </p>
+                          {managedTransaction.complaint_notes && (
+                            <p className="italic bg-white/80 p-2 rounded text-[11px] border border-red-300">
+                              "{managedTransaction.complaint_notes}"
+                            </p>
+                          )}
+                        </div>
+                      )}
+
                       <div className="rounded bg-amber-50 border border-amber-200 p-2.5 text-[10px] text-amber-900 flex items-start gap-2">
                         <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-amber-600 mt-0.5" />
                         <p>
@@ -1087,6 +1553,57 @@ function AdminTransactionsPage() {
                             </SelectContent>
                           </Select>
                         </div>
+
+                        {/* Photo Proof Upload for Siap Diambil / Sedang Diantar / Selesai */}
+                        {(managedStatus === "ready_for_pickup" || managedStatus === "shipped" || managedStatus === "completed" || managedStatus === "settlement") && (
+                          <div className="space-y-2">
+                            <Label className="text-xs font-bold text-ink">Foto Bukti Pengambilan / Penerimaan Barang</Label>
+
+                            <div className="border-2 border-dashed border-ink/40 bg-cream/30 hover:bg-cream/60 rounded-xl p-3.5 text-center transition flex flex-col items-center justify-center gap-2">
+                              {managedFulfillmentProof ? (
+                                <div className="relative w-full flex flex-col items-center gap-2">
+                                  <div className="relative w-40 h-28 rounded-lg border-2 border-ink overflow-hidden shadow-sm">
+                                    <img src={resolveImageUrl(managedFulfillmentProof)} alt="Bukti Pengambilan/Penerimaan" className="w-full h-full object-cover" />
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded">
+                                      ✓ Foto Bukti Terunggah
+                                    </span>
+                                    <label className="cursor-pointer text-[10px] font-extrabold uppercase text-brand-orange hover:underline">
+                                      {uploadingFulfillmentProof ? "Mengunggah..." : "Ganti Foto"}
+                                      <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        disabled={uploadingFulfillmentProof}
+                                        onChange={(e) => void handleUploadFulfillmentProofFile(e)}
+                                      />
+                                    </label>
+                                  </div>
+                                </div>
+                              ) : (
+                                <label className="cursor-pointer w-full flex flex-col items-center justify-center py-2 text-xs gap-1.5">
+                                  <div className="w-10 h-10 rounded-full bg-cream border border-ink/30 flex items-center justify-center text-ink">
+                                    <Upload className="w-5 h-5 text-brand-orange" />
+                                  </div>
+                                  <span className="font-extrabold text-ink uppercase tracking-wider text-[11px]">
+                                    {uploadingFulfillmentProof ? "Sedang Mengunggah Foto..." : "Klik Untuk Unggah Foto Bukti"}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    Format: JPG, PNG, WEBP (Foto serah terima / foto resi)
+                                  </span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    disabled={uploadingFulfillmentProof}
+                                    onChange={(e) => void handleUploadFulfillmentProofFile(e)}
+                                  />
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         <div className="space-y-1">
                           <Label className="text-xs font-semibold text-ink">Alamat Pengiriman</Label>

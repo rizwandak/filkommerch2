@@ -151,13 +151,13 @@ function AdminProductsPage() {
     }
 
     const newVariants: any[] = [];
-    const sizesToUse = sizes.length > 0 ? sizes : ["One Size"];
+    const sizesToUse = sizes.length > 0 ? sizes : [""];
     const colorsToUse = colors.length > 0 ? colors : [""];
 
     for (const size of sizesToUse) {
       for (const color of colorsToUse) {
         const existing = currentVariants.find(
-          (v) => (v.size || "One Size") === size && (v.color || "") === color
+          (v) => (v.size || "") === size && (v.color || "") === color
         );
         newVariants.push({
           size,
@@ -657,7 +657,7 @@ function AdminProductsPage() {
       size_chart_url: form.size_chart_url || undefined,
       images: form.images,
       variants: form.variants.map((v) => ({
-        size: v.size || "One Size",
+        size: v.size || "",
         color: v.color || "",
         stock: form.sale_type === "pre_order" ? 999 : (parseInt(v.stock) || 0),
         filkom_price: v.filkom_price ? parseFloat(v.filkom_price) : null,
@@ -906,15 +906,22 @@ function AdminProductsPage() {
                           <p className="text-[10px] text-muted-foreground">{product.slug}</p>
                           {product.variants && product.variants.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1 max-w-md">
-                              {product.variants.map((v, idx) => (
-                                <span
-                                  key={idx}
-                                  className="text-[9px] bg-cream border border-border px-1.5 py-0.5 rounded text-muted-foreground font-medium"
-                                >
-                                  {v.size}
-                                  {v.color ? ` (${v.color})` : ""}: {v.stock}
-                                </span>
-                              ))}
+                              {product.variants.map((v, idx) => {
+                                const isSingleGeneric =
+                                  product.variants.length === 1 &&
+                                  (!v.size || v.size === "One Size" || v.size === "All Size") &&
+                                  !v.color;
+                                return (
+                                  <span
+                                    key={idx}
+                                    className="text-[9px] bg-cream border border-border px-1.5 py-0.5 rounded text-muted-foreground font-medium"
+                                  >
+                                    {isSingleGeneric
+                                      ? `Stok: ${v.stock}`
+                                      : `${v.size}${v.color ? ` (${v.color})` : ""}: ${v.stock}`}
+                                  </span>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -1429,7 +1436,7 @@ function AdminProductsPage() {
                         : "bg-cream/40 text-muted-foreground hover:bg-cream/60"
                     }`}
                   >
-                    Tidak (Single Item / One Size)
+                    Tidak (Item Tunggal)
                   </button>
                   <button
                     type="button"
@@ -1449,7 +1456,7 @@ function AdminProductsPage() {
                 /* Single Item Simple Form */
                 <div className="bg-cream/20 p-4 rounded-xl border border-ink/20 space-y-3">
                   <p className="text-[10px] text-muted-foreground font-semibold">
-                    Produk Anda akan memiliki 1 variasi default (&quot;One Size&quot;). Silakan tentukan stoknya di bawah ini:
+                    Produk ini dijual sebagai item tunggal tanpa pilihan varian. Silakan tentukan stoknya di bawah ini:
                   </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
@@ -1527,7 +1534,7 @@ function AdminProductsPage() {
                       {/* Badge options list */}
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         {sizeOptions.length === 0 ? (
-                          <span className="text-[9px] text-muted-foreground font-semibold italic">Belum ada pilihan ukuran. Default: One Size</span>
+                          <span className="text-[9px] text-muted-foreground font-semibold italic">Belum ada pilihan ukuran. Tambahkan minimal 1 ukuran.</span>
                         ) : (
                           sizeOptions.map((sz, idx) => (
                             <span
@@ -1616,7 +1623,7 @@ function AdminProductsPage() {
                       {form.variants.map((v, i) => (
                         <div key={i} className="grid grid-cols-12 gap-2 items-center bg-cream/10 p-2 rounded-xl border border-ink/20">
                           <div className="col-span-2">
-                            <span className="text-xs font-black uppercase text-ink">{v.size}</span>
+                            <span className="text-xs font-black uppercase text-ink">{v.size || "-"}</span>
                           </div>
                           <div className="col-span-2">
                             <span className="text-xs font-bold text-muted-foreground uppercase">{v.color || "-"}</span>
@@ -1677,7 +1684,7 @@ function AdminProductsPage() {
                                 const variants = form.variants.filter((_, idx) => idx !== i);
                                 setForm({
                                   ...form,
-                                  variants: variants.length > 0 ? variants : [{ size: "One Size", color: "", stock: "0", filkom_price: "" }],
+                                  variants: variants.length > 0 ? variants : [{ size: "", color: "", stock: "0", filkom_price: "" }],
                                 });
                               }}
                             >
@@ -1700,7 +1707,7 @@ function AdminProductsPage() {
                             ...form,
                             variants: [
                               ...form.variants,
-                              { size: "One Size", color: "", stock: "0", filkom_price: "" }
+                              { size: "", color: "", stock: "0", filkom_price: "" }
                             ]
                           });
                         }}
