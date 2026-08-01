@@ -28,6 +28,10 @@ import {
   Image,
   Eye,
   RefreshCw,
+  Star,
+  FileText,
+  ShieldAlert,
+  CheckCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -37,6 +41,9 @@ import {
   getStoreSettings,
   submitPaymentProof,
   createPelunasanOrderServerAction,
+  confirmOrderCompletionServerAction,
+  createProductReviewServerAction,
+  submitOrderComplaintServerAction,
 } from "@backend/server-actions";
 import { Navbar } from "@/components/Navbar";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -95,6 +102,29 @@ function UserOrdersPage() {
 
   const [mayarCheckoutUrl, setMayarCheckoutUrl] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  const [completingOrderId, setCompletingOrderId] = useState<string | null>(null);
+
+  const handleConfirmCompletion = async (orderId: string) => {
+    try {
+      setCompletingOrderId(orderId);
+      const res = await confirmOrderCompletionServerAction({ data: { orderId } });
+      if (res.success) {
+        toast.success("Pesanan berhasil dikonfirmasi selesai! Terima kasih.");
+        await fetchOrders();
+        // Modal detail state removed
+      } else {
+        toast.error(res.error || "Gagal mengonfirmasi pesanan selesai");
+      }
+    } catch (err: any) {
+      console.error(err);
+      toast.error("Terjadi kesalahan saat mengonfirmasi pesanan");
+    } finally {
+      setCompletingOrderId(null);
+    }
+  };
+
+
 
   // Check if store is in manual QRIS mode
   const isManualQrisMode = storeSettings?.payment_mode === "manual_qris";
@@ -687,10 +717,37 @@ function UserOrdersPage() {
                       </span>
                     </div>
 
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 justify-end">
+                      <Link
+                        to="/orders/$orderId"
+                        params={{ orderId: order.order_id }}
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 border-2 border-ink text-xs font-bold uppercase bg-amber-100 hover:bg-amber-200 text-ink rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-ink" />
+                        Detail Transaksi
+                      </Link>
+
+                      {/* Confirm Completion Button */}
+                      {order.payment_status === "paid" && order.order_status !== "completed" && order.order_status !== "cancelled" && (
+                        <button
+                          onClick={() => handleConfirmCompletion(order.order_id)}
+                          disabled={completingOrderId === order.order_id}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 border-2 border-ink text-xs font-extrabold uppercase bg-emerald-500 text-white hover:bg-emerald-600 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer disabled:opacity-50"
+                        >
+                          {completingOrderId === order.order_id ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : (
+                            <CheckCheck className="w-3.5 h-3.5" />
+                          )}
+                          Pesanan Diterima
+                        </button>
+                      )}
+
+
+
                       {/* Contact admin button for all states */}
                       <a
-                        href="https://wa.me/6282287190402" // Dummy WhatsApp number
+                        href="https://wa.me/6282287190402"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3.5 py-2 border-2 border-ink text-xs font-bold uppercase bg-white hover:bg-cream rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all"
@@ -815,7 +872,6 @@ function UserOrdersPage() {
           </div>
         )}
       </main>
-
 
     </div>
   );

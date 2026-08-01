@@ -160,6 +160,24 @@ CREATE TABLE IF NOT EXISTS store_settings (
 );
 
 -- ==========================================================
+-- 7. TABEL PRODUCT REVIEWS
+-- ==========================================================
+CREATE TABLE IF NOT EXISTS product_reviews (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    product_id INT NOT NULL,
+    order_id VARCHAR(50) NOT NULL,
+    user_id INT NOT NULL,
+    rating INT NOT NULL,
+    comment TEXT DEFAULT NULL,
+    variant VARCHAR(100) DEFAULT NULL,
+    user_name VARCHAR(100) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_user_product_order (order_id, product_id, user_id)
+);
+
+-- ==========================================================
 -- INSERT DATA DUMMY
 -- ==========================================================
 INSERT INTO categories (name, slug) VALUES 

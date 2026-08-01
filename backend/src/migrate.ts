@@ -21,6 +21,23 @@ export async function runMigration() {
 
     const queries = [
       {
+        name: "product_reviews",
+        sql: `CREATE TABLE IF NOT EXISTS product_reviews (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          product_id INT NOT NULL,
+          order_id VARCHAR(50) NOT NULL,
+          user_id INT NOT NULL,
+          rating INT NOT NULL,
+          comment TEXT DEFAULT NULL,
+          variant VARCHAR(100) DEFAULT NULL,
+          user_name VARCHAR(100) DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          UNIQUE KEY unique_user_product_order (order_id, product_id, user_id)
+        )`
+      },
+      {
         name: "bundle_items",
         sql: `CREATE TABLE IF NOT EXISTS bundle_items (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -198,6 +215,28 @@ export async function runMigration() {
       console.log("✅ Managed historical voucher_code backfill successfully!");
     } catch (err: any) {
       console.warn("Notice: voucher_code backfill status:", err.message);
+    }
+
+    // Create product_reviews table if it doesn't exist
+    try {
+      console.log("Creating product_reviews table if not exists...");
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS product_reviews (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          product_id INT NOT NULL,
+          order_id VARCHAR(100) NOT NULL,
+          user_id INT DEFAULT NULL,
+          rating TINYINT NOT NULL DEFAULT 5,
+          comment TEXT DEFAULT NULL,
+          variant VARCHAR(255) DEFAULT NULL,
+          user_name VARCHAR(255) DEFAULT 'Pembeli FILKOM',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY unique_review (product_id, order_id)
+        )
+      `);
+      console.log("✅ product_reviews table ready!");
+    } catch (err: any) {
+      console.warn("Notice: product_reviews table status:", err.message);
     }
 
     console.log("Schema migration finished successfully!");

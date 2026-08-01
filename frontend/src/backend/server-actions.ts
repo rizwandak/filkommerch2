@@ -580,7 +580,7 @@ const getOrderByIdServerFn = createServerFn({ method: "GET" })
   .handler(
     async ({
       data: orderId,
-    }): Promise<{ success: boolean; order?: Order; items?: OrderItem[]; error?: string }> => {
+    }): Promise<{ success: boolean; order?: Order; items?: OrderItem[]; reviews?: any[]; error?: string }> => {
       try {
         return await executeApiCall(`/api/orders/${orderId}`, "GET");
       } catch (error) {
@@ -590,7 +590,7 @@ const getOrderByIdServerFn = createServerFn({ method: "GET" })
     },
   );
 
-export const getOrderById = async (opts: { data: string }): Promise<{ success: boolean; order?: Order; items?: OrderItem[]; error?: string }> => {
+export const getOrderById = async (opts: { data: string }): Promise<{ success: boolean; order?: Order; items?: OrderItem[]; reviews?: any[]; error?: string }> => {
   if (typeof window !== "undefined") {
     try {
       return await executeApiCall(`/api/orders/${opts.data}`, "GET");
@@ -1726,4 +1726,47 @@ export const submitOrderComplaintServerAction = createServerFn({ method: "POST" 
       return { success: false, error: e.message || "Failed to submit order complaint" };
     }
   });
+
+// Submit Product Review (Buyer)
+export const createProductReviewServerAction = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      productId: number;
+      orderId: string;
+      userId?: number;
+      rating: number;
+      comment?: string;
+      variant?: string;
+      userName?: string;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/reviews`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("createProductReviewServerAction error:", e);
+      return { success: false, error: e.message || "Failed to submit review" };
+    }
+  });
+
+// Get Product Reviews (Public)
+export const getProductReviewsServerAction = createServerFn({ method: "POST" })
+  .validator((data: { productId: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/products/${data.productId}/reviews`);
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getProductReviewsServerAction error:", e);
+      return { success: false, reviews: [], totalReviews: 0, avgRating: 0 };
+    }
+  });
+
 

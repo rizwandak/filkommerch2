@@ -23,6 +23,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as PosIndexRouteImport } from './routes/pos/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
+import { Route as OrdersOrderIdRouteImport } from './routes/orders_.$orderId'
 import { Route as ApiDbTestRouteImport } from './routes/api/db-test'
 import { Route as AdminVouchersRouteImport } from './routes/admin/vouchers'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
@@ -105,6 +106,11 @@ const ProductSlugRoute = ProductSlugRouteImport.update({
   path: '/product/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OrdersOrderIdRoute = OrdersOrderIdRouteImport.update({
+  id: '/orders_/$orderId',
+  path: '/orders/$orderId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiDbTestRoute = ApiDbTestRouteImport.update({
   id: '/api/db-test',
   path: '/api/db-test',
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/admin/users': typeof AdminUsersRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/api/db-test': typeof ApiDbTestRoute
+  '/orders/$orderId': typeof OrdersOrderIdRoute
   '/product/$slug': typeof ProductSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/pos/': typeof PosIndexRoute
@@ -209,6 +216,7 @@ export interface FileRoutesByTo {
   '/admin/users': typeof AdminUsersRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/api/db-test': typeof ApiDbTestRoute
+  '/orders/$orderId': typeof OrdersOrderIdRoute
   '/product/$slug': typeof ProductSlugRoute
   '/admin': typeof AdminIndexRoute
   '/pos': typeof PosIndexRoute
@@ -237,6 +245,7 @@ export interface FileRoutesById {
   '/admin/users': typeof AdminUsersRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/api/db-test': typeof ApiDbTestRoute
+  '/orders_/$orderId': typeof OrdersOrderIdRoute
   '/product/$slug': typeof ProductSlugRoute
   '/admin/': typeof AdminIndexRoute
   '/pos/': typeof PosIndexRoute
@@ -266,6 +275,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/vouchers'
     | '/api/db-test'
+    | '/orders/$orderId'
     | '/product/$slug'
     | '/admin/'
     | '/pos/'
@@ -291,6 +301,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/vouchers'
     | '/api/db-test'
+    | '/orders/$orderId'
     | '/product/$slug'
     | '/admin'
     | '/pos'
@@ -318,6 +329,7 @@ export interface FileRouteTypes {
     | '/admin/users'
     | '/admin/vouchers'
     | '/api/db-test'
+    | '/orders_/$orderId'
     | '/product/$slug'
     | '/admin/'
     | '/pos/'
@@ -336,6 +348,7 @@ export interface RootRouteChildren {
   PreOrderRoute: typeof PreOrderRoute
   ProductsRoute: typeof ProductsRoute
   ApiDbTestRoute: typeof ApiDbTestRoute
+  OrdersOrderIdRoute: typeof OrdersOrderIdRoute
   ProductSlugRoute: typeof ProductSlugRoute
 }
 
@@ -437,6 +450,13 @@ declare module '@tanstack/react-router' {
       path: '/product/$slug'
       fullPath: '/product/$slug'
       preLoaderRoute: typeof ProductSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/orders_/$orderId': {
+      id: '/orders_/$orderId'
+      path: '/orders/$orderId'
+      fullPath: '/orders/$orderId'
+      preLoaderRoute: typeof OrdersOrderIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/db-test': {
@@ -576,6 +596,7 @@ const rootRouteChildren: RootRouteChildren = {
   PreOrderRoute: PreOrderRoute,
   ProductsRoute: ProductsRoute,
   ApiDbTestRoute: ApiDbTestRoute,
+  OrdersOrderIdRoute: OrdersOrderIdRoute,
   ProductSlugRoute: ProductSlugRoute,
 }
 export const routeTree = rootRouteImport

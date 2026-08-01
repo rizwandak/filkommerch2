@@ -341,6 +341,10 @@ app.post("/api/orders/:id/confirm-completion", apiControllers.confirmOrderComple
 app.post("/api/orders/:id/complaint", apiControllers.submitOrderComplaint);
 app.post("/api/vouchers/validate", apiControllers.validateVoucher);
 
+// Product Reviews API Routes
+app.get("/api/products/:productId/reviews", apiControllers.getProductReviews);
+app.post("/api/reviews", apiControllers.createProductReview);
+
 // Offline POS Sales API Routes
 app.post("/api/sales", (req, res, next) => { clearCache("/api/products"); next(); }, apiControllers.createSale);
 app.get("/api/sales", apiControllers.getOfflineSales);

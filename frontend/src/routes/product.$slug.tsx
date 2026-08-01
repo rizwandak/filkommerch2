@@ -26,7 +26,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getProductBySlug } from "@backend/server-actions";
+import { getProductBySlug, getProductReviewsServerAction } from "@backend/server-actions";
 import { Button } from "@frontend/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { Navbar } from "@/components/Navbar";
@@ -40,6 +40,27 @@ const scrollToId = (id: string) => {
   const el = document.getElementById(id);
   if (el) el.scrollIntoView({ behavior: "smooth" });
 };
+
+const maskReviewerName = (name: string): string => {
+  if (!name) return "***";
+  const words = name.trim().split(/\s+/).slice(0, 2);
+  return words
+    .map((word) => {
+      if (!word) return "";
+      return word[0] + "*".repeat(Math.max(1, word.length - 1));
+    })
+    .join(" ");
+};
+
+const formatSizeVariant = (variant?: string): string => {
+  if (!variant) return "";
+  const parts = variant.split("/").map((p) => p.trim());
+  const cleanParts = parts.filter(
+    (p) => !/^(dp|lunas|dp\s*\d*%?)$/i.test(p)
+  );
+  return cleanParts.join(" / ");
+};
+
 
 const NAV = [
   { label: "BERANDA", href: "/", isScroll: true, target: "top" },
@@ -71,40 +92,6 @@ export const Route = createFileRoute("/product/$slug")({
   component: ProductDetailPage,
 });
 
-// Mock reviews seed
-const MOCK_REVIEWS = [
-  {
-    id: 1,
-    name: "Rian Prasetya",
-    nim: "2251502******",
-    rating: 5,
-    date: "2026-06-18",
-    comment:
-      "Bahan varsity-nya tebal banget, bordirannya rapi pol. Gak nyesel beli pre-order kmrn. Dipakai nugas malem-malem di gazebo adem bgt.",
-    variant: "Navy / L",
-  },
-  {
-    id: 2,
-    name: "Alya Nabila",
-    nim: "2351504******",
-    rating: 5,
-    date: "2026-06-20",
-    comment:
-      "T-shirt debugging kaosnya adem, sablonannya oke, pas banget buat kuliah harian. Desainnya juga relate anak IT bgt wkwk.",
-    variant: "Black / M",
-  },
-  {
-    id: 3,
-    name: "Daffa Ramadhan",
-    nim: "2151506******",
-    rating: 4,
-    date: "2026-06-22",
-    comment:
-      "Lanyard-nya bagus, tali tebal dan pengaitnya kokoh. Pas buat id card praktikum. Sukses terus Bem Filkom!",
-    variant: "All Size",
-  },
-];
-
 function ProductDetailPage() {
   const { product, error } = Route.useLoaderData();
   const navigate = useNavigate();
@@ -127,6 +114,36 @@ function ProductDetailPage() {
 
   const [selectedBundleVariants, setSelectedBundleVariants] = useState<Record<number, any>>({});
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+
+  // Reviews Data State
+  const [reviewsData, setReviewsData] = useState<{ reviews: any[]; totalReviews: number; avgRating: number }>({
+    reviews: [],
+    totalReviews: 0,
+    avgRating: 0,
+  });
+  const [loadingReviews, setLoadingReviews] = useState(true);
+
+  useEffect(() => {
+    if (!product?.id) return;
+    const fetchReviews = async () => {
+      try {
+        setLoadingReviews(true);
+        const res = await getProductReviewsServerAction({ data: { productId: product.id } });
+        if (res.reviews) {
+          setReviewsData({
+            reviews: res.reviews,
+            totalReviews: res.totalReviews || 0,
+            avgRating: res.avgRating || 0,
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching product reviews:", err);
+      } finally {
+        setLoadingReviews(false);
+      }
+    };
+    void fetchReviews();
+  }, [product?.id]);
 
   // Size Fit Guide State
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
@@ -655,7 +672,7 @@ function ProductDetailPage() {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<"detail" | "spesifikasi" | "panduan">("detail");
+  const [activeTab, setActiveTab] = useState<"detail" | "spesifikasi" | "panduan" | "ulasan">("detail");
 
   return (
     <div className="min-h-screen bg-[#FCFAF7] text-ink flex flex-col justify-between">
@@ -1135,13 +1152,24 @@ function ProductDetailPage() {
                 </button>
                 <button
                   onClick={() => setActiveTab("panduan")}
-                  className={`flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer ${
+                  className={`flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer border-r border-ink/20 ${
                     activeTab === "panduan"
                       ? "bg-white text-brand-orange border-b-4 border-b-brand-orange font-extrabold"
                       : "text-muted-foreground hover:text-ink hover:bg-cream"
                   }`}
                 >
                   Panduan Ukuran
+                </button>
+                <button
+                  onClick={() => setActiveTab("ulasan")}
+                  className={`flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
+                    activeTab === "ulasan"
+                      ? "bg-white text-brand-orange border-b-4 border-b-brand-orange font-extrabold"
+                      : "text-muted-foreground hover:text-ink hover:bg-cream"
+                  }`}
+                >
+                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                  <span>Ulasan ({reviewsData.totalReviews})</span>
                 </button>
               </div>
 
@@ -1183,6 +1211,89 @@ function ProductDetailPage() {
                           alt="Size Chart"
                           className="w-full h-auto object-contain"
                         />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "ulasan" && (
+                  <div className="space-y-4">
+                    {loadingReviews ? (
+                      <p className="text-xs text-muted-foreground italic text-center py-4">Memuat ulasan produk...</p>
+                    ) : reviewsData.reviews.length === 0 ? (
+                      /* Empty state as requested by user */
+                      <div className="text-center py-8">
+                        <div className="w-12 h-12 bg-amber-50 border-2 border-ink rounded-full flex items-center justify-center mx-auto mb-3 text-amber-500">
+                          <Star className="w-6 h-6" />
+                        </div>
+                        <h4 className="font-extrabold text-sm text-ink uppercase tracking-wide">Belum Ada Ulasan</h4>
+                        <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1">
+                          Belum ada ulasan untuk produk ini. Jadilah pembeli terverifikasi pertama yang memberikan ulasan setelah menyelesaikan pesanan!
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Overall Summary Bar */}
+                        <div className="bg-cream/20 border border-ink/20 p-4 rounded-xl flex items-center justify-between">
+                          <div>
+                            <div className="text-3xl font-black text-ink flex items-baseline gap-1">
+                              {reviewsData.avgRating} <span className="text-xs text-muted-foreground font-normal">/ 5.0</span>
+                            </div>
+                            <p className="text-[11px] font-bold text-muted-foreground mt-0.5">
+                              Berdasarkan {reviewsData.totalReviews} ulasan pembeli
+                            </p>
+                          </div>
+                          <div className="flex gap-1 text-amber-400">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star
+                                key={star}
+                                className={`w-5 h-5 ${
+                                  star <= Math.round(reviewsData.avgRating)
+                                    ? "fill-amber-400 text-amber-500"
+                                    : "text-gray-300 fill-gray-100"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* List of Reviews */}
+                        <div className="divide-y divide-border">
+                          {reviewsData.reviews.map((rev) => (
+                            <div key={rev.id} className="py-3.5 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-xs text-ink">{maskReviewerName(rev.name)}</span>
+                                </div>
+                                <span className="text-[10px] text-muted-foreground">{rev.date}</span>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <div className="flex text-amber-400">
+                                  {[1, 2, 3, 4, 5].map((s) => (
+                                    <Star
+                                      key={s}
+                                      className={`w-3.5 h-3.5 ${
+                                        s <= rev.rating ? "fill-amber-400 text-amber-500" : "text-gray-300 fill-gray-100"
+                                      }`}
+                                    />
+                                  ))}
+                                </div>
+                                {formatSizeVariant(rev.variant) && (
+                                  <span className="text-[10px] font-semibold text-muted-foreground bg-cream border border-ink/10 px-1.5 py-0.5 rounded">
+                                    Ukuran: {formatSizeVariant(rev.variant)}
+                                  </span>
+                                )}
+                              </div>
+
+                              {rev.comment && (
+                                <p className="text-xs text-ink/90 font-medium leading-relaxed mt-1">
+                                  "{rev.comment}"
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>

@@ -1139,7 +1139,13 @@ export const getOrderById = async (req: Request, res: Response) => {
        WHERE oi.order_id = ?`,
       [id]
     );
-    return res.json({ success: true, order, items });
+
+    const reviews = await query<any>(
+      `SELECT * FROM product_reviews WHERE order_id = ?`,
+      [id]
+    );
+
+    return res.json({ success: true, order, items, reviews });
   } catch (error: any) {
     console.error("Error fetching order:", error);
     return res.status(500).json({ success: false, error: "Failed to fetch order" });
@@ -2657,12 +2663,25 @@ export const getUserOrders = async (req: Request, res: Response) => {
       orderIds
     );
 
-    // Map items to their respective orders
+    // Fetch reviews submitted for these orders
+    let reviews: any[] = [];
+    try {
+      reviews = await query<any>(
+        `SELECT * FROM product_reviews WHERE order_id IN (${placeholders}) AND user_id = ?`,
+        [...orderIds, userId]
+      );
+    } catch (e) {
+      console.warn("Notice: product_reviews query error", e);
+    }
+
+    // Map items and reviews to their respective orders
     const ordersWithItems = orders.map((order) => {
       const orderItems = items.filter((item) => item.order_id === order.order_id);
+      const orderReviews = reviews.filter((r) => r.order_id === order.order_id);
       return {
         ...order,
         items: orderItems,
+        reviews: orderReviews,
       };
     });
 
@@ -4282,4 +4301,100 @@ export const submitOrderComplaint = async (req: Request, res: Response) => {
   }
 };
 
+// Submit product review (Buyer)
+export const createProductReview = async (req: Request, res: Response) => {
+  try {
+    const { productId, orderId, userId, rating, comment, variant, userName } = req.body;
 
+    if (!productId || !orderId || !rating) {
+      return res.status(400).json({ success: false, error: "Data ulasan tidak lengkap" });
+    }
+
+    // Verify order exists
+    let orderRows;
+    if (userId) {
+      orderRows = await query<any>(
+        "SELECT * FROM orders WHERE order_id = ? AND user_id = ?",
+        [orderId, userId]
+      );
+    } else {
+      // For guest checkout (user_id is null) or if no user is provided, just check orderId
+      orderRows = await query<any>(
+        "SELECT * FROM orders WHERE order_id = ?",
+        [orderId]
+      );
+    }
+
+    if (orderRows.length === 0) {
+      return res.status(403).json({ success: false, error: "Pesanan tidak ditemukan atau bukan milik Anda" });
+    }
+
+    const currentOrder = orderRows[0];
+    const orderStatus = (currentOrder.order_status || currentOrder.transaction_status || "").toLowerCase();
+
+    // If not completed yet, automatically mark order as completed upon receiving review
+    if (orderStatus !== "completed") {
+      await execute(
+        "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed' WHERE order_id = ?",
+        [orderId]
+      );
+    }
+
+    // Insert or update review
+    await execute(
+      `INSERT INTO product_reviews (product_id, order_id, user_id, rating, comment, variant, user_name)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), variant = VALUES(variant), user_name = VALUES(user_name), created_at = NOW()`,
+      [productId, orderId, userId || null, rating, comment || "", variant || "", userName || currentOrder.customer_name || "Pembeli FILKOM"]
+    );
+
+    return res.json({ success: true, message: "Ulasan berhasil dikirim!" });
+  } catch (error: any) {
+    console.error("Error creating product review:", error);
+    return res.status(500).json({ success: false, error: error.message || "Gagal mengirim ulasan" });
+  }
+};
+
+// Get product reviews (Public)
+export const getProductReviews = async (req: Request, res: Response) => {
+  try {
+    const { productId } = req.params;
+    const reviews = await query<any>(
+      `SELECT pr.*, u.name as reviewer_name
+       FROM product_reviews pr
+       LEFT JOIN users u ON u.id = pr.user_id
+       WHERE pr.product_id = ?
+       ORDER BY pr.created_at DESC`,
+      [productId]
+    );
+
+    const formattedReviews = reviews.map((r: any) => {
+      let displayName = r.user_name || r.reviewer_name || "Pembeli FILKOM";
+      return {
+        id: r.id,
+        name: displayName,
+        rating: Number(r.rating),
+        date: r.created_at ? new Date(r.created_at).toISOString().split("T")[0] : "",
+        comment: r.comment || "",
+        variant: r.variant || "Standard",
+        orderId: r.order_id,
+        isVerified: true,
+      };
+    });
+
+    const totalReviews = formattedReviews.length;
+    const avgRating = totalReviews > 0
+      ? Number((formattedReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews).toFixed(1))
+      : 0;
+
+    return res.json({
+      success: true,
+      reviews: formattedReviews,
+      totalReviews,
+      avgRating,
+    });
+  } catch (error: any) {
+    console.error("Error fetching product reviews:", error);
+    return res.status(500).json({ success: false, reviews: [], totalReviews: 0, avgRating: 0 });
+  }
+};
