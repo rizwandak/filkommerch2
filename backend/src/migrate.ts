@@ -182,6 +182,24 @@ export async function runMigration() {
       console.warn("Notice: order_items foreign keys migration status:", err.message);
     }
 
+    // Backfill historical order voucher_code in production database
+    try {
+      console.log("Backfilling voucher_code for historical orders...");
+      await connection.query(`
+        UPDATE orders 
+        SET voucher_code = 'AKUMABA100' 
+        WHERE discount_amount > 0 AND voucher_code IS NULL AND discount_amount = subtotal * 0.1
+      `);
+      await connection.query(`
+        UPDATE orders 
+        SET voucher_code = 'THANKYOU20' 
+        WHERE discount_amount > 0 AND voucher_code IS NULL
+      `);
+      console.log("✅ Managed historical voucher_code backfill successfully!");
+    } catch (err: any) {
+      console.warn("Notice: voucher_code backfill status:", err.message);
+    }
+
     console.log("Schema migration finished successfully!");
   } catch (err) {
     console.error("Fatal connection error during migration:", err);
