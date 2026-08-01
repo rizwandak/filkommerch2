@@ -258,7 +258,7 @@ function OrderConfirmationPage() {
         setProofUrlTemp("");
         setIsEditingProof(false);
         toast.success("Bukti transfer berhasil terkirim. Menunggu verifikasi admin.");
-        
+
         // Fetch updated order from DB
         const updated = await getOrderById({ data: targetOrderId });
         if (updated.success && updated.order) {
@@ -746,7 +746,7 @@ function OrderConfirmationPage() {
                 </p>
               </div>
               <a
-                href="https://wa.me/628123456789"
+                href="https://wa.me/6282287190402"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="shrink-0 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg border border-emerald-800 text-xs font-extrabold uppercase transition shadow-xs"
