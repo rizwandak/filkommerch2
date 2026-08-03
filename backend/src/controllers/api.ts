@@ -1631,6 +1631,18 @@ export const deleteProduct = async (req: Request, res: Response) => {
 // Get online orders
 export const getOnlineOrders = async (req: Request, res: Response) => {
   try {
+    // Auto-complete orders that are shipped or ready_for_pickup and haven't been updated for 3 days
+    try {
+      await execute(`
+        UPDATE orders 
+        SET order_status = 'completed', fulfillment_status = 'completed', completed_at = NOW()
+        WHERE order_status IN ('ready_for_pickup', 'shipped')
+        AND updated_at <= DATE_SUB(NOW(), INTERVAL 3 DAY)
+      `);
+    } catch (e) {
+      console.error("Notice: auto-complete orders error", e);
+    }
+
     const orders = await query<any>(
       "SELECT * FROM orders WHERE channel = 'online' ORDER BY created_at DESC LIMIT 150"
     );
@@ -2642,6 +2654,18 @@ export const getUserOrders = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     
+    // Auto-complete orders that are shipped or ready_for_pickup and haven't been updated for 3 days
+    try {
+      await execute(`
+        UPDATE orders 
+        SET order_status = 'completed', fulfillment_status = 'completed', completed_at = NOW()
+        WHERE order_status IN ('ready_for_pickup', 'shipped')
+        AND updated_at <= DATE_SUB(NOW(), INTERVAL 3 DAY)
+      `);
+    } catch (e) {
+      console.error("Notice: auto-complete orders error", e);
+    }
+
     // Fetch orders
     const orders = await query<any>(
       "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
@@ -2927,7 +2951,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       const isPaid = item.payment_status === "paid" || item.payment_status === "settlement" || item.order_status === "completed";
       
       const buyerId = item.customer_email || item.user_email || item.customer_phone || `order-${item.order_id}`;
-      if (!isCancelled) {
+      if (isPaid) {
         uniqueBuyersSet.add(buyerId);
       }
 
@@ -2978,7 +3002,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         };
       }
 
-      if (!isCancelled) {
+      if (isPaid) {
         totalUnitsSold += item.quantity;
         productSalesMap[pid].total_qty += item.quantity;
         productSalesMap[pid].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
@@ -4251,10 +4275,19 @@ const ensureOrderColumns = async () => {
     await execute("ALTER TABLE orders ADD COLUMN fulfillment_proof_url VARCHAR(500) NULL");
   } catch {}
   try {
+    await execute("ALTER TABLE product_reviews ADD COLUMN media_url VARCHAR(500) NULL");
+  } catch {}
+  try {
     await execute("ALTER TABLE orders ADD COLUMN is_complained TINYINT(1) DEFAULT 0");
   } catch {}
   try {
     await execute("ALTER TABLE orders ADD COLUMN complaint_notes TEXT NULL");
+  } catch {}
+  try {
+    await execute("ALTER TABLE orders ADD COLUMN complaint_media_urls TEXT NULL");
+  } catch {}
+  try {
+    await execute("ALTER TABLE orders ADD COLUMN completed_at TIMESTAMP NULL");
   } catch {}
 };
 ensureOrderColumns();
@@ -4267,12 +4300,12 @@ export const confirmOrderCompletion = async (req: Request, res: Response) => {
 
     if (fulfillment_proof_url) {
       await execute(
-        "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed', fulfillment_proof_url = ? WHERE order_id = ? OR notes LIKE ?",
+        "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed', fulfillment_proof_url = ?, completed_at = NOW() WHERE order_id = ? OR notes LIKE ?",
         [fulfillment_proof_url, id, `%Pelunasan untuk Order: ${id}%`]
       );
     } else {
       await execute(
-        "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed' WHERE order_id = ? OR notes LIKE ?",
+        "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed', completed_at = NOW() WHERE order_id = ? OR notes LIKE ?",
         [id, `%Pelunasan untuk Order: ${id}%`]
       );
     }
@@ -4287,12 +4320,13 @@ export const confirmOrderCompletion = async (req: Request, res: Response) => {
 export const submitOrderComplaint = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { notes } = req.body;
+    const { notes, mediaUrls } = req.body;
     const complaintText = notes || "Pembeli mengajukan komplain kecacatan produk (defect).";
+    const mediaUrlsStr = mediaUrls && mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : null;
 
     await execute(
-      "UPDATE orders SET is_complained = 1, complaint_notes = ? WHERE order_id = ? OR notes LIKE ?",
-      [complaintText, id, `%Pelunasan untuk Order: ${id}%`]
+      "UPDATE orders SET is_complained = 1, complaint_notes = ?, complaint_media_urls = ? WHERE order_id = ? OR notes LIKE ?",
+      [complaintText, mediaUrlsStr, id, `%Pelunasan untuk Order: ${id}%`]
     );
     return res.json({ success: true, message: "Komplain berhasil dicatat." });
   } catch (error: any) {
@@ -4304,7 +4338,7 @@ export const submitOrderComplaint = async (req: Request, res: Response) => {
 // Submit product review (Buyer)
 export const createProductReview = async (req: Request, res: Response) => {
   try {
-    const { productId, orderId, userId, rating, comment, variant, userName } = req.body;
+    const { productId, orderId, userId, rating, comment, variant, userName, mediaUrl } = req.body;
 
     if (!productId || !orderId || !rating) {
       return res.status(400).json({ success: false, error: "Data ulasan tidak lengkap" });
@@ -4342,10 +4376,10 @@ export const createProductReview = async (req: Request, res: Response) => {
 
     // Insert or update review
     await execute(
-      `INSERT INTO product_reviews (product_id, order_id, user_id, rating, comment, variant, user_name)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), variant = VALUES(variant), user_name = VALUES(user_name), created_at = NOW()`,
-      [productId, orderId, userId || null, rating, comment || "", variant || "", userName || currentOrder.customer_name || "Pembeli FILKOM"]
+      `INSERT INTO product_reviews (product_id, order_id, user_id, rating, comment, variant, user_name, media_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), variant = VALUES(variant), user_name = VALUES(user_name), media_url = VALUES(media_url), created_at = NOW()`,
+      [productId, orderId, userId || null, rating, comment || "", variant || "", userName || currentOrder.customer_name || "Pembeli FILKOM", mediaUrl || null]
     );
 
     return res.json({ success: true, message: "Ulasan berhasil dikirim!" });
@@ -4379,6 +4413,7 @@ export const getProductReviews = async (req: Request, res: Response) => {
         variant: r.variant || "Standard",
         orderId: r.order_id,
         isVerified: true,
+        media_url: r.media_url || null,
       };
     });
 
@@ -4387,11 +4422,21 @@ export const getProductReviews = async (req: Request, res: Response) => {
       ? Number((formattedReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews).toFixed(1))
       : 0;
 
+    const buyersQuery = await query<any>(
+      `SELECT COALESCE(SUM(oi.quantity), 0) as total_buyers 
+       FROM order_items oi 
+       JOIN orders o ON oi.order_id = o.order_id 
+       WHERE oi.product_id = ? AND o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed')`,
+       [productId]
+    );
+    const totalBuyers = Number(buyersQuery[0]?.total_buyers || 0);
+
     return res.json({
       success: true,
       reviews: formattedReviews,
       totalReviews,
       avgRating,
+      totalBuyers,
     });
   } catch (error: any) {
     console.error("Error fetching product reviews:", error);

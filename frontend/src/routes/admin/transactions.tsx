@@ -36,6 +36,7 @@ import {
   AlertCircle,
   Filter,
   Upload,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
@@ -173,6 +174,7 @@ function AdminTransactionsPage() {
   const [verificationNote, setVerificationNote] = useState<string>("");
   const [submittingVerification, setSubmittingVerification] = useState(false);
   const [showRejectReason, setShowRejectReason] = useState(false);
+  const [zoomMedia, setZoomMedia] = useState<{url: string, type: string} | null>(null);
 
   const getAdminRequestHeaders = () => {
     const role = user?.type === "admin" ? user.role : undefined;
@@ -1525,6 +1527,26 @@ function AdminTransactionsPage() {
                               "{managedTransaction.complaint_notes}"
                             </p>
                           )}
+                          {managedTransaction.complaint_media_urls && (
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {(() => {
+                                try {
+                                  const urls = JSON.parse(managedTransaction.complaint_media_urls);
+                                  return urls.map((url: string, idx: number) => (
+                                    <div key={idx} className="w-16 h-16 rounded border border-red-300 overflow-hidden bg-white shrink-0 cursor-zoom-in" onClick={() => setZoomMedia({ url: resolveImageUrl(url) || "", type: url.match(/\.(mp4|mov|webm)$/i) ? "video" : "image" })}>
+                                      {url.match(/\.(mp4|mov|webm)$/i) ? (
+                                        <video src={resolveImageUrl(url)} className="w-full h-full object-cover" />
+                                      ) : (
+                                        <img src={resolveImageUrl(url)} alt={`Bukti ${idx+1}`} className="w-full h-full object-cover hover:scale-110 transition" />
+                                      )}
+                                    </div>
+                                  ));
+                                } catch (e) {
+                                  return null;
+                                }
+                              })()}
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -1652,6 +1674,27 @@ function AdminTransactionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Lightbox / Zoom Dialog for Complaint Media */}
+      {zoomMedia && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 cursor-zoom-out select-none animate-fadeIn"
+          onClick={() => setZoomMedia(null)}
+        >
+          <button
+            onClick={() => setZoomMedia(null)}
+            className="absolute top-4 right-4 bg-white border-2 border-ink p-2 rounded-full shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:scale-105 transition active:scale-95 z-[101] cursor-pointer"
+            aria-label="Close media view"
+          >
+            <X className="w-5 h-5 text-ink" />
+          </button>
+          {zoomMedia.type === "video" ? (
+            <video src={zoomMedia.url} className="max-w-full max-h-[90vh] rounded-lg border-2 border-white/10 shadow-2xl scale-up" controls autoPlay onClick={(e) => e.stopPropagation()} />
+          ) : (
+            <img src={zoomMedia.url} alt="Preview Bukti" className="max-w-full max-h-[90vh] object-contain rounded-lg border-2 border-white/10 shadow-2xl scale-up" onClick={(e) => e.stopPropagation()} />
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -1711,14 +1711,14 @@ export const confirmOrderCompletionServerAction = createServerFn({ method: "POST
 
 // Submit Order Complaint (Buyer)
 export const submitOrderComplaintServerAction = createServerFn({ method: "POST" })
-  .validator((data: { orderId: string; notes?: string }) => data)
+  .validator((data: { orderId: string; notes?: string; mediaUrls?: string[] }) => data)
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();
       const res = await serverFetch(`${baseUrl}/api/orders/${data.orderId}/complaint`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ notes: data.notes, mediaUrls: data.mediaUrls }),
       });
       return await res.json();
     } catch (e: any) {
@@ -1738,6 +1738,7 @@ export const createProductReviewServerAction = createServerFn({ method: "POST" }
       comment?: string;
       variant?: string;
       userName?: string;
+      mediaUrl?: string;
     }) => data,
   )
   .handler(async ({ data }) => {

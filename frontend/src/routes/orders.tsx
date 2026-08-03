@@ -106,13 +106,16 @@ function UserOrdersPage() {
   const [completingOrderId, setCompletingOrderId] = useState<string | null>(null);
 
   const handleConfirmCompletion = async (orderId: string) => {
+    if (!confirm("Apakah Anda yakin telah menerima semua pesanan dengan baik? Jika sudah diterima Anda tidak bisa mengajukan pengembalian dan hanya dapat memberikan penilaian produk.")) return;
+
     try {
       setCompletingOrderId(orderId);
       const res = await confirmOrderCompletionServerAction({ data: { orderId } });
       if (res.success) {
         toast.success("Pesanan berhasil dikonfirmasi selesai! Terima kasih.");
         await fetchOrders();
-        // Modal detail state removed
+        navigate({ to: "/orders/$orderId", params: { orderId } });
+
       } else {
         toast.error(res.error || "Gagal mengonfirmasi pesanan selesai");
       }
@@ -728,7 +731,7 @@ function UserOrdersPage() {
                       </Link>
 
                       {/* Confirm Completion Button */}
-                      {order.payment_status === "paid" && order.order_status !== "completed" && order.order_status !== "cancelled" && (
+                      {(order.order_status === "ready_for_pickup" || order.order_status === "shipped") && (
                         <button
                           onClick={() => handleConfirmCompletion(order.order_id)}
                           disabled={completingOrderId === order.order_id}

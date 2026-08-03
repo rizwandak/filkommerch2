@@ -116,12 +116,76 @@ function ProductDetailPage() {
   const [isZoomOpen, setIsZoomOpen] = useState(false);
 
   // Reviews Data State
-  const [reviewsData, setReviewsData] = useState<{ reviews: any[]; totalReviews: number; avgRating: number }>({
+  const [reviewsData, setReviewsData] = useState<{ reviews: any[]; totalReviews: number; avgRating: number; totalBuyers: number }>({
     reviews: [],
     totalReviews: 0,
     avgRating: 0,
+    totalBuyers: 0,
   });
   const [loadingReviews, setLoadingReviews] = useState(true);
+
+  const reviewMediaList = useMemo(() => {
+    const list: { url: string; type: string }[] = [];
+    reviewsData.reviews.forEach((r) => {
+      if (r.media_url) {
+        try {
+          const urls = r.media_url.startsWith("[") ? JSON.parse(r.media_url) : [r.media_url];
+          urls.forEach((url: string) => {
+            if (url.match(/\.(mp4|mov|webm)$/i)) {
+              list.push({ url, type: "video" });
+            } else {
+              list.push({ url, type: "image" });
+            }
+          });
+        } catch (e) {
+          // ignore
+        }
+      }
+    });
+    return list;
+  }, [reviewsData.reviews]);
+
+  const [isReviewsOpen, setIsReviewsOpen] = useState(false);
+  const [reviewSort, setReviewSort] = useState<"terbaru" | "dengan_foto">("terbaru");
+
+  const reviewVariants = useMemo(() => {
+    const vars = new Set<string>();
+    vars.add("Semua Varian");
+    reviewsData.reviews.forEach((r) => {
+      if (r.variant) {
+        const fmt = formatSizeVariant(r.variant);
+        if (fmt) vars.add(fmt);
+      }
+    });
+    return Array.from(vars);
+  }, [reviewsData.reviews]);
+
+  const [reviewFilterVariant, setReviewFilterVariant] = useState<string>("Semua Varian");
+
+  const displayedReviews = useMemo(() => {
+    if (!reviewsData.reviews) return [];
+    let list = [...reviewsData.reviews];
+    
+    if (reviewFilterVariant !== "Semua Varian") {
+      list = list.filter((r: any) => formatSizeVariant(r.variant) === reviewFilterVariant);
+    }
+
+    list.sort((a, b) => new Date(b.created_at || b.date || 0).getTime() - new Date(a.created_at || a.date || 0).getTime());
+
+    if (reviewSort === "dengan_foto") {
+      list = list.filter((r) => {
+        if (!r.media_url) return false;
+        try {
+           const parsed = r.media_url.startsWith("[") ? JSON.parse(r.media_url) : [r.media_url];
+           return parsed && parsed.length > 0;
+        } catch(e) {
+           return false;
+        }
+      });
+    }
+
+    return list;
+  }, [reviewsData.reviews, reviewSort, reviewFilterVariant]);
 
   useEffect(() => {
     if (!product?.id) return;
@@ -134,6 +198,7 @@ function ProductDetailPage() {
             reviews: res.reviews,
             totalReviews: res.totalReviews || 0,
             avgRating: res.avgRating || 0,
+            totalBuyers: res.totalBuyers || 0,
           });
         }
       } catch (err) {
@@ -672,7 +737,7 @@ function ProductDetailPage() {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<"detail" | "spesifikasi" | "panduan" | "ulasan">("detail");
+  const [activeTab, setActiveTab] = useState<"detail" | "spesifikasi" | "panduan">("detail");
 
   return (
     <div className="min-h-screen bg-[#FCFAF7] text-ink flex flex-col justify-between">
@@ -879,6 +944,137 @@ function ProductDetailPage() {
                   )}
                 </div>
               ) : null}
+            </div>
+
+            {/* REVIEW CARD ACCORDION */}
+            <div className="border-2 border-ink rounded-2xl bg-white overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] mb-6" id="ulasan-section">
+              <button
+                onClick={() => setIsReviewsOpen(!isReviewsOpen)}
+                className="w-full bg-cream/40 py-4 px-5 flex items-center justify-between cursor-pointer hover:bg-cream transition-colors border-none outline-none"
+              >
+                <div className="flex items-center gap-3">
+                  <h3 className="font-black text-sm uppercase tracking-wider text-ink flex items-center gap-2">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-500" />
+                    Ulasan ({reviewsData.totalReviews})
+                  </h3>
+                  <div className="flex items-baseline gap-1 bg-white border border-ink/20 px-2 py-0.5 rounded-md">
+                    <span className="font-extrabold text-ink text-xs">{reviewsData.avgRating}</span>
+                    <span className="text-[10px] text-muted-foreground">/ 5.0</span>
+                  </div>
+                  {reviewsData.totalBuyers > 0 && (
+                    <div className="flex items-baseline gap-1 bg-cream border border-ink/20 px-2 py-0.5 rounded-md">
+                      <span className="font-extrabold text-ink text-xs">{reviewsData.totalBuyers}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase">Terjual</span>
+                    </div>
+                  )}
+                </div>
+                <div className={`transition-transform duration-300 ${isReviewsOpen ? "rotate-180" : ""}`}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-ink"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </div>
+              </button>
+              
+              {isReviewsOpen && (
+                <div className="p-5 border-t-2 border-ink text-xs sm:text-sm bg-white animate-fade-in text-left">
+                  {loadingReviews ? (
+                    <p className="text-xs text-muted-foreground italic text-center py-4">Memuat ulasan produk...</p>
+                  ) : reviewsData.reviews.length === 0 ? (
+                    <div className="text-center py-4">
+                      <p className="text-xs text-muted-foreground font-medium">Belum ada ulasan untuk produk ini.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-3">
+                        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+                          <button
+                            onClick={() => setReviewSort("terbaru")}
+                            className={`px-3 py-1.5 text-[11px] font-bold border-2 transition rounded-lg shrink-0 cursor-pointer ${
+                              reviewSort === "terbaru" ? "bg-brand-orange text-ink border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-white text-ink border-ink hover:bg-cream"
+                            }`}
+                          >
+                            Terbaru
+                          </button>
+                          <button
+                            onClick={() => setReviewSort("dengan_foto")}
+                            className={`px-3 py-1.5 text-[11px] font-bold border-2 transition rounded-lg shrink-0 cursor-pointer ${
+                              reviewSort === "dengan_foto" ? "bg-brand-orange text-ink border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-white text-ink border-ink hover:bg-cream"
+                            }`}
+                          >
+                            Dengan Foto
+                          </button>
+                          
+                          {reviewVariants.length > 1 && (
+                            <div className="flex items-center gap-2 border-l-2 border-ink/20 pl-2 ml-1">
+                              {reviewVariants.map((v) => (
+                                <button
+                                  key={v}
+                                  onClick={() => setReviewFilterVariant(v)}
+                                  className={`px-3 py-1.5 text-[11px] font-bold border-2 transition rounded-lg shrink-0 cursor-pointer ${
+                                    reviewFilterVariant === v
+                                      ? "bg-brand-orange text-ink border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                                      : "bg-white text-ink border-ink hover:bg-cream"
+                                  }`}
+                                >
+                                  {v}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="divide-y divide-border">
+                        {displayedReviews.length === 0 ? (
+                          <p className="text-xs text-muted-foreground italic py-4 text-center">Tidak ada ulasan dengan foto.</p>
+                        ) : (
+                          displayedReviews.map((rev) => (
+                            <div key={rev.id} className="py-4 space-y-2">
+                              <div className="flex items-center justify-between">
+                                <span className="font-bold text-xs text-ink">{maskReviewerName(rev.name)}</span>
+                                <span className="text-[10px] text-muted-foreground">{rev.date}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <div className="flex text-amber-400">
+                                  {[1, 2, 3, 4, 5].map((s) => (
+                                    <Star key={s} className={`w-3.5 h-3.5 ${s <= rev.rating ? "fill-amber-400 text-amber-500" : "text-gray-300 fill-gray-100"}`} />
+                                  ))}
+                                </div>
+                                {formatSizeVariant(rev.variant) && (
+                                  <span className="text-[10px] font-semibold text-muted-foreground bg-cream border border-ink/10 px-1.5 py-0.5 rounded">
+                                    Ukuran: {formatSizeVariant(rev.variant)}
+                                  </span>
+                                )}
+                              </div>
+                              {rev.comment && (
+                                <p className="text-xs text-ink/90 font-medium leading-relaxed mt-1">"{rev.comment}"</p>
+                              )}
+                              {rev.media_url && (
+                                <div className="mt-2.5 flex flex-wrap gap-2">
+                                  {(() => {
+                                    try {
+                                      const urls = rev.media_url.startsWith("[") ? JSON.parse(rev.media_url) : [rev.media_url];
+                                      return urls.map((url: string, idx: number) => (
+                                        <div key={idx} className="shrink-0">
+                                          {url.match(/\.(mp4|mov|webm)$/i) ? (
+                                            <video src={resolveImageUrl(url)} className="w-16 h-16 object-cover rounded-lg border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" controls />
+                                          ) : (
+                                            <img src={resolveImageUrl(url)} alt={`Bukti Ulasan ${idx+1}`} className="w-16 h-16 object-cover rounded-lg border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-zoom-in hover:scale-105 transition-transform" onClick={() => { setActiveImage(resolveImageUrl(url) || ""); setIsZoomOpen(true); }} />
+                                          )}
+                                        </div>
+                                      ));
+                                    } catch (e) {
+                                      return null;
+                                    }
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Product Variant Selectors */}
@@ -1160,17 +1356,6 @@ function ProductDetailPage() {
                 >
                   Panduan Ukuran
                 </button>
-                <button
-                  onClick={() => setActiveTab("ulasan")}
-                  className={`flex-1 py-3 px-4 text-xs font-black uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
-                    activeTab === "ulasan"
-                      ? "bg-white text-brand-orange border-b-4 border-b-brand-orange font-extrabold"
-                      : "text-muted-foreground hover:text-ink hover:bg-cream"
-                  }`}
-                >
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
-                  <span>Ulasan ({reviewsData.totalReviews})</span>
-                </button>
               </div>
 
               {/* Tab Content Body */}
@@ -1216,90 +1401,11 @@ function ProductDetailPage() {
                   </div>
                 )}
 
-                {activeTab === "ulasan" && (
-                  <div className="space-y-4">
-                    {loadingReviews ? (
-                      <p className="text-xs text-muted-foreground italic text-center py-4">Memuat ulasan produk...</p>
-                    ) : reviewsData.reviews.length === 0 ? (
-                      /* Empty state as requested by user */
-                      <div className="text-center py-8">
-                        <div className="w-12 h-12 bg-amber-50 border-2 border-ink rounded-full flex items-center justify-center mx-auto mb-3 text-amber-500">
-                          <Star className="w-6 h-6" />
-                        </div>
-                        <h4 className="font-extrabold text-sm text-ink uppercase tracking-wide">Belum Ada Ulasan</h4>
-                        <p className="text-xs text-muted-foreground max-w-sm mx-auto mt-1">
-                          Belum ada ulasan untuk produk ini. Jadilah pembeli terverifikasi pertama yang memberikan ulasan setelah menyelesaikan pesanan!
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {/* Overall Summary Bar */}
-                        <div className="bg-cream/20 border border-ink/20 p-4 rounded-xl flex items-center justify-between">
-                          <div>
-                            <div className="text-3xl font-black text-ink flex items-baseline gap-1">
-                              {reviewsData.avgRating} <span className="text-xs text-muted-foreground font-normal">/ 5.0</span>
-                            </div>
-                            <p className="text-[11px] font-bold text-muted-foreground mt-0.5">
-                              Berdasarkan {reviewsData.totalReviews} ulasan pembeli
-                            </p>
-                          </div>
-                          <div className="flex gap-1 text-amber-400">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`w-5 h-5 ${
-                                  star <= Math.round(reviewsData.avgRating)
-                                    ? "fill-amber-400 text-amber-500"
-                                    : "text-gray-300 fill-gray-100"
-                                }`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* List of Reviews */}
-                        <div className="divide-y divide-border">
-                          {reviewsData.reviews.map((rev) => (
-                            <div key={rev.id} className="py-3.5 space-y-1.5">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-xs text-ink">{maskReviewerName(rev.name)}</span>
-                                </div>
-                                <span className="text-[10px] text-muted-foreground">{rev.date}</span>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <div className="flex text-amber-400">
-                                  {[1, 2, 3, 4, 5].map((s) => (
-                                    <Star
-                                      key={s}
-                                      className={`w-3.5 h-3.5 ${
-                                        s <= rev.rating ? "fill-amber-400 text-amber-500" : "text-gray-300 fill-gray-100"
-                                      }`}
-                                    />
-                                  ))}
-                                </div>
-                                {formatSizeVariant(rev.variant) && (
-                                  <span className="text-[10px] font-semibold text-muted-foreground bg-cream border border-ink/10 px-1.5 py-0.5 rounded">
-                                    Ukuran: {formatSizeVariant(rev.variant)}
-                                  </span>
-                                )}
-                              </div>
-
-                              {rev.comment && (
-                                <p className="text-xs text-ink/90 font-medium leading-relaxed mt-1">
-                                  "{rev.comment}"
-                                </p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
+
+
+
           </div>
 
           {/* COLUMN 3: RIGHT STICKY CHECKOUT SIDEBAR BOX (3 Cols - Fixed Anchored) */}
