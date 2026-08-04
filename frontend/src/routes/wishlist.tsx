@@ -29,7 +29,7 @@ function WishlistPage() {
   });
 
   const products = data?.products || [];
-  const wishlistProducts = products.filter((p) => wishlist.includes(p.id));
+  const wishlistProducts = products.filter((p) => wishlist.includes(String(p.id)));
 
   // Determine active price helper
   const getActivePrice = (product: any) => {
