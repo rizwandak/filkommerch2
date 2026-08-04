@@ -1330,32 +1330,48 @@ function CustomerDetailsStep({
             <button
               type="button"
               onClick={() => onFulfillmentTypeChange("pickup")}
-              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${fulfillmentType === "pickup"
+              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer relative overflow-hidden ${fulfillmentType === "pickup"
                 ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
                 : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
                 }`}
             >
+              {fulfillmentType === "pickup" && (
+                <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black uppercase px-2 py-1 rounded-bl-lg">
+                  Terpilih
+                </div>
+              )}
               <span className="font-extrabold text-sm text-ink">Ambil di FILKOM Merch</span>
               <span className="text-[10px] text-emerald-700 font-bold uppercase mt-1">GRATIS</span>
               <span className="text-[10px] text-muted-foreground mt-1 leading-snug">
                 Ambil langsung di toko fisik FILKOM Merch UB.
+              </span>
+              <span className="text-[10px] text-ink font-bold mt-2 bg-emerald-100 px-2 py-1 inline-block w-fit rounded">
+                ⏱️ Estimasi Pengambilan: Hari ini (Jam Kerja)
               </span>
             </button>
 
             <button
               type="button"
               onClick={() => onFulfillmentTypeChange("shipping")}
-              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${fulfillmentType === "shipping"
+              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer relative overflow-hidden ${fulfillmentType === "shipping"
                 ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
                 : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
                 }`}
             >
+              {fulfillmentType === "shipping" && (
+                <div className="absolute top-0 right-0 bg-brand-orange text-white text-[8px] font-black uppercase px-2 py-1 rounded-bl-lg">
+                  Terpilih
+                </div>
+              )}
               <span className="font-extrabold text-sm text-ink">Diantar (Kurir)</span>
               <span className="text-[10px] text-brand-orange font-bold uppercase mt-1">
                 Ada Ongkir (Jarak)
               </span>
               <span className="text-[10px] text-muted-foreground mt-1 leading-snug">
                 Kirim ke alamat Anda, info tarif ongkos kirim akan dikomunikasikan via WhatsApp.
+              </span>
+              <span className="text-[10px] text-ink font-bold mt-2 bg-orange-100 px-2 py-1 inline-block w-fit rounded">
+                🚚 Estimasi Pengiriman: 2-3 Hari Kerja
               </span>
             </button>
           </div>

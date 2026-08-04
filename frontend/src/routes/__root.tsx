@@ -18,6 +18,7 @@ import { AuthProvider } from "../lib/auth";
 import { Toaster } from "@frontend/components/ui/sonner";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { SplashScreen } from "../components/SplashScreen";
+import { BackToTop } from "../components/BackToTop";
 
 function NotFoundComponent() {
   return (
@@ -174,6 +175,7 @@ function GlobalLayout() {
       <div className="flex-1 flex flex-col min-w-0">
         <Outlet />
       </div>
+      <BackToTop />
     </div>
   );
 }
@@ -184,6 +186,31 @@ function RootComponent() {
   useEffect(() => {
     if (localStorage.getItem("theme") === "dark") {
       document.documentElement.classList.add("dark");
+    }
+
+    // Task 10: Cart Persistence Warning
+    const savedCart = localStorage.getItem("cart");
+    if (savedCart) {
+      try {
+        const cartItems = JSON.parse(savedCart);
+        if (Array.isArray(cartItems) && cartItems.length > 0) {
+          // Use setTimeout to ensure toast fires after mount
+          setTimeout(() => {
+            import("sonner").then(({ toast }) => {
+              toast("Keranjang Anda belum kosong", {
+                description: "Anda memiliki barang di keranjang yang belum dicheckout.",
+                action: {
+                  label: "Lihat",
+                  onClick: () => window.location.href = "/checkout"
+                },
+                duration: 5000,
+              });
+            });
+          }, 1500);
+        }
+      } catch (e) {
+        // ignore JSON parse error
+      }
     }
   }, []);
 

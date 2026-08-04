@@ -119,6 +119,8 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
   const [localQuery, setLocalQuery] = useState("");
+  const [cartBounce, setCartBounce] = useState(false);
+  const prevCartCountRef = useRef(0);
 
   const displayQuery = searchQuery !== undefined ? searchQuery : localQuery;
 
@@ -210,6 +212,16 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
   const cartTotal = cart.reduce((s, i) => s + parsePrice(i.price) * i.qty, 0);
+
+  // Trigger bounce animation when cart count increases
+  useEffect(() => {
+    if (cartCount > prevCartCountRef.current && prevCartCountRef.current > 0) {
+      setCartBounce(true);
+      const timer = setTimeout(() => setCartBounce(false), 450);
+      return () => clearTimeout(timer);
+    }
+    prevCartCountRef.current = cartCount;
+  }, [cartCount]);
 
   const handleCheckout = () => {
     if (!cart.length) {
@@ -513,7 +525,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
             >
               <ShoppingBag className="w-5 h-5" />
               {cartCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 bg-brand-orange text-cream text-[9px] min-w-[17px] h-[17px] px-1 rounded-full flex items-center justify-center font-bold shadow-sm">
+                <span className={`absolute top-0.5 right-0.5 bg-brand-orange text-cream text-[9px] min-w-[17px] h-[17px] px-1 rounded-full flex items-center justify-center font-bold shadow-sm ${cartBounce ? 'animate-cart-bounce' : ''}`}>
                   {cartCount}
                 </span>
               )}

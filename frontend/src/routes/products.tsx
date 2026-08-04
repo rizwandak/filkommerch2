@@ -37,6 +37,9 @@ import { resolveImageUrl } from "@/lib/image-resolver";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import logo from "@/assets/logo-fm.jpg";
+import { SkeletonProductGrid } from "@/components/SkeletonProductCard";
+import { useWishlist } from "@/lib/useWishlist";
+import { QuickViewModal } from "@/components/QuickViewModal";
 
 const scrollToId = (id: string) => {
   const el = document.getElementById(id);
@@ -77,6 +80,7 @@ export const Route = createFileRoute("/products")({
     ],
   }),
   component: ProductsCatalogPage,
+  pendingComponent: ProductsCatalogSkeleton,
 });
 
 type CartItem = {
@@ -136,6 +140,9 @@ function ProductsCatalogPage() {
   const [sortBy, setSortBy] = useState<string>("NEWEST");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
+  const { wishlist, toggleWishlist, isInWishlist } = useWishlist();
+  const [quickViewProduct, setQuickViewProduct] = useState<any | null>(null);
+
   // Read params if they update
   useEffect(() => {
     if (searchParams.category) setSelectedCategory(searchParams.category);
@@ -152,6 +159,23 @@ function ProductsCatalogPage() {
       return Number(product.filkom_price);
     }
     return Number(product.price);
+  };
+
+  const addToCart = (product: any, size?: string) => {
+    const price = getActivePrice(product);
+    const cartItem = {
+      ...product,
+      id: size ? `${product.id}-${size}` : product.id,
+      productId: product.id,
+      name: product.name,
+      price: price,
+      originalPrice: product.original_price || product.price,
+      img: product.image_url || product.img,
+      size: size || null,
+      qty: 1,
+    };
+    window.dispatchEvent(new CustomEvent("add-to-cart", { detail: cartItem }));
+    toast.success("Ditambahkan ke keranjang");
   };
 
   // Get color and size list from all active variants
@@ -496,14 +520,15 @@ function ProductsCatalogPage() {
               </div>
             ) : filteredProducts.length > 0 ? (
               <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-6">
-                {filteredProducts.map((p) => {
+                {filteredProducts.map((p, index) => {
                   const currentPrice = getActivePrice(p);
                   const showDiscount = p.original_price && p.original_price > currentPrice;
 
                   return (
                     <article
                       key={p.id}
-                      className="group flex flex-col bg-card border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 overflow-hidden relative h-full text-ink"
+                      className="group flex flex-col bg-card border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 overflow-hidden relative h-full text-ink animate-card-entrance"
+                      style={{ animationDelay: `${Math.min(index, 8) * 50}ms` }}
                     >
                       <Link
                         to="/product/$slug"
@@ -554,6 +579,30 @@ function ProductsCatalogPage() {
                           Lihat Detail Fit
                         </div>
                       </Link>
+
+                      {/* Quick View Button */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setQuickViewProduct(p);
+                        }}
+                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 bg-cream text-ink border-2 border-ink font-bold text-[10px] px-4 py-2 opacity-0 group-hover:opacity-100 transition-opacity uppercase hover:bg-brand-orange hover:text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                      >
+                        Quick View
+                      </button>
+
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          toggleWishlist(p.id, p.name);
+                        }}
+                        className="absolute top-2 right-2 z-10 p-1.5 bg-white/80 hover:bg-white text-ink rounded-full border border-ink shadow-sm transition-colors"
+                        aria-label="Toggle Wishlist"
+                      >
+                        <Heart className={`w-4 h-4 pointer-events-none ${isInWishlist(p.id) ? "fill-red-500 text-red-500" : ""}`} />
+                      </button>
 
                       <div className="p-4 flex-1 flex flex-col justify-between">
                         <div>
@@ -727,7 +776,48 @@ function ProductsCatalogPage() {
         </div>
       )}
 
+      {/* Quick View Modal */}
+      <QuickViewModal
+        product={quickViewProduct}
+        onClose={() => setQuickViewProduct(null)}
+        user={user}
+        wishlist={wishlist}
+        toggleWishlist={toggleWishlist}
+        addToCart={addToCart}
+      />
+    </div>
+  );
+}
 
+function ProductsCatalogSkeleton() {
+  return (
+    <div className="min-h-screen bg-[#FCFAF7] text-ink font-sans">
+      <Navbar />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Sidebar skeleton */}
+          <aside className="hidden lg:block w-64 shrink-0">
+            <div className="bg-card p-6 rounded-xl border-2 border-ink/20 h-[480px] animate-pulse">
+              <div className="h-5 w-24 bg-ink/10 rounded mb-6" />
+              <div className="space-y-3">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="h-8 bg-ink/8 rounded-lg" />
+                ))}
+              </div>
+            </div>
+          </aside>
+          {/* Grid skeleton */}
+          <div className="flex-1">
+            {/* Top bar skeleton */}
+            <div className="bg-card p-4 rounded-xl border-2 border-ink/20 flex items-center justify-between mb-6 animate-pulse">
+              <div className="h-4 w-32 bg-ink/10 rounded" />
+              <div className="h-8 w-28 bg-ink/8 rounded-lg" />
+            </div>
+            <SkeletonProductGrid count={6} />
+          </div>
+        </div>
+      </main>
+      <Footer />
     </div>
   );
 }
