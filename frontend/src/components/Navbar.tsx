@@ -315,8 +315,9 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
   });
   const allProducts = productsData?.products || [];
 
-  const autocompleteSuggestions = displayQuery.trim().length >= 2 
-    ? allProducts.filter((p: any) => p.name.toLowerCase().includes(displayQuery.toLowerCase()) || p.category_name?.toLowerCase().includes(displayQuery.toLowerCase())).slice(0, 5)
+  const safeQuery = displayQuery || "";
+  const autocompleteSuggestions = safeQuery.trim().length >= 2 
+    ? allProducts.filter((p: any) => p.name?.toLowerCase().includes(safeQuery.toLowerCase()) || p.category_name?.toLowerCase().includes(safeQuery.toLowerCase())).slice(0, 5)
     : [];
 
   const navItems = NAV.filter((item) => {
