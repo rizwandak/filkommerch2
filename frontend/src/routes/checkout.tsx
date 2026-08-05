@@ -487,44 +487,34 @@ function CheckoutPage() {
       </div>
 
       {/* Steps Indicator Bar */}
-      <div className="border-b-2 border-ink bg-[#FCFAF7] shadow-[0px_4px_0px_0px_rgba(27,27,27,1)] relative z-20">
-        <div className="mx-auto max-w-6xl px-3 sm:px-4 py-4 sm:py-6">
+      <div className="border-b border-border bg-card">
+        <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3 sm:py-4">
           <div className="flex items-center justify-between gap-1 sm:gap-2">
-            {steps.map((s, index) => {
-              const isCompleted = currentStep > s.step;
-              const isActive = currentStep === s.step;
-              return (
-                <div key={s.step} className="flex items-center flex-1 min-w-0">
-                  <div
-                    className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full text-xs sm:text-sm font-black border-2 transition-all shrink-0 ${
-                      isCompleted
-                        ? "bg-emerald-500 border-ink text-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-                        : isActive
-                        ? "bg-brand-orange border-ink text-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-                        : "bg-white border-ink text-muted-foreground opacity-60"
+            {steps.map((s, index) => (
+              <div key={s.step} className="flex items-center flex-1 min-w-0">
+                <div
+                  className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs sm:text-sm font-bold shrink-0 ${currentStep >= s.step
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-muted text-muted-foreground"
                     }`}
-                  >
-                    {isCompleted ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : s.step}
-                  </div>
-                  <div className={`ml-2 hidden text-[11px] sm:text-xs font-black uppercase tracking-wider sm:block truncate ${isActive || isCompleted ? "text-ink" : "text-muted-foreground opacity-60"}`}>
-                    {s.title}
-                  </div>
-                  {index < steps.length - 1 && (
-                    <div
-                      className={`ml-1.5 sm:ml-4 h-1 flex-1 rounded-full border border-ink transition-colors ${
-                        currentStep > s.step ? "bg-emerald-500" : "bg-white opacity-40"
-                      }`}
-                    />
-                  )}
+                >
+                  {s.step}
                 </div>
-              );
-            })}
+                <div className="ml-2 hidden text-xs sm:text-sm font-bold sm:block truncate">{s.title}</div>
+                {index < steps.length - 1 && (
+                  <div
+                    className={`ml-1.5 sm:ml-4 h-1 flex-1 rounded-full transition-colors ${currentStep > s.step ? "bg-primary" : "bg-muted"
+                      }`}
+                  />
+                )}
+              </div>
+            ))}
           </div>
           {/* Active step title mobile badge */}
-          <div className="mt-4 text-center sm:hidden">
-            <span className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 bg-white border-2 border-ink rounded-full shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
+          <div className="mt-2 text-center sm:hidden">
+            <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
               Langkah {currentStep} dari 4:{" "}
-              <span className="text-brand-orange">{steps.find((s) => s.step === currentStep)?.title}</span>
+              <span className="text-primary font-bold">{steps.find((s) => s.step === currentStep)?.title}</span>
             </span>
           </div>
         </div>
@@ -1340,48 +1330,32 @@ function CustomerDetailsStep({
             <button
               type="button"
               onClick={() => onFulfillmentTypeChange("pickup")}
-              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer relative overflow-hidden ${fulfillmentType === "pickup"
+              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${fulfillmentType === "pickup"
                 ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
                 : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
                 }`}
             >
-              {fulfillmentType === "pickup" && (
-                <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[8px] font-black uppercase px-2 py-1 rounded-bl-lg">
-                  Terpilih
-                </div>
-              )}
               <span className="font-extrabold text-sm text-ink">Ambil di FILKOM Merch</span>
               <span className="text-[10px] text-emerald-700 font-bold uppercase mt-1">GRATIS</span>
               <span className="text-[10px] text-muted-foreground mt-1 leading-snug">
                 Ambil langsung di toko fisik FILKOM Merch UB.
-              </span>
-              <span className="text-[10px] text-ink font-bold mt-2 bg-emerald-100 px-2 py-1 inline-block w-fit rounded">
-                ⏱️ Estimasi Pengambilan: Hari ini (Jam Kerja)
               </span>
             </button>
 
             <button
               type="button"
               onClick={() => onFulfillmentTypeChange("shipping")}
-              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer relative overflow-hidden ${fulfillmentType === "shipping"
+              className={`flex flex-col text-left p-4 rounded-xl border-2 transition cursor-pointer ${fulfillmentType === "shipping"
                 ? "border-ink bg-cream/40 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
                 : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
                 }`}
             >
-              {fulfillmentType === "shipping" && (
-                <div className="absolute top-0 right-0 bg-brand-orange text-white text-[8px] font-black uppercase px-2 py-1 rounded-bl-lg">
-                  Terpilih
-                </div>
-              )}
               <span className="font-extrabold text-sm text-ink">Diantar (Kurir)</span>
               <span className="text-[10px] text-brand-orange font-bold uppercase mt-1">
                 Ada Ongkir (Jarak)
               </span>
               <span className="text-[10px] text-muted-foreground mt-1 leading-snug">
                 Kirim ke alamat Anda, info tarif ongkos kirim akan dikomunikasikan via WhatsApp.
-              </span>
-              <span className="text-[10px] text-ink font-bold mt-2 bg-orange-100 px-2 py-1 inline-block w-fit rounded">
-                🚚 Estimasi Pengiriman: 2-3 Hari Kerja
               </span>
             </button>
           </div>

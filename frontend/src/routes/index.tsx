@@ -37,11 +37,8 @@ import { useAuth } from "@/lib/auth";
 import { getProducts, getStoreSettings, getCategories, getActivePreOrderCampaignServerAction, type ProductWithVariants } from "@backend/server-actions";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { useWishlist } from "@/lib/useWishlist";
-import { useRecentlyViewed } from "@/lib/useRecentlyViewed";
 import { isProductVisibleToUser } from "@/lib/pre-order-utils";
 import { PreOrderNotOpenPlaceholder } from "@/components/PreOrderNotOpenPlaceholder";
-import { QuickViewModal } from "@/components/QuickViewModal";
 import {
   type HomepageSegment,
   convertLegacyToSegments,
@@ -68,75 +65,65 @@ import baraSmile from "@/assets/bara-smile.png";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    try {
-      const [productsRes, settingsRes, categoriesRes] = await Promise.all([
-        getProducts(),
-        getStoreSettings(),
-        getCategories(),
-      ]);
+    const [productsRes, settingsRes, categoriesRes] = await Promise.all([
+      getProducts(),
+      getStoreSettings(),
+      getCategories(),
+    ]);
 
-      const dbProducts = productsRes.products || [];
-      const settings = settingsRes.settings || null;
+    const dbProducts = productsRes.products || [];
+    const settings = settingsRes.settings || null;
 
-      const formattedProducts: ProductCard[] = dbProducts.map((product: ProductWithVariants) => {
-        const productName = product.name?.toLowerCase() || "";
-        const cat: Filter =
-          product.category_slug === "bundle" || product.category_slug === "bundles" || product.product_type === "bundle"
-            ? "BUNDLE"
-            : product.category_id === 2
-              ? "ACCESSORIES"
-              : productName.includes("hood")
-                ? "HOODIE"
-                : productName.includes("varsity") || productName.includes("jacket")
-                  ? "JACKET"
-                  : productName.includes("tee") || productName.includes("shirt")
-                    ? "TEE"
-                    : "ACCESSORIES";
+    const formattedProducts: ProductCard[] = dbProducts.map((product: ProductWithVariants) => {
+      const productName = product.name.toLowerCase();
+      const cat: Filter =
+        product.category_slug === "bundle" || product.category_slug === "bundles" || product.product_type === "bundle"
+          ? "BUNDLE"
+          : product.category_id === 2
+            ? "ACCESSORIES"
+            : productName.includes("hood")
+              ? "HOODIE"
+              : productName.includes("varsity") || productName.includes("jacket")
+                ? "JACKET"
+                : productName.includes("tee") || productName.includes("shirt")
+                  ? "TEE"
+                  : "ACCESSORIES";
 
-        return {
-          id: product.slug || `product-${product.id}`,
-          img: product.image_url || pVarsity,
-          name: product.name,
-          price: `Rp ${Number(product.price || 0).toLocaleString("id-ID")}`,
-          was: product.original_price
-            ? `Rp ${Number(product.original_price || 0).toLocaleString("id-ID")}`
-            : null,
-          tag: product.is_best_seller
-            ? "BEST SELLER"
-            : product.is_limited
-              ? "LIMITED"
-              : product.sale_type === "pre_order"
-                ? "PRE-ORDER"
-                : "NEW",
-          cat,
-          product_id: product.id,
-          is_best_seller: Boolean(product.is_best_seller),
-          is_limited: Boolean(product.is_limited),
-          is_featured: Boolean(product.is_featured),
-          sale_type: product.sale_type || null,
-          variants: product.variants || [],
-          description: product.description || null,
-          category_id: product.category_id || null,
-          category_slug: product.category_slug || null,
-          product_type: product.product_type || null,
-          bundle_components: product.bundle_components || [],
-          rawPrice: product.price || 0,
-          rawOriginalPrice: product.original_price || null,
-          filkom_price: (product as any).filkom_price || null,
-          promo_price: (product as any).promo_price || null,
-        };
-      });
-
-      return { products: formattedProducts, settings, categories: categoriesRes.categories || [] };
-    } catch (e: any) {
-      console.error("LOADER ERROR:", e);
       return {
-        products: [],
-        settings: null,
-        categories: [],
-        loaderError: String(e.stack || e.message || e),
+        id: product.slug || `product-${product.id}`,
+        img: product.image_url || pVarsity,
+        name: product.name,
+        price: `Rp ${product.price.toLocaleString("id-ID")}`,
+        was: product.original_price
+          ? `Rp ${product.original_price.toLocaleString("id-ID")}`
+          : null,
+        tag: product.is_best_seller
+          ? "BEST SELLER"
+          : product.is_limited
+            ? "LIMITED"
+            : product.sale_type === "pre_order"
+              ? "PRE-ORDER"
+              : "NEW",
+        cat,
+        product_id: product.id,
+        is_best_seller: Boolean(product.is_best_seller),
+        is_limited: Boolean(product.is_limited),
+        is_featured: Boolean(product.is_featured),
+        sale_type: product.sale_type || null,
+        variants: product.variants || [],
+        description: product.description || null,
+        category_id: product.category_id || null,
+        category_slug: product.category_slug || null,
+        product_type: product.product_type || null,
+        bundle_components: product.bundle_components || [],
+        rawPrice: product.price || 0,
+        rawOriginalPrice: product.original_price || null,
+        filkom_price: (product as any).filkom_price || null,
+        promo_price: (product as any).promo_price || null,
       };
-    }
+    });
+
+    return { products: formattedProducts, settings, categories: categoriesRes.categories || [] };
   },
   head: () => ({
     meta: [
@@ -159,40 +146,6 @@ export const Route = createFileRoute("/")({
       { rel: "shortcut icon", href: logo },
     ],
   }),
-  pendingComponent: () => (
-    <div className="min-h-screen bg-[#FCFAF7] pt-28 pb-20">
-      <div className="max-w-[1400px] mx-auto px-5 lg:px-10 space-y-12">
-        {/* Hero Skeleton */}
-        <div className="h-[40vh] md:h-[60vh] bg-ink/10 animate-pulse rounded-xl md:rounded-3xl border-2 border-ink" />
-        {/* Title Skeleton */}
-        <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-          <div className="h-10 w-64 bg-ink/10 animate-pulse rounded" />
-          <div className="h-12 w-full md:w-96 bg-ink/10 animate-pulse rounded-xl" />
-        </div>
-        {/* Product Grid Skeleton */}
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3.5 sm:gap-6 lg:gap-8">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <div key={i} className="flex flex-col bg-card border-2 border-ink/20 rounded-xl overflow-hidden h-[340px] sm:h-[400px] animate-pulse">
-              <div className="flex-1 bg-cream/80 border-b-2 border-ink/10 relative">
-                <div className="absolute top-3 left-3 h-5 w-20 bg-ink/10 rounded" />
-              </div>
-              <div className="p-4 h-[120px] sm:h-[130px] flex flex-col justify-between">
-                <div>
-                  <div className="h-3 w-20 bg-ink/10 rounded mb-2" />
-                  <div className="h-4 w-full bg-ink/15 rounded mb-1.5" />
-                  <div className="h-4 w-3/4 bg-ink/10 rounded" />
-                </div>
-                <div className="mt-4 pt-4 border-t border-cream flex items-end justify-between">
-                  <div className="h-5 w-24 bg-ink/15 rounded" />
-                  <div className="w-9 h-9 bg-ink/10 rounded-lg" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  ),
   component: Index,
 });
 
@@ -215,7 +168,6 @@ type ProductCard = {
   was?: string | null;
   tag?: string;
   cat: Filter;
-  slug?: string;
   product_id?: number;
   is_best_seller?: boolean;
   is_limited?: boolean;
@@ -670,8 +622,7 @@ function Index() {
   );
 
   const [filter, setFilter] = useState<Filter>("ALL");
-  const { wishlist, toggleWishlist, isInWishlist } = useWishlist();
-  const { recentlyViewed } = useRecentlyViewed();
+  const [wishlist, setWishlist] = useState<string[]>([]);
   const [quickViewProduct, setQuickViewProduct] = useState<ProductCard | null>(null);
   const [faqOpen, setFaqOpen] = useState<Record<number, boolean>>({});
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -686,9 +637,13 @@ function Index() {
     setHash(window.location.hash);
   }, []);
 
-  // Load cart from localStorage
+  // Load wishlist and cart from localStorage
   useEffect(() => {
     try {
+      const savedWishlist = localStorage.getItem("wishlist");
+      if (savedWishlist) {
+        setWishlist(JSON.parse(savedWishlist));
+      }
       const savedCart = localStorage.getItem("cart");
       if (savedCart) {
         setCart(JSON.parse(savedCart));
@@ -733,10 +688,7 @@ function Index() {
 
   const [query, setQuery] = useState("");
   const [email, setEmail] = useState("");
-  const loaderData = Route.useLoaderData() || {} as any;
-  if (loaderData.loaderError) {
-    return <div className="p-10 text-red-500 font-mono text-xs whitespace-pre-wrap">SSR LOADER ERROR:<br/>{loaderData.loaderError}</div>;
-  }
+  const loaderData = Route.useLoaderData() || {};
   const dbProducts = loaderData.products || [];
   const initialSettings = loaderData.settings || null;
   const categories = loaderData.categories || [];
@@ -881,13 +833,27 @@ function Index() {
     return counts;
   }, [products]);
 
+  // Wishlist actions
+  const toggleWishlist = (id: string) => {
+    setWishlist((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      localStorage.setItem("wishlist", JSON.stringify(next));
+      if (next.includes(id)) {
+        toast.success("Added to wishlist", { icon: "❤️" });
+      } else {
+        toast.info("Removed from wishlist");
+      }
+      return next;
+    });
+  };
+
   const visibleProducts = useMemo(() => {
     let list = products;
     if (filter !== "ALL") list = list.filter((p) => p.cat === filter);
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter(
-        (p) => p.name?.toLowerCase().includes(q) || (p.cat || "").toLowerCase().includes(q),
+        (p) => p.name.toLowerCase().includes(q) || p.cat.toLowerCase().includes(q),
       );
     }
     return list;
@@ -922,8 +888,8 @@ function Index() {
     // If it has only one size (e.g. accessories, bags), return empty to show simple Add To Cart
     if (
       p.variants.length === 1 &&
-      (p.variants[0].size?.toLowerCase() === "all size" ||
-        p.variants[0].size?.toLowerCase() === "one size")
+      (p.variants[0].size.toLowerCase() === "all size" ||
+        p.variants[0].size.toLowerCase() === "one size")
     ) {
       return [];
     }
@@ -988,7 +954,6 @@ function Index() {
 
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-brand-orange selection:text-cream">
-      <div className="noise-overlay" />
       {/* Header */}
       <Navbar searchQuery={query} onSearchQueryChange={setQuery} />
 
@@ -1024,9 +989,9 @@ function Index() {
                           )}
 
                           {/* Title */}
-                          <h1 className="display text-[44px] sm:text-[68px] lg:text-[96px] leading-[0.9] text-ink font-extrabold uppercase">
+                          <h1 className="display text-[44px] sm:text-[68px] lg:text-[96px] leading-[0.9] text-ink animate-fade-in font-extrabold uppercase">
                             {(el.config.title || "").split("\n").map((line: string, idx: number) => (
-                              <span key={idx} className="block animate-text-reveal" style={{ animationDelay: `${idx * 0.1}s` }}>
+                              <span key={idx} className="block">
                                 {line}
                               </span>
                             ))}
@@ -1062,7 +1027,7 @@ function Index() {
                                   scrollToId("shop");
                                 }
                               }}
-                              className="inline-flex items-center justify-center gap-2 bg-ink text-cream px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] hover:bg-brand-orange shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] brutal-press cursor-pointer uppercase"
+                              className="inline-flex items-center justify-center gap-2 bg-ink text-cream px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] hover:bg-brand-orange transition-all duration-300 shadow-[3px_3px_0px_0px_rgba(27,27,27,0.15)] active:translate-y-0.5 cursor-pointer uppercase"
                             >
                               {el.config.btnText} <ArrowRight className="w-4 h-4" />
                             </button>
@@ -1076,7 +1041,7 @@ function Index() {
                                     navigate({ to: link });
                                   }
                                 }}
-                                className="inline-flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] border-2 border-ink text-ink hover:bg-ink hover:text-cream shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] brutal-press cursor-pointer uppercase"
+                                className="inline-flex items-center justify-center px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] border-2 border-ink text-ink hover:bg-ink hover:text-cream transition-all duration-300 active:translate-y-0.5 cursor-pointer uppercase"
                               >
                                 {el.config.lookbookBtnText || "LOOKBOOK"}
                               </button>
@@ -1086,19 +1051,19 @@ function Index() {
                                 return (
                                   <button
                                     onClick={() => navigate({ to: "/login" })}
-                                    className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] bg-cream text-ink border-2 border-ink hover:bg-brand-orange hover:text-cream hover:border-brand-orange shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] brutal-press cursor-pointer uppercase"
+                                    className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] bg-cream text-ink border-2 border-ink hover:bg-brand-orange hover:text-cream hover:border-brand-orange transition-all duration-300 shadow-[3px_3px_0px_0px_rgba(27,27,27,0.15)] active:translate-y-0.5 cursor-pointer uppercase"
                                   >
                                     <ShieldCheck className="w-4 h-4" /> YUK LOGIN DULU
                                   </button>
                                 );
                               }
-                              const isStudentUbEmail = user?.email?.toLowerCase().endsWith("@student.ub.ac.id");
-                              const isVerified = Number(user?.is_filkom_verified) === 1;
+                              const isStudentUbEmail = user.email?.toLowerCase().endsWith("@student.ub.ac.id");
+                              const isVerified = Number(user.is_filkom_verified) === 1;
                               if (isStudentUbEmail && !isVerified) {
                                 return (
                                   <button
                                     onClick={() => window.dispatchEvent(new Event("open-verification"))}
-                                    className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] bg-cream text-ink border-2 border-ink hover:bg-brand-orange hover:text-cream hover:border-brand-orange shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] brutal-press cursor-pointer uppercase animate-pulse"
+                                    className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-3.5 sm:py-4 text-xs font-bold tracking-[0.2em] bg-cream text-ink border-2 border-ink hover:bg-brand-orange hover:text-cream hover:border-brand-orange transition-all duration-300 shadow-[3px_3px_0px_0px_rgba(27,27,27,0.15)] active:translate-y-0.5 cursor-pointer uppercase animate-pulse"
                                   >
                                     <ShieldCheck className="w-4 h-4" /> VERIFIKASI NIM-MU!
                                   </button>
@@ -1145,7 +1110,7 @@ function Index() {
                       list = list.filter((p) => p.is_best_seller);
                     } else if (source === "slugs") {
                       const slugs = (cfg.slugs || "").split(",").map((s: string) => s.trim().toLowerCase());
-                      list = list.filter((p) => slugs.includes((p.slug || String(p.id)).toLowerCase()));
+                      list = list.filter((p) => slugs.includes(p.id.toLowerCase()));
                     }
                     return list.slice(0, cfg.maxItems || 6);
                   };
@@ -1232,29 +1197,7 @@ function Index() {
                                           </span>
                                         )}
                                       </div>
-                                      </Link>
-                                      {/* Quick View Button */}
-                                      <button
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          setQuickViewProduct(p);
-                                        }}
-                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 bg-cream text-ink border-2 border-ink font-bold text-[10px] px-4 py-2 opacity-0 group-hover:opacity-100 transition-opacity uppercase hover:bg-brand-orange hover:text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-                                      >
-                                        Quick View
-                                      </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        toggleWishlist(p.id, p.name);
-                                      }}
-                                      className="absolute top-2 right-2 z-10 p-1.5 bg-white/80 hover:bg-white text-ink rounded-full border border-ink shadow-sm transition-colors"
-                                      aria-label="Toggle Wishlist"
-                                    >
-                                      <Heart className={`w-4 h-4 pointer-events-none ${isInWishlist(p.id) ? "fill-red-500 text-red-500" : ""}`} />
-                                    </button>
+                                    </Link>
 
                                     {/* Details Content Body Below Image */}
                                     <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
@@ -1381,29 +1324,6 @@ function Index() {
                                         )}
                                       </div>
                                     </Link>
-                                    {/* Quick View Button */}
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setQuickViewProduct(p);
-                                      }}
-                                      className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 bg-cream text-ink border-2 border-ink font-bold text-[10px] px-4 py-2 opacity-0 group-hover:opacity-100 transition-opacity uppercase hover:bg-brand-orange hover:text-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-                                    >
-                                      Quick View
-                                    </button>
-
-                                    <button
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        toggleWishlist(p.id, p.name);
-                                      }}
-                                      className="absolute top-2 right-2 z-10 p-1.5 bg-white/80 hover:bg-white text-ink rounded-full border border-ink shadow-sm transition-colors"
-                                      aria-label="Toggle Wishlist"
-                                    >
-                                      <Heart className={`w-4 h-4 pointer-events-none ${isInWishlist(p.id) ? "fill-red-500 text-red-500" : ""}`} />
-                                    </button>
 
                                     <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
                                       <div>
@@ -1956,7 +1876,7 @@ function Index() {
                                           {bundle.itemsList.split(",").map((it: string, itIdx: number) => {
                                             const trimmedName = it.trim();
                                             const matchProd = products.find(
-                                              (p) => p.name?.toLowerCase().includes(trimmedName.toLowerCase())
+                                              (p) => p.name.toLowerCase().includes(trimmedName.toLowerCase())
                                             );
                                             const compImg = matchProd?.img || (itIdx % 2 === 0 ? pTshirt : pHoodie);
 
@@ -2213,82 +2133,120 @@ function Index() {
           </ScrollFadeSegment>
         ))}
 
-      {/* Recently Viewed Section */}
-      {(() => {
-        const recentlyViewedProducts = recentlyViewed.map(id => products.find((p: any) => p.id === id)).filter(Boolean).slice(0, 8);
-        if (recentlyViewedProducts.length === 0) return null;
-        
-        return (
-          <section className="bg-[#FCFAF7] py-16 sm:py-24 border-b-2 border-ink animate-slide-up">
-            <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
-              <div className="flex flex-col items-center text-center mb-10 sm:mb-12 gap-2">
-                <div className="text-xs tracking-[0.35em] text-brand-orange font-bold mb-2 uppercase">
-                  YOUR HISTORY
-                </div>
-                <h2 className="display text-3xl sm:text-5xl lg:text-7xl text-ink font-bold uppercase">
-                  Terakhir Dilihat
-                </h2>
-                <p className="text-sm sm:text-base text-muted-foreground font-medium max-w-lg">
-                  Produk-produk yang baru saja Anda buka sebelumnya.
-                </p>
-              </div>
-              <div className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none gap-4 sm:gap-6 pb-6">
-                {recentlyViewedProducts.map((p: any) => {
-                const currentPrice = parsePrice(p.price);
-                return (
-                  <div
-                    key={p.id}
-                    className="group flex flex-col border-2 border-ink bg-cream text-ink rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[220px] sm:w-[260px] shrink-0 snap-center"
-                  >
-                    <Link
-                      to="/product/$slug"
-                      params={{ slug: p.id }}
-                      className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden block"
-                    >
-                      <img
-                        src={resolveImageUrl(p.img || p.image_url)}
-                        alt={p.name}
-                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                      />
-                    </Link>
-                    <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
-                      <div>
-                        <div className="text-[8.5px] font-extrabold tracking-widest text-brand-orange uppercase mb-0.5">
-                          {p.cat || p.category_name}
-                        </div>
-                        <Link to="/product/$slug" params={{ slug: p.id }} className="hover:text-brand-orange transition-colors">
-                          <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight group-hover:text-brand-orange transition-colors line-clamp-2">
-                            {p.name}
-                          </h3>
-                        </Link>
-                      </div>
-                      <div className="pt-2 border-t border-ink/10 flex items-baseline justify-between gap-1">
-                        <span className="text-sm sm:text-base font-black text-ink tracking-tight block leading-none">
-                          {formatRp(currentPrice)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </section>
-        );
-      })()}
 
       {/* 10. Footer */}
       <Footer />
 
+
+
       {/* Quick View Dialog / Modal overlay */}
-      <QuickViewModal
-        product={quickViewProduct}
-        onClose={() => setQuickViewProduct(null)}
-        user={user}
-        wishlist={wishlist}
-        toggleWishlist={toggleWishlist}
-        addToCart={addToCart}
-      />
+      {quickViewProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-sm animate-fade-in">
+          <div className="absolute inset-0" onClick={() => setQuickViewProduct(null)} />
+          <div className="relative bg-background border-4 border-ink rounded-lg w-full max-w-4xl p-6 sm:p-8 flex flex-col md:flex-row gap-6 sm:gap-8 z-10 animate-scale-in max-h-[90vh] overflow-y-auto shadow-2xl">
+            <button
+              onClick={() => setQuickViewProduct(null)}
+              className="absolute top-4 right-4 p-2 rounded border-2 border-ink bg-cream text-ink hover:bg-ink hover:text-cream transition-colors z-20 cursor-pointer"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            {/* Left Image column */}
+            <div className="w-full md:w-1/2 aspect-[4/5] bg-secondary border-2 border-ink rounded overflow-hidden relative">
+              <img
+                src={resolveImageUrl(quickViewProduct.img)}
+                alt={quickViewProduct.name}
+                className="w-full h-full object-cover"
+              />
+              {quickViewProduct.tag && (
+                <span className="absolute top-3 left-3 text-[9px] font-bold tracking-widest px-2.5 py-1 bg-ink text-cream rounded uppercase">
+                  {quickViewProduct.tag}
+                </span>
+              )}
+            </div>
+
+            {/* Right Details column */}
+            <div className="w-full md:w-1/2 flex flex-col justify-between">
+              <div>
+                <div className="text-[10px] font-bold tracking-widest text-brand-orange uppercase mb-1">
+                  {quickViewProduct.cat}
+                </div>
+                <h3 className="display text-xl sm:text-3xl text-ink font-bold uppercase leading-none tracking-wide mb-3">
+                  {quickViewProduct.name}
+                </h3>
+
+                <div className="flex items-baseline gap-2 mb-4">
+                  <span className="text-xl font-extrabold text-ink">{getActivePriceForCard(quickViewProduct, user)}</span>
+                  {(quickViewProduct.was || (quickViewProduct.filkom_price && Number(user?.is_filkom_verified) === 1 && Number(quickViewProduct.filkom_price) < (quickViewProduct.rawPrice || 0))) && (
+                    <span className="text-sm text-muted-foreground line-through font-bold">
+                      {quickViewProduct.was || quickViewProduct.price}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-sm text-muted-foreground leading-relaxed mb-6 font-medium">
+                  {quickViewProduct.name.includes("Varsity")
+                    ? "Varsity Jacket edisi khusus civitas akademika Fakultas Ilmu Komputer Universitas Brawijaya. Terbuat dari cotton fleece premium 330gsm dengan jahitan double-stitch, furing katun adem, kancing snap metal anti-karat, dan bordir komputer timbul super tebal (chenille embroidery) khas varsity retail."
+                    : quickViewProduct.name.includes("Hoodie")
+                      ? "Heavyweight Hoodie dengan cuttingan boxy khas fashion modern. Sangat pas untuk ngoding semalaman, melindungi tubuh dari angin malam AC gazebo. Terbuat dari katun fleece 300gsm tebal dengan kap kepala double layer."
+                      : quickViewProduct.name.includes("Tee")
+                        ? "T-Shirt harian berbahan katun kombed 24s premium (Twill combed) bertekstur lembut dan menyerap keringat. Sablon presisi tinggi tahan cuci dengan desain grafis ikonik representasi kehidupan programmer FILKOM."
+                        : "Aksesoris eksklusif penunjang identitas mahasiswa FILKOM UB. Dibuat dengan material kokoh berdaya tahan tinggi, cocok dipakai kuliah harian maupun kegiatan praktikum."}
+                </p>
+
+                {/* Size Selector */}
+                {getProductAvailableSizes(quickViewProduct).length > 0 && (
+                  <div className="space-y-2 mb-6 animate-scale-in">
+                    <span className="text-xs font-bold text-ink tracking-wider uppercase block">
+                      PILIH UKURAN:
+                    </span>
+                    <div className="flex flex-wrap gap-2">
+                      {getProductAvailableSizes(quickViewProduct).map((size) => (
+                        <button
+                          key={size}
+                          onClick={() => {
+                            addToCart(quickViewProduct, size);
+                            setQuickViewProduct(null);
+                          }}
+                          className="border-2 border-ink font-bold text-xs py-2 px-4 hover:bg-brand-orange hover:text-cream cursor-pointer uppercase transition-all duration-200"
+                        >
+                          Size {size}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="pt-4 border-t border-ink/10 flex flex-col sm:flex-row gap-3">
+                <button
+                  onClick={() => {
+                    addToCart(quickViewProduct);
+                    setQuickViewProduct(null);
+                  }}
+                  className="flex-1 bg-ink text-cream font-bold tracking-widest text-xs py-4 text-center hover:bg-brand-orange hover:text-cream transition-all duration-200 uppercase cursor-pointer"
+                >
+                  ADD TO BAG
+                </button>
+                <button
+                  onClick={() => {
+                    toggleWishlist(quickViewProduct.id);
+                  }}
+                  className="border-2 border-ink font-bold text-xs p-4 flex items-center justify-center hover:bg-ink hover:text-cream transition-all duration-200 cursor-pointer"
+                  aria-label="Wishlist toggle"
+                >
+                  <Heart
+                    className={`w-4 h-4 ${wishlist.includes(quickViewProduct.id) ? "fill-red-500 text-red-500" : ""}`}
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
     </div>
   );
 }
