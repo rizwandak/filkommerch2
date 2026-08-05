@@ -27,7 +27,7 @@ jobs:
           VITE_API_URL: https://filkommerch.com
         run: |
           cd frontend
-          npm ci
+          npm install
           npm run build
 
       # ---- CREATE RESTART TRIGGER ----
@@ -72,7 +72,7 @@ jobs:
       - name: 🔨 Install & Build Backend
         run: |
           cd backend
-          npm ci
+          npm install
           npm run build
 
       # ---- CREATE RESTART TRIGGER ----
