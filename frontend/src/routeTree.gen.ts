@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as WishlistRouteImport } from './routes/wishlist'
 import { Route as ProductsRouteImport } from './routes/products'
 import { Route as PreOrderRouteImport } from './routes/pre-order'
 import { Route as OrdersRouteImport } from './routes/orders'
@@ -36,6 +37,11 @@ import { Route as AdminHomepageRouteImport } from './routes/admin/homepage'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminActivityLogsRouteImport } from './routes/admin/activity-logs'
 
+const WishlistRoute = WishlistRouteImport.update({
+  id: '/wishlist',
+  path: '/wishlist',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductsRoute = ProductsRouteImport.update({
   id: '/products',
   path: '/products',
@@ -179,6 +185,7 @@ export interface FileRoutesByFullPath {
   '/orders': typeof OrdersRoute
   '/pre-order': typeof PreOrderRoute
   '/products': typeof ProductsRoute
+  '/wishlist': typeof WishlistRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/homepage': typeof AdminHomepageRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/orders': typeof OrdersRoute
   '/pre-order': typeof PreOrderRoute
   '/products': typeof ProductsRoute
+  '/wishlist': typeof WishlistRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/homepage': typeof AdminHomepageRoute
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   '/orders': typeof OrdersRoute
   '/pre-order': typeof PreOrderRoute
   '/products': typeof ProductsRoute
+  '/wishlist': typeof WishlistRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/homepage': typeof AdminHomepageRoute
@@ -264,6 +273,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/pre-order'
     | '/products'
+    | '/wishlist'
     | '/admin/activity-logs'
     | '/admin/dashboard'
     | '/admin/homepage'
@@ -290,6 +300,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/pre-order'
     | '/products'
+    | '/wishlist'
     | '/admin/activity-logs'
     | '/admin/dashboard'
     | '/admin/homepage'
@@ -318,6 +329,7 @@ export interface FileRouteTypes {
     | '/orders'
     | '/pre-order'
     | '/products'
+    | '/wishlist'
     | '/admin/activity-logs'
     | '/admin/dashboard'
     | '/admin/homepage'
@@ -347,6 +359,7 @@ export interface RootRouteChildren {
   OrdersRoute: typeof OrdersRoute
   PreOrderRoute: typeof PreOrderRoute
   ProductsRoute: typeof ProductsRoute
+  WishlistRoute: typeof WishlistRoute
   ApiDbTestRoute: typeof ApiDbTestRoute
   OrdersOrderIdRoute: typeof OrdersOrderIdRoute
   ProductSlugRoute: typeof ProductSlugRoute
@@ -354,6 +367,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/wishlist': {
+      id: '/wishlist'
+      path: '/wishlist'
+      fullPath: '/wishlist'
+      preLoaderRoute: typeof WishlistRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/products': {
       id: '/products'
       path: '/products'
@@ -595,6 +615,7 @@ const rootRouteChildren: RootRouteChildren = {
   OrdersRoute: OrdersRoute,
   PreOrderRoute: PreOrderRoute,
   ProductsRoute: ProductsRoute,
+  WishlistRoute: WishlistRoute,
   ApiDbTestRoute: ApiDbTestRoute,
   OrdersOrderIdRoute: OrdersOrderIdRoute,
   ProductSlugRoute: ProductSlugRoute,

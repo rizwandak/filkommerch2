@@ -233,6 +233,33 @@
   animation: scaleIn 0.25s ease-out both;
 }
 
+/* Cart badge bounce - triggered when cart count changes */
+@keyframes cartBounce {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.35); }
+  50% { transform: scale(0.9); }
+  75% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+.animate-cart-bounce {
+  animation: cartBounce 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* Staggered card entrance animation (for product grids) */
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-card-entrance {
+  animation: cardEntrance 0.35s ease-out both;
+}
+
 @keyframes splash-bara {
   0% {
     transform: translateX(-150%) rotate(-15deg);
@@ -283,4 +310,67 @@
   .has-global-marquee header.sticky {
     top: 44px !important;
   }
+}
+
+/* --- UI Premium Additions --- */
+@keyframes textReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(1.5rem) skewY(2deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) skewY(0);
+  }
+}
+
+.animate-text-reveal {
+  animation: textReveal 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.brutal-press {
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.brutal-press:active {
+  transform: translate(4px, 4px) !important;
+  box-shadow: 0px 0px 0px 0px rgba(27,27,27,1) !important;
+}
+
+.noise-overlay {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  opacity: 0.04;
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40; /* Below sticky navbar (z-50) but above most content */
+}
+
+.dark .noise-overlay {
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+}
+
+.mesh-gradient-bg {
+  background: linear-gradient(120deg, var(--color-brand-orange), #ff4d4d, var(--color-brand-blue));
+  background-size: 200% 200%;
+  animation: meshGradient 8s ease infinite;
+}
+
+@keyframes meshGradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes cartBounce {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+.animate-cart-bounce {
+  animation: cartBounce 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }

@@ -262,7 +262,7 @@ function PreOrderPage() {
     const isUb = Number(user?.is_filkom_verified) === 1;
     const list = dbProducts.length > 0 ? dbProducts : [];
     return list.map((product: ProductWithVariants) => {
-      const productName = product.name.toLowerCase();
+      const productName = product.name?.toLowerCase() || "";
       const cat =
         product.category_id === 2
           ? "ACCESSORIES"
@@ -405,18 +405,18 @@ function PreOrderPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between">
+      <div className="noise-overlay" />
       <Navbar />
 
       {/* Hero Countdown Section (Compact Vibrant Light Mode) */}
-      <section className="bg-cream text-ink py-6 sm:py-8 border-b-2 border-ink text-center flex flex-col items-center justify-center relative overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(#ff6b00_1.5px,transparent_1.5px)] [background-size:20px_20px] opacity-15 pointer-events-none" />
+      <section className="mesh-gradient-bg text-cream py-6 sm:py-8 border-b-2 border-ink text-center flex flex-col items-center justify-center relative overflow-hidden">
         <div className="max-w-3xl px-5 space-y-4 relative z-10 animate-slide-up">
-          <div className="inline-flex items-center gap-2 bg-brand-orange text-cream font-mono font-extrabold text-[10px] tracking-widest px-3.5 py-1 rounded-full uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] border-2 border-ink">
-            <span className="w-2 h-2 rounded-full bg-cream animate-ping" />
+          <div className="inline-flex items-center gap-2 bg-ink text-cream font-mono font-extrabold text-[10px] tracking-widest px-3.5 py-1 rounded-full uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] border-2 border-ink">
+            <span className="w-2 h-2 rounded-full bg-brand-orange animate-ping" />
             ⏱ Pre-Order
           </div>
 
-          <h1 className="display text-3xl sm:text-5xl lg:text-6xl font-extrabold uppercase leading-none tracking-wide text-ink">
+          <h1 className="display text-3xl sm:text-5xl lg:text-6xl font-extrabold uppercase leading-none tracking-wide text-cream drop-shadow-md">
             {poInfo ? poInfo.batchName : "Pre-Order Terkini"}
           </h1>
 
@@ -570,7 +570,7 @@ function PreOrderPage() {
                           <div className="pt-2.5 border-t border-neutral-800 flex gap-2">
                             <button
                               onClick={() => addToCart(p)}
-                              className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-extrabold tracking-wider text-[10px] py-2 px-2 rounded-lg border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all uppercase cursor-pointer flex items-center justify-center gap-1"
+                              className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-extrabold tracking-wider text-[10px] py-2 px-2 rounded-lg border border-neutral-600 shadow-[2px_2px_0px_0px_rgba(255,255,255,0.7)] brutal-press uppercase cursor-pointer flex items-center justify-center gap-1"
                             >
                               <ShoppingBag className="w-3 h-3 text-brand-orange" />
                               BAG
@@ -579,7 +579,7 @@ function PreOrderPage() {
                             <Link
                               to="/product/$slug"
                               params={{ slug: p.id }}
-                              className="flex-1 bg-brand-orange hover:bg-cream text-ink hover:text-ink font-extrabold tracking-wider text-[10px] py-2 px-2 rounded-lg border border-ink shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all uppercase cursor-pointer flex items-center justify-center gap-1 text-center"
+                              className="flex-1 bg-brand-orange hover:bg-cream text-ink hover:text-ink font-extrabold tracking-wider text-[10px] py-2 px-2 rounded-lg border border-ink shadow-[2px_2px_0px_0px_rgba(255,255,255,0.7)] brutal-press uppercase cursor-pointer flex items-center justify-center gap-1 text-center"
                             >
                               PESAN <ArrowRight className="w-3 h-3" />
                             </Link>
