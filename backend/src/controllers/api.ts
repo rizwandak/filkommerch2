@@ -1972,6 +1972,17 @@ export const deleteOrder = async (req: Request, res: Response) => {
       }
     }
 
+    // Delete any linked LNS pelunasan sub-orders and their order_items
+    const [lnsRows] = await connection.execute(
+      "SELECT order_id FROM orders WHERE order_id LIKE CONCAT('LNS-', ?, '-%') OR notes LIKE CONCAT('%Pelunasan untuk Order: ', ?)",
+      [id, id]
+    );
+    for (const lnsOrder of lnsRows as any[]) {
+      await connection.execute("DELETE FROM order_items WHERE order_id = ?", [lnsOrder.order_id]);
+      await connection.execute("DELETE FROM orders WHERE order_id = ?", [lnsOrder.order_id]);
+    }
+
+    await connection.execute("DELETE FROM order_items WHERE order_id = ?", [id]);
     await connection.execute("DELETE FROM orders WHERE order_id = ?", [id]);
     await connection.commit();
     return res.json({ success: true });

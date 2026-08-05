@@ -487,14 +487,34 @@ function AdminTransactionsPage() {
 
   const stats = useMemo(() => {
     const ordersList = Array.isArray(onlineOrders) ? onlineOrders : [];
-    const total = ordersList.length;
+    const parentIdsInList = new Set(ordersList.map((o) => o.order_id));
+
+    // Exclude child LNS sub-orders whose parent DP order is in onlineOrders (they are displayed embedded under the parent order)
+    const mainOrders = ordersList.filter((o) => {
+      if (!o) return false;
+      const isLns = String(o.order_id || "").startsWith("LNS") || (o.notes && o.notes.includes("Pelunasan untuk Order:"));
+      if (isLns) {
+        const match = o.notes && o.notes.match(/Pelunasan untuk Order:\s*([A-Za-z0-9-]+)/);
+        const parentId = match ? match[1] : (o.order_id || "").split("-").slice(1, -1).join("-");
+        if (parentId && parentIdsInList.has(parentId)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const total = mainOrders.length;
     let paidCount = 0;
     let verifyingCount = 0;
     let dpCount = 0;
     let unpaidCount = 0;
 
-    ordersList.forEach((o) => {
+    mainOrders.forEach((o) => {
       if (!o) return;
+
+      const oStatus = o.order_status || o.transaction_status;
+      const isCancelled = oStatus === "cancelled" || oStatus === "cancel" || oStatus === "expire";
+
       const isPaid =
         o.payment_status === "paid" ||
         o.transaction_status === "settlement" ||
@@ -502,10 +522,15 @@ function AdminTransactionsPage() {
       const hasProof = !!o.payment_proof_url;
       const linkedLns = dpPelunasanMap[o.order_id];
       const lnsHasProof = linkedLns && !!linkedLns.payment_proof_url && linkedLns.payment_status !== "paid";
+      const lnsIsPaid = linkedLns && (linkedLns.payment_status === "paid" || linkedLns.order_status === "completed");
 
-      if (isPaid && (!linkedLns || linkedLns.payment_status === "paid")) {
+      if (isCancelled) {
+        return;
+      }
+
+      if (isPaid && (!linkedLns || lnsIsPaid)) {
         paidCount++;
-      } else if (hasProof || lnsHasProof) {
+      } else if ((hasProof && !isPaid) || lnsHasProof) {
         verifyingCount++;
       } else {
         unpaidCount++;

@@ -26,7 +26,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getProductBySlug, getProductReviewsServerAction } from "@backend/server-actions";
+import { getProductBySlug, getProducts, getProductReviewsServerAction } from "@backend/server-actions";
 import { Button } from "@frontend/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { Navbar } from "@/components/Navbar";
@@ -72,8 +72,15 @@ const NAV = [
 
 export const Route = createFileRoute("/product/$slug")({
   loader: async ({ params }) => {
-    const result = await getProductBySlug({ data: params.slug });
-    return { product: result.product || null, error: result.error || null };
+    const [result, productsRes] = await Promise.all([
+      getProductBySlug({ data: params.slug }),
+      getProducts().catch(() => ({ products: [] })),
+    ]);
+    return {
+      product: result.product || null,
+      error: result.error || null,
+      allProducts: productsRes?.products || [],
+    };
   },
   head: ({ loaderData }) => {
     const title = loaderData?.product
@@ -93,9 +100,25 @@ export const Route = createFileRoute("/product/$slug")({
 });
 
 function ProductDetailPage() {
-  const { product, error } = Route.useLoaderData();
+  const { product, error, allProducts = [] } = Route.useLoaderData();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
+
+  const relatedProducts = useMemo(() => {
+    if (!product || !allProducts || allProducts.length === 0) return [];
+    
+    const otherProducts = allProducts.filter((p: any) => p.id !== product.id && p.slug !== product.slug);
+    
+    const sameCategory = otherProducts.filter(
+      (p: any) => p.category_id === product.category_id || (p.category_name && p.category_name === product.category_name)
+    );
+    
+    const differentCategory = otherProducts.filter(
+      (p: any) => p.category_id !== product.category_id && (!p.category_name || p.category_name !== product.category_name)
+    );
+
+    return [...sameCategory, ...differentCategory].slice(0, 4);
+  }, [product, allProducts]);
 
   const [pathname, setPathname] = useState("");
   const [search, setSearch] = useState("");
@@ -1517,6 +1540,102 @@ function ProductDetailPage() {
             </div>
           </div>
         </div>
+        {/* ===== KAMU MUNGKIN SUKA (RECOMMENDED PRODUCTS) ===== */}
+        {relatedProducts.length > 0 && (
+          <section className="mt-12 sm:mt-16 pt-8 border-t-2 border-ink/20">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <span className="text-brand-orange text-lg">✦</span>
+                <h2 className="display text-xl sm:text-2xl font-black text-ink uppercase tracking-wide">
+                  Kamu Mungkin Suka
+                </h2>
+              </div>
+              <Link
+                to="/products"
+                className="text-xs font-extrabold text-brand-orange hover:text-ink transition-colors flex items-center gap-1 uppercase tracking-wider"
+              >
+                Lihat Semua <ArrowRight className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-5">
+              {relatedProducts.map((p: any) => {
+                const displayPrice = p.promo_price && Number(p.promo_price) > 0
+                  ? Number(p.promo_price)
+                  : Number(p.price || 0);
+                const showOriginalPrice = p.original_price && Number(p.original_price) > displayPrice
+                  ? Number(p.original_price)
+                  : null;
+
+                return (
+                  <Link
+                    key={p.id}
+                    to="/product/$slug"
+                    params={{ slug: p.slug || String(p.id) }}
+                    className="group flex flex-col bg-cream border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 overflow-hidden text-ink h-full"
+                  >
+                    {/* Product Image */}
+                    <div className="relative aspect-square overflow-hidden bg-secondary border-b-2 border-ink select-none">
+                      {p.image_url ? (
+                        <img
+                          src={resolveImageUrl(p.image_url)}
+                          alt={p.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold bg-cream text-xs">
+                          No Photo
+                        </div>
+                      )}
+                      
+                      {/* Tag / Badge */}
+                      <div className="absolute top-2 left-2 flex flex-col gap-1 items-start">
+                        {p.sale_type === "pre_order" && (
+                          <span className="text-[8px] sm:text-[9px] font-black tracking-wider px-2 py-0.5 bg-brand-orange text-cream rounded-full border border-ink shadow-xs uppercase">
+                            PO
+                          </span>
+                        )}
+                        {!!p.is_best_seller && (
+                          <span className="text-[8px] sm:text-[9px] font-black tracking-wider px-2 py-0.5 bg-emerald-600 text-cream rounded-full border border-ink shadow-xs uppercase">
+                            BEST SELLER
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Product Info */}
+                    <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between space-y-2">
+                      <div>
+                        <p className="text-[9px] sm:text-[10px] font-extrabold text-brand-orange uppercase tracking-wider mb-0.5">
+                          {p.category_name || "MERCHANDISE"}
+                        </p>
+                        <h3 className="font-extrabold text-xs sm:text-sm text-ink group-hover:text-brand-orange transition-colors tracking-tight line-clamp-2 leading-snug">
+                          {p.name}
+                        </h3>
+                      </div>
+
+                      <div className="pt-2 border-t border-ink/10 flex items-center justify-between gap-1">
+                        <div>
+                          <span className="font-black text-xs sm:text-sm text-ink">
+                            Rp {displayPrice.toLocaleString("id-ID")}
+                          </span>
+                          {showOriginalPrice && (
+                            <span className="block text-[9px] sm:text-[10px] text-muted-foreground line-through font-bold">
+                              Rp {showOriginalPrice.toLocaleString("id-ID")}
+                            </span>
+                          )}
+                        </div>
+                        <div className="p-1.5 rounded-lg bg-brand-orange text-cream border-2 border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] group-hover:bg-cream group-hover:text-ink transition-colors shrink-0">
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </main>
 
 

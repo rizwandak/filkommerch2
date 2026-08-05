@@ -42,7 +42,7 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+  console.error("SSR ERROR:", error);
   const router = useRouter();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
@@ -54,6 +54,12 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
         </h1>
+        <p className="mt-2 text-sm text-red-500">
+          ERROR: {error?.message || "Unknown error"}
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground whitespace-pre-wrap text-left bg-gray-100 p-2 overflow-auto max-h-64">
+          {error?.stack}
+        </p>
         <p className="mt-2 text-sm text-muted-foreground">
           Something went wrong on our end. You can try refreshing or head back home.
         </p>
