@@ -24,6 +24,7 @@ export function renderErrorPage(): string {
         <button class="primary" onclick="location.reload()">Try again</button>
         <a class="secondary" href="/">Go home</a>
       </div>
+      <pre id="error-stack" style="margin-top: 2rem; background: #eee; padding: 1rem; text-align: left; overflow: auto; max-width: 100%; font-size: 0.75rem; color: #d32f2f; border-radius: 4px; border: 1px solid #ccc;"></pre>
     </div>
   </body>
 </html>`;

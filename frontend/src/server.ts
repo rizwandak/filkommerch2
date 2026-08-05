@@ -34,7 +34,11 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
   const err = error as any;
   const errorStack = err?.stack || String(err);
   console.error(error);
-  return new Response(renderErrorPage().replace("</body>", "<!-- Error: " + errorStack + " --></body>"), {
+  
+  const finalHtml = renderErrorPage()
+    .replace("</body>", "<!-- Error: " + errorStack + " --></body>")
+    .replace('id="error-stack"></pre>', 'id="error-stack">' + errorStack.replace(/</g, "&lt;").replace(/>/g, "&gt;") + '</pre>');
+  return new Response(finalHtml, {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
   });
@@ -50,7 +54,12 @@ export default {
       console.error(caughtError);
       const err = caughtError as any;
       const errorStack = err?.stack || String(err);
-      return new Response(renderErrorPage().replace("</body>", "<!-- Error: " + errorStack + " --></body>"), {
+      
+      const finalHtml = renderErrorPage()
+        .replace("</body>", "<!-- Error: " + errorStack + " --></body>")
+        .replace('id="error-stack"></pre>', 'id="error-stack">' + errorStack.replace(/</g, "&lt;").replace(/>/g, "&gt;") + '</pre>');
+        
+      return new Response(finalHtml, {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },
       });
