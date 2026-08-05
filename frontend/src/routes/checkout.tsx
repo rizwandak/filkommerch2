@@ -487,34 +487,44 @@ function CheckoutPage() {
       </div>
 
       {/* Steps Indicator Bar */}
-      <div className="border-b border-border bg-card">
-        <div className="mx-auto max-w-6xl px-3 sm:px-4 py-3 sm:py-4">
+      <div className="border-b-2 border-ink bg-[#FCFAF7] shadow-[0px_4px_0px_0px_rgba(27,27,27,1)] relative z-20">
+        <div className="mx-auto max-w-6xl px-3 sm:px-4 py-4 sm:py-6">
           <div className="flex items-center justify-between gap-1 sm:gap-2">
-            {steps.map((s, index) => (
-              <div key={s.step} className="flex items-center flex-1 min-w-0">
-                <div
-                  className={`flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-full text-xs sm:text-sm font-bold shrink-0 ${currentStep >= s.step
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-muted text-muted-foreground"
-                    }`}
-                >
-                  {s.step}
-                </div>
-                <div className="ml-2 hidden text-xs sm:text-sm font-bold sm:block truncate">{s.title}</div>
-                {index < steps.length - 1 && (
+            {steps.map((s, index) => {
+              const isCompleted = currentStep > s.step;
+              const isActive = currentStep === s.step;
+              return (
+                <div key={s.step} className="flex items-center flex-1 min-w-0">
                   <div
-                    className={`ml-1.5 sm:ml-4 h-1 flex-1 rounded-full transition-colors ${currentStep > s.step ? "bg-primary" : "bg-muted"
+                    className={`flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full text-xs sm:text-sm font-black border-2 transition-all shrink-0 ${
+                      isCompleted
+                        ? "bg-emerald-500 border-ink text-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                        : isActive
+                        ? "bg-brand-orange border-ink text-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                        : "bg-white border-ink text-muted-foreground opacity-60"
+                    }`}
+                  >
+                    {isCompleted ? <Check className="w-4 h-4 sm:w-5 sm:h-5" /> : s.step}
+                  </div>
+                  <div className={`ml-2 hidden text-[11px] sm:text-xs font-black uppercase tracking-wider sm:block truncate ${isActive || isCompleted ? "text-ink" : "text-muted-foreground opacity-60"}`}>
+                    {s.title}
+                  </div>
+                  {index < steps.length - 1 && (
+                    <div
+                      className={`ml-1.5 sm:ml-4 h-1 flex-1 rounded-full border border-ink transition-colors ${
+                        currentStep > s.step ? "bg-emerald-500" : "bg-white opacity-40"
                       }`}
-                  />
-                )}
-              </div>
-            ))}
+                    />
+                  )}
+                </div>
+              );
+            })}
           </div>
           {/* Active step title mobile badge */}
-          <div className="mt-2 text-center sm:hidden">
-            <span className="text-[11px] font-black uppercase tracking-wider text-muted-foreground">
+          <div className="mt-4 text-center sm:hidden">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest px-3 py-1.5 bg-white border-2 border-ink rounded-full shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
               Langkah {currentStep} dari 4:{" "}
-              <span className="text-primary font-bold">{steps.find((s) => s.step === currentStep)?.title}</span>
+              <span className="text-brand-orange">{steps.find((s) => s.step === currentStep)?.title}</span>
             </span>
           </div>
         </div>
