@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { getOrderById, confirmOrderCompletionServerAction, createProductReviewServerAction, submitOrderComplaintServerAction } from "@/backend/server-actions";
+import { getOrderById, confirmOrderCompletionServerAction, createProductReviewServerAction, submitOrderComplaintServerAction, submitPaymentProof } from "@/backend/server-actions";
 import { Navbar } from "@/components/Navbar";
-import { ArrowLeft, FileText, ShoppingBag, ShieldAlert, Star, X, CheckCircle, Package, Truck, Clock, CheckCheck, Upload } from "lucide-react";
+import { ArrowLeft, FileText, ShoppingBag, ShieldAlert, Star, X, CheckCircle, Package, Truck, Clock, CheckCheck, Upload, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { useAuth } from "@/lib/auth";
@@ -30,6 +30,22 @@ function getStatusBadge(order: any) {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-red-100 text-red-800 px-2.5 py-1 rounded-full border border-red-200">
         <X className="w-3 h-3" /> Dibatalkan
+      </span>
+    );
+  }
+
+  if (order.payment_proof_note && pStatus !== "paid") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-red-100 text-red-800 px-2.5 py-1 rounded-full border border-red-200">
+        <AlertTriangle className="w-3 h-3" /> Bukti Ditolak Admin
+      </span>
+    );
+  }
+
+  if (order.payment_proof_url && (pStatus === "unpaid" || pStatus === "pending")) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200">
+        <Clock className="w-3 h-3 animate-pulse" /> Verifikasi Pembayaran
       </span>
     );
   }
@@ -97,6 +113,79 @@ function OrderDetailComponent() {
   const [reviews, setReviews] = useState(initialReviews);
 
   const [completingOrderId, setCompletingOrderId] = useState<string | null>(null);
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
+
+  const handlePaymentProofFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Ukuran file terlalu besar (maksimal 20MB)");
+      return;
+    }
+
+    if (file.type.startsWith("image/")) {
+      const compressed = await compressImage(file);
+      setPaymentProofFile(compressed);
+    } else {
+      setPaymentProofFile(file);
+    }
+  };
+
+  const handleUploadPaymentProof = async () => {
+    if (!paymentProofFile) {
+      toast.error("Pilih file bukti pembayaran terlebih dahulu");
+      return;
+    }
+
+    setUploadingPaymentProof(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || "https://filkommerch.com";
+      const formData = new FormData();
+      formData.append("file", paymentProofFile);
+
+      const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadRes.ok) {
+        throw new Error("Gagal mengunggah gambar ke server");
+      }
+
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success || !uploadData.url) {
+        throw new Error(uploadData.error || "Gagal mendapatkan URL gambar");
+      }
+
+      const proofUrl = uploadData.url;
+      const res = await submitPaymentProof({
+        data: {
+          orderId: order.order_id,
+          paymentProofUrl: proofUrl,
+        },
+      });
+
+      if (res.success) {
+        toast.success("Bukti pembayaran berhasil dikirim. Menunggu verifikasi admin.");
+        setOrder({
+          ...order,
+          payment_proof_url: proofUrl,
+          payment_proof_note: null,
+          order_status: "pending_payment",
+          payment_status: "pending",
+        });
+        setPaymentProofFile(null);
+      } else {
+        toast.error(res.error || "Gagal menyimpan bukti pembayaran");
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Terjadi kesalahan sistem saat unggah bukti");
+    } finally {
+      setUploadingPaymentProof(false);
+    }
+  };
   
   const [selectedItemForReview, setSelectedItemForReview] = useState<{ item: any } | null>(null);
   const [reviewRating, setReviewRating] = useState(0);
@@ -418,6 +507,191 @@ function OrderDetailComponent() {
           </div>
           <div>{getStatusBadge(order)}</div>
         </div>
+
+        {/* 1. Admin Rejected Payment Proof Alert */}
+        {order.payment_proof_note && order.payment_status !== "paid" && order.order_status !== "cancelled" && (
+          <div className="bg-red-50 border-2 border-red-500 rounded-xl p-5 mb-6 shadow-[4px_4px_0px_0px_rgba(239,68,68,1)] animate-scale-in">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-red-100 border border-red-300 rounded-lg text-red-600 shrink-0 mt-0.5">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <h3 className="font-black text-sm text-red-900 uppercase tracking-wide">
+                    Bukti Pembayaran Ditolak Admin
+                  </h3>
+                  <span className="text-[10px] font-bold bg-red-200 text-red-900 px-2 py-0.5 rounded border border-red-300 uppercase">
+                    Perlu Tindakan
+                  </span>
+                </div>
+                <div className="mt-2 bg-white/80 border border-red-200 rounded-lg p-3 text-xs text-red-800 font-medium leading-relaxed">
+                  <span className="font-extrabold text-red-900 block mb-0.5">Catatan/Alasan dari Admin:</span>
+                  "{order.payment_proof_note}"
+                </div>
+                <p className="text-xs text-red-700 mt-2.5 font-medium">
+                  Silakan periksa kembali bukti transfer Anda dan unggah ulang bukti pembayaran yang sah di bawah ini agar pesanan dapat diproses.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. Order Cancelled Alert */}
+        {order.order_status === "cancelled" && (
+          <div className="bg-red-50 border-2 border-ink rounded-xl p-5 mb-6 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-red-100 border border-ink/20 rounded-lg text-red-600 shrink-0 mt-0.5">
+                <X className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-black text-sm text-ink uppercase tracking-wide">
+                  Pesanan Dibatalkan
+                </h3>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  {order.payment_status === "expired"
+                    ? "Pesanan ini otomatis dibatalkan oleh sistem karena pembayaran tidak diselesaikan sesuai batas waktu."
+                    : order.notes
+                    ? `Alasan Pembatalan / Catatan Admin: "${order.notes}"`
+                    : "Pesanan ini telah dibatalkan oleh Admin / Sistem. Jika Anda telah melakukan pembayaran, silakan hubungi tim Admin FILKOM Merch via WhatsApp."}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 3. General Admin Notes Notice (for non-cancelled orders) */}
+        {order.notes && order.order_status !== "cancelled" && (
+          <div className="bg-blue-50 border-2 border-ink rounded-xl p-4 mb-6 shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-100 border border-ink/20 rounded-lg text-blue-700 shrink-0 mt-0.5">
+                <FileText className="w-4 h-4" />
+              </div>
+              <div>
+                <h4 className="font-extrabold text-xs text-ink uppercase tracking-wider">Catatan dari Admin</h4>
+                <p className="text-xs font-medium text-blue-900 mt-1">{order.notes}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Payment Proof Upload & Status Box (for Unpaid / Pending verification orders) */}
+        {order.order_status !== "cancelled" && order.payment_status !== "paid" && (
+          <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 mb-6">
+            <div className="flex items-center justify-between border-b-2 border-ink pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-amber-600" />
+                <h3 className="font-black text-xs text-ink uppercase tracking-wider">
+                  {order.payment_proof_url ? "Status Bukti Pembayaran QRIS" : "Unggah Bukti Pembayaran QRIS"}
+                </h3>
+              </div>
+              {order.payment_proof_url && (
+                <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
+                  Menunggu Verifikasi Admin
+                </span>
+              )}
+            </div>
+
+            {order.payment_proof_url ? (
+              <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row items-start gap-4 bg-cream/30 border border-ink/20 rounded-xl p-3.5">
+                  <a
+                    href={resolveImageUrl(order.payment_proof_url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-24 h-24 border-2 border-ink rounded-lg overflow-hidden bg-white shrink-0 group relative cursor-pointer"
+                  >
+                    <img
+                      src={resolveImageUrl(order.payment_proof_url)}
+                      alt="Bukti Transfer Terkirim"
+                      className="w-full h-full object-cover group-hover:scale-105 transition"
+                    />
+                  </a>
+                  <div className="text-xs text-ink space-y-1 flex-1">
+                    <p className="font-extrabold text-amber-900">Bukti Pembayaran Sudah Terunggah</p>
+                    <p className="text-muted-foreground text-[11px] leading-relaxed">
+                      Bukti pembayaran Anda sudah masuk ke sistem dan sedang dicek oleh Admin. Verifikasi biasanya membutuhkan waktu beberapa saat saat jam operasional.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <label className="block text-xs font-bold text-ink uppercase mb-2">
+                    Ingin Mengganti / Unggah Ulang Bukti Pembayaran?
+                  </label>
+                  <div className="flex flex-col sm:flex-row items-center gap-3">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePaymentProofFileChange}
+                      className="text-xs w-full sm:w-auto text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-ink file:text-xs file:font-bold file:bg-cream file:text-ink hover:file:bg-brand-orange hover:file:text-cream cursor-pointer"
+                    />
+                    {paymentProofFile && (
+                      <button
+                        onClick={handleUploadPaymentProof}
+                        disabled={uploadingPaymentProof}
+                        className="w-full sm:w-auto px-4 py-2 bg-brand-orange text-white border-2 border-ink font-bold text-xs uppercase rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer disabled:opacity-50"
+                      >
+                        {uploadingPaymentProof ? "Mengunggah..." : "Kirim Bukti Baru"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Silakan bayar atau transfer via QRIS BEM FILKOM, lalu unggah foto/screenshot bukti transfer di bawah ini:
+                </p>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePaymentProofFileChange}
+                    className="text-xs w-full sm:w-auto text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-ink file:text-xs file:font-bold file:bg-cream file:text-ink hover:file:bg-brand-orange hover:file:text-cream cursor-pointer"
+                  />
+                  {paymentProofFile && (
+                    <button
+                      onClick={handleUploadPaymentProof}
+                      disabled={uploadingPaymentProof}
+                      className="w-full sm:w-auto px-5 py-2.5 bg-brand-orange text-white border-2 border-ink font-extrabold text-xs uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer disabled:opacity-50"
+                    >
+                      {uploadingPaymentProof ? "Mengunggah..." : "Unggah Bukti Transfer"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 5. Fulfillment Proof Uploaded by Admin */}
+        {order.fulfillment_proof_url && (
+          <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 mb-6">
+            <h3 className="font-extrabold text-ink uppercase tracking-wider text-xs mb-3 border-b border-ink/20 pb-2 flex items-center gap-2">
+              <CheckCircle className="w-4 h-4 text-emerald-600" /> Bukti Serah Terima / Pengiriman dari Admin
+            </h3>
+            <div className="flex flex-col sm:flex-row items-start gap-4">
+              <a
+                href={resolveImageUrl(order.fulfillment_proof_url)}
+                target="_blank"
+                rel="noreferrer"
+                className="w-28 h-28 border-2 border-ink rounded-lg overflow-hidden bg-cream shrink-0 hover:opacity-90 transition group relative cursor-pointer"
+              >
+                <img
+                  src={resolveImageUrl(order.fulfillment_proof_url)}
+                  alt="Bukti Serah Terima Admin"
+                  className="w-full h-full object-cover group-hover:scale-105 transition"
+                />
+              </a>
+              <div className="text-xs text-muted-foreground space-y-1">
+                <p className="font-bold text-ink text-xs">Foto Penyerahan / Bukti Pengiriman Terlampir</p>
+                <p className="leading-relaxed">
+                  Admin telah mengunggah foto bukti fisik penyerahan barang atau resi pengiriman. Silakan klik gambar di samping untuk melihat dalam ukuran penuh.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Info Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
