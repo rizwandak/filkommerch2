@@ -404,76 +404,19 @@ function OrderDetailComponent() {
         </div>
 
         {/* Order ID & Status Header */}
-        <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 mb-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-ink/10 pb-4 mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-brand-orange/10 border border-ink/20 rounded-lg text-brand-orange">
-                <FileText className="w-5 h-5" />
-              </div>
-              <div>
-                <h2 className="font-black text-sm text-ink uppercase tracking-wide">ID: {order.order_id}</h2>
-                <p className="text-xs text-muted-foreground">
-                  {new Date(order.created_at).toLocaleString("id-ID", { dateStyle: "full", timeStyle: "short" }) || order.created_at}
-                </p>
-              </div>
+        <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-brand-orange/10 border border-ink/20 rounded-lg text-brand-orange">
+              <FileText className="w-5 h-5" />
             </div>
-            <div>{getStatusBadge(order)}</div>
+            <div>
+              <h2 className="font-black text-sm text-ink uppercase tracking-wide">ID: {order.order_id}</h2>
+              <p className="text-xs text-muted-foreground">
+                {new Date(order.created_at).toLocaleString("id-ID", { dateStyle: "full", timeStyle: "short" }) || order.created_at}
+              </p>
+            </div>
           </div>
-
-          {/* Order Tracking Timeline */}
-          {order.order_status !== "cancelled" && (
-            <div className="relative pt-2 pb-4">
-              <div className="flex justify-between items-center relative z-10">
-                {[
-                  { label: "Bayar", icon: Clock },
-                  { label: "Diproses", icon: Package },
-                  { label: order.fulfillment_type === "pickup" ? "Siap" : "Kirim", icon: Truck },
-                  { label: "Selesai", icon: CheckCircle }
-                ].map((step, idx) => {
-                  let activeStep = 0;
-                  if (order.order_status === "completed") activeStep = 3;
-                  else if (order.order_status === "ready_for_pickup" || order.order_status === "shipped") activeStep = 2;
-                  else if (order.payment_status === "paid") activeStep = 1;
-                  else activeStep = 0;
-
-                  const isCompleted = idx < activeStep;
-                  const isActive = idx === activeStep;
-                  const isPending = idx > activeStep;
-
-                  const Icon = step.icon;
-                  return (
-                    <div key={idx} className="flex flex-col items-center gap-2 flex-1 relative">
-                      <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 transition-colors z-10 ${
-                        isCompleted ? "bg-emerald-500 border-emerald-600 text-white" : 
-                        isActive ? "bg-brand-orange border-brand-orange text-white" : 
-                        "bg-cream border-ink/20 text-muted-foreground"
-                      }`}>
-                        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                      </div>
-                      <span className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-center ${
-                        isCompleted ? "text-emerald-600" :
-                        isActive ? "text-brand-orange" :
-                        "text-muted-foreground"
-                      }`}>
-                        {step.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Connecting Lines */}
-              <div className="absolute top-6 sm:top-7 left-[12.5%] right-[12.5%] h-0.5 bg-ink/10 -z-0">
-                <div 
-                  className="h-full bg-emerald-500 transition-all duration-500" 
-                  style={{ 
-                    width: order.order_status === "completed" ? "100%" : 
-                           (order.order_status === "ready_for_pickup" || order.order_status === "shipped") ? "66%" : 
-                           order.payment_status === "paid" ? "33%" : "0%" 
-                  }} 
-                />
-              </div>
-            </div>
-          )}
+          <div>{getStatusBadge(order)}</div>
         </div>
 
         {/* Info Grid */}
@@ -622,7 +565,7 @@ function OrderDetailComponent() {
 
           {/* Contact admin */}
           <a
-            href={`https://wa.me/6282287190402?text=${encodeURIComponent("Halo Admin BEM FILKOM, saya ingin mengonfirmasi pesanan saya dengan Order ID: " + order.order_id)}`}
+            href="https://wa.me/6282287190402"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3.5 py-2 border-2 border-ink text-xs font-bold uppercase bg-green-100 hover:bg-green-200 text-green-800 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"

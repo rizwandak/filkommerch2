@@ -26,7 +26,7 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getProductBySlug, getProductReviewsServerAction, getProducts } from "@backend/server-actions";
+import { getProductBySlug, getProductReviewsServerAction } from "@backend/server-actions";
 import { Button } from "@frontend/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { Navbar } from "@/components/Navbar";
@@ -35,7 +35,6 @@ import pHoodie from "@/assets/p-hoodie.jpg";
 import pTshirt from "@/assets/p-tshirt.jpg";
 import pTee2 from "@/assets/p-tee2.jpg";
 import { resolveImageUrl } from "@/lib/image-resolver";
-import { useRecentlyViewed } from "@/lib/useRecentlyViewed";
 
 const scrollToId = (id: string) => {
   const el = document.getElementById(id);
@@ -73,15 +72,8 @@ const NAV = [
 
 export const Route = createFileRoute("/product/$slug")({
   loader: async ({ params }) => {
-    const [result, productsRes] = await Promise.all([
-      getProductBySlug({ data: params.slug }),
-      getProducts(),
-    ]);
-    return {
-      product: result.product || null,
-      error: result.error || null,
-      allProducts: productsRes.products || [],
-    };
+    const result = await getProductBySlug({ data: params.slug });
+    return { product: result.product || null, error: result.error || null };
   },
   head: ({ loaderData }) => {
     const title = loaderData?.product
@@ -101,7 +93,7 @@ export const Route = createFileRoute("/product/$slug")({
 });
 
 function ProductDetailPage() {
-  const { product, error, allProducts } = Route.useLoaderData();
+  const { product, error } = Route.useLoaderData();
   const navigate = useNavigate();
   const { user, logout } = useAuth();
 
@@ -113,13 +105,6 @@ function ProductDetailPage() {
     setSearch(window.location.search);
     setHash(window.location.hash);
   }, []);
-
-  const { addViewedProduct } = useRecentlyViewed();
-  useEffect(() => {
-    if (product?.id) {
-      addViewedProduct(product.id);
-    }
-  }, [product?.id]);
 
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
@@ -609,8 +594,7 @@ function ProductDetailPage() {
         return;
       }
       if (!selectedColor && colors.length > 0) {
-        const isPayment = colors.some((c) => c.toUpperCase() === "DP" || c.toUpperCase() === "LUNAS");
-        toast.error(`Pilih ${isPayment ? "pembayaran" : "warna"} terlebih dahulu!`);
+        toast.error("Pilih warna terlebih dahulu!");
         return;
       }
     } else if (product.product_type === "bundle") {
@@ -746,13 +730,9 @@ function ProductDetailPage() {
 
       // Dispatch events to notify Navbar component
       window.dispatchEvent(new Event("cart-updated"));
-      // window.dispatchEvent(new Event("open-cart"));
-      toast.success("Ditambahkan ke Keranjang", {
+      window.dispatchEvent(new Event("open-cart"));
+      toast.success("Berhasil ditambahkan ke Keranjang", {
         description: `${cartItemName} (${quantity} pcs)`,
-        action: {
-          label: "Lihat",
-          onClick: () => window.dispatchEvent(new Event("open-cart")),
-        },
       });
     }
   };
@@ -1208,7 +1188,7 @@ function ProductDetailPage() {
                 {colors.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-extrabold uppercase text-ink">
-                      {colors.some((c) => c.toUpperCase() === "DP" || c.toUpperCase() === "LUNAS") ? "Pilih Pembayaran: " : "Pilih Warna: "} <span className="text-brand-orange">{selectedColor || "-"}</span>
+                      Pilih Warna: <span className="text-brand-orange">{selectedColor || "-"}</span>
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {colors.map((color) => (
@@ -1539,96 +1519,6 @@ function ProductDetailPage() {
         </div>
       </main>
 
-      {/* Related Products Section */}
-      {product && allProducts && allProducts.length > 1 && (() => {
-        // Get related products: same category first, then others, exclude current
-        const sameCategory = allProducts.filter(
-          (p: any) => p.id !== product.id && p.category_id === product.category_id && p.is_active !== false
-        );
-        const otherProducts = allProducts.filter(
-          (p: any) => p.id !== product.id && p.category_id !== product.category_id && p.is_active !== false
-        );
-        const related = [...sameCategory, ...otherProducts].slice(0, 4);
-
-        if (related.length === 0) return null;
-
-        return (
-          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-32 md:pb-16">
-            <div className="border-t-2 border-ink/10 pt-10">
-              <h2 className="display text-2xl sm:text-3xl text-ink mb-6 flex items-center gap-3">
-                <span className="text-brand-orange">✦</span>
-                Kamu Mungkin Suka
-              </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5">
-                {related.map((p: any, idx: number) => {
-                  const relPrice = p.promo_price && Number(p.promo_price) > 0
-                    ? Number(p.promo_price)
-                    : p.price;
-                  const showStrike = p.original_price && p.original_price > relPrice;
-
-                  return (
-                    <Link
-                      key={p.id}
-                      to="/product/$slug"
-                      params={{ slug: p.slug }}
-                      className="group flex flex-col bg-card border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 overflow-hidden animate-card-entrance"
-                      style={{ animationDelay: `${idx * 80}ms` }}
-                    >
-                      {/* Image */}
-                      <div className="relative aspect-square overflow-hidden bg-cream border-b-2 border-ink">
-                        {p.image_url ? (
-                          <img
-                            src={resolveImageUrl(p.image_url)}
-                            alt={p.name}
-                            className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold bg-cream text-xs">
-                            No Photo
-                          </div>
-                        )}
-                        {/* Sale badge */}
-                        {p.sale_type === "pre_order" && (
-                          <span className="absolute top-2 left-2 bg-brand-orange text-cream border-2 border-ink font-extrabold text-[8px] px-1.5 py-0.5 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] tracking-wide uppercase">
-                            PRE-ORDER
-                          </span>
-                        )}
-                        {!!p.is_best_seller && (
-                          <span className="absolute top-2 left-2 bg-emerald-600 text-cream border-2 border-ink font-extrabold text-[8px] px-1.5 py-0.5 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] tracking-wide uppercase">
-                            BEST SELLER
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Info */}
-                      <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between">
-                        <div>
-                          <p className="text-[9px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-0.5">
-                            {p.category_name || "Merchandise"}
-                          </p>
-                          <h3 className="font-extrabold text-xs sm:text-sm text-ink group-hover:text-brand-orange transition tracking-tight line-clamp-2">
-                            {p.name}
-                          </h3>
-                        </div>
-                        <div className="mt-3 pt-3 border-t border-cream">
-                          <span className="font-extrabold text-sm text-ink">
-                            Rp {Number(relPrice).toLocaleString("id-ID")}
-                          </span>
-                          {showStrike && (
-                            <span className="ml-1.5 text-[10px] text-muted-foreground line-through font-bold">
-                              Rp {Number(p.original_price).toLocaleString("id-ID")}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            </div>
-          </section>
-        );
-      })()}
 
 
       {/* Lightbox / Zoom Dialog */}
@@ -1732,68 +1622,6 @@ function ProductDetailPage() {
           </div>
         </div>
       )}
-
-      {/* Related Products Section */}
-      {allProducts && allProducts.length > 1 && (
-        <div className="mt-16 md:mt-24 border-t-2 border-ink/10 pt-10">
-          <h2 className="text-xl md:text-3xl font-black text-ink uppercase tracking-tight mb-8">
-            Kamu Mungkin Suka
-          </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {allProducts
-              .filter((p: any) => p.id !== product.id && (p.category_id === product.category_id || p.category_name === product.category_name))
-              .slice(0, 4)
-              // If not enough related products by category, pad with others
-              .concat(
-                allProducts
-                  .filter((p: any) => p.id !== product.id && p.category_id !== product.category_id)
-              )
-              .slice(0, 4)
-              .map((p: any) => (
-                <Link
-                  key={p.id}
-                  to="/product/$slug"
-                  params={{ slug: p.slug }}
-                  className="group flex flex-col bg-card border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 overflow-hidden relative h-full text-ink"
-                >
-                  <div className="block relative aspect-square overflow-hidden bg-cream border-b-2 border-ink select-none">
-                    {p.image_url ? (
-                      <img
-                        src={resolveImageUrl(p.image_url)}
-                        alt={p.name}
-                        className="object-cover w-full h-full group-hover:scale-105 transition-transform duration-500"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold bg-cream text-xs">
-                        No Photo
-                      </div>
-                    )}
-                  </div>
-                  <div className="p-4 flex-1 flex flex-col justify-between">
-                    <div>
-                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">
-                        {p.category_name || "Uncategorized"}
-                      </p>
-                      <h3 className="font-extrabold text-sm text-ink group-hover:text-brand-orange transition tracking-tight line-clamp-2">
-                        {p.name}
-                      </h3>
-                    </div>
-                    <div className="mt-4 pt-4 border-t border-cream flex items-end justify-between">
-                      <span className="font-extrabold text-base text-ink">
-                        Rp {Number(p.price).toLocaleString("id-ID")}
-                      </span>
-                      <div className="bg-brand-orange text-cream p-1.5 rounded-lg border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
-                        <ArrowRight className="w-4 h-4" />
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-          </div>
-        </div>
-      )}
-
-
       {/* Sticky Bottom Dock for Mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t-2 border-ink p-3 md:hidden shadow-[0_-4px_15px_rgba(0,0,0,0.08)]">
         <div className="grid grid-cols-2 gap-2.5">
