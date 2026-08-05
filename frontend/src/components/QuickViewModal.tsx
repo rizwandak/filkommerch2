@@ -28,7 +28,7 @@ export function QuickViewModal({
       if (isUb && p.filkom_price && Number(p.filkom_price) > 0) {
         return "Rp " + Number(p.filkom_price).toLocaleString("id-ID");
       }
-      return "Rp " + p.rawPrice.toLocaleString("id-ID");
+      return "Rp " + Number(p.rawPrice || 0).toLocaleString("id-ID");
     }
     // Fallback for DB product structure
     if (p.price) {

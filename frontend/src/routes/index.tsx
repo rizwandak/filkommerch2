@@ -97,9 +97,9 @@ export const Route = createFileRoute("/")({
           id: product.slug || `product-${product.id}`,
           img: product.image_url || pVarsity,
           name: product.name,
-          price: `Rp ${product.price.toLocaleString("id-ID")}`,
+          price: `Rp ${Number(product.price || 0).toLocaleString("id-ID")}`,
           was: product.original_price
-            ? `Rp ${product.original_price.toLocaleString("id-ID")}`
+            ? `Rp ${Number(product.original_price || 0).toLocaleString("id-ID")}`
             : null,
           tag: product.is_best_seller
             ? "BEST SELLER"
