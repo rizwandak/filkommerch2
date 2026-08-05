@@ -1900,13 +1900,12 @@ export const verifyPaymentProof = async (req: Request, res: Response) => {
         `Pembayaran QRIS untuk Order ID ${id} diterima dan pesanan mulai diproses oleh ${userName || 'Sistem'}`
       );
     } else {
-      // Reject: set payment status to unpaid, order status to pending_payment, clear payment_proof_url, and set payment_proof_note
+      // Reject: set payment status to unpaid, order status to pending_payment, KEEP payment_proof_url, and set payment_proof_note
       await connection.execute(
         `UPDATE orders 
          SET transaction_status = 'pending', 
              payment_status = 'pending', 
              order_status = 'pending_payment', 
-             payment_proof_url = NULL, 
              payment_proof_note = ? 
          WHERE order_id = ?`,
         [note || "Bukti pembayaran tidak sesuai", id]

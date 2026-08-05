@@ -1385,9 +1385,20 @@ function AdminTransactionsPage() {
                           </div>
                         ) : (
                           <div className="space-y-3">
-                            <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-xs font-semibold">
-                              ⚠️ Menunggu Verifikasi Pembayaran
-                            </div>
+                            {managedTransaction.payment_proof_note ? (
+                              <div className="bg-red-50 border border-red-200 text-red-800 p-3 rounded-lg text-xs font-semibold space-y-1">
+                                <div className="flex items-center gap-1.5 font-bold text-red-700">
+                                  <span>🚫 Bukti Ditolak Admin (Menunggu Pembeli Unggah Baru)</span>
+                                </div>
+                                <div className="text-[11px] text-red-600 italic">
+                                  Catatan Penolakan: "{managedTransaction.payment_proof_note}"
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-lg text-xs font-semibold">
+                                ⚠️ Menunggu Verifikasi Pembayaran
+                              </div>
+                            )}
                             {!isCashier && (
                               <div className="space-y-3">
                                 {!showRejectReason ? (

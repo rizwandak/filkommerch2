@@ -515,22 +515,49 @@ function OrderDetailComponent() {
               <div className="p-2 bg-red-100 border border-red-300 rounded-lg text-red-600 shrink-0 mt-0.5">
                 <AlertTriangle className="w-5 h-5" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <h3 className="font-black text-sm text-red-900 uppercase tracking-wide">
                     Bukti Pembayaran Ditolak Admin
                   </h3>
                   <span className="text-[10px] font-bold bg-red-200 text-red-900 px-2 py-0.5 rounded border border-red-300 uppercase">
-                    Perlu Tindakan
+                    Perlu Unggah Ulang
                   </span>
                 </div>
-                <div className="mt-2 bg-white/80 border border-red-200 rounded-lg p-3 text-xs text-red-800 font-medium leading-relaxed">
+
+                <div className="bg-white/90 border border-red-200 rounded-lg p-3 text-xs text-red-800 font-medium leading-relaxed">
                   <span className="font-extrabold text-red-900 block mb-0.5">Catatan/Alasan dari Admin:</span>
                   "{order.payment_proof_note}"
                 </div>
-                <p className="text-xs text-red-700 mt-2.5 font-medium">
-                  Silakan periksa kembali bukti transfer Anda dan unggah ulang bukti pembayaran yang sah di bawah ini agar pesanan dapat diproses.
-                </p>
+
+                {/* Show Old Rejected Proof Thumbnail */}
+                {order.payment_proof_url && (
+                  <div className="bg-white/90 border border-red-300 rounded-lg p-3">
+                    <span className="text-[11px] font-extrabold text-red-900 uppercase block mb-1.5">
+                      Foto Bukti Transfer yang Ditolak:
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <a
+                        href={resolveImageUrl(order.payment_proof_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-20 h-20 border-2 border-red-400 rounded-lg overflow-hidden bg-cream shrink-0 group relative cursor-pointer"
+                      >
+                        <img
+                          src={resolveImageUrl(order.payment_proof_url)}
+                          alt="Bukti Transfer Ditolak"
+                          className="w-full h-full object-cover group-hover:scale-105 transition"
+                        />
+                        <div className="absolute inset-0 bg-red-900/30 flex items-center justify-center">
+                          <span className="bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded uppercase">Ditolak</span>
+                        </div>
+                      </a>
+                      <p className="text-[11px] text-red-700 leading-relaxed font-medium">
+                        Foto di atas adalah bukti transfer sebelumnya yang dinilai tidak valid oleh admin. Silakan periksa kembali dan unggah bukti baru yang jelas di bawah.
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
