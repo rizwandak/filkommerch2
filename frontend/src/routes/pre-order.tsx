@@ -28,7 +28,7 @@ import {
 import { getProducts, getStoreSettings, getActivePreOrderCampaignServerAction, type ProductWithVariants, type PreOrderCampaign } from "@backend/server-actions";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { isProductVisibleToUser } from "@/lib/pre-order-utils";
+import { isProductVisibleToUser, isPreOrderOpen } from "@/lib/pre-order-utils";
 import { PreOrderNotOpenPlaceholder } from "@/components/PreOrderNotOpenPlaceholder";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Navbar } from "@/components/Navbar";
@@ -206,6 +206,7 @@ function PreOrderPage() {
     staleTime: 30 * 1000,
   });
   const activePoCampaign = activePoRes?.data || null;
+  const isPoOpen = useMemo(() => isPreOrderOpen(activePoCampaign), [activePoCampaign]);
   const poInfo = useMemo(() => getPoPhaseInfo(activePoCampaign), [activePoCampaign]);
   const canSeeProducts = useMemo(
     () => isProductVisibleToUser(user, activePoCampaign),
@@ -354,6 +355,10 @@ function PreOrderPage() {
   };
 
   const addToCart = useCallback((p: any, selectedSize?: string) => {
+    if (!isPoOpen) {
+      toast.error("Periode Pre-Order saat ini telah ditutup.");
+      return;
+    }
     const variants = p.variants || [];
     const sizeToUse = selectedSize || variants[0]?.size || "One Size";
     const matchingVariant = variants.find((v: any) => v.size === sizeToUse) || variants[0];
@@ -570,7 +575,8 @@ function PreOrderPage() {
                           <div className="pt-2.5 border-t border-neutral-800 flex gap-2">
                             <button
                               onClick={() => addToCart(p)}
-                              className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-extrabold tracking-wider text-[10px] py-2 px-2 rounded-lg border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all uppercase cursor-pointer flex items-center justify-center gap-1"
+                              disabled={!isPoOpen}
+                              className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-extrabold tracking-wider text-[10px] py-2 px-2 rounded-lg border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all uppercase cursor-pointer flex items-center justify-center gap-1 disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                             >
                               <ShoppingBag className="w-3 h-3 text-brand-orange" />
                               BAG
@@ -777,7 +783,8 @@ function PreOrderPage() {
 
                             <button
                               onClick={() => addToCart(p)}
-                              className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
+                              disabled={!isPoOpen}
+                              className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                               title="Tambah ke bag"
                             >
                               <ShoppingBag className="w-3 h-3" />

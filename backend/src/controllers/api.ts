@@ -695,6 +695,23 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       }
     }
 
+    // Check active pre-order campaign status
+    const [campaignRows] = await connection.execute(
+      "SELECT * FROM pre_order_campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1"
+    );
+    const activeCampaign = (campaignRows as any[])[0];
+    let isPoOpen = false;
+    if (activeCampaign && Number(activeCampaign.is_active) === 1) {
+      const now = new Date();
+      const start = new Date(activeCampaign.start_date);
+      const end = activeCampaign.extended_end_date
+        ? new Date(activeCampaign.extended_end_date)
+        : new Date(activeCampaign.end_date);
+      if (now >= start && now <= end) {
+        isPoOpen = true;
+      }
+    }
+
     for (const item of details.items) {
       const variantId = item.variant_id;
       if (!variantId) {
@@ -705,7 +722,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       const [rows] = await connection.execute(
         `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix,
                 p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price,
-                p.product_type AS product_type
+                p.product_type AS product_type, p.sale_type AS sale_type
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
@@ -715,6 +732,13 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       const variant = (rows as any[])[0];
       if (!variant) {
         throw new Error(`Produk/Varian dengan ID ${variantId} tidak ditemukan atau tidak aktif`);
+      }
+
+      // Verify Pre-Order status if product is pre-order
+      if (variant.sale_type === 'preorder' || variant.sale_type === 'pre_order') {
+        if (!isPoOpen) {
+          throw new Error(`Periode Pre-Order saat ini telah DITUTUP. Produk "${variant.product_name}" tidak dapat dipesan lagi.`);
+        }
       }
 
       // Check stock availability (physical stock minus reserved stock)

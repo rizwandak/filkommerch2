@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { getProducts, getCategories, getActivePreOrderCampaignServerAction, type ProductWithVariants } from "@backend/server-actions";
 import { useQuery } from "@tanstack/react-query";
-import { isProductVisibleToUser } from "@/lib/pre-order-utils";
+import { isProductVisibleToUser, isPreOrderOpen } from "@/lib/pre-order-utils";
 import { PreOrderNotOpenPlaceholder } from "@/components/PreOrderNotOpenPlaceholder";
 import { useAuth } from "@/lib/auth";
 import { VerificationModal } from "@frontend/components/VerificationModal";
@@ -104,6 +104,7 @@ function ProductsCatalogPage() {
     staleTime: 30 * 1000,
   });
   const activePoCampaign = activePoRes?.data || null;
+  const isPoOpen = useMemo(() => isPreOrderOpen(activePoCampaign), [activePoCampaign]);
   const canSeeProducts = useMemo(
     () => isProductVisibleToUser(user, activePoCampaign),
     [user, activePoCampaign]
@@ -524,11 +525,18 @@ function ProductsCatalogPage() {
 
                         {/* Drop Badge */}
                         <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
-                          {p.sale_type === "pre_order" && (
-                            <span className="bg-brand-orange text-cream border-2 border-ink font-extrabold text-[9px] px-2 py-0.5 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] tracking-wide flex items-center gap-1 uppercase">
-                              <Calendar className="w-3 h-3" />
-                              PRE-ORDER
-                            </span>
+                          {(p.sale_type === "pre_order" || p.sale_type === "preorder") && (
+                            isPoOpen ? (
+                              <span className="bg-brand-orange text-cream border-2 border-ink font-extrabold text-[9px] px-2 py-0.5 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] tracking-wide flex items-center gap-1 uppercase">
+                                <Calendar className="w-3 h-3" />
+                                PRE-ORDER
+                              </span>
+                            ) : (
+                              <span className="bg-rose-600 text-white border-2 border-ink font-extrabold text-[9px] px-2 py-0.5 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] tracking-wide flex items-center gap-1 uppercase">
+                                <X className="w-3 h-3" />
+                                PO DITUTUP
+                              </span>
+                            )
                           )}
                           {p.sale_type === "limited_drop" && (
                             <span className="bg-red-500 text-cream border-2 border-ink font-extrabold text-[9px] px-2 py-0.5 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] tracking-wide uppercase">

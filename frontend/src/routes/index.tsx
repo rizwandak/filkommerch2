@@ -37,8 +37,9 @@ import { useAuth } from "@/lib/auth";
 import { getProducts, getStoreSettings, getCategories, getActivePreOrderCampaignServerAction, type ProductWithVariants } from "@backend/server-actions";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
-import { isProductVisibleToUser } from "@/lib/pre-order-utils";
+import { isProductVisibleToUser, isPreOrderOpen } from "@/lib/pre-order-utils";
 import { PreOrderNotOpenPlaceholder } from "@/components/PreOrderNotOpenPlaceholder";
+import { AnnouncementModal } from "@/components/AnnouncementModal";
 import {
   type HomepageSegment,
   convertLegacyToSegments,
@@ -616,6 +617,7 @@ function Index() {
     staleTime: 30 * 1000,
   });
   const activePoCampaign = activePoRes?.data || null;
+  const isPoOpen = useMemo(() => isPreOrderOpen(activePoCampaign), [activePoCampaign]);
   const canSeeProducts = useMemo(
     () => isProductVisibleToUser(user, activePoCampaign),
     [user, activePoCampaign]
@@ -899,6 +901,10 @@ function Index() {
   // Add to cart with support for custom sizes
   // Add to cart with support for custom sizes
   const addToCart = useCallback((p: ProductCard, selectedSize?: string) => {
+    if ((p.sale_type === "preorder" || p.sale_type === "pre_order") && !isPoOpen) {
+      toast.error("Periode Pre-Order saat ini telah ditutup.");
+      return;
+    }
     const variants = p.variants || [];
     const sizeToUse = selectedSize || variants[0]?.size || "One Size";
     const matchingVariant = variants.find((v: any) => v.size === sizeToUse) || variants[0];
@@ -1241,8 +1247,9 @@ function Index() {
                                               addToCart(p);
                                             }
                                           }}
+                                          disabled={(p.sale_type === "preorder" || p.sale_type === "pre_order") && !isPoOpen}
                                           title="Masuk Bag"
-                                          className="flex-1 h-8 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-brand-orange border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center"
+                                          className="flex-1 h-8 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-brand-orange border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                                         >
                                           <ShoppingBag className="w-4 h-4" />
                                         </button>
@@ -1363,8 +1370,9 @@ function Index() {
                                               addToCart(p);
                                             }
                                           }}
+                                          disabled={(p.sale_type === "preorder" || p.sale_type === "pre_order") && !isPoOpen}
                                           title="Masuk Bag"
-                                          className="flex-1 h-8 rounded-lg bg-ink hover:bg-brand-orange text-cream border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center"
+                                          className="flex-1 h-8 rounded-lg bg-ink hover:bg-brand-orange text-cream border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
                                         >
                                           <ShoppingBag className="w-4 h-4 text-brand-orange" />
                                         </button>
@@ -2246,7 +2254,8 @@ function Index() {
         </div>
       )}
 
-
+      {/* Pre-Order Closing Thank You Announcement Modal */}
+      <AnnouncementModal />
     </div>
   );
 }

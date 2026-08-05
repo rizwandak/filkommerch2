@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
-import { createOrderAndPayment, getStoreSettings, validateVoucherServerAction } from "@backend/server-actions";
+import { useQuery } from "@tanstack/react-query";
+import { createOrderAndPayment, getStoreSettings, validateVoucherServerAction, getActivePreOrderCampaignServerAction } from "@backend/server-actions";
+import { isPreOrderOpen } from "@/lib/pre-order-utils";
 import { Button } from "@frontend/components/ui/button";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Input } from "@frontend/components/ui/input";
@@ -53,6 +55,14 @@ export const Route = createFileRoute("/checkout")({
 function CheckoutPage() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
+
+  const { data: activePoRes } = useQuery({
+    queryKey: ["activePreOrderCampaign"],
+    queryFn: () => getActivePreOrderCampaignServerAction(),
+    staleTime: 30 * 1000,
+  });
+  const activePoCampaign = activePoRes?.data || null;
+  const isPoOpen = isPreOrderOpen(activePoCampaign);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState(
     user ? (user.type === "buyer" ? user.name : user.username) : ""
@@ -278,6 +288,10 @@ function CheckoutPage() {
   };
 
   const validateStep = (): boolean => {
+    if (!isPoOpen) {
+      toast.error("Periode Pre-Order saat ini telah ditutup. Pesanan tidak dapat diproses.");
+      return false;
+    }
     if (currentStep === 1) {
       if (cartItems.length === 0) {
         toast.error("Your cart is empty");

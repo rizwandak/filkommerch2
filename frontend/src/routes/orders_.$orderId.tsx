@@ -1,8 +1,38 @@
 import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { getOrderById, confirmOrderCompletionServerAction, createProductReviewServerAction, submitOrderComplaintServerAction, submitPaymentProof } from "@/backend/server-actions";
+import { useState, useEffect } from "react";
+import {
+  getOrderById,
+  getUserOrders,
+  createPelunasanOrderServerAction,
+  confirmOrderCompletionServerAction,
+  createProductReviewServerAction,
+  submitOrderComplaintServerAction,
+  submitPaymentProof,
+} from "@/backend/server-actions";
 import { Navbar } from "@/components/Navbar";
-import { ArrowLeft, FileText, ShoppingBag, ShieldAlert, Star, X, CheckCircle, Package, Truck, Clock, CheckCheck, Upload, AlertTriangle } from "lucide-react";
+import {
+  ArrowLeft,
+  FileText,
+  ShoppingBag,
+  ShieldAlert,
+  Star,
+  X,
+  CheckCircle,
+  Package,
+  Truck,
+  Clock,
+  CheckCheck,
+  Upload,
+  AlertTriangle,
+  CreditCard,
+  Copy,
+  Check,
+  Eye,
+  RefreshCw,
+  Plus,
+  Loader2,
+  User as UserIcon,
+} from "lucide-react";
 import { toast } from "sonner";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { useAuth } from "@/lib/auth";
@@ -16,13 +46,96 @@ export const Route = createFileRoute("/orders_/$orderId")({
     return {
       order: result.order,
       items: result.items || [],
-      reviews: result.reviews || []
+      reviews: result.reviews || [],
     };
   },
   component: OrderDetailComponent,
 });
 
-function getStatusBadge(order: any) {
+const isPelunasanOrder = (order: any) => {
+  if (!order) return false;
+  return (
+    String(order.order_id || "").startsWith("LNS-") ||
+    (order.notes && String(order.notes).includes("Pelunasan untuk Order:"))
+  );
+};
+
+const isDpOrder = (order: any, linkedLns?: any) => {
+  if (isPelunasanOrder(order)) return false;
+  if (linkedLns) return true;
+  if (!order.items || order.items.length === 0) return false;
+
+  return order.items.some((item: any) => {
+    const colorStr = String(item.color || "").toUpperCase().trim();
+    const sizeStr = String(item.size || "").toUpperCase().trim();
+
+    const isExplicitLunas =
+      colorStr.includes("LUNAS") ||
+      sizeStr.includes("LUNAS") ||
+      colorStr.includes("FULL");
+
+    if (isExplicitLunas) {
+      return false;
+    }
+
+    return colorStr.includes("DP") || sizeStr.includes("DP");
+  });
+};
+
+const getSizeSurcharge = (sizeStr: string): number => {
+  const s = String(sizeStr || "").toUpperCase().trim();
+  if (s === "XXL" || s === "2XL") return 10000;
+  if (s === "XXXL" || s === "3XL") return 20000;
+  if (s === "XXXXL" || s === "4XL") return 30000;
+  if (s === "XXXXXL" || s === "5XL") return 40000;
+  return 0;
+};
+
+function getPelunasanStatusBadge(lns: any) {
+  if (!lns) return null;
+  const pStatus = lns.payment_status;
+  const oStatus = lns.order_status;
+
+  if (oStatus === "cancelled") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full border border-red-200">
+        <X className="w-3 h-3" /> Dibatalkan
+      </span>
+    );
+  }
+
+  if (pStatus === "paid") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-200">
+        <CheckCircle className="w-3 h-3 text-emerald-600" /> Pelunasan Lunas
+      </span>
+    );
+  }
+
+  if (lns.payment_proof_note && pStatus !== "paid") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full border border-red-200 animate-pulse">
+        <AlertTriangle className="w-3 h-3" /> Bukti Pelunasan Ditolak
+      </span>
+    );
+  }
+
+  if (lns.payment_proof_url) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full border border-blue-200">
+        <Clock className="w-3 h-3 animate-pulse text-blue-600" /> Verifikasi Pelunasan
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200">
+      <Clock className="w-3 h-3 animate-pulse text-amber-600" /> Menunggu Pelunasan
+    </span>
+  );
+}
+
+function getStatusBadge(order: any, linkedLns?: any) {
   const oStatus = order.order_status;
   const pStatus = order.payment_status;
 
@@ -34,18 +147,26 @@ function getStatusBadge(order: any) {
     );
   }
 
+  if (oStatus === "completed") {
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200">
+        <CheckCircle className="w-3 h-3 text-emerald-600" /> Selesai
+      </span>
+    );
+  }
+
   if (order.payment_proof_note && pStatus !== "paid") {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-red-100 text-red-800 px-2.5 py-1 rounded-full border border-red-200">
-        <AlertTriangle className="w-3 h-3" /> Bukti Ditolak Admin
+        <AlertTriangle className="w-3 h-3" /> Bukti DP Ditolak
       </span>
     );
   }
 
   if (order.payment_proof_url && (pStatus === "unpaid" || pStatus === "pending")) {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200">
-        <Clock className="w-3 h-3 animate-pulse" /> Verifikasi Pembayaran
+      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full border border-blue-200">
+        <Clock className="w-3 h-3 animate-pulse" /> Verifikasi Pembayaran DP
       </span>
     );
   }
@@ -54,6 +175,49 @@ function getStatusBadge(order: any) {
     return (
       <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200">
         <Clock className="w-3 h-3 animate-pulse" /> Belum Dibayar
+      </span>
+    );
+  }
+
+  if (pStatus === "paid" && isDpOrder(order, linkedLns)) {
+    if (linkedLns && linkedLns.payment_status === "paid") {
+      if (oStatus === "ready_for_pickup") {
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full border border-teal-200">
+            <CheckCircle className="w-3 h-3" /> Siap Diambil (Lunas)
+          </span>
+        );
+      }
+      if (oStatus === "shipped") {
+        return (
+          <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full border border-blue-200">
+            <CheckCircle className="w-3 h-3" /> Siap Diantar (Lunas)
+          </span>
+        );
+      }
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200">
+          <CheckCircle className="w-3 h-3 text-emerald-600" /> Lunas Terbayar
+        </span>
+      );
+    }
+    if (oStatus === "ready_for_pickup") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-teal-100 text-teal-800 px-2.5 py-1 rounded-full border border-teal-200">
+          <CheckCircle className="w-3 h-3" /> Siap Diambil
+        </span>
+      );
+    }
+    if (oStatus === "shipped") {
+      return (
+        <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full border border-blue-200">
+          <CheckCircle className="w-3 h-3" /> Sedang Diantar
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full border border-blue-200">
+        <Clock className="w-3 h-3 animate-pulse" /> Sedang Diproses
       </span>
     );
   }
@@ -74,25 +238,9 @@ function getStatusBadge(order: any) {
     );
   }
 
-  if (oStatus === "completed") {
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200">
-        <CheckCircle className="w-3 h-3" /> Selesai
-      </span>
-    );
-  }
-
-  if (pStatus === "paid") {
-    return (
-      <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-200">
-        <Clock className="w-3 h-3 animate-pulse" /> Sedang Diproses
-      </span>
-    );
-  }
-
   return (
-    <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-gray-100 text-gray-800 px-2.5 py-1 rounded-full border border-gray-200">
-      <Clock className="w-3 h-3" /> Menunggu Pembayaran
+    <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full border border-blue-200">
+      <Clock className="w-3 h-3 animate-pulse" /> Sedang Diproses
     </span>
   );
 }
@@ -115,6 +263,113 @@ function OrderDetailComponent() {
   const [completingOrderId, setCompletingOrderId] = useState<string | null>(null);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
+
+  const [linkedPelunasan, setLinkedPelunasan] = useState<any>(null);
+  const [creatingPelunasan, setCreatingPelunasan] = useState(false);
+  const [pelunasanProofFile, setPelunasanProofFile] = useState<File | null>(null);
+  const [uploadingPelunasanProof, setUploadingPelunasanProof] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const fetchLinkedPelunasan = async () => {
+    if (!order || isPelunasanOrder(order)) return;
+    try {
+      const targetUserId = user?.id ? Number(user.id) : (order.user_id ? Number(order.user_id) : undefined);
+      if (!targetUserId) return;
+      const res = await getUserOrders({ data: targetUserId });
+      if (res.success && res.orders) {
+        const found = res.orders.find(
+          (o: any) =>
+            o.order_status !== "cancelled" &&
+            ((o.notes && o.notes.includes(`Pelunasan untuk Order: ${order.order_id}`)) ||
+              String(o.order_id || "").startsWith(`LNS-${order.order_id}`))
+        );
+        if (found) {
+          setLinkedPelunasan(found);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching linked pelunasan:", err);
+    }
+  };
+
+  useEffect(() => {
+    void fetchLinkedPelunasan();
+  }, [order?.order_id, user?.id]);
+
+  const handleCopyId = (id: string) => {
+    void navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    toast.success("ID disalin ke clipboard");
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleCreatePelunasanDetail = async () => {
+    try {
+      setCreatingPelunasan(true);
+      const res = await createPelunasanOrderServerAction({ data: { originalOrderId: order.order_id } });
+      if (res.success && res.orderId) {
+        toast.success("Pesanan pelunasan berhasil dibuat!");
+        await fetchLinkedPelunasan();
+        navigate({ to: "/order-confirmation", search: { orderId: res.orderId } });
+      } else {
+        toast.error(res.error || "Gagal membuat pesanan pelunasan");
+      }
+    } catch (err: any) {
+      toast.error("Gagal memproses pelunasan");
+    } finally {
+      setCreatingPelunasan(false);
+    }
+  };
+
+  const handlePelunasanProofFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Ukuran file terlalu besar (maksimal 20MB)");
+      return;
+    }
+    if (file.type.startsWith("image/")) {
+      const compressed = await compressImage(file);
+      setPelunasanProofFile(compressed);
+    } else {
+      setPelunasanProofFile(file);
+    }
+  };
+
+  const handleUploadPelunasanProof = async () => {
+    if (!pelunasanProofFile || !linkedPelunasan) return;
+    setUploadingPelunasanProof(true);
+    try {
+      const API_BASE_URL = import.meta.env.VITE_API_URL || "https://filkommerch.com";
+      const formData = new FormData();
+      formData.append("file", pelunasanProofFile);
+
+      const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, { method: "POST", body: formData });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok || !uploadData.success || !uploadData.url) {
+        throw new Error(uploadData.error || "Gagal mengunggah gambar ke server");
+      }
+
+      const res = await submitPaymentProof({
+        data: {
+          orderId: linkedPelunasan.order_id,
+          paymentProofUrl: uploadData.url,
+        },
+      });
+
+      if (res.success) {
+        toast.success("Bukti pelunasan berhasil dikirim! Menunggu verifikasi admin.");
+        setPelunasanProofFile(null);
+        await fetchLinkedPelunasan();
+      } else {
+        toast.error(res.error || "Gagal menyimpan bukti pelunasan");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan sistem");
+    } finally {
+      setUploadingPelunasanProof(false);
+    }
+  };
 
   const handlePaymentProofFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -473,44 +728,231 @@ function OrderDetailComponent() {
     }
   };
 
-  const itemSubtotal = items?.reduce((sum: number, i: any) => sum + i.subtotal, 0) || order.gross_amount;
+  const fullOrder = { ...order, items };
+  const isDp = isDpOrder(fullOrder, linkedPelunasan);
+
+  const pelunasanAmount = linkedPelunasan
+    ? Number(linkedPelunasan.gross_amount)
+    : items
+    ? items
+        .filter((item: any) => {
+          const c = String(item.color || "").toUpperCase();
+          const s = String(item.size || "").toUpperCase();
+          return (c.includes("DP") || s.includes("DP")) && !c.includes("LUNAS") && !s.includes("LUNAS");
+        })
+        .reduce((sum: number, item: any) => {
+          const baseSubtotal = Number(item.subtotal || item.unit_price * item.quantity || 0);
+          const sizeAddon = getSizeSurcharge(item.size) * Number(item.quantity || 1);
+          return sum + baseSubtotal + sizeAddon;
+        }, 0)
+    : Number(order.gross_amount);
+
+  const totalSizeSurcharge = items?.reduce((sum: number, i: any) => sum + getSizeSurcharge(i.size) * Number(i.quantity || 1), 0) || 0;
+  const grandTotalProduct = Number(order.gross_amount) + (isDp ? pelunasanAmount : 0);
 
   return (
     <div className="min-h-screen bg-[#FCFAF7] text-ink font-sans">
       <Navbar />
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-10 py-6 space-y-6">
 
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <Link
-            to="/orders"
-            className="p-2 bg-white border-2 border-ink rounded-lg hover:bg-cream active:scale-95 transition-all shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-          >
-            <ArrowLeft className="w-4 h-4 text-ink" />
-          </Link>
-          <h1 className="text-xl font-black text-ink uppercase tracking-tight">Detail Pesanan</h1>
-        </div>
-
-        {/* Order ID & Status Header */}
-        <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-brand-orange/10 border border-ink/20 rounded-lg text-brand-orange">
-              <FileText className="w-5 h-5" />
+        {/* Parent Order Banner if current order is a Pelunasan order */}
+        {isPelunasanOrder(fullOrder) && (
+          <div className="bg-amber-50 border-2 border-ink rounded-xl p-4 shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 border border-ink/20 rounded-lg text-amber-800 shrink-0">
+                <CreditCard className="w-5 h-5" />
+              </div>
+              <div>
+                <span className="font-extrabold text-xs text-amber-900 uppercase block">Transaksi Pelunasan</span>
+                <p className="text-xs text-muted-foreground">
+                  Ini adalah transaksi pelunasan sisa tagihan untuk pesanan DP utama.
+                </p>
+              </div>
             </div>
+            {order.notes && order.notes.includes("Pelunasan untuk Order:") && (
+              <button
+                onClick={() => {
+                  const match = order.notes.match(/Pelunasan untuk Order:\s*([A-Za-z0-9-]+)/);
+                  if (match?.[1]) {
+                    navigate({ to: "/orders/$orderId", params: { orderId: match[1] } });
+                  }
+                }}
+                className="px-3 py-1.5 bg-white hover:bg-cream text-ink font-bold border-2 border-ink rounded-lg text-xs shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition cursor-pointer shrink-0"
+              >
+                Lihat Pesanan DP Utama →
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Top Header Bar: Clean & Open Layout */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b-2 border-ink/10 pb-4">
+          <div className="flex items-center gap-3">
+            <Link
+              to="/orders"
+              className="p-2 bg-white border-2 border-ink rounded-lg hover:bg-cream active:scale-95 transition-all shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4 text-ink" />
+            </Link>
             <div>
-              <h2 className="font-black text-sm text-ink uppercase tracking-wide">ID: {order.order_id}</h2>
-              <p className="text-xs text-muted-foreground">
-                {new Date(order.created_at).toLocaleString("id-ID", { dateStyle: "full", timeStyle: "short" }) || order.created_at}
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-black text-ink uppercase tracking-tight">ID PESANAN: {order.order_id}</h1>
+                {isDp && (
+                  <span className="px-2 py-0.5 bg-amber-100 text-amber-900 font-extrabold border border-amber-300 rounded text-[10px] uppercase">
+                    DP 50%
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Dibuat pada: {new Date(order.created_at).toLocaleString("id-ID", { dateStyle: "full", timeStyle: "short" }) || order.created_at}
               </p>
             </div>
           </div>
-          <div>{getStatusBadge(order)}</div>
+          <div>{getStatusBadge(fullOrder, linkedPelunasan)}</div>
         </div>
+
+        {/* Status & Rincian Pelunasan Box for DP Orders */}
+        {isDp && order.order_status !== "cancelled" && (
+          <div className="bg-amber-50/70 border-2 border-amber-300 rounded-xl p-4 sm:p-5 shadow-[3px_3px_0px_0px_rgba(217,119,6,0.25)]">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b-2 border-amber-200/80 pb-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 bg-brand-orange text-white rounded-md border border-ink/20">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-xs text-ink uppercase tracking-wider">
+                    STATUS &amp; RINCIAN PELUNASAN
+                  </h3>
+                  <p className="text-[11px] text-muted-foreground">
+                    Pelunasan wajib diselesaikan sebelum atau saat pengambilan barang
+                  </p>
+                </div>
+              </div>
+              {linkedPelunasan ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono bg-white border border-amber-300 px-2 py-0.5 rounded font-bold text-ink">
+                    {linkedPelunasan.order_id}
+                  </span>
+                  {getPelunasanStatusBadge(linkedPelunasan)}
+                </div>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full border border-amber-300">
+                  <Clock className="w-3 h-3 animate-pulse" /> Menunggu Pelunasan
+                </span>
+              )}
+            </div>
+
+            {/* If Pelunasan proof was rejected by admin */}
+            {linkedPelunasan && linkedPelunasan.payment_proof_note && linkedPelunasan.payment_status !== "paid" && (
+              <div className="bg-red-50 border-2 border-red-400 rounded-lg p-3 text-xs text-red-900 font-medium mb-4 space-y-1">
+                <span className="font-extrabold text-red-900 block flex items-center gap-1">
+                  <AlertTriangle className="w-3.5 h-3.5 text-red-600" /> Catatan Penolakan Pelunasan dari Admin:
+                </span>
+                <p className="italic">"{linkedPelunasan.payment_proof_note}"</p>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold text-muted-foreground uppercase block">
+                  Nominal Pelunasan (Sisa Kurang):
+                </span>
+                <span className="font-black text-brand-orange text-lg">
+                  Rp {pelunasanAmount > 0 ? pelunasanAmount.toLocaleString("id-ID") : "—"}
+                </span>
+                <p className="text-[11px] text-muted-foreground font-medium mt-1">
+                  * DP Terbayar: Rp {Number(order.gross_amount).toLocaleString("id-ID")}
+                  {pelunasanAmount > 0 && ` • Total Harga Produk: Rp ${(Number(order.gross_amount) + pelunasanAmount).toLocaleString("id-ID")}`}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2 justify-end w-full sm:w-auto">
+                {linkedPelunasan ? (
+                  linkedPelunasan.payment_status === "paid" ? (
+                    <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-100 text-emerald-800 font-extrabold border border-emerald-300 rounded-lg text-xs">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                      Pelunasan Lunas Terbayar
+                    </span>
+                  ) : linkedPelunasan.payment_proof_url ? (
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => window.open(resolveImageUrl(linkedPelunasan.payment_proof_url), "_blank")}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold border border-blue-200 rounded-lg text-xs transition cursor-pointer"
+                      >
+                        <Eye className="w-3.5 h-3.5" />
+                        Lihat Bukti
+                      </button>
+                      <button
+                        onClick={() => navigate({ to: "/order-confirmation", search: { orderId: linkedPelunasan.order_id } })}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-cream text-ink font-bold border-2 border-ink rounded-lg text-xs shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition cursor-pointer"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-brand-orange" />
+                        Ganti Bukti
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => navigate({ to: "/order-confirmation", search: { orderId: linkedPelunasan.order_id } })}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold border-2 border-ink rounded-lg text-xs uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:translate-x-[1px] active:translate-y-[1px] transition cursor-pointer"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      Upload Bukti Pelunasan
+                    </button>
+                  )
+                ) : (
+                  <button
+                    onClick={handleCreatePelunasanDetail}
+                    disabled={creatingPelunasan}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold border-2 border-ink rounded-lg text-xs uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:translate-x-[1px] active:translate-y-[1px] transition cursor-pointer disabled:opacity-50"
+                  >
+                    {creatingPelunasan ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Memproses...
+                      </>
+                    ) : (
+                      <>
+                        <Plus className="w-3.5 h-3.5" />
+                        BAYAR PELUNASAN
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Embedded Direct Upload Box for Pelunasan QRIS if linked & unpaid */}
+            {linkedPelunasan && linkedPelunasan.payment_status !== "paid" && (
+              <div className="mt-4 pt-3 border-t border-amber-300/60">
+                <label className="block text-xs font-extrabold text-ink uppercase mb-1.5">
+                  {linkedPelunasan.payment_proof_url ? "Unggah Ulang Bukti Transfer Pelunasan:" : "Unggah Bukti Transfer Pelunasan (QRIS):"}
+                </label>
+                <div className="flex flex-col sm:flex-row items-center gap-3">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePelunasanProofFileChange}
+                    className="text-xs w-full sm:w-auto text-muted-foreground file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-2 file:border-ink file:text-xs file:font-bold file:bg-white file:text-ink hover:file:bg-brand-orange hover:file:text-cream cursor-pointer"
+                  />
+                  {pelunasanProofFile && (
+                    <button
+                      onClick={handleUploadPelunasanProof}
+                      disabled={uploadingPelunasanProof}
+                      className="w-full sm:w-auto px-4 py-1.5 bg-brand-orange text-white border-2 border-ink font-bold text-xs uppercase rounded-lg shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer disabled:opacity-50"
+                    >
+                      {uploadingPelunasanProof ? "Mengunggah..." : "Kirim Bukti Pelunasan"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 1. Admin Rejected Payment Proof Alert */}
         {order.payment_proof_note && order.payment_status !== "paid" && order.order_status !== "cancelled" && (
-          <div className="bg-red-50 border-2 border-red-500 rounded-xl p-5 mb-6 shadow-[4px_4px_0px_0px_rgba(239,68,68,1)] animate-scale-in">
+          <div className="bg-red-50 border-2 border-red-500 rounded-xl p-4 sm:p-5 shadow-[3px_3px_0px_0px_rgba(239,68,68,1)] animate-scale-in">
             <div className="flex items-start gap-3">
               <div className="p-2 bg-red-100 border border-red-300 rounded-lg text-red-600 shrink-0 mt-0.5">
                 <AlertTriangle className="w-5 h-5" />
@@ -565,7 +1007,7 @@ function OrderDetailComponent() {
 
         {/* 2. Order Cancelled Alert */}
         {order.order_status === "cancelled" && (
-          <div className="bg-red-50 border-2 border-ink rounded-xl p-5 mb-6 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+          <div className="bg-red-50 border-2 border-ink rounded-xl p-4 sm:p-5 shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]">
             <div className="flex items-start gap-3">
               <div className="p-2 bg-red-100 border border-ink/20 rounded-lg text-red-600 shrink-0 mt-0.5">
                 <X className="w-5 h-5" />
@@ -588,7 +1030,7 @@ function OrderDetailComponent() {
 
         {/* 3. General Admin Notes Notice (for non-cancelled orders) */}
         {order.notes && order.order_status !== "cancelled" && (
-          <div className="bg-blue-50 border-2 border-ink rounded-xl p-4 mb-6 shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]">
+          <div className="bg-blue-50 border-2 border-ink rounded-xl p-4 shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]">
             <div className="flex items-start gap-3">
               <div className="p-2 bg-blue-100 border border-ink/20 rounded-lg text-blue-700 shrink-0 mt-0.5">
                 <FileText className="w-4 h-4" />
@@ -601,278 +1043,320 @@ function OrderDetailComponent() {
           </div>
         )}
 
-        {/* 4. Payment Proof Upload & Status Box (for Unpaid / Pending verification orders) */}
-        {order.order_status !== "cancelled" && order.payment_status !== "paid" && (
-          <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 mb-6">
-            <div className="flex items-center justify-between border-b-2 border-ink pb-3 mb-4">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-600" />
-                <h3 className="font-black text-xs text-ink uppercase tracking-wider">
-                  {order.payment_proof_url ? "Status Bukti Pembayaran QRIS" : "Unggah Bukti Pembayaran QRIS"}
+        {/* Main 2-Column Responsive Grid Layout */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+          
+          {/* Left Column: Buyer & Shipping Info (Model Loss) + Items Cards */}
+          <div className="lg:col-span-2 space-y-6">
+
+            {/* Buyer & Shipping Info - Clean Loss Model (No heavy nested cards) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-white/70 border border-ink/15 rounded-xl p-4 sm:p-5">
+              <div>
+                <h3 className="font-black text-xs text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <UserIcon className="w-3.5 h-3.5 text-brand-orange" /> Informasi Pembeli
                 </h3>
+                <p className="font-extrabold text-ink text-sm">{order.customer_name}</p>
+                {order.customer_nim && <p className="text-xs text-muted-foreground mt-0.5">NIM: {order.customer_nim}</p>}
+                <p className="text-xs text-muted-foreground mt-0.5">{order.customer_email}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{order.customer_phone}</p>
               </div>
-              {order.payment_proof_url && (
-                <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
-                  Menunggu Verifikasi Admin
-                </span>
-              )}
+              
+              <div className="border-t sm:border-t-0 sm:border-l border-ink/15 pt-4 sm:pt-0 sm:pl-6">
+                <h3 className="font-black text-xs text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-brand-orange" /> Informasi Pengiriman
+                </h3>
+                <p className="font-extrabold text-ink text-sm">{getFulfillmentLabel(order.fulfillment_type)}</p>
+                {order.fulfillment_type === "shipping" && order.shipping_address && (
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{order.shipping_address}</p>
+                )}
+              </div>
             </div>
 
-            {order.payment_proof_url ? (
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row items-start gap-4 bg-cream/30 border border-ink/20 rounded-xl p-3.5">
+            {/* Items List (Cards) */}
+            <div>
+              <h3 className="font-black text-xs text-ink uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                <ShoppingBag className="w-4 h-4 text-brand-orange" /> Item Yang Dibeli ({items?.length || 0})
+              </h3>
+              <div className="space-y-3">
+                {items?.map((item: any) => {
+                  const hasReview = reviews?.some((r: any) => Number(r.product_id) === Number(item.product_id));
+                  return (
+                    <div key={item.id} className="bg-white border-2 border-ink rounded-xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-14 h-16 bg-cream border border-ink rounded-lg overflow-hidden flex items-center justify-center shrink-0">
+                          {item.image_url ? (
+                            <img src={resolveImageUrl(item.image_url)} alt={item.product_name} className="w-full h-full object-cover" />
+                          ) : (
+                            <ShoppingBag className="w-5 h-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-bold text-ink text-sm leading-snug">{item.product_name}</p>
+                          <div className="flex gap-2 text-[10px] text-muted-foreground mt-0.5">
+                            {item.size && <span>Ukuran: {item.size}</span>}
+                            {item.color && item.color !== "Default" && <span>Warna: {item.color}</span>}
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {item.quantity} x Rp {item.unit_price.toLocaleString("id-ID")}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2">
+                        <div className="font-extrabold text-ink">
+                          Rp {item.subtotal.toLocaleString("id-ID")}
+                        </div>
+                        {order.order_status === "completed" && (
+                          <div>
+                            {hasReview ? (
+                              <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-200">
+                                Ulasan Terkirim ✓
+                              </span>
+                            ) : isReviewAllowed(fullOrder) ? (
+                              <button 
+                                onClick={() => setSelectedItemForReview({ item })}
+                                className="text-[10px] px-3 py-1.5 bg-brand-orange text-white font-extrabold uppercase rounded shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer"
+                              >
+                                Beri Ulasan
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-red-600 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">
+                                Masa Ulasan Habis
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Payment Proof Upload & Status Box (for Unpaid / Pending verification orders) */}
+            {order.order_status !== "cancelled" && order.payment_status !== "paid" && (
+              <div className="bg-white border-2 border-ink rounded-xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] p-5">
+                <div className="flex items-center justify-between border-b-2 border-ink pb-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-amber-600" />
+                    <h3 className="font-black text-xs text-ink uppercase tracking-wider">
+                      {order.payment_proof_url ? "Status Bukti Pembayaran QRIS" : "Unggah Bukti Pembayaran QRIS"}
+                    </h3>
+                  </div>
+                  {order.payment_proof_url && (
+                    <span className="text-[10px] font-bold bg-amber-100 text-amber-900 px-2 py-0.5 rounded border border-amber-300">
+                      Menunggu Verifikasi Admin
+                    </span>
+                  )}
+                </div>
+
+                {order.payment_proof_url ? (
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row items-start gap-4 bg-cream/30 border border-ink/20 rounded-xl p-3.5">
+                      <a
+                        href={resolveImageUrl(order.payment_proof_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-24 h-24 border-2 border-ink rounded-lg overflow-hidden bg-white shrink-0 group relative cursor-pointer"
+                      >
+                        <img
+                          src={resolveImageUrl(order.payment_proof_url)}
+                          alt="Bukti Transfer Terkirim"
+                          className="w-full h-full object-cover group-hover:scale-105 transition"
+                        />
+                      </a>
+                      <div className="text-xs text-ink space-y-1 flex-1">
+                        <p className="font-extrabold text-amber-900">Bukti Pembayaran Sudah Terunggah</p>
+                        <p className="text-muted-foreground text-[11px] leading-relaxed">
+                          Bukti pembayaran Anda sudah masuk ke sistem dan sedang dicek oleh Admin. Verifikasi biasanya membutuhkan waktu beberapa saat saat jam operasional.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="pt-2">
+                      <label className="block text-xs font-bold text-ink uppercase mb-2">
+                        Ingin Mengganti / Unggah Ulang Bukti Pembayaran?
+                      </label>
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePaymentProofFileChange}
+                          className="text-xs w-full sm:w-auto text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-ink file:text-xs file:font-bold file:bg-cream file:text-ink hover:file:bg-brand-orange hover:file:text-cream cursor-pointer"
+                        />
+                        {paymentProofFile && (
+                          <button
+                            onClick={handleUploadPaymentProof}
+                            disabled={uploadingPaymentProof}
+                            className="w-full sm:w-auto px-4 py-2 bg-brand-orange text-white border-2 border-ink font-bold text-xs uppercase rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {uploadingPaymentProof ? "Mengunggah..." : "Kirim Bukti Baru"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Silakan bayar atau transfer via QRIS BEM FILKOM, lalu unggah foto/screenshot bukti transfer di bawah ini:
+                    </p>
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePaymentProofFileChange}
+                        className="text-xs w-full sm:w-auto text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-ink file:text-xs file:font-bold file:bg-cream file:text-ink hover:file:bg-brand-orange hover:file:text-cream cursor-pointer"
+                      />
+                      {paymentProofFile && (
+                        <button
+                          onClick={handleUploadPaymentProof}
+                          disabled={uploadingPaymentProof}
+                          className="w-full sm:w-auto px-5 py-2.5 bg-brand-orange text-white border-2 border-ink font-extrabold text-xs uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer disabled:opacity-50"
+                        >
+                          {uploadingPaymentProof ? "Mengunggah..." : "Unggah Bukti Transfer"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fulfillment Proof Uploaded by Admin */}
+            {order.fulfillment_proof_url && (
+              <div className="bg-white border-2 border-ink rounded-xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] p-5">
+                <h3 className="font-extrabold text-ink uppercase tracking-wider text-xs mb-3 border-b border-ink/20 pb-2 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600" /> Bukti Serah Terima / Pengiriman dari Admin
+                </h3>
+                <div className="flex flex-col sm:flex-row items-start gap-4">
                   <a
-                    href={resolveImageUrl(order.payment_proof_url)}
+                    href={resolveImageUrl(order.fulfillment_proof_url)}
                     target="_blank"
                     rel="noreferrer"
-                    className="w-24 h-24 border-2 border-ink rounded-lg overflow-hidden bg-white shrink-0 group relative cursor-pointer"
+                    className="w-28 h-28 border-2 border-ink rounded-lg overflow-hidden bg-cream shrink-0 hover:opacity-90 transition group relative cursor-pointer"
                   >
                     <img
-                      src={resolveImageUrl(order.payment_proof_url)}
-                      alt="Bukti Transfer Terkirim"
+                      src={resolveImageUrl(order.fulfillment_proof_url)}
+                      alt="Bukti Serah Terima Admin"
                       className="w-full h-full object-cover group-hover:scale-105 transition"
                     />
                   </a>
-                  <div className="text-xs text-ink space-y-1 flex-1">
-                    <p className="font-extrabold text-amber-900">Bukti Pembayaran Sudah Terunggah</p>
-                    <p className="text-muted-foreground text-[11px] leading-relaxed">
-                      Bukti pembayaran Anda sudah masuk ke sistem dan sedang dicek oleh Admin. Verifikasi biasanya membutuhkan waktu beberapa saat saat jam operasional.
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p className="font-bold text-ink text-xs">Foto Penyerahan / Bukti Pengiriman Terlampir</p>
+                    <p className="leading-relaxed">
+                      Admin telah mengunggah foto bukti fisik penyerahan barang atau resi pengiriman. Silakan klik gambar di samping untuk melihat dalam ukuran penuh.
                     </p>
                   </div>
                 </div>
-
-                <div className="pt-2">
-                  <label className="block text-xs font-bold text-ink uppercase mb-2">
-                    Ingin Mengganti / Unggah Ulang Bukti Pembayaran?
-                  </label>
-                  <div className="flex flex-col sm:flex-row items-center gap-3">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handlePaymentProofFileChange}
-                      className="text-xs w-full sm:w-auto text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-ink file:text-xs file:font-bold file:bg-cream file:text-ink hover:file:bg-brand-orange hover:file:text-cream cursor-pointer"
-                    />
-                    {paymentProofFile && (
-                      <button
-                        onClick={handleUploadPaymentProof}
-                        disabled={uploadingPaymentProof}
-                        className="w-full sm:w-auto px-4 py-2 bg-brand-orange text-white border-2 border-ink font-bold text-xs uppercase rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer disabled:opacity-50"
-                      >
-                        {uploadingPaymentProof ? "Mengunggah..." : "Kirim Bukti Baru"}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                  Silakan bayar atau transfer via QRIS BEM FILKOM, lalu unggah foto/screenshot bukti transfer di bawah ini:
-                </p>
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePaymentProofFileChange}
-                    className="text-xs w-full sm:w-auto text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-ink file:text-xs file:font-bold file:bg-cream file:text-ink hover:file:bg-brand-orange hover:file:text-cream cursor-pointer"
-                  />
-                  {paymentProofFile && (
-                    <button
-                      onClick={handleUploadPaymentProof}
-                      disabled={uploadingPaymentProof}
-                      className="w-full sm:w-auto px-5 py-2.5 bg-brand-orange text-white border-2 border-ink font-extrabold text-xs uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer disabled:opacity-50"
-                    >
-                      {uploadingPaymentProof ? "Mengunggah..." : "Unggah Bukti Transfer"}
-                    </button>
-                  )}
-                </div>
               </div>
             )}
           </div>
-        )}
 
-        {/* 5. Fulfillment Proof Uploaded by Admin */}
-        {order.fulfillment_proof_url && (
-          <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 mb-6">
-            <h3 className="font-extrabold text-ink uppercase tracking-wider text-xs mb-3 border-b border-ink/20 pb-2 flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-600" /> Bukti Serah Terima / Pengiriman dari Admin
-            </h3>
-            <div className="flex flex-col sm:flex-row items-start gap-4">
-              <a
-                href={resolveImageUrl(order.fulfillment_proof_url)}
-                target="_blank"
-                rel="noreferrer"
-                className="w-28 h-28 border-2 border-ink rounded-lg overflow-hidden bg-cream shrink-0 hover:opacity-90 transition group relative cursor-pointer"
-              >
-                <img
-                  src={resolveImageUrl(order.fulfillment_proof_url)}
-                  alt="Bukti Serah Terima Admin"
-                  className="w-full h-full object-cover group-hover:scale-105 transition"
-                />
-              </a>
-              <div className="text-xs text-muted-foreground space-y-1">
-                <p className="font-bold text-ink text-xs">Foto Penyerahan / Bukti Pengiriman Terlampir</p>
-                <p className="leading-relaxed">
-                  Admin telah mengunggah foto bukti fisik penyerahan barang atau resi pengiriman. Silakan klik gambar di samping untuk melihat dalam ukuran penuh.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Info Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5">
-            <h3 className="font-extrabold text-muted-foreground uppercase text-[10px] tracking-wider mb-2">Informasi Pembeli</h3>
-            <p className="font-bold text-ink text-sm">{order.customer_name}</p>
-            {order.customer_nim && <p className="text-xs text-muted-foreground mt-0.5">NIM: {order.customer_nim}</p>}
-            <p className="text-xs text-muted-foreground mt-0.5">{order.customer_email}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{order.customer_phone}</p>
-          </div>
-          <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5">
-            <h3 className="font-extrabold text-muted-foreground uppercase text-[10px] tracking-wider mb-2">Informasi Pengiriman</h3>
-            <p className="font-bold text-ink text-sm">{getFulfillmentLabel(order.fulfillment_type)}</p>
-            {order.fulfillment_type === "shipping" && order.shipping_address && (
-              <p className="text-xs text-muted-foreground mt-1">{order.shipping_address}</p>
-            )}
-          </div>
-        </div>
-
-        {/* Items List */}
-        <div className="mb-6">
-          <h3 className="font-black text-xs text-ink uppercase tracking-wider mb-3">Item Yang Dibeli</h3>
-          <div className="space-y-3">
-            {items?.map((item: any) => {
-              const hasReview = reviews?.some((r: any) => Number(r.product_id) === Number(item.product_id));
-              return (
-                <div key={item.id} className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-14 h-16 bg-cream border border-ink rounded-lg overflow-hidden flex items-center justify-center shrink-0">
-                      {item.image_url ? (
-                        <img src={resolveImageUrl(item.image_url)} alt={item.product_name} className="w-full h-full object-cover" />
-                      ) : (
-                        <ShoppingBag className="w-5 h-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-bold text-ink text-sm leading-snug">{item.product_name}</p>
-                      <div className="flex gap-2 text-[10px] text-muted-foreground mt-0.5">
-                        {item.size && <span>Ukuran: {item.size}</span>}
-                        {item.color && item.color !== "Default" && <span>Warna: {item.color}</span>}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {item.quantity} x Rp {item.unit_price.toLocaleString("id-ID")}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2">
-                    <div className="font-extrabold text-ink">
-                      Rp {item.subtotal.toLocaleString("id-ID")}
-                    </div>
-                    {order.order_status === "completed" && (
-                      <div>
-                        {hasReview ? (
-                          <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-1 rounded border border-green-200">
-                            Ulasan Terkirim ✓
-                          </span>
-                        ) : isReviewAllowed(order) ? (
-                          <button 
-                            onClick={() => setSelectedItemForReview({ item })}
-                            className="text-[10px] px-3 py-1.5 bg-brand-orange text-white font-extrabold uppercase rounded shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer"
-                          >
-                            Beri Ulasan
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-red-600 font-bold bg-red-50 px-2 py-1 rounded border border-red-200">
-                            Masa Ulasan Habis
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Rincian Pembayaran */}
-        <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 mb-6">
-          <h3 className="font-extrabold text-ink uppercase tracking-wider text-xs mb-3 border-b border-ink/20 pb-2">Rincian Pembayaran</h3>
-          <div className="space-y-2 text-xs">
-            <div className="flex justify-between text-muted-foreground">
-              <span>Subtotal Produk:</span>
-              <span className="font-bold text-ink">Rp {itemSubtotal.toLocaleString("id-ID")}</span>
-            </div>
+          {/* Right Column: Rincian Pembayaran & Action Buttons */}
+          <div className="space-y-4 lg:sticky lg:top-24">
             
-            {order.voucher_code && (
-              <div className="flex justify-between text-brand-orange font-semibold">
-                <span>Voucher ({order.voucher_code}):</span>
-                <span>-Rp {Number(order.discount_amount || 0).toLocaleString("id-ID")}</span>
-              </div>
-            )}
+            {/* Rincian Pembayaran */}
+            <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 space-y-3">
+              <h3 className="font-extrabold text-ink uppercase tracking-wider text-xs border-b border-ink/20 pb-2">
+                Rincian Pembayaran
+              </h3>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Subtotal Produk ({isDp ? "DP 50%" : "Full Payment"}):</span>
+                  <span className="font-bold text-ink">Rp {Number(order.gross_amount).toLocaleString("id-ID")}</span>
+                </div>
 
-            {!order.voucher_code && order.discount_amount > 0 && (
-              <div className="flex justify-between text-brand-orange font-semibold">
-                <span>Potongan Diskon Civitas UB:</span>
-                <span>-Rp {Number(order.discount_amount).toLocaleString("id-ID")}</span>
-              </div>
-            )}
+                {totalSizeSurcharge > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Tambahan Ukuran di atas XL:</span>
+                    <span className="font-bold text-ink">+Rp {totalSizeSurcharge.toLocaleString("id-ID")}</span>
+                  </div>
+                )}
+                
+                {order.voucher_code && (
+                  <div className="flex justify-between text-brand-orange font-semibold">
+                    <span>Voucher ({order.voucher_code}):</span>
+                    <span>-Rp {Number(order.discount_amount || 0).toLocaleString("id-ID")}</span>
+                  </div>
+                )}
 
-            <div className="flex justify-between text-muted-foreground">
-              <span>Metode Pengiriman:</span>
-              <span className="font-bold text-ink">{getFulfillmentLabel(order.fulfillment_type)}</span>
+                {!order.voucher_code && order.discount_amount > 0 && (
+                  <div className="flex justify-between text-brand-orange font-semibold">
+                    <span>Potongan Diskon Civitas UB:</span>
+                    <span>-Rp {Number(order.discount_amount).toLocaleString("id-ID")}</span>
+                  </div>
+                )}
+
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Metode Pengiriman:</span>
+                  <span className="font-bold text-ink">{getFulfillmentLabel(order.fulfillment_type)}</span>
+                </div>
+
+                {order.fulfillment_type === "shipping" && order.shipping_address && (
+                  <div className="text-[11px] text-muted-foreground border-t border-dashed border-ink/20 pt-1 mt-1">
+                    <span className="font-bold text-ink">Alamat Kirim: </span>
+                    {order.shipping_address}
+                  </div>
+                )}
+
+                {isDp && (
+                  <>
+                    <div className="flex justify-between text-emerald-700 font-semibold border-t border-dashed border-ink/20 pt-2 mt-2">
+                      <span>DP Terbayar Sekarang:</span>
+                      <span>Rp {Number(order.gross_amount).toLocaleString("id-ID")}</span>
+                    </div>
+                    <div className="flex justify-between text-brand-orange font-semibold">
+                      <span>Nominal Pelunasan (Sisa Kurang):</span>
+                      <span>Rp {pelunasanAmount.toLocaleString("id-ID")}</span>
+                    </div>
+                  </>
+                )}
+
+                <div className="flex justify-between items-center text-sm font-extrabold text-ink border-t-2 border-ink pt-2.5 mt-2">
+                  <span>{isDp ? "TOTAL ESTIMASI HARGA PRODUK:" : "TOTAL AKHIR:"}</span>
+                  <span className="text-brand-orange text-base font-black">
+                    Rp {grandTotalProduct.toLocaleString("id-ID")}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            {order.fulfillment_type === "shipping" && order.shipping_address && (
-              <div className="text-[11px] text-muted-foreground border-t border-dashed border-ink/20 pt-1 mt-1">
-                <span className="font-bold text-ink">Alamat Kirim: </span>
-                {order.shipping_address}
-              </div>
-            )}
+            {/* Action Buttons */}
+            <div className="flex flex-col gap-2">
+              {(order.order_status === "ready_for_pickup" || order.order_status === "shipped" || order.is_complained === 1) && (
+                <button
+                  onClick={() => setComplaintModalOpen(true)}
+                  className={`w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 border-2 border-ink text-xs font-bold uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer ${order.is_complained === 1 ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-50 text-red-700 hover:bg-red-100"}`}
+                >
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                  {order.is_complained === 1 ? "Komplain Diajukan" : "Ajukan Komplain"}
+                </button>
+              )}
 
-            <div className="flex justify-between items-center text-sm font-extrabold text-ink border-t-2 border-ink pt-2.5 mt-2">
-              <span>TOTAL AKHIR:</span>
-              <span className="text-brand-orange text-base font-black">
-                Rp {order.gross_amount.toLocaleString("id-ID")}
-              </span>
+              {(order.order_status === "ready_for_pickup" || order.order_status === "shipped") && (
+                <button
+                  onClick={() => setCompletionModalOpen(true)}
+                  disabled={completingOrderId === order.order_id}
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 border-2 border-ink text-xs font-extrabold uppercase bg-emerald-500 text-white hover:bg-emerald-600 rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" />
+                  {completingOrderId === order.order_id ? "Memproses..." : "Pesanan Diterima"}
+                </button>
+              )}
+
+              {/* Contact admin */}
+              <a
+                href="https://wa.me/6282287190402"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 border-2 border-ink text-xs font-bold uppercase bg-green-100 hover:bg-green-200 text-green-800 rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"
+              >
+                Hubungi Admin
+              </a>
             </div>
+
           </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex flex-wrap gap-2 justify-end">
-          {(order.order_status === "ready_for_pickup" || order.order_status === "shipped" || order.is_complained === 1) && (
-            <button
-              onClick={() => setComplaintModalOpen(true)}
-              className={`inline-flex items-center gap-1.5 px-3.5 py-2 border-2 border-ink text-xs font-bold uppercase rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer ${order.is_complained === 1 ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-50 text-red-700 hover:bg-red-100"}`}
-            >
-              <ShieldAlert className="w-3.5 h-3.5" />
-              {order.is_complained === 1 ? "Komplain Diajukan" : "Ajukan Komplain"}
-            </button>
-          )}
-
-          {(order.order_status === "ready_for_pickup" || order.order_status === "shipped") && (
-            <button
-              onClick={() => setCompletionModalOpen(true)}
-              disabled={completingOrderId === order.order_id}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 border-2 border-ink text-xs font-extrabold uppercase bg-emerald-500 text-white hover:bg-emerald-600 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer disabled:opacity-50"
-            >
-              <CheckCheck className="w-3.5 h-3.5" />
-              {completingOrderId === order.order_id ? "Memproses..." : "Pesanan Diterima"}
-            </button>
-          )}
-
-          {/* Contact admin */}
-          <a
-            href="https://wa.me/6282287190402"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 border-2 border-ink text-xs font-bold uppercase bg-green-100 hover:bg-green-200 text-green-800 rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"
-          >
-            Hubungi Admin
-          </a>
         </div>
 
       </main>

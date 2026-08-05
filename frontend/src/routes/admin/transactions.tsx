@@ -135,7 +135,7 @@ const getFulfillmentStatusBadge = (order: any) => {
     return { text: "Siap Diambil", color: "bg-teal-100 text-teal-800 border-teal-200 font-bold" };
   }
 
-  return { text: "Sedang Diproses", color: "bg-indigo-100 text-indigo-800 border-indigo-200" };
+  return { text: "Sedang Diproses", color: "bg-blue-100 text-blue-800 border-blue-200 font-bold" };
 };
 
 const getStatusBadgeTextAndColor = getPaymentStatusBadge;
@@ -513,7 +513,7 @@ function AdminTransactionsPage() {
       if (!o) return;
 
       const oStatus = o.order_status || o.transaction_status;
-      const isCancelled = oStatus === "cancelled" || oStatus === "cancel" || oStatus === "expire";
+      const isCancelled = String(oStatus) === "cancelled" || String(oStatus) === "cancel" || String(oStatus) === "expire";
 
       const isPaid =
         o.payment_status === "paid" ||

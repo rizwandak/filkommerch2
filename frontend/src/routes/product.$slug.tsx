@@ -26,7 +26,9 @@ import {
   Zap,
 } from "lucide-react";
 import { toast } from "sonner";
-import { getProductBySlug, getProducts, getProductReviewsServerAction } from "@backend/server-actions";
+import { useQuery } from "@tanstack/react-query";
+import { getProductBySlug, getProducts, getProductReviewsServerAction, getActivePreOrderCampaignServerAction } from "@backend/server-actions";
+import { isPreOrderOpen } from "@/lib/pre-order-utils";
 import { Button } from "@frontend/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { Navbar } from "@/components/Navbar";
@@ -319,13 +321,18 @@ function ProductDetailPage() {
     )) as string[];
   }, [product, isSingleVariant]);
 
-  const isPreOrder = product?.sale_type === "preorder";
+  const { data: activePoRes } = useQuery({
+    queryKey: ["activePreOrderCampaign"],
+    queryFn: () => getActivePreOrderCampaignServerAction(),
+    staleTime: 30 * 1000,
+  });
+  const activePoCampaign = activePoRes?.data || null;
+
+  const isPreOrder = product?.sale_type === "preorder" || product?.sale_type === "pre_order";
   const isPreOrderClosed = useMemo(() => {
-    if (!product || product.sale_type !== "preorder") return false;
-    if (!product.preorder_end_at) return false;
-    const end = new Date(product.preorder_end_at);
-    return new Date() > end;
-  }, [product]);
+    if (!product || (product.sale_type !== "preorder" && product.sale_type !== "pre_order")) return false;
+    return !isPreOrderOpen(activePoCampaign);
+  }, [product, activePoCampaign]);
 
   // Calculate dynamic stock based on selections
   const currentVariant = useMemo(() => {
@@ -1279,10 +1286,16 @@ function ProductDetailPage() {
                     </div>
 
                     <div className="text-right text-xs">
-                      {product.sale_type === "preorder" ? (
-                        <span className="text-brand-orange font-black uppercase tracking-wider text-[11px] bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/30">
-                          ⚡ Pre-Order Open
-                        </span>
+                      {isPreOrder ? (
+                        isPreOrderClosed ? (
+                          <span className="text-rose-800 font-black uppercase tracking-wider text-[11px] bg-rose-100 px-2 py-0.5 rounded border border-rose-300">
+                            🔒 PO Ditutup
+                          </span>
+                        ) : (
+                          <span className="text-brand-orange font-black uppercase tracking-wider text-[11px] bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/30">
+                            ⚡ Pre-Order Open
+                          </span>
+                        )
                       ) : (
                         <>
                           <span className="text-muted-foreground font-bold">Stok: </span>
@@ -1481,10 +1494,16 @@ function ProductDetailPage() {
                   </div>
 
                   <div className="text-right text-xs">
-                    {product.sale_type === "preorder" ? (
-                      <span className="text-brand-orange font-black uppercase tracking-wider text-[11px] bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/30">
-                        ⚡ Pre-Order
-                      </span>
+                    {isPreOrder ? (
+                      isPreOrderClosed ? (
+                        <span className="text-rose-800 font-black uppercase tracking-wider text-[11px] bg-rose-100 px-2 py-0.5 rounded border border-rose-300">
+                          🔒 PO Ditutup
+                        </span>
+                      ) : (
+                        <span className="text-brand-orange font-black uppercase tracking-wider text-[11px] bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/30">
+                          ⚡ Pre-Order
+                        </span>
+                      )
                     ) : (
                       <>
                         <span className="text-muted-foreground font-bold">Stok: </span>
@@ -1511,14 +1530,14 @@ function ProductDetailPage() {
                     disabled={currentStock <= 0 || isPreOrderClosed}
                     className="w-full py-3 px-4 bg-brand-orange hover:bg-brand-orange/90 text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-200"
                   >
-                    <Plus className="w-4 h-4" /> {isPreOrderClosed ? "Pre-Order Ditutup" : (currentStock <= 0 ? "Stok Habis" : "+ Keranjang")}
+                    <Plus className="w-4 h-4" /> {currentStock <= 0 ? "Stok Habis" : "+ Keranjang"}
                   </button>
                   <button
                     onClick={() => handleAddToCart(true)}
                     disabled={currentStock <= 0 || isPreOrderClosed}
                     className="w-full py-3 px-4 bg-white hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isPreOrderClosed ? "Pre-Order Ditutup" : (currentStock <= 0 ? "Stok Habis" : (isPreOrder ? "Pesan Sekarang" : "Beli Langsung"))}
+                    {currentStock <= 0 ? "Stok Habis" : (isPreOrder ? "Pesan Sekarang" : "Beli Langsung")}
                   </button>
                 </div>
 
