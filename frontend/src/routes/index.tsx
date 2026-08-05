@@ -78,7 +78,7 @@ export const Route = createFileRoute("/")({
     const settings = settingsRes.settings || null;
 
     const formattedProducts: ProductCard[] = dbProducts.map((product: ProductWithVariants) => {
-      const productName = product.name.toLowerCase();
+      const productName = product?.name?.toLowerCase() || "";
       const cat: Filter =
         product.category_slug === "bundle" || product.category_slug === "bundles" || product.product_type === "bundle"
           ? "BUNDLE"
@@ -874,7 +874,7 @@ function Index() {
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter(
-        (p) => p.name.toLowerCase().includes(q) || p.cat.toLowerCase().includes(q),
+        (p) => (p?.name?.toLowerCase() || "").includes(q) || (p?.cat?.toLowerCase() || "").includes(q),
       );
     }
     return list;
@@ -1132,7 +1132,7 @@ function Index() {
                       list = list.filter((p) => p.is_best_seller);
                     } else if (source === "slugs") {
                       const slugs = (cfg.slugs || "").split(",").map((s: string) => s.trim().toLowerCase());
-                      list = list.filter((p) => slugs.includes(p.id.toLowerCase()));
+                      list = list.filter((p) => slugs.includes((p?.id || "").toLowerCase()));
                     }
                     return list.slice(0, cfg.maxItems || 6);
                   };
