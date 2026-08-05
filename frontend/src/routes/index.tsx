@@ -1078,8 +1078,8 @@ function Index() {
                                   </button>
                                 );
                               }
-                              const isStudentUbEmail = user.email?.toLowerCase().endsWith("@student.ub.ac.id");
-                              const isVerified = Number(user.is_filkom_verified) === 1;
+                              const isStudentUbEmail = user?.email?.toLowerCase().endsWith("@student.ub.ac.id");
+                              const isVerified = Number(user?.is_filkom_verified) === 1;
                               if (isStudentUbEmail && !isVerified) {
                                 return (
                                   <button
