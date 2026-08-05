@@ -215,6 +215,7 @@ type ProductCard = {
   was?: string | null;
   tag?: string;
   cat: Filter;
+  slug?: string;
   product_id?: number;
   is_best_seller?: boolean;
   is_limited?: boolean;
