@@ -15,15 +15,14 @@ export function useWishlist() {
     }
   }, []);
 
-  const toggleWishlist = (productId: string | number, productName?: string) => {
-    const idStr = String(productId);
+  const toggleWishlist = (productId: string, productName?: string) => {
     setWishlist((prev) => {
       let updated;
-      if (prev.includes(idStr)) {
-        updated = prev.filter((id) => id !== idStr);
+      if (prev.includes(productId)) {
+        updated = prev.filter((id) => id !== productId);
         if (productName) toast.success(`Dihapus dari wishlist: ${productName}`);
       } else {
-        updated = [...prev, idStr];
+        updated = [...prev, productId];
         if (productName) toast.success(`Ditambahkan ke wishlist: ${productName}`);
       }
       localStorage.setItem("wishlist", JSON.stringify(updated));
@@ -31,7 +30,7 @@ export function useWishlist() {
     });
   };
 
-  const isInWishlist = (productId: string | number) => wishlist.includes(String(productId));
+  const isInWishlist = (productId: string) => wishlist.includes(productId);
 
   return { wishlist, toggleWishlist, isInWishlist };
 }

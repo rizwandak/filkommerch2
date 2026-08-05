@@ -68,75 +68,65 @@ import baraSmile from "@/assets/bara-smile.png";
 
 export const Route = createFileRoute("/")({
   loader: async () => {
-    try {
-      const [productsRes, settingsRes, categoriesRes] = await Promise.all([
-        getProducts(),
-        getStoreSettings(),
-        getCategories(),
-      ]);
+    const [productsRes, settingsRes, categoriesRes] = await Promise.all([
+      getProducts(),
+      getStoreSettings(),
+      getCategories(),
+    ]);
 
-      const dbProducts = productsRes.products || [];
-      const settings = settingsRes.settings || null;
+    const dbProducts = productsRes.products || [];
+    const settings = settingsRes.settings || null;
 
-      const formattedProducts: ProductCard[] = dbProducts.map((product: ProductWithVariants) => {
-        const productName = product.name?.toLowerCase() || "";
-        const cat: Filter =
-          product.category_slug === "bundle" || product.category_slug === "bundles" || product.product_type === "bundle"
-            ? "BUNDLE"
-            : product.category_id === 2
-              ? "ACCESSORIES"
-              : productName.includes("hood")
-                ? "HOODIE"
-                : productName.includes("varsity") || productName.includes("jacket")
-                  ? "JACKET"
-                  : productName.includes("tee") || productName.includes("shirt")
-                    ? "TEE"
-                    : "ACCESSORIES";
+    const formattedProducts: ProductCard[] = dbProducts.map((product: ProductWithVariants) => {
+      const productName = product.name.toLowerCase();
+      const cat: Filter =
+        product.category_slug === "bundle" || product.category_slug === "bundles" || product.product_type === "bundle"
+          ? "BUNDLE"
+          : product.category_id === 2
+            ? "ACCESSORIES"
+            : productName.includes("hood")
+              ? "HOODIE"
+              : productName.includes("varsity") || productName.includes("jacket")
+                ? "JACKET"
+                : productName.includes("tee") || productName.includes("shirt")
+                  ? "TEE"
+                  : "ACCESSORIES";
 
-        return {
-          id: product.slug || `product-${product.id}`,
-          img: product.image_url || pVarsity,
-          name: product.name,
-          price: `Rp ${product.price.toLocaleString("id-ID")}`,
-          was: product.original_price
-            ? `Rp ${product.original_price.toLocaleString("id-ID")}`
-            : null,
-          tag: product.is_best_seller
-            ? "BEST SELLER"
-            : product.is_limited
-              ? "LIMITED"
-              : product.sale_type === "pre_order"
-                ? "PRE-ORDER"
-                : "NEW",
-          cat,
-          product_id: product.id,
-          is_best_seller: Boolean(product.is_best_seller),
-          is_limited: Boolean(product.is_limited),
-          is_featured: Boolean(product.is_featured),
-          sale_type: product.sale_type || null,
-          variants: product.variants || [],
-          description: product.description || null,
-          category_id: product.category_id || null,
-          category_slug: product.category_slug || null,
-          product_type: product.product_type || null,
-          bundle_components: product.bundle_components || [],
-          rawPrice: product.price || 0,
-          rawOriginalPrice: product.original_price || null,
-          filkom_price: (product as any).filkom_price || null,
-          promo_price: (product as any).promo_price || null,
-        };
-      });
-
-      return { products: formattedProducts, settings, categories: categoriesRes.categories || [] };
-    } catch (e: any) {
-      console.error("LOADER ERROR:", e);
       return {
-        products: [],
-        settings: null,
-        categories: [],
-        loaderError: String(e.stack || e.message || e),
+        id: product.slug || `product-${product.id}`,
+        img: product.image_url || pVarsity,
+        name: product.name,
+        price: `Rp ${product.price.toLocaleString("id-ID")}`,
+        was: product.original_price
+          ? `Rp ${product.original_price.toLocaleString("id-ID")}`
+          : null,
+        tag: product.is_best_seller
+          ? "BEST SELLER"
+          : product.is_limited
+            ? "LIMITED"
+            : product.sale_type === "pre_order"
+              ? "PRE-ORDER"
+              : "NEW",
+        cat,
+        product_id: product.id,
+        is_best_seller: Boolean(product.is_best_seller),
+        is_limited: Boolean(product.is_limited),
+        is_featured: Boolean(product.is_featured),
+        sale_type: product.sale_type || null,
+        variants: product.variants || [],
+        description: product.description || null,
+        category_id: product.category_id || null,
+        category_slug: product.category_slug || null,
+        product_type: product.product_type || null,
+        bundle_components: product.bundle_components || [],
+        rawPrice: product.price || 0,
+        rawOriginalPrice: product.original_price || null,
+        filkom_price: (product as any).filkom_price || null,
+        promo_price: (product as any).promo_price || null,
       };
-    }
+    });
+
+    return { products: formattedProducts, settings, categories: categoriesRes.categories || [] };
   },
   head: () => ({
     meta: [
@@ -733,10 +723,7 @@ function Index() {
 
   const [query, setQuery] = useState("");
   const [email, setEmail] = useState("");
-  const loaderData = Route.useLoaderData() || {} as any;
-  if (loaderData.loaderError) {
-    return <div className="p-10 text-red-500 font-mono text-xs whitespace-pre-wrap">SSR LOADER ERROR:<br/>{loaderData.loaderError}</div>;
-  }
+  const loaderData = Route.useLoaderData() || {};
   const dbProducts = loaderData.products || [];
   const initialSettings = loaderData.settings || null;
   const categories = loaderData.categories || [];
@@ -887,7 +874,7 @@ function Index() {
     if (query.trim()) {
       const q = query.toLowerCase();
       list = list.filter(
-        (p) => p.name?.toLowerCase().includes(q) || (p.cat || "").toLowerCase().includes(q),
+        (p) => p.name.toLowerCase().includes(q) || p.cat.toLowerCase().includes(q),
       );
     }
     return list;
@@ -922,8 +909,8 @@ function Index() {
     // If it has only one size (e.g. accessories, bags), return empty to show simple Add To Cart
     if (
       p.variants.length === 1 &&
-      (p.variants[0].size?.toLowerCase() === "all size" ||
-        p.variants[0].size?.toLowerCase() === "one size")
+      (p.variants[0].size.toLowerCase() === "all size" ||
+        p.variants[0].size.toLowerCase() === "one size")
     ) {
       return [];
     }
@@ -1092,8 +1079,8 @@ function Index() {
                                   </button>
                                 );
                               }
-                              const isStudentUbEmail = user?.email?.toLowerCase().endsWith("@student.ub.ac.id");
-                              const isVerified = Number(user?.is_filkom_verified) === 1;
+                              const isStudentUbEmail = user.email?.toLowerCase().endsWith("@student.ub.ac.id");
+                              const isVerified = Number(user.is_filkom_verified) === 1;
                               if (isStudentUbEmail && !isVerified) {
                                 return (
                                   <button
@@ -1145,7 +1132,7 @@ function Index() {
                       list = list.filter((p) => p.is_best_seller);
                     } else if (source === "slugs") {
                       const slugs = (cfg.slugs || "").split(",").map((s: string) => s.trim().toLowerCase());
-                      list = list.filter((p) => slugs.includes((p.slug || String(p.id)).toLowerCase()));
+                      list = list.filter((p) => slugs.includes(p.id.toLowerCase()));
                     }
                     return list.slice(0, cfg.maxItems || 6);
                   };
@@ -1956,7 +1943,7 @@ function Index() {
                                           {bundle.itemsList.split(",").map((it: string, itIdx: number) => {
                                             const trimmedName = it.trim();
                                             const matchProd = products.find(
-                                              (p) => p.name?.toLowerCase().includes(trimmedName.toLowerCase())
+                                              (p) => p.name.toLowerCase().includes(trimmedName.toLowerCase())
                                             );
                                             const compImg = matchProd?.img || (itIdx % 2 === 0 ? pTshirt : pHoodie);
 

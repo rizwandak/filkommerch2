@@ -14,13 +14,12 @@ export function useRecentlyViewed() {
     }
   }, []);
 
-  const addViewedProduct = (productId: string | number) => {
-    const idStr = String(productId);
+  const addViewedProduct = (productId: string) => {
     setRecentlyViewed((prev) => {
       // Remove if it exists to push to front
-      const filtered = prev.filter((id) => id !== idStr);
+      const filtered = prev.filter((id) => id !== productId);
       // Add to front, keep max 10
-      const updated = [idStr, ...filtered].slice(0, 10);
+      const updated = [productId, ...filtered].slice(0, 10);
       localStorage.setItem("recentlyViewed", JSON.stringify(updated));
       return updated;
     });

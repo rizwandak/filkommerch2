@@ -262,7 +262,7 @@ function PreOrderPage() {
     const isUb = Number(user?.is_filkom_verified) === 1;
     const list = dbProducts.length > 0 ? dbProducts : [];
     return list.map((product: ProductWithVariants) => {
-      const productName = product.name?.toLowerCase() || "";
+      const productName = product.name.toLowerCase();
       const cat =
         product.category_id === 2
           ? "ACCESSORIES"

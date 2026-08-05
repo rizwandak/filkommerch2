@@ -27,7 +27,7 @@ jobs:
           VITE_API_URL: https://filkommerch.com
         run: |
           cd frontend
-          npm install
+          npm ci
           npm run build
 
       # ---- CREATE RESTART TRIGGER ----

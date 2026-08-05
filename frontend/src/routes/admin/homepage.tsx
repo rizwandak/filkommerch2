@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuth } from "@/lib/auth";
@@ -46,7 +45,6 @@ import workJacket from "@/assets/workjacket.png";
 
 
 // Drag and drop imports
-// @ts-ignore
 import {
   DndContext,
   closestCenter,
@@ -56,7 +54,6 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-// @ts-ignore
 import {
   arrayMove,
   SortableContext,
@@ -64,7 +61,6 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-// @ts-ignore
 import { CSS } from "@dnd-kit/utilities";
 
 export const Route = createFileRoute("/admin/homepage")({
