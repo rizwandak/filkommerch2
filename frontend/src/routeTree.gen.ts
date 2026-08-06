@@ -26,6 +26,7 @@ import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 import { Route as OrdersOrderIdRouteImport } from './routes/orders_.$orderId'
 import { Route as ApiDbTestRouteImport } from './routes/api/db-test'
 import { Route as AdminVouchersRouteImport } from './routes/admin/vouchers'
+import { Route as AdminVendoringRouteImport } from './routes/admin/vendoring'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminTransactionsRouteImport } from './routes/admin/transactions'
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
@@ -121,6 +122,11 @@ const AdminVouchersRoute = AdminVouchersRouteImport.update({
   path: '/vouchers',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminVendoringRoute = AdminVendoringRouteImport.update({
+  id: '/vendoring',
+  path: '/vendoring',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
   path: '/users',
@@ -188,6 +194,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/vendoring': typeof AdminVendoringRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/api/db-test': typeof ApiDbTestRoute
   '/orders/$orderId': typeof OrdersOrderIdRoute
@@ -214,6 +221,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/vendoring': typeof AdminVendoringRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/api/db-test': typeof ApiDbTestRoute
   '/orders/$orderId': typeof OrdersOrderIdRoute
@@ -243,6 +251,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/admin/transactions': typeof AdminTransactionsRoute
   '/admin/users': typeof AdminUsersRoute
+  '/admin/vendoring': typeof AdminVendoringRoute
   '/admin/vouchers': typeof AdminVouchersRoute
   '/api/db-test': typeof ApiDbTestRoute
   '/orders_/$orderId': typeof OrdersOrderIdRoute
@@ -273,6 +282,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/transactions'
     | '/admin/users'
+    | '/admin/vendoring'
     | '/admin/vouchers'
     | '/api/db-test'
     | '/orders/$orderId'
@@ -299,6 +309,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/transactions'
     | '/admin/users'
+    | '/admin/vendoring'
     | '/admin/vouchers'
     | '/api/db-test'
     | '/orders/$orderId'
@@ -327,6 +338,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/admin/transactions'
     | '/admin/users'
+    | '/admin/vendoring'
     | '/admin/vouchers'
     | '/api/db-test'
     | '/orders_/$orderId'
@@ -473,6 +485,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminVouchersRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/vendoring': {
+      id: '/admin/vendoring'
+      path: '/vendoring'
+      fullPath: '/admin/vendoring'
+      preLoaderRoute: typeof AdminVendoringRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/users': {
       id: '/admin/users'
       path: '/users'
@@ -549,6 +568,7 @@ interface AdminRouteRouteChildren {
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminTransactionsRoute: typeof AdminTransactionsRoute
   AdminUsersRoute: typeof AdminUsersRoute
+  AdminVendoringRoute: typeof AdminVendoringRoute
   AdminVouchersRoute: typeof AdminVouchersRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -563,6 +583,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminSettingsRoute: AdminSettingsRoute,
   AdminTransactionsRoute: AdminTransactionsRoute,
   AdminUsersRoute: AdminUsersRoute,
+  AdminVendoringRoute: AdminVendoringRoute,
   AdminVouchersRoute: AdminVouchersRoute,
   AdminIndexRoute: AdminIndexRoute,
 }

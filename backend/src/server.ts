@@ -388,6 +388,28 @@ app.put("/api/pre-order-campaigns/:id", checkRole(["admin"]), apiControllers.upd
 app.patch("/api/pre-order-campaigns/:id/toggle-active", checkRole(["admin"]), apiControllers.togglePreOrderCampaignActive);
 app.delete("/api/pre-order-campaigns/:id", checkRole(["admin"]), apiControllers.deletePreOrderCampaign);
 
+// CSV Import API Routes
+app.post("/api/admin/import/orders", checkRole(["admin"]), apiControllers.importOrders);
+app.delete("/api/admin/import/orders/:campaignId", checkRole(["admin"]), apiControllers.clearImportedOrders);
+
+// Vendoring API Routes
+app.get("/api/admin/vendors", checkRole(["admin", "cashier"]), apiControllers.getVendors);
+app.post("/api/admin/vendors", checkRole(["admin"]), apiControllers.createVendor);
+app.put("/api/admin/vendors/:id", checkRole(["admin"]), apiControllers.updateVendor);
+app.delete("/api/admin/vendors/:id", checkRole(["admin"]), apiControllers.deleteVendor);
+
+app.get("/api/admin/vendoring/summary", checkRole(["admin", "cashier"]), apiControllers.getProductionSummary);
+app.get("/api/admin/vendoring/orders", checkRole(["admin", "cashier"]), apiControllers.getVendorOrders);
+app.post("/api/admin/vendoring/orders", checkRole(["admin"]), apiControllers.createVendorOrder);
+app.put("/api/admin/vendoring/orders/:id/status", checkRole(["admin"]), apiControllers.updateVendorOrderStatus);
+app.delete("/api/admin/vendoring/orders/:id", checkRole(["admin"]), apiControllers.deleteVendorOrder);
+app.get("/api/admin/vendoring/financials", checkRole(["admin", "cashier"]), apiControllers.getFinancialOverview);
+
+// Batch Product Prices API Routes
+app.get("/api/admin/batch-prices/:campaignId", checkRole(["admin", "cashier"]), apiControllers.getBatchProductPrices);
+app.post("/api/admin/batch-prices/:campaignId", checkRole(["admin"]), apiControllers.saveBatchProductPrices);
+
+
 // Analytics API Routes
 app.get("/api/analytics/daily", checkRole(["admin", "cashier"]), apiControllers.getDailySalesSummary);
 app.get("/api/analytics/top-products", checkRole(["admin", "cashier"]), apiControllers.getTopProducts);

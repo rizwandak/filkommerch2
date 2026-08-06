@@ -58,6 +58,9 @@ interface ProductForm {
   original_price: string;
   filkom_price: string;
   promo_price: string;
+  vendor_cost: string;
+  shipping_cost_per_pcs: string;
+  other_cost_per_pcs: string;
   sale_type: string;
   product_type: string;
   pre_order_campaign_id?: number | null;
@@ -86,6 +89,9 @@ const emptyForm = (): ProductForm => ({
   original_price: "",
   filkom_price: "",
   promo_price: "",
+  vendor_cost: "",
+  shipping_cost_per_pcs: "",
+  other_cost_per_pcs: "",
   sale_type: "ready_stock",
   product_type: "apparel",
   pre_order_campaign_id: null,
@@ -429,6 +435,9 @@ function AdminProductsPage() {
       original_price: product.original_price ? String(product.original_price) : "",
       filkom_price: product.filkom_price ? String(product.filkom_price) : "",
       promo_price: product.promo_price ? String(product.promo_price) : "",
+      vendor_cost: (product as any).vendor_cost ? String((product as any).vendor_cost) : "",
+      shipping_cost_per_pcs: (product as any).shipping_cost_per_pcs ? String((product as any).shipping_cost_per_pcs) : "",
+      other_cost_per_pcs: (product as any).other_cost_per_pcs ? String((product as any).other_cost_per_pcs) : "",
       sale_type: product.sale_type || "ready_stock",
       product_type: product.product_type === "bundle" ? "bundle" : "apparel",
       pre_order_campaign_id: (product as any).pre_order_campaign_id || null,
@@ -642,6 +651,10 @@ function AdminProductsPage() {
       original_price: form.original_price ? parseFloat(form.original_price) : null,
       filkom_price: form.filkom_price ? parseFloat(form.filkom_price) : null,
       promo_price: form.promo_price ? parseFloat(form.promo_price) : null,
+      vendor_cost: form.vendor_cost ? parseFloat(form.vendor_cost) : 0,
+      shipping_cost_per_pcs: form.shipping_cost_per_pcs ? parseFloat(form.shipping_cost_per_pcs) : 0,
+      other_cost_per_pcs: form.other_cost_per_pcs ? parseFloat(form.other_cost_per_pcs) : 0,
+      cost_price: (parseFloat(form.vendor_cost) || 0) + (parseFloat(form.shipping_cost_per_pcs) || 0) + (parseFloat(form.other_cost_per_pcs) || 0),
       sale_type: form.sale_type,
       product_type: form.product_type === "bundle" ? "bundle" : "apparel",
       pre_order_campaign_id: form.pre_order_campaign_id || null,
@@ -1172,6 +1185,157 @@ function AdminProductsPage() {
                   <p className="text-[9px] text-muted-foreground">Untuk tampilan harga dicoret</p>
                 </div>
               </div>
+            </div>
+
+            {/* Section 3.5: Rincian Modal & HPP (COGS & Profit Margin Calculator) */}
+            <div className="p-4 border-2 border-emerald-800/40 rounded-xl bg-emerald-50/40 space-y-4 shadow-xs">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-wider text-emerald-800 flex items-center gap-2">
+                  📊 RINCIAN MODAL HPP (COGS) &amp; ESTIMASI MARGIN PROFIT
+                </h4>
+                <span className="text-[10px] font-bold px-2.5 py-0.5 bg-emerald-200 text-emerald-900 rounded border border-emerald-400">
+                  Per-Pcs / Per-Unit
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-extrabold uppercase text-ink">
+                    1. Harga Vendor / Produksi (Rp)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={form.vendor_cost}
+                    onChange={(e) => setForm({ ...form, vendor_cost: e.target.value })}
+                    placeholder="Contoh: 75000"
+                    className="border-2 border-ink/40 font-bold bg-white"
+                  />
+                  <p className="text-[9px] text-muted-foreground">Harga pcs asli dari vendor</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-extrabold uppercase text-ink">
+                    2. Ongkir Vendor per Pcs (Rp)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={form.shipping_cost_per_pcs}
+                    onChange={(e) => setForm({ ...form, shipping_cost_per_pcs: e.target.value })}
+                    placeholder="Contoh: 3000"
+                    className="border-2 border-ink/40 font-bold bg-white"
+                  />
+                  <p className="text-[9px] text-muted-foreground">Biaya pengiriman dibagi total pcs</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-extrabold uppercase text-ink">
+                    3. Biaya Lain / Packaging (Rp)
+                  </Label>
+                  <Input
+                    type="number"
+                    value={form.other_cost_per_pcs}
+                    onChange={(e) => setForm({ ...form, other_cost_per_pcs: e.target.value })}
+                    placeholder="Contoh: 2000"
+                    className="border-2 border-ink/40 font-bold bg-white"
+                  />
+                  <p className="text-[9px] text-muted-foreground">Plastik, stiker, hangtag, dll.</p>
+                </div>
+              </div>
+
+              {/* Dynamic COGS & Profit Margin Summary Indicator Card */}
+              {(() => {
+                const vCost = parseFloat(form.vendor_cost) || 0;
+                const sCost = parseFloat(form.shipping_cost_per_pcs) || 0;
+                const oCost = parseFloat(form.other_cost_per_pcs) || 0;
+                const totalCogs = vCost + sCost + oCost;
+
+                const sellingPriceUmum = parseFloat(form.price) || 0;
+                const originalFullPrice = parseFloat(form.original_price) || 0;
+
+                const hasDpKeyword = form.name.toLowerCase().includes("dp") || form.variants.some(v => (v.size + " " + v.color).toLowerCase().includes("dp"));
+                const isDpProduct = hasDpKeyword && originalFullPrice > sellingPriceUmum;
+                const effectiveFullPriceUmum = isDpProduct ? originalFullPrice : sellingPriceUmum;
+
+                const profitUmumFull = effectiveFullPriceUmum - totalCogs;
+                const marginUmumFull = effectiveFullPriceUmum > 0 ? ((profitUmumFull / effectiveFullPriceUmum) * 100) : 0;
+
+                const sellingPriceFilkom = parseFloat(form.filkom_price) || 0;
+                const effectiveFullPriceFilkom = isDpProduct ? (originalFullPrice - (sellingPriceUmum - sellingPriceFilkom)) : sellingPriceFilkom;
+                const profitFilkomFull = effectiveFullPriceFilkom - totalCogs;
+                const marginFilkomFull = effectiveFullPriceFilkom > 0 ? ((profitFilkomFull / effectiveFullPriceFilkom) * 100) : 0;
+
+                const isHealthy = marginUmumFull >= 20;
+                const isWarning = marginUmumFull > 0 && marginUmumFull < 20;
+
+                return (
+                  <div className="p-3.5 bg-white border-2 border-ink/30 rounded-xl space-y-3">
+                    {isDpProduct && (
+                      <div className="p-2.5 bg-blue-50 border border-blue-300 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2 text-blue-900 font-bold">
+                          <span>💡 Skema DP (Down Payment) Terdeteksi</span>
+                        </div>
+                        <span className="text-[10px] bg-blue-200 text-blue-900 px-2 py-0.5 rounded font-black uppercase">
+                          Harga Penuh / Pelunasan: Rp {originalFullPrice.toLocaleString("id-ID")}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center border-b border-ink/10 pb-3">
+                      <div>
+                        <div className="text-[10px] font-bold uppercase text-muted-foreground">TOTAL HPP (COGS PER PCS)</div>
+                        <div className="text-sm font-black text-ink">
+                          Rp {totalCogs.toLocaleString("id-ID")}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold uppercase text-muted-foreground">
+                          {isDpProduct ? "EST. LABA PENUH (SETELAH PELUNASAN)" : "EST. LABA BERSIH (HARGA UMUM)"}
+                        </div>
+                        <div className={`text-sm font-black ${profitUmumFull >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                          Rp {profitUmumFull.toLocaleString("id-ID")}
+                        </div>
+                        {isDpProduct && (
+                          <div className="text-[9px] font-bold text-muted-foreground mt-0.5">
+                            Cashflow DP Awal: <span className={sellingPriceUmum - totalCogs >= 0 ? "text-emerald-700" : "text-amber-600"}>Rp {(sellingPriceUmum - totalCogs).toLocaleString("id-ID")}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold uppercase text-muted-foreground">
+                          {isDpProduct ? "MARGIN PROFIT PENUH (%)" : "MARGIN HARGA UMUM (%)"}
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-sm font-black ${isHealthy ? "text-emerald-700" : isWarning ? "text-amber-600" : "text-rose-600"}`}>
+                            {marginUmumFull.toFixed(1)}%
+                          </span>
+                          <span className={`text-[9px] font-black px-2 py-0.5 rounded uppercase ${isHealthy ? "bg-emerald-100 text-emerald-800 border border-emerald-300" : isWarning ? "bg-amber-100 text-amber-800 border border-amber-300" : "bg-rose-100 text-rose-800 border border-rose-300"}`}>
+                            {isHealthy ? "Margin Sehat" : isWarning ? "Margin Tipis" : "Rugi"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {sellingPriceFilkom > 0 && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center text-xs">
+                        <div className="flex items-center justify-between p-2 bg-orange-50 border border-brand-orange/40 rounded-lg">
+                          <span className="font-extrabold text-[11px] text-brand-orange">
+                            {isDpProduct ? "Est. Laba Penuh (Harga FILKOM):" : "Est. Laba (Harga FILKOM):"}
+                          </span>
+                          <strong className={`font-black ${profitFilkomFull >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                            Rp {profitFilkomFull.toLocaleString("id-ID")}
+                          </strong>
+                        </div>
+                        <div className="flex items-center justify-between p-2 bg-orange-50 border border-brand-orange/40 rounded-lg">
+                          <span className="font-extrabold text-[11px] text-brand-orange">Margin Profit FILKOM:</span>
+                          <strong className="font-black text-brand-orange">
+                            {marginFilkomFull.toFixed(1)}%
+                          </strong>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Conditional Parameters: Pre-Order */}

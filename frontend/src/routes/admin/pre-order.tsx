@@ -19,6 +19,8 @@ import {
   Search,
   Package,
   X,
+  Upload,
+  FileText,
 } from "lucide-react";
 import {
   getPreOrderCampaignsServerAction,
@@ -27,6 +29,10 @@ import {
   deletePreOrderCampaignServerAction,
   togglePreOrderCampaignActiveServerAction,
   getPreOrderCampaignStatsServerAction,
+  importOrdersServerAction,
+  clearImportedOrdersServerAction,
+  getBatchProductPricesServerAction,
+  saveBatchProductPricesServerAction,
   type PreOrderCampaign,
 } from "@backend/server-actions";
 
@@ -43,6 +49,15 @@ function AdminPreOrderBatchPage() {
   const [selectedBatchForStats, setSelectedBatchForStats] = useState<PreOrderCampaign | null>(null);
   const [statsTab, setStatsTab] = useState<"products" | "orders" | "connected">("products");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [batchPricesMap, setBatchPricesMap] = useState<Record<number, { selling_price: number; filkom_price: number }>>({});
+  const [isSavingBatchPrices, setIsSavingBatchPrices] = useState<boolean>(false);
+
+  // CSV Import Modal state
+  const [selectedBatchForImport, setSelectedBatchForImport] = useState<PreOrderCampaign | null>(null);
+  const [csvRows, setCsvRows] = useState<any[]>([]);
+  const [csvFileName, setCsvFileName] = useState<string>("");
+  const [isImporting, setIsImporting] = useState<boolean>(false);
+  const [overwriteImport, setOverwriteImport] = useState<boolean>(true);
 
   // Form states
   const [batchName, setBatchName] = useState("");
@@ -147,14 +162,203 @@ function AdminPreOrderBatchPage() {
     setEditingCampaign(null);
   };
 
-  const openStatsModal = (c: PreOrderCampaign) => {
+  const openStatsModal = async (c: PreOrderCampaign) => {
     setSelectedBatchForStats(c);
     setStatsTab("products");
     setOrderSearchQuery("");
+    setBatchPricesMap({});
+
+    try {
+      const res = await getBatchProductPricesServerAction({ data: { campaignId: c.id } });
+      if (res?.success && Array.isArray(res.data)) {
+        const pMap: Record<number, { selling_price: number; filkom_price: number }> = {};
+        res.data.forEach((bp: any) => {
+          pMap[bp.product_id] = {
+            selling_price: Number(bp.selling_price || 0),
+            filkom_price: Number(bp.filkom_price || 0),
+          };
+        });
+        setBatchPricesMap(pMap);
+      }
+    } catch (e) {
+      console.warn("Could not fetch batch prices:", e);
+    }
+  };
+
+  const handleSaveBatchPrices = async () => {
+    if (!selectedBatchForStats || !statsData?.connected_products) return;
+    setIsSavingBatchPrices(true);
+    try {
+      const priceArray = statsData.connected_products.map((p: any) => {
+        const custom = batchPricesMap[p.id];
+        return {
+          product_id: p.id,
+          selling_price: custom?.selling_price !== undefined ? custom.selling_price : Number(p.price || 0),
+          filkom_price: custom?.filkom_price !== undefined ? custom.filkom_price : Number(p.filkom_price || 0),
+        };
+      });
+
+      const res = await saveBatchProductPricesServerAction({
+        data: {
+          campaignId: selectedBatchForStats.id,
+          prices: priceArray,
+        },
+      });
+
+      if (res?.success) {
+        alert("Berhasil menyimpan pengaturan harga khusus batch!");
+        refetchStats();
+      } else {
+        alert("Gagal menyimpan harga: " + (res?.error || ""));
+      }
+    } catch (e: any) {
+      alert("Gagal menyimpan harga: " + e.message);
+    } finally {
+      setIsSavingBatchPrices(false);
+    }
   };
 
   const closeStatsModal = () => {
     setSelectedBatchForStats(null);
+  };
+
+  const openImportModal = (c: PreOrderCampaign) => {
+    setSelectedBatchForImport(c);
+    setCsvRows([]);
+    setCsvFileName("");
+  };
+
+  const closeImportModal = () => {
+    setSelectedBatchForImport(null);
+    setCsvRows([]);
+    setCsvFileName("");
+    setIsImporting(false);
+  };
+
+  const parseOrdersCSV = (text: string) => {
+    const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length <= 1) return [];
+
+    const parseLine = (line: string) => {
+      const result: string[] = [];
+      let current = "";
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (char === "," && !inQuotes) {
+          result.push(current.trim());
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim());
+      return result;
+    };
+
+    const parsedRows: any[] = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cols = parseLine(lines[i]);
+      if (cols.length < 3) continue;
+
+      let no_order = cols[0] || "";
+      let tanggal_order = cols[1] || "";
+      let nama_pembeli = cols[2] || "";
+      let email_pembeli = cols[3] || "";
+      let no_hp = cols[4] || "";
+      let nim = cols[5] || "";
+      let rincian_produk = cols[6] || "";
+      let status_pembayaran = cols.length >= 10 ? cols[7] : "settlement";
+      let status_pesanan = cols.length >= 10 ? cols[8] : "completed";
+      let total_bayar = cols.length >= 10 ? cols[9] : cols[7] || "0";
+
+      parsedRows.push({
+        no_order,
+        tanggal_order,
+        nama_pembeli,
+        email_pembeli,
+        no_hp,
+        nim,
+        rincian_produk,
+        status_pembayaran,
+        status_pesanan,
+        total_bayar,
+      });
+    }
+
+    return parsedRows;
+  };
+
+  const handleCSVFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      const rows = parseOrdersCSV(text);
+      setCsvRows(rows);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleConfirmImport = async () => {
+    if (!selectedBatchForImport || csvRows.length === 0) return;
+    setIsImporting(true);
+    try {
+      const res = await importOrdersServerAction({
+        data: {
+          campaignId: selectedBatchForImport.id,
+          rows: csvRows,
+          overwrite: overwriteImport,
+        },
+      });
+
+      if (res?.success) {
+        alert(res.message || `Berhasil meng-import ${csvRows.length} pesanan`);
+        queryClient.invalidateQueries({ queryKey: ["adminPreOrderCampaigns"] });
+        queryClient.invalidateQueries({ queryKey: ["preOrderCampaignStats", selectedBatchForImport.id] });
+        closeImportModal();
+      } else {
+        alert("Gagal meng-import: " + (res?.error || "Terjadi kesalahan"));
+      }
+    } catch (e: any) {
+      alert("Gagal meng-import: " + e.message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleClearImportedOrders = async () => {
+    if (!selectedBatchForImport) return;
+    if (!confirm(`Hapus seluruh data transaksi hasil import CSV pada batch "${selectedBatchForImport.batch_name}"?`)) return;
+    setIsImporting(true);
+    try {
+      const res = await clearImportedOrdersServerAction({
+        data: { campaignId: selectedBatchForImport.id },
+      });
+      if (res?.success) {
+        alert(res.message || "Berhasil menghapus data import sebelumnya");
+        queryClient.invalidateQueries({ queryKey: ["adminPreOrderCampaigns"] });
+        queryClient.invalidateQueries({ queryKey: ["preOrderCampaignStats", selectedBatchForImport.id] });
+        setCsvRows([]);
+        setCsvFileName("");
+      } else {
+        alert("Gagal menghapus data: " + (res?.error || ""));
+      }
+    } catch (e: any) {
+      alert("Gagal menghapus data: " + e.message);
+    } finally {
+      setIsImporting(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -372,7 +576,7 @@ function AdminPreOrderBatchPage() {
                   <tr key={c.id} className="hover:bg-cream/40 transition-colors">
                     <td className="p-4 font-bold text-ink text-sm">
                       {c.batch_name}
-                      {c.is_active && (
+                      {Boolean(c.is_active) && (
                         <span className="ml-2 px-2 py-0.5 bg-emerald-500 text-cream text-[9px] font-black rounded uppercase">
                           AKTIF DI FRONTEND
                         </span>
@@ -392,6 +596,13 @@ function AdminPreOrderBatchPage() {
                           title="Lihat Laporan & Detail Batch"
                         >
                           <BarChart3 className="w-3.5 h-3.5" /> Laporan &amp; Detail
+                        </button>
+                        <button
+                          onClick={() => openImportModal(c)}
+                          className="px-3 py-1.5 rounded-lg border-2 border-ink bg-blue-600 text-cream hover:bg-ink font-extrabold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                          title="Import Pesanan Batch 1 / Historical via CSV"
+                        >
+                          <Upload className="w-3.5 h-3.5" /> Import CSV
                         </button>
                         <button
                           onClick={() =>
@@ -570,58 +781,77 @@ function AdminPreOrderBatchPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                {/* 4 Summary Stats KPI Cards */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="bg-orange-50/60 border-2 border-brand-orange p-4 rounded-xl space-y-1 shadow-xs">
-                    <div className="flex items-center justify-between text-brand-orange text-xs font-black uppercase">
-                      <span>Total Omset PO</span>
-                      <DollarSign className="w-4 h-4" />
-                    </div>
-                    <div className="text-xl sm:text-2xl font-black text-ink">
-                      Rp {Number(statsData?.summary?.total_revenue || 0).toLocaleString("id-ID")}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground font-medium">Dari transaksi terbayar</p>
-                  </div>
+                {/* 5 Summary Stats KPI Cards */}
+                {(() => {
+                  const hasDpInBatch = statsData?.product_breakdown?.some((p: any) => p.full_unit_price > p.unit_price && p.name?.toLowerCase().includes("dp"));
+                  return (
+                    <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                      <div className="bg-orange-50/60 border-2 border-brand-orange p-3.5 rounded-xl space-y-1 shadow-xs">
+                        <div className="flex items-center justify-between text-brand-orange text-xs font-black uppercase">
+                          <span>{hasDpInBatch ? "Proyeksi Omset Penuh" : "Total Omset PO"}</span>
+                          <DollarSign className="w-4 h-4" />
+                        </div>
+                        <div className="text-lg sm:text-xl font-black text-ink">
+                          Rp {Number((hasDpInBatch ? (statsData?.summary?.total_full_revenue || statsData?.summary?.total_revenue) : statsData?.summary?.total_revenue) || 0).toLocaleString("id-ID")}
+                        </div>
+                        <p className="text-[9px] text-muted-foreground font-medium">
+                          {hasDpInBatch ? `DP Masuk: Rp ${Number(statsData?.summary?.total_revenue || 0).toLocaleString("id-ID")}` : "Dari transaksi terbayar"}
+                        </p>
+                      </div>
 
-                  <div className="bg-blue-50/60 border-2 border-brand-blue p-4 rounded-xl space-y-1 shadow-xs">
-                    <div className="flex items-center justify-between text-brand-blue text-xs font-black uppercase">
-                      <span>Terjual</span>
-                      <ShoppingBag className="w-4 h-4" />
-                    </div>
-                    <div className="text-xl sm:text-2xl font-black text-ink">
-                      {statsData?.summary?.total_units_sold || 0} <span className="text-xs text-muted-foreground">unit</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground font-medium">Total akumulasi pcs produk</p>
-                  </div>
+                      <div className="bg-slate-50 border-2 border-slate-700 p-3.5 rounded-xl space-y-1 shadow-xs">
+                        <div className="flex items-center justify-between text-slate-700 text-xs font-black uppercase">
+                          <span>Total HPP (COGS)</span>
+                          <Package className="w-4 h-4" />
+                        </div>
+                        <div className="text-lg sm:text-xl font-black text-ink">
+                          Rp {Number(statsData?.summary?.total_cogs || 0).toLocaleString("id-ID")}
+                        </div>
+                        <p className="text-[9px] text-muted-foreground font-medium">Modal vendor + ongkir + packaging</p>
+                      </div>
 
-                  <div className="bg-emerald-50/60 border-2 border-emerald-600 p-4 rounded-xl space-y-1 shadow-xs">
-                    <div className="flex items-center justify-between text-emerald-700 text-xs font-black uppercase">
-                      <span>Total Transaksi</span>
-                      <Package className="w-4 h-4" />
-                    </div>
-                    <div className="text-xl sm:text-2xl font-black text-ink">
-                      {statsData?.summary?.total_orders || 0} <span className="text-xs text-muted-foreground">pesanan</span>
-                    </div>
-                    <p className="text-[10px] text-emerald-800 font-bold">
-                      {statsData?.summary?.paid_orders_count || 0} Lunas • {statsData?.summary?.pending_orders_count || 0} Pending
-                    </p>
-                  </div>
+                      <div className="bg-emerald-600 text-cream border-2 border-ink p-3.5 rounded-xl space-y-1 shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]">
+                        <div className="flex items-center justify-between text-cream text-xs font-black uppercase">
+                          <span>{hasDpInBatch ? "Est. Profit Bersih Penuh" : "Est. Profit Bersih"}</span>
+                          <Sparkles className="w-4 h-4" />
+                        </div>
+                        <div className="text-lg sm:text-xl font-black text-cream">
+                          Rp {Number(statsData?.summary?.total_profit || 0).toLocaleString("id-ID")}
+                        </div>
+                        <p className="text-[9px] text-cream/90 font-bold">
+                          Margin: {Number(statsData?.summary?.profit_margin_pct || 0).toFixed(1)}% {hasDpInBatch ? "(Setelah Pelunasan)" : ""}
+                        </p>
+                      </div>
+                      <div className="bg-blue-50/60 border-2 border-brand-blue p-3.5 rounded-xl space-y-1 shadow-xs">
+                        <div className="flex items-center justify-between text-brand-blue text-xs font-black uppercase">
+                          <span>Terjual</span>
+                          <ShoppingBag className="w-4 h-4" />
+                        </div>
+                        <div className="text-lg sm:text-xl font-black text-ink">
+                          {statsData?.summary?.total_units_sold || 0} <span className="text-xs text-muted-foreground">unit</span>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground font-medium">Total akumulasi pcs produk</p>
+                      </div>
 
-                  <div className="bg-purple-50/60 border-2 border-purple-600 p-4 rounded-xl space-y-1 shadow-xs">
-                    <div className="flex items-center justify-between text-purple-700 text-xs font-black uppercase">
-                      <span>Total Pembeli</span>
-                      <Users className="w-4 h-4" />
+                      <div className="bg-purple-50/60 border-2 border-purple-600 p-3.5 rounded-xl space-y-1 shadow-xs col-span-2 lg:col-span-1">
+                        <div className="flex items-center justify-between text-purple-700 text-xs font-black uppercase">
+                          <span>Transaksi &amp; Pembeli</span>
+                          <Users className="w-4 h-4" />
+                        </div>
+                        <div className="text-lg sm:text-xl font-black text-ink">
+                          {statsData?.summary?.total_orders || 0} <span className="text-xs text-muted-foreground">order</span>
+                        </div>
+                        <p className="text-[9px] text-purple-800 font-bold">
+                          {statsData?.summary?.total_buyers || 0} Pembeli Unik
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-xl sm:text-2xl font-black text-ink">
-                      {statsData?.summary?.total_buyers || 0} <span className="text-xs text-muted-foreground">orang</span>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground font-medium">Pembeli unik terdaftar</p>
-                  </div>
-                </div>
+                  );
+                })()}
 
-                {/* Navigation Tabs */}
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b-2 border-ink pb-2">
-                  <div className="flex items-center gap-2">
+                {/* Filter & Navigation Tabs */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-ink pb-3">
+                  <div className="flex items-center gap-2 overflow-x-auto">
                     <button
                       onClick={() => setStatsTab("products")}
                       className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer border-2 border-ink ${
@@ -650,7 +880,7 @@ function AdminPreOrderBatchPage() {
                           : "bg-cream text-ink hover:bg-neutral-200"
                       }`}
                     >
-                      🏷️ Katalog Produk ({statsData?.connected_products?.length || 0})
+                      🏷️ Katalog &amp; Harga Batch ({statsData?.connected_products?.length || 0})
                     </button>
                   </div>
 
@@ -673,15 +903,17 @@ function AdminPreOrderBatchPage() {
                         Belum ada penjualan produk terakumulasi dalam batch ini.
                       </div>
                     ) : (
-                      <div className="border-2 border-ink rounded-xl overflow-hidden bg-background">
-                        <table className="w-full text-left text-xs border-collapse">
+                      <div className="border-2 border-ink rounded-xl overflow-hidden bg-background overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse min-w-[700px]">
                           <thead>
                             <tr className="bg-cream border-b-2 border-ink text-ink font-black uppercase">
                               <th className="p-3">Produk</th>
-                              <th className="p-3">Harga Satuan</th>
-                              <th className="p-3">Total Qty Terjual</th>
-                              <th className="p-3">Rincian Varian / Ukuran</th>
-                              <th className="p-3 text-right">Subtotal Omset</th>
+                              <th className="p-3">Harga Jual</th>
+                              <th className="p-3">HPP (COGS) / Pcs</th>
+                              <th className="p-3">Qty Terjual</th>
+                              <th className="p-3">Rincian Varian</th>
+                              <th className="p-3 text-right">Omset</th>
+                              <th className="p-3 text-right">Est. Profit</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y border-ink/10">
@@ -704,6 +936,9 @@ function AdminPreOrderBatchPage() {
                                 <td className="p-3 font-semibold">
                                   Rp {Number(p.unit_price || 0).toLocaleString("id-ID")}
                                 </td>
+                                <td className="p-3 font-medium text-slate-700">
+                                  Rp {Number(p.cogs_per_unit || 0).toLocaleString("id-ID")}
+                                </td>
                                 <td className="p-3 font-black text-brand-orange text-sm">
                                   {p.total_qty} pcs
                                 </td>
@@ -723,7 +958,17 @@ function AdminPreOrderBatchPage() {
                                   </div>
                                 </td>
                                 <td className="p-3 text-right font-black text-ink">
-                                  Rp {Number(p.total_subtotal || 0).toLocaleString("id-ID")}
+                                   <div>
+                                     Rp {Number(p.total_full_subtotal || p.total_subtotal || 0).toLocaleString("id-ID")}
+                                   </div>
+                                   {p.full_unit_price > p.unit_price && p.name?.toLowerCase().includes("dp") && (
+                                     <div className="text-[9px] text-muted-foreground font-semibold mt-0.5">
+                                       DP Masuk: Rp {Number(p.total_subtotal || 0).toLocaleString("id-ID")}
+                                     </div>
+                                   )}
+                                </td>
+                                <td className="p-3 text-right font-black text-emerald-700">
+                                  Rp {Number(p.estimated_profit || 0).toLocaleString("id-ID")}
                                 </td>
                               </tr>
                             ))}
@@ -821,46 +1066,272 @@ function AdminPreOrderBatchPage() {
                   </div>
                 )}
 
-                {/* Tab 3: Connected Products */}
+                {/* Tab 3: Connected Products & Batch Price Override */}
                 {statsTab === "connected" && (
                   <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-cream/40 border-2 border-ink rounded-xl">
+                      <div>
+                        <h4 className="text-xs font-black text-ink uppercase tracking-wide">
+                          💰 Pengaturan Harga Produk Khusus {selectedBatchForStats?.batch_name}
+                        </h4>
+                        <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                          Ubah harga jual publik &amp; mahasiswa FILKOM khusus untuk batch ini jika berbeda dari harga umum katalog.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleSaveBatchPrices}
+                        disabled={isSavingBatchPrices}
+                        className="px-4 py-2 bg-brand-orange hover:bg-ink text-cream font-bold text-xs uppercase tracking-wider rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer disabled:opacity-50 shrink-0 flex items-center gap-1.5"
+                      >
+                        {isSavingBatchPrices ? (
+                          <>
+                            <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Menyimpan...
+                          </>
+                        ) : (
+                          <>
+                            💾 Simpan Harga Batch
+                          </>
+                        )}
+                      </button>
+                    </div>
+
                     {statsData?.connected_products?.length === 0 ? (
                       <div className="p-8 text-center text-muted-foreground text-xs font-bold border-2 border-dashed border-ink/30 rounded-xl">
                         Belum ada produk katalog yang dihubungkan ke batch PO ini. Ubah skema penjualan produk di menu Produk untuk menghubungkan.
                       </div>
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {statsData?.connected_products?.map((p: any) => (
-                          <div
-                            key={p.id}
-                            className="border-2 border-ink p-4 rounded-xl bg-white space-y-3 flex items-start gap-3 shadow-xs"
-                          >
-                            {p.image_url ? (
-                              <img
-                                src={p.image_url}
-                                alt={p.name}
-                                className="w-14 h-14 rounded-lg object-cover border border-ink/30 shrink-0"
-                              />
-                            ) : (
-                              <div className="w-14 h-14 rounded-lg bg-cream border border-ink/30 shrink-0" />
-                            )}
-                            <div className="space-y-1">
-                              <h4 className="font-extrabold text-xs text-ink line-clamp-1">{p.name}</h4>
-                              <p className="text-[10px] text-muted-foreground uppercase font-bold">
-                                {p.category_name || "Kategori"}
-                              </p>
-                              <div className="text-xs font-black text-brand-orange">
-                                Rp {Number(p.price).toLocaleString("id-ID")}
+                        {statsData?.connected_products?.map((p: any) => {
+                          const currentPrices = batchPricesMap[p.id] || {
+                            selling_price: Number(p.price || 0),
+                            filkom_price: Number(p.filkom_price || 0),
+                          };
+                          return (
+                            <div
+                              key={p.id}
+                              className="border-2 border-ink p-4 rounded-xl bg-white space-y-3 shadow-xs"
+                            >
+                              <div className="flex items-start gap-3 border-b border-ink/10 pb-3">
+                                {p.image_url ? (
+                                  <img
+                                    src={p.image_url}
+                                    alt={p.name}
+                                    className="w-12 h-12 rounded-lg object-cover border border-ink/30 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-lg bg-cream border border-ink/30 shrink-0" />
+                                )}
+                                <div className="space-y-0.5">
+                                  <h4 className="font-black text-xs text-ink line-clamp-1">{p.name}</h4>
+                                  <p className="text-[10px] text-muted-foreground uppercase font-bold">
+                                    {p.category_name || "Kategori"}
+                                  </p>
+                                  <div className="text-[10px] font-bold text-muted-foreground">
+                                    Katalog Normal: <span className="text-ink">Rp {Number(p.price).toLocaleString("id-ID")}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2 pt-1">
+                                <div>
+                                  <label className="block text-[10px] font-extrabold text-ink uppercase mb-1">
+                                    Harga Jual Batch Ini (Rp)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={currentPrices.selling_price}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setBatchPricesMap((prev) => ({
+                                        ...prev,
+                                        [p.id]: {
+                                          ...prev[p.id],
+                                          selling_price: val,
+                                          filkom_price: prev[p.id]?.filkom_price ?? Number(p.filkom_price || 0),
+                                        },
+                                      }));
+                                    }}
+                                    className="w-full px-2.5 py-1.5 border-2 border-ink rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-orange bg-cream/20"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-extrabold text-ink uppercase mb-1">
+                                    Harga Mahasiswa FILKOM (Rp)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={currentPrices.filkom_price}
+                                    onChange={(e) => {
+                                      const val = parseFloat(e.target.value) || 0;
+                                      setBatchPricesMap((prev) => ({
+                                        ...prev,
+                                        [p.id]: {
+                                          ...prev[p.id],
+                                          selling_price: prev[p.id]?.selling_price ?? Number(p.price || 0),
+                                          filkom_price: val,
+                                        },
+                                      }));
+                                    }}
+                                    className="w-full px-2.5 py-1.5 border-2 border-ink rounded-lg text-xs font-bold focus:outline-none focus:ring-2 focus:ring-brand-orange bg-cream/20"
+                                  />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* CSV Import Modal */}
+      {selectedBatchForImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-background border-4 border-ink rounded-2xl w-full max-w-3xl my-8 p-6 sm:p-8 space-y-6 shadow-[10px_10px_0px_0px_rgba(27,27,27,1)] relative">
+            <div className="flex items-start justify-between border-b-2 border-ink pb-4">
+              <div>
+                <span className="px-2.5 py-0.5 bg-blue-600 text-cream text-[10px] font-black rounded uppercase tracking-wider">
+                  IMPORT CSV PESANAN BATCH
+                </span>
+                <h2 className="text-2xl font-black text-ink uppercase tracking-wide mt-1">
+                  Import ke {selectedBatchForImport.batch_name}
+                </h2>
+                <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                  Upload file CSV (format standar export 10-kolom atau 8-kolom) untuk memasukkan transaksi historis.
+                </p>
+              </div>
+              <button
+                onClick={closeImportModal}
+                className="p-2 border-2 border-ink rounded-xl bg-cream hover:bg-rose-500 hover:text-white transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="border-2 border-dashed border-ink rounded-xl p-6 bg-cream/30 text-center space-y-3">
+                <FileText className="w-10 h-10 text-brand-orange mx-auto opacity-70" />
+                <div>
+                  <label className="px-4 py-2 bg-brand-orange text-cream font-bold text-xs rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer hover:bg-ink transition-colors inline-block">
+                    PILIH FILE CSV...
+                    <input
+                      type="file"
+                      accept=".csv"
+                      onChange={handleCSVFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                  {csvFileName && (
+                    <p className="text-xs font-bold text-ink mt-2">
+                      📄 File terpilih: <span className="text-blue-700 font-mono">{csvFileName}</span>
+                    </p>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground max-w-md mx-auto">
+                  Format kolom: No Order, Tanggal Order, Nama Pembeli, Email, No HP, NIM, Rincian Produk, Status Bayar, Status Pesanan, Total Bayar.
+                </p>
+              </div>
+
+              {csvRows.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between text-xs font-bold text-ink">
+                    <span>Preview Data ({csvRows.length} Pesanan SIAP DI-IMPORT):</span>
+                    <span className="text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300 font-mono">
+                      ✓ Valid Format
+                    </span>
+                  </div>
+
+                  <div className="max-h-60 overflow-y-auto border-2 border-ink rounded-xl overflow-x-auto bg-white">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-cream border-b border-ink font-bold text-[11px] uppercase">
+                          <th className="p-2 border-r border-ink/20">No Order</th>
+                          <th className="p-2 border-r border-ink/20">Nama Pembeli</th>
+                          <th className="p-2 border-r border-ink/20">HP / NIM</th>
+                          <th className="p-2 border-r border-ink/20">Rincian Produk</th>
+                          <th className="p-2 text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-ink/10 text-[11px]">
+                        {csvRows.slice(0, 10).map((row, idx) => (
+                          <tr key={idx} className="hover:bg-cream/20">
+                            <td className="p-2 font-mono border-r border-ink/10">{row.no_order || `B1-${idx + 1}`}</td>
+                            <td className="p-2 font-bold border-r border-ink/10">{row.nama_pembeli}</td>
+                            <td className="p-2 border-r border-ink/10 text-muted-foreground">
+                              {row.no_hp} {row.nim ? `(${row.nim})` : ""}
+                            </td>
+                            <td className="p-2 border-r border-ink/10 max-w-xs truncate">{row.rincian_produk}</td>
+                            <td className="p-2 text-right font-extrabold text-brand-orange">
+                              Rp {Number(parseFloat(String(row.total_bayar || 0).replace(/[^0-9.]/g, "")) || 0).toLocaleString("id-ID")}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {csvRows.length > 10 && (
+                      <div className="p-2 bg-cream text-center text-[10px] font-bold text-muted-foreground border-t border-ink/20">
+                        ...dan {csvRows.length - 10} baris pesanan lainnya
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center justify-between border-t-2 border-b-2 border-ink/20 py-3 gap-2">
+                <label className="flex items-center gap-2 text-xs font-bold text-ink cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={overwriteImport}
+                    onChange={(e) => setOverwriteImport(e.target.checked)}
+                    className="w-4 h-4 rounded border-2 border-ink text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Hapus &amp; Timpa Data CSV Import Sebelumnya (Clean Re-Import)</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={handleClearImportedOrders}
+                  disabled={isImporting}
+                  className="text-[11px] font-black text-rose-600 hover:text-rose-800 hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Hapus Seluruh Pesanan Import CSV pada Batch Ini"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Hapus Data Import Batch Ini
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 border-t-2 border-ink pt-4">
+              <button
+                type="button"
+                onClick={closeImportModal}
+                className="px-4 py-2.5 border-2 border-ink rounded-xl text-xs font-bold text-ink hover:bg-neutral-200 uppercase"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmImport}
+                disabled={csvRows.length === 0 || isImporting}
+                className="px-6 py-2.5 bg-blue-600 hover:bg-ink text-cream font-bold text-xs uppercase tracking-wider rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {isImporting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Meng-import Pesanan...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Konfirmasi Import {csvRows.length > 0 ? `(${csvRows.length} Pesanan)` : ""}
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
