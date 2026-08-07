@@ -2937,6 +2937,26 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
     const endSql = formatSqlDate(effectiveEndDate);
 
     // Helpers to clean product names & variant labels (matching Vendoring logic)
+    const allCampaigns = await query<any>("SELECT * FROM pre_order_campaigns ORDER BY start_date ASC");
+
+    const resolveBatchId = (row: any) => {
+      if (row.order_campaign_id) {
+        const found = allCampaigns.find((c: any) => c.id === row.order_campaign_id);
+        if (found) return found.id;
+      }
+      if (row.order_created_at) {
+        const oDate = new Date(row.order_created_at).getTime();
+        const foundDate = allCampaigns.find((c: any) => {
+          const s = new Date(c.start_date).getTime();
+          const e = new Date(c.extended_end_date || c.end_date).getTime();
+          return oDate >= s && oDate <= e;
+        });
+        if (foundDate) return foundDate.id;
+      }
+      return Number(id);
+    };
+
+    // Helpers to clean product names & variant labels (matching Vendoring logic)
     const cleanProductName = (name: string) => {
       if (!name) return "Unknown Product";
       return name
@@ -2950,9 +2970,20 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         .trim();
     };
 
-    const cleanVariantLabel = (sz: string, clr: string) => {
+    const cleanVariantLabel = (size: string | null, color: string | null) => {
+      let sz = (size || "").trim();
+      let clr = (color || "").trim();
+
+      if (clr.toLowerCase() === "default" || clr.toLowerCase() === "all color" || clr.toLowerCase() === "one size" || clr === "-") {
+        clr = "";
+      }
+      if ((sz.toLowerCase() === "default" || sz.toLowerCase() === "one size" || sz.toLowerCase() === "all size" || sz === "-") && clr) {
+        sz = "";
+      }
+
       let parts = [sz, clr].filter(Boolean);
       let raw = parts.join(" / ").trim();
+
       let cleaned = raw
         .replace(/\s*\/\s*LUNAS/gi, "")
         .replace(/\s*\/\s*DP/gi, "")
@@ -2960,14 +2991,15 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         .replace(/\s*DP/gi, "")
         .trim();
 
-      if (!cleaned || cleaned.toLowerCase() === "default" || cleaned.toLowerCase() === "one size / default" || cleaned.toLowerCase() === "one size" || cleaned.toLowerCase() === "all size") {
+      if (!cleaned || cleaned.toLowerCase() === "default" || cleaned.toLowerCase() === "one size / default" || cleaned.toLowerCase() === "one size" || cleaned.toLowerCase() === "all size" || cleaned === "-") {
         return "Standard";
       }
+
       return cleaned;
     };
 
-    // 2. Fetch all order items and orders for pre-order products within campaign date range or direct campaign id (excluding bundle container rows)
-    const items = await query<any>(
+    // 2. Fetch all order items (excluding bundle containers and cancelled/failed orders)
+    const allItems = await query<any>(
       `SELECT 
         oi.*,
         o.order_id,
@@ -3001,12 +3033,12 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
        JOIN products p ON oi.product_id = p.id
        LEFT JOIN users u ON o.user_id = u.id
        WHERE p.product_type != 'bundle'
-         AND o.order_status != 'cancelled'
-         AND (o.payment_status IS NULL OR o.payment_status NOT IN ('failed', 'expired'))
-         AND (o.pre_order_campaign_id = ? OR (o.created_at >= ? AND o.created_at <= ?))
-       ORDER BY o.created_at DESC`,
-      [id, campaign.start_date, effectiveEndDate]
+         AND (o.payment_status = 'paid' OR o.payment_status = 'settlement' OR o.order_status = 'completed')
+       ORDER BY o.created_at DESC`
     );
+
+    // Filter items belonging to this campaign batch using resolveBatchId
+    const items = (allItems || []).filter((row: any) => resolveBatchId(row) === Number(id));
 
     // Group items by order_id
     const ordersMap: Record<string, any> = {};
@@ -3023,6 +3055,8 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       full_unit_price: number;
       cogs_per_unit: number;
       total_qty: number;
+      direct_qty: number;
+      bundle_qty: number;
       total_subtotal: number;
       total_full_subtotal: number;
       total_cogs: number;
@@ -3030,7 +3064,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       variants: Record<string, number>;
     }> = {};
 
-    // Initialize product map for connected products (using clean product names)
+    // Initialize product map for connected products
     for (const prod of connectedProducts) {
       if (prod.product_type === 'bundle') continue;
       const cleanName = cleanProductName(prod.name);
@@ -3049,6 +3083,8 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           full_unit_price: fullUnitPrice,
           cogs_per_unit: cogsPerUnit,
           total_qty: 0,
+          direct_qty: 0,
+          bundle_qty: 0,
           total_subtotal: 0,
           total_full_subtotal: 0,
           total_cogs: 0,
@@ -3102,13 +3138,15 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       });
 
       // Aggregate product sales & COGS using clean product name
-      const cleanName = cleanProductName(item.product_name || item.catalog_product_name);
+      const rawName = item.product_name || item.catalog_product_name;
+      const cleanName = cleanProductName(rawName);
+      const isBundleComponent = rawName.toUpperCase().includes("[KOMPONEN BUNDLE]");
       const itemCogsPerUnit = Number(item.prod_cost_price) || ((Number(item.prod_vendor_cost) || 0) + (Number(item.prod_shipping_cost) || 0) + (Number(item.prod_other_cost) || 0));
       const itemCogsSubtotal = itemCogsPerUnit * item.quantity;
 
       const origPrice = Number(item.prod_original_price || 0);
       const normalPrice = Number(item.prod_price || item.unit_price || 0);
-      const hasDpName = (item.product_name && item.product_name.toLowerCase().includes("dp")) || (item.catalog_product_name && item.catalog_product_name.toLowerCase().includes("dp")) || (item.size && item.size.toLowerCase().includes("dp")) || (item.color && item.color.toLowerCase().includes("dp"));
+      const hasDpName = (rawName && rawName.toLowerCase().includes("dp")) || (item.size && item.size.toLowerCase().includes("dp")) || (item.color && item.color.toLowerCase().includes("dp"));
       const isDp = origPrice > normalPrice && hasDpName;
       const fullUnitPrice = isDp ? (origPrice || (normalPrice * 2)) : Math.max(normalPrice, Number(item.unit_price || 0));
       const itemFullSubtotal = fullUnitPrice * item.quantity;
@@ -3122,6 +3160,8 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           full_unit_price: fullUnitPrice,
           cogs_per_unit: itemCogsPerUnit,
           total_qty: 0,
+          direct_qty: 0,
+          bundle_qty: 0,
           total_subtotal: 0,
           total_full_subtotal: 0,
           total_cogs: 0,
@@ -3135,6 +3175,12 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       totalFullRevenue += itemFullSubtotal;
 
       productSalesMap[cleanName].total_qty += item.quantity;
+      if (isBundleComponent) {
+        productSalesMap[cleanName].bundle_qty += item.quantity;
+      } else {
+        productSalesMap[cleanName].direct_qty += item.quantity;
+      }
+
       productSalesMap[cleanName].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
       productSalesMap[cleanName].total_full_subtotal += itemFullSubtotal;
       productSalesMap[cleanName].total_cogs += itemCogsSubtotal;
@@ -4881,7 +4927,7 @@ export const getProductionSummary = async (req: Request, res: Response) => {
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
        JOIN products p ON oi.product_id = p.id
-       WHERE p.product_type != 'bundle' AND o.order_status != 'cancelled' AND o.payment_status != 'failed' AND o.payment_status != 'expired'`
+       WHERE p.product_type != 'bundle' AND (o.payment_status = 'paid' OR o.payment_status = 'settlement' OR o.order_status = 'completed')`
     );
 
     // Helpers to clean product names & variant labels
