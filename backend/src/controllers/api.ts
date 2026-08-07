@@ -1391,19 +1391,13 @@ export const createProduct = async (req: Request, res: Response) => {
     // Set the first image from images array as main image_url if provided
     const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
 
-    const vendorCost = Number(input.vendor_cost || 0);
-    const shippingCostPerPcs = Number(input.shipping_cost_per_pcs || 0);
-    const otherCostPerPcs = Number(input.other_cost_per_pcs || 0);
-    const totalCostPrice = Number(input.cost_price || (vendorCost + shippingCostPerPcs + otherCostPerPcs));
-
     const result = await execute(
       `INSERT INTO products (
         category_id, name, slug, description, price, original_price, filkom_price, promo_price,
         sale_type, product_type, low_stock_threshold, is_best_seller, is_limited,
         preorder_start_at, preorder_end_at, preorder_moq, production_eta_days,
-        image_url, is_active, bahan, asal, aplikasi, size_chart_url, pre_order_campaign_id,
-        vendor_cost, shipping_cost_per_pcs, other_cost_per_pcs, cost_price
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        image_url, is_active, bahan, asal, aplikasi, size_chart_url, pre_order_campaign_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         input.category_id,
         input.name,
@@ -1429,10 +1423,6 @@ export const createProduct = async (req: Request, res: Response) => {
         input.aplikasi || null,
         input.size_chart_url || null,
         input.pre_order_campaign_id || null,
-        vendorCost,
-        shippingCostPerPcs,
-        otherCostPerPcs,
-        totalCostPrice,
       ]
     );
 
@@ -1497,18 +1487,12 @@ export const updateProduct = async (req: Request, res: Response) => {
     // Set the first image from images array as main image_url if provided
     const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
 
-    const vendorCost = Number(input.vendor_cost || 0);
-    const shippingCostPerPcs = Number(input.shipping_cost_per_pcs || 0);
-    const otherCostPerPcs = Number(input.other_cost_per_pcs || 0);
-    const totalCostPrice = Number(input.cost_price || (vendorCost + shippingCostPerPcs + otherCostPerPcs));
-
     await execute(
       `UPDATE products 
        SET category_id = ?, name = ?, slug = ?, description = ?, price = ?, original_price = ?, filkom_price = ?, promo_price = ?,
            sale_type = ?, product_type = ?, low_stock_threshold = ?, is_best_seller = ?, is_limited = ?,
            preorder_start_at = ?, preorder_end_at = ?, preorder_moq = ?, production_eta_days = ?,
-           image_url = ?, is_active = ?, bahan = ?, asal = ?, aplikasi = ?, size_chart_url = ?, pre_order_campaign_id = ?,
-           vendor_cost = ?, shipping_cost_per_pcs = ?, other_cost_per_pcs = ?, cost_price = ?
+           image_url = ?, is_active = ?, bahan = ?, asal = ?, aplikasi = ?, size_chart_url = ?, pre_order_campaign_id = ?
        WHERE id = ?`,
       [
         input.category_id,
@@ -1535,10 +1519,6 @@ export const updateProduct = async (req: Request, res: Response) => {
         input.aplikasi || null,
         input.size_chart_url || null,
         input.pre_order_campaign_id || null,
-        vendorCost,
-        shippingCostPerPcs,
-        otherCostPerPcs,
-        totalCostPrice,
         input.id,
       ]
     );
@@ -2935,71 +2915,10 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
 
     const startSql = formatSqlDate(campaign.start_date);
     const endSql = formatSqlDate(effectiveEndDate);
+    const isCampaignActive = Boolean(campaign.is_active);
 
-    // Helpers to clean product names & variant labels (matching Vendoring logic)
-    const allCampaigns = await query<any>("SELECT * FROM pre_order_campaigns ORDER BY start_date ASC");
-
-    const resolveBatchId = (row: any) => {
-      if (row.order_campaign_id) {
-        const found = allCampaigns.find((c: any) => c.id === row.order_campaign_id);
-        if (found) return found.id;
-      }
-      if (row.order_created_at) {
-        const oDate = new Date(row.order_created_at).getTime();
-        const foundDate = allCampaigns.find((c: any) => {
-          const s = new Date(c.start_date).getTime();
-          const e = new Date(c.extended_end_date || c.end_date).getTime();
-          return oDate >= s && oDate <= e;
-        });
-        if (foundDate) return foundDate.id;
-      }
-      return Number(id);
-    };
-
-    // Helpers to clean product names & variant labels (matching Vendoring logic)
-    const cleanProductName = (name: string) => {
-      if (!name) return "Unknown Product";
-      return name
-        .replace(/^\[KOMPONEN BUNDLE\]\s*/gi, "")
-        .replace(/\s*\(DP\s*\d*%\)/gi, "")
-        .replace(/\s*\[DP\s*\d*%\]/gi, "")
-        .replace(/\s*\(Lunas\)/gi, "")
-        .replace(/\s*\[LUNAS\]/gi, "")
-        .replace(/\s*-\s*DP\b/gi, "")
-        .replace(/\s*-\s*LUNAS\b/gi, "")
-        .trim();
-    };
-
-    const cleanVariantLabel = (size: string | null, color: string | null) => {
-      let sz = (size || "").trim();
-      let clr = (color || "").trim();
-
-      if (clr.toLowerCase() === "default" || clr.toLowerCase() === "all color" || clr.toLowerCase() === "one size" || clr === "-") {
-        clr = "";
-      }
-      if ((sz.toLowerCase() === "default" || sz.toLowerCase() === "one size" || sz.toLowerCase() === "all size" || sz === "-") && clr) {
-        sz = "";
-      }
-
-      let parts = [sz, clr].filter(Boolean);
-      let raw = parts.join(" / ").trim();
-
-      let cleaned = raw
-        .replace(/\s*\/\s*LUNAS/gi, "")
-        .replace(/\s*\/\s*DP/gi, "")
-        .replace(/\s*LUNAS/gi, "")
-        .replace(/\s*DP/gi, "")
-        .trim();
-
-      if (!cleaned || cleaned.toLowerCase() === "default" || cleaned.toLowerCase() === "one size / default" || cleaned.toLowerCase() === "one size" || cleaned.toLowerCase() === "all size" || cleaned === "-") {
-        return "Standard";
-      }
-
-      return cleaned;
-    };
-
-    // 2. Fetch all order items (excluding bundle containers and cancelled/failed orders)
-    const allItems = await query<any>(
+    // 2. Fetch all order items and orders for pre-order products within campaign date range or active campaign
+    const items = await query<any>(
       `SELECT 
         oi.*,
         o.order_id,
@@ -3008,22 +2927,14 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         o.customer_phone,
         o.user_id,
         o.created_at as order_created_at,
-        o.pre_order_campaign_id as order_campaign_id,
         o.order_status,
         o.payment_status,
         o.fulfillment_status,
         o.payment_type as payment_method,
         o.payment_proof_url,
         o.gross_amount as grand_total,
-        p.name as catalog_product_name,
-        p.product_type,
+        p.name as connected_product_name,
         p.image_url as connected_product_image,
-        p.price as prod_price,
-        p.original_price as prod_original_price,
-        p.cost_price as prod_cost_price,
-        p.vendor_cost as prod_vendor_cost,
-        p.shipping_cost_per_pcs as prod_shipping_cost,
-        p.other_cost_per_pcs as prod_other_cost,
         u.name as user_full_name,
         u.email as user_email,
         u.phone as user_phone,
@@ -3032,71 +2943,45 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
        JOIN orders o ON oi.order_id = o.order_id
        JOIN products p ON oi.product_id = p.id
        LEFT JOIN users u ON o.user_id = u.id
-       WHERE p.product_type != 'bundle'
-         AND (o.payment_status = 'paid' OR o.payment_status = 'settlement' OR o.order_status = 'completed')
-       ORDER BY o.created_at DESC`
+       WHERE (p.sale_type = 'pre_order' OR p.product_type = 'preorder' OR p.pre_order_campaign_id = ?)
+         AND o.created_at >= ?
+         AND o.created_at <= ?
+       ORDER BY o.created_at DESC`,
+      [id, campaign.start_date, effectiveEndDate]
     );
-
-    // Filter items belonging to this campaign batch using resolveBatchId
-    const items = (allItems || []).filter((row: any) => resolveBatchId(row) === Number(id));
 
     // Group items by order_id
     const ordersMap: Record<string, any> = {};
     let totalRevenue = 0;
-    let totalFullRevenue = 0;
-    let totalCogs = 0;
     let totalUnitsSold = 0;
 
-    const productSalesMap: Record<string, {
+    const productSalesMap: Record<number, {
       product_id: number;
       name: string;
       image_url: string | null;
       unit_price: number;
-      full_unit_price: number;
-      cogs_per_unit: number;
       total_qty: number;
-      direct_qty: number;
-      bundle_qty: number;
       total_subtotal: number;
-      total_full_subtotal: number;
-      total_cogs: number;
-      estimated_profit: number;
       variants: Record<string, number>;
     }> = {};
 
     // Initialize product map for connected products
     for (const prod of connectedProducts) {
-      if (prod.product_type === 'bundle') continue;
-      const cleanName = cleanProductName(prod.name);
-      const cogsPerUnit = Number(prod.cost_price) || ((Number(prod.vendor_cost) || 0) + (Number(prod.shipping_cost_per_pcs) || 0) + (Number(prod.other_cost_per_pcs) || 0));
-      const origPrice = Number(prod.original_price || 0);
-      const normalPrice = Number(prod.price || 0);
-      const isDp = origPrice > normalPrice && (prod.name && prod.name.toLowerCase().includes("dp"));
-      const fullUnitPrice = isDp ? (origPrice || (normalPrice * 2)) : normalPrice;
-
-      if (!productSalesMap[cleanName]) {
-        productSalesMap[cleanName] = {
-          product_id: prod.id,
-          name: cleanName,
-          image_url: prod.image_url,
-          unit_price: normalPrice,
-          full_unit_price: fullUnitPrice,
-          cogs_per_unit: cogsPerUnit,
-          total_qty: 0,
-          direct_qty: 0,
-          bundle_qty: 0,
-          total_subtotal: 0,
-          total_full_subtotal: 0,
-          total_cogs: 0,
-          estimated_profit: 0,
-          variants: {},
-        };
-      }
+      productSalesMap[prod.id] = {
+        product_id: prod.id,
+        name: prod.name,
+        image_url: prod.image_url,
+        unit_price: Number(prod.price),
+        total_qty: 0,
+        total_subtotal: 0,
+        variants: {},
+      };
     }
 
     const uniqueBuyersSet = new Set<string>();
 
     for (const item of items) {
+      const isCancelled = item.order_status === "cancelled" || item.payment_status === "failed" || item.payment_status === "expired";
       const isPaid = item.payment_status === "paid" || item.payment_status === "settlement" || item.order_status === "completed";
       
       const buyerId = item.customer_email || item.user_email || item.customer_phone || `order-${item.order_id}`;
@@ -3129,7 +3014,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       ordersMap[item.order_id].items.push({
         order_item_id: item.id || item.order_item_id,
         product_id: item.product_id,
-        product_name: item.product_name || item.catalog_product_name,
+        product_name: item.product_name || item.connected_product_name,
         size: item.size || "-",
         color: item.color || "-",
         quantity: item.quantity,
@@ -3137,66 +3022,32 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         subtotal: Number(item.subtotal || (item.quantity * item.unit_price)),
       });
 
-      // Aggregate product sales & COGS using clean product name
-      const rawName = item.product_name || item.catalog_product_name;
-      const cleanName = cleanProductName(rawName);
-      const isBundleComponent = rawName.toUpperCase().includes("[KOMPONEN BUNDLE]");
-      const itemCogsPerUnit = Number(item.prod_cost_price) || ((Number(item.prod_vendor_cost) || 0) + (Number(item.prod_shipping_cost) || 0) + (Number(item.prod_other_cost) || 0));
-      const itemCogsSubtotal = itemCogsPerUnit * item.quantity;
-
-      const origPrice = Number(item.prod_original_price || 0);
-      const normalPrice = Number(item.prod_price || item.unit_price || 0);
-      const hasDpName = (rawName && rawName.toLowerCase().includes("dp")) || (item.size && item.size.toLowerCase().includes("dp")) || (item.color && item.color.toLowerCase().includes("dp"));
-      const isDp = origPrice > normalPrice && hasDpName;
-      const fullUnitPrice = isDp ? (origPrice || (normalPrice * 2)) : Math.max(normalPrice, Number(item.unit_price || 0));
-      const itemFullSubtotal = fullUnitPrice * item.quantity;
-
-      if (!productSalesMap[cleanName]) {
-        productSalesMap[cleanName] = {
-          product_id: item.product_id,
-          name: cleanName,
+      // Aggregate product sales
+      const pid = item.product_id;
+      if (!productSalesMap[pid]) {
+        productSalesMap[pid] = {
+          product_id: pid,
+          name: item.product_name || item.connected_product_name || `Product #${pid}`,
           image_url: item.connected_product_image || null,
           unit_price: Number(item.unit_price),
-          full_unit_price: fullUnitPrice,
-          cogs_per_unit: itemCogsPerUnit,
           total_qty: 0,
-          direct_qty: 0,
-          bundle_qty: 0,
           total_subtotal: 0,
-          total_full_subtotal: 0,
-          total_cogs: 0,
-          estimated_profit: 0,
           variants: {},
         };
       }
 
-      totalUnitsSold += item.quantity;
-      totalCogs += itemCogsSubtotal;
-      totalFullRevenue += itemFullSubtotal;
+      if (isPaid) {
+        totalUnitsSold += item.quantity;
+        productSalesMap[pid].total_qty += item.quantity;
+        productSalesMap[pid].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
 
-      productSalesMap[cleanName].total_qty += item.quantity;
-      if (isBundleComponent) {
-        productSalesMap[cleanName].bundle_qty += item.quantity;
-      } else {
-        productSalesMap[cleanName].direct_qty += item.quantity;
+        const variantKey = [item.size, item.color].filter(Boolean).filter((x: string) => x !== "-").join(" / ") || "Default";
+        productSalesMap[pid].variants[variantKey] = (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
       }
-
-      productSalesMap[cleanName].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
-      productSalesMap[cleanName].total_full_subtotal += itemFullSubtotal;
-      productSalesMap[cleanName].total_cogs += itemCogsSubtotal;
-      productSalesMap[cleanName].estimated_profit = productSalesMap[cleanName].total_full_subtotal - productSalesMap[cleanName].total_cogs;
-
-      const variantKey = cleanVariantLabel(item.size, item.color);
-      productSalesMap[cleanName].variants[variantKey] = (productSalesMap[cleanName].variants[variantKey] || 0) + item.quantity;
     }
 
     const ordersList = Object.values(ordersMap);
     const productBreakdown = Object.values(productSalesMap);
-    
-    // Total Full Revenue fallback if 0
-    const effectiveTotalFullRevenue = totalFullRevenue > 0 ? totalFullRevenue : totalRevenue;
-    const totalProfit = effectiveTotalFullRevenue - totalCogs;
-    const profitMarginPct = effectiveTotalFullRevenue > 0 ? (totalProfit / effectiveTotalFullRevenue) * 100 : 0;
 
     return res.json({
       success: true,
@@ -3205,15 +3056,11 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         connected_products: connectedProducts,
         summary: {
           total_revenue: totalRevenue,
-          total_full_revenue: effectiveTotalFullRevenue,
-          total_cogs: totalCogs,
-          total_profit: totalProfit,
-          cashflow_profit: totalRevenue - totalCogs,
-          profit_margin_pct: profitMarginPct,
           total_units_sold: totalUnitsSold,
           total_orders: ordersList.length,
           total_buyers: uniqueBuyersSet.size,
-          total_unique_buyers: uniqueBuyersSet.size,
+          paid_orders_count: ordersList.filter(o => o.payment_status === 'paid' || o.payment_status === 'settlement' || o.order_status === 'completed').length,
+          pending_orders_count: ordersList.filter(o => o.payment_status === 'pending' || o.payment_status === 'unpaid').length,
         },
         product_breakdown: productBreakdown,
         orders: ordersList,
@@ -4630,732 +4477,3 @@ export const getProductReviews = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, reviews: [], totalReviews: 0, avgRating: 0 });
   }
 };
-
-// ============ VENDORING & CSV IMPORT CONTROLLERS ============
-
-// Helper for smart product alias matching
-const findBestMatchingProduct = (rawProdName: string, productsList: any[]) => {
-  const norm = rawProdName.toLowerCase().trim();
-  if (!norm || !productsList || productsList.length === 0) return productsList[0];
-
-  // 1. Exact match
-  let matched = productsList.find((p) => p.name.toLowerCase().trim() === norm);
-  if (matched) return matched;
-
-  // 2. Substring match
-  matched = productsList.find((p) => norm.includes(p.name.toLowerCase().trim()) || p.name.toLowerCase().trim().includes(norm));
-  if (matched) return matched;
-
-  // 3. Smart keywords mapping
-  if (norm.includes("enamel") || norm.includes("pin enamel")) {
-    return productsList.find((p) => p.name.toLowerCase().includes("pin enamel")) || productsList[0];
-  }
-  if (norm.includes("pin tas") || norm.includes("pin")) {
-    return productsList.find((p) => p.name.toLowerCase().includes("pin tas")) || productsList.find((p) => p.name.toLowerCase().includes("pin")) || productsList[0];
-  }
-  if (norm.includes("kaos") || norm.includes("t-shirt") || norm.includes("tshirt") || norm.includes("shirt")) {
-    return productsList.find((p) => p.name.toLowerCase().includes("t-shirt") || p.name.toLowerCase().includes("kaos")) || productsList[0];
-  }
-  if (norm.includes("topi") || norm.includes("cap")) {
-    return productsList.find((p) => p.name.toLowerCase().includes("topi")) || productsList[0];
-  }
-  if (norm.includes("totebag") || norm.includes("tote")) {
-    return productsList.find((p) => p.name.toLowerCase().includes("totebag")) || productsList[0];
-  }
-  if (norm.includes("keychain") || norm.includes("gantungan")) {
-    return productsList.find((p) => p.name.toLowerCase().includes("keychain")) || productsList[0];
-  }
-  if (norm.includes("sticker") || norm.includes("stiker")) {
-    return productsList.find((p) => p.name.toLowerCase().includes("sticker")) || productsList[0];
-  }
-  if (norm.includes("jacket") || norm.includes("jaket") || norm.includes("varsity")) {
-    return productsList.find((p) => p.name.toLowerCase().includes("jacket") || p.name.toLowerCase().includes("jaket")) || productsList[0];
-  }
-  if (norm.includes("pulpen") || norm.includes("pen")) {
-    return productsList.find((p) => p.name.toLowerCase().includes("pulpen")) || productsList[0];
-  }
-  if (norm.includes("notebook") || norm.includes("buku")) {
-    return productsList.find((p) => p.name.toLowerCase().includes("notebook")) || productsList[0];
-  }
-
-  return productsList[0];
-};
-
-// Import CSV orders into database (Batch 1 or historical orders)
-export const importOrders = async (req: Request, res: Response) => {
-  const connection = await getConnection();
-  try {
-    const { campaignId, rows, overwrite } = req.body;
-    if (!rows || !Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json({ success: false, error: "Data CSV wajib diisi" });
-    }
-
-    await connection.beginTransaction();
-
-    // Clear previous CSV imports for this campaign if overwrite is enabled
-    if (overwrite && campaignId) {
-      const [orderRows] = await connection.execute(
-        "SELECT order_id FROM orders WHERE pre_order_campaign_id = ? AND batch_source = 'csv_import'",
-        [campaignId]
-      );
-      const orderIds = (orderRows as any[]).map((o) => o.order_id);
-      if (orderIds.length > 0) {
-        const placeholders = orderIds.map(() => "?").join(",");
-        await connection.execute(`DELETE FROM order_items WHERE order_id IN (${placeholders})`, orderIds);
-        await connection.execute(`DELETE FROM orders WHERE order_id IN (${placeholders})`, orderIds);
-      }
-    }
-
-    const [productRows] = await connection.execute("SELECT id, name, price FROM products");
-    const productsList = productRows as any[];
-
-    let importedOrdersCount = 0;
-    let importedItemsCount = 0;
-
-    for (const r of rows) {
-      const orderId = (r.no_order || `B1-${Date.now()}-${Math.floor(Math.random() * 1000)}`).trim();
-      const customerName = (r.nama_pembeli || "Pembeli Batch 1").trim();
-      const customerEmail = (r.email_pembeli || "").trim();
-      const customerPhone = (r.no_hp || "").trim();
-      const customerNim = (r.nim || "").trim();
-      const rawTotal = parseFloat(String(r.total_bayar || 0).replace(/[^0-9.]/g, "")) || 0;
-      const orderDate = r.tanggal_order ? new Date(r.tanggal_order) : new Date();
-      const formattedDate = isNaN(orderDate.getTime()) ? new Date() : orderDate;
-      const rawPayStatus = String(r.status_pembayaran || "settlement").toLowerCase();
-      const paymentStatus = (rawPayStatus === "settlement" || rawPayStatus === "lunas" || rawPayStatus === "paid") ? "paid" : "pending";
-      const rawOrdStatus = String(r.status_pesanan || "completed").toLowerCase();
-      const orderStatus = (rawOrdStatus === "completed" || rawOrdStatus === "selesai" || rawOrdStatus === "lunas") ? "completed" : "pending";
-
-      const [existing] = await connection.execute("SELECT id FROM orders WHERE order_id = ?", [orderId]);
-      if ((existing as any[]).length > 0) {
-        continue;
-      }
-
-      await connection.execute(
-        `INSERT INTO orders (
-          order_id, user_id, customer_name, customer_email, customer_phone, customer_nim,
-          subtotal, gross_amount, payment_status, order_status, fulfillment_status,
-          transaction_status, channel, batch_source, pre_order_campaign_id, created_at, updated_at
-        ) VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'settlement', 'online', 'csv_import', ?, ?, ?)`,
-        [
-          orderId, customerName, customerEmail, customerPhone, customerNim,
-          rawTotal, rawTotal, paymentStatus, orderStatus, orderStatus,
-          campaignId || null, formattedDate, formattedDate
-        ]
-      );
-
-      importedOrdersCount++;
-
-      const rincianStr = r.rincian_produk || "";
-      const itemSegments = rincianStr.split("|").map((s: string) => s.trim()).filter(Boolean);
-
-      for (const seg of itemSegments) {
-        const match = seg.match(/^(.*?)(?:\[(.*?)\])?(?:\s*\(x(\d+)\))?$/);
-        if (match) {
-          const prodName = match[1].trim();
-          const variantText = match[2] ? match[2].trim() : "";
-          const qty = match[3] ? parseInt(match[3], 10) : 1;
-
-          let size = variantText;
-          let color = "";
-          if (variantText.includes("/")) {
-            const vParts = variantText.split("/");
-            size = vParts[0].trim();
-            color = vParts[1].trim();
-          }
-
-          const matchedProd = findBestMatchingProduct(prodName, productsList);
-          const productId = matchedProd ? matchedProd.id : null;
-          const unitPrice = matchedProd && matchedProd.price ? matchedProd.price : Math.round(rawTotal / (Math.max(itemSegments.length, 1) * qty));
-
-          await connection.execute(
-            `INSERT INTO order_items (
-              order_id, product_id, product_name, unit_price, quantity, subtotal, size, color
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [orderId, productId, prodName, unitPrice, qty, unitPrice * qty, size || "", color || ""]
-          );
-          importedItemsCount++;
-        }
-      }
-    }
-
-    await connection.commit();
-    return res.json({
-      success: true,
-      message: `Berhasil meng-import ${importedOrdersCount} pesanan (${importedItemsCount} item)`,
-      importedOrders: importedOrdersCount,
-      importedItems: importedItemsCount
-    });
-  } catch (error: any) {
-    await connection.rollback();
-    console.error("Error importing orders CSV:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal meng-import CSV" });
-  } finally {
-    connection.release();
-  }
-};
-
-export const clearImportedOrders = async (req: Request, res: Response) => {
-  const connection = await getConnection();
-  try {
-    const { campaignId } = req.params;
-    await connection.beginTransaction();
-
-    const [orderRows] = await connection.execute(
-      "SELECT order_id FROM orders WHERE pre_order_campaign_id = ? AND batch_source = 'csv_import'",
-      [campaignId]
-    );
-    const orderIds = (orderRows as any[]).map((o) => o.order_id);
-
-    if (orderIds.length > 0) {
-      const placeholders = orderIds.map(() => "?").join(",");
-      await connection.execute(`DELETE FROM order_items WHERE order_id IN (${placeholders})`, orderIds);
-      await connection.execute(`DELETE FROM orders WHERE order_id IN (${placeholders})`, orderIds);
-    }
-
-    await connection.commit();
-    return res.json({
-      success: true,
-      message: `Berhasil menghapus ${orderIds.length} pesanan import batch ini`,
-      deletedCount: orderIds.length,
-    });
-  } catch (error: any) {
-    await connection.rollback();
-    console.error("Error clearing imported orders:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  } finally {
-    connection.release();
-  }
-};
-
-// Vendor CRUD
-export const getVendors = async (req: Request, res: Response) => {
-  try {
-    const vendors = await query("SELECT * FROM vendors ORDER BY id DESC");
-    return res.json({ success: true, data: vendors || [] });
-  } catch (error: any) {
-    console.error("Error fetching vendors:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-export const createVendor = async (req: Request, res: Response) => {
-  try {
-    const { name, contact_person, phone, email, notes } = req.body;
-    if (!name) {
-      return res.status(400).json({ success: false, error: "Nama vendor wajib diisi" });
-    }
-    const result = await execute(
-      "INSERT INTO vendors (name, contact_person, phone, email, notes) VALUES (?, ?, ?, ?, ?)",
-      [name, contact_person || null, phone || null, email || null, notes || null]
-    );
-    return res.json({ success: true, id: (result as any).insertId, message: "Vendor berhasil ditambahkan" });
-  } catch (error: any) {
-    console.error("Error creating vendor:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-export const updateVendor = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { name, contact_person, phone, email, notes, is_active } = req.body;
-    if (!name) {
-      return res.status(400).json({ success: false, error: "Nama vendor wajib diisi" });
-    }
-    await execute(
-      "UPDATE vendors SET name = ?, contact_person = ?, phone = ?, email = ?, notes = ?, is_active = ? WHERE id = ?",
-      [name, contact_person || null, phone || null, email || null, notes || null, is_active ? 1 : 0, id]
-    );
-    return res.json({ success: true, message: "Vendor berhasil diperbarui" });
-  } catch (error: any) {
-    console.error("Error updating vendor:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-export const deleteVendor = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    await execute("DELETE FROM vendors WHERE id = ?", [id]);
-    return res.json({ success: true, message: "Vendor berhasil dihapus" });
-  } catch (error: any) {
-    console.error("Error deleting vendor:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// Production Summary (aggregates items per product & variant across campaigns)
-export const getProductionSummary = async (req: Request, res: Response) => {
-  try {
-    const { batch } = req.query; // 'all' or campaign_id string
-
-    // 1. Fetch campaigns for smart batch resolution
-    const campaigns = await query<any>("SELECT * FROM pre_order_campaigns ORDER BY start_date ASC");
-
-    // 2. Fetch bundle components map
-    const bundleRows = await query<any>(
-      `SELECT bi.bundle_product_id, bi.component_product_id, bi.quantity as bundle_qty,
-              p.name as component_name, p.image_url as component_image, p.product_type as component_type
-       FROM bundle_items bi
-       JOIN products p ON bi.component_product_id = p.id`
-    );
-
-    const bundleMap: Record<number, any[]> = {};
-    (bundleRows || []).forEach((b) => {
-      if (!bundleMap[b.bundle_product_id]) bundleMap[b.bundle_product_id] = [];
-      bundleMap[b.bundle_product_id].push(b);
-    });
-
-    // 3. Fetch all order items with order and product details (excluding bundle containers)
-    const orderItems = await query<any>(
-      `SELECT 
-        oi.id as order_item_id,
-        oi.order_id,
-        oi.product_id,
-        oi.product_name,
-        oi.size,
-        oi.color,
-        oi.quantity,
-        o.created_at as order_created_at,
-        o.pre_order_campaign_id,
-        o.order_status,
-        o.payment_status,
-        p.name as catalog_product_name,
-        p.product_type,
-        p.pre_order_campaign_id as prod_campaign_id
-       FROM order_items oi
-       JOIN orders o ON oi.order_id = o.order_id
-       JOIN products p ON oi.product_id = p.id
-       WHERE p.product_type != 'bundle' AND (o.payment_status = 'paid' OR o.payment_status = 'settlement' OR o.order_status = 'completed')`
-    );
-
-    // Helpers to clean product names & variant labels
-    const cleanProductName = (name: string) => {
-      if (!name) return "Unknown Product";
-      return name
-        .replace(/^\[KOMPONEN BUNDLE\]\s*/gi, "")
-        .replace(/\s*\(DP\s*\d*%\)/gi, "")
-        .replace(/\s*\(DP\)/gi, "")
-        .replace(/\s*DP$/gi, "")
-        .trim();
-    };
-
-    const cleanVariantLabel = (size: string | null, color: string | null) => {
-      let sz = (size || "").trim();
-      let clr = (color || "").trim();
-
-      // Filter out redundant/dummy color labels
-      if (clr.toLowerCase() === "default" || clr.toLowerCase() === "all color" || clr.toLowerCase() === "one size") {
-        clr = "";
-      }
-
-      // Filter out redundant size labels if color is present
-      if ((sz.toLowerCase() === "default" || sz.toLowerCase() === "one size" || sz.toLowerCase() === "all size") && clr) {
-        sz = "";
-      }
-
-      let parts = [sz, clr].filter(Boolean);
-      let raw = parts.join(" / ").trim();
-
-      let cleaned = raw
-        .replace(/\s*\/\s*LUNAS/gi, "")
-        .replace(/\s*\/\s*DP/gi, "")
-        .replace(/\s*LUNAS/gi, "")
-        .replace(/\s*DP/gi, "")
-        .trim();
-
-      if (!cleaned || cleaned.toLowerCase() === "default" || cleaned.toLowerCase() === "one size / default" || cleaned.toLowerCase() === "one size" || cleaned.toLowerCase() === "all size") {
-        return "Standard";
-      }
-
-      return cleaned;
-    };
-
-    const resolveBatch = (row: any) => {
-      // Direct order campaign id
-      if (row.pre_order_campaign_id) {
-        const found = campaigns.find((c: any) => c.id === row.pre_order_campaign_id);
-        if (found) return { id: found.id, name: found.batch_name };
-      }
-
-      // Date matching against created_at
-      if (row.order_created_at) {
-        const oDate = new Date(row.order_created_at).getTime();
-        const foundDate = campaigns.find((c: any) => {
-          const s = new Date(c.start_date).getTime();
-          const e = new Date(c.extended_end_date || c.end_date).getTime();
-          return oDate >= s && oDate <= e;
-        });
-        if (foundDate) return { id: foundDate.id, name: foundDate.batch_name };
-      }
-
-      // Product fallback campaign id
-      if (row.prod_campaign_id) {
-        const foundProd = campaigns.find((c: any) => c.id === row.prod_campaign_id);
-        if (foundProd) return { id: foundProd.id, name: foundProd.batch_name };
-      }
-
-      // Fallback active or latest campaign
-      const activeCamp = campaigns.find((c: any) => c.is_active) || campaigns[campaigns.length - 1];
-      if (activeCamp) return { id: activeCamp.id, name: activeCamp.batch_name };
-
-      return { id: 0, name: "General Stock" };
-    };
-
-    const summaryMap: Record<string, {
-      product_id: number;
-      product_name: string;
-      variants_breakdown: Record<string, number>;
-      batch_breakdown: Record<string, number>;
-      total_qty: number;
-    }> = {};
-
-    (orderItems || []).forEach((row) => {
-      const batchInfo = resolveBatch(row);
-
-      // Filter by requested batch query parameter if specified
-      if (batch && batch !== "all") {
-        if (String(batchInfo.id) !== String(batch)) return;
-      }
-
-      const isBundle = row.product_type === "bundle" || Boolean(bundleMap[row.product_id]);
-
-      if (isBundle && bundleMap[row.product_id]) {
-        // UNPACK BUNDLE into components
-        const components = bundleMap[row.product_id];
-        components.forEach((comp) => {
-          const compQty = row.quantity * (comp.bundle_qty || 1);
-          const cName = cleanProductName(comp.component_name);
-          const cVariant = cleanVariantLabel(row.size, row.color);
-
-          if (!summaryMap[cName]) {
-            summaryMap[cName] = {
-              product_id: comp.component_product_id,
-              product_name: cName,
-              variants_breakdown: {},
-              batch_breakdown: {},
-              total_qty: 0,
-            };
-          }
-
-          summaryMap[cName].variants_breakdown[cVariant] = (summaryMap[cName].variants_breakdown[cVariant] || 0) + compQty;
-          summaryMap[cName].batch_breakdown[batchInfo.name] = (summaryMap[cName].batch_breakdown[batchInfo.name] || 0) + compQty;
-          summaryMap[cName].total_qty += compQty;
-        });
-      } else {
-        // REGULAR ITEM
-        const pName = cleanProductName(row.catalog_product_name || row.product_name);
-        const vLabel = cleanVariantLabel(row.size, row.color);
-
-        if (!summaryMap[pName]) {
-          summaryMap[pName] = {
-            product_id: row.product_id,
-            product_name: pName,
-            variants_breakdown: {},
-            batch_breakdown: {},
-            total_qty: 0,
-          };
-        }
-
-        summaryMap[pName].variants_breakdown[vLabel] = (summaryMap[pName].variants_breakdown[vLabel] || 0) + Number(row.quantity);
-        summaryMap[pName].batch_breakdown[batchInfo.name] = (summaryMap[pName].batch_breakdown[batchInfo.name] || 0) + Number(row.quantity);
-        summaryMap[pName].total_qty += Number(row.quantity);
-      }
-    });
-
-    const summaryList = Object.values(summaryMap);
-    return res.json({ success: true, data: summaryList });
-  } catch (error: any) {
-    console.error("Error fetching production summary:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// Vendor Orders (Purchase Orders)
-export const getVendorOrders = async (req: Request, res: Response) => {
-  try {
-    const orders = await query<any>(
-      `SELECT vo.*, v.name as vendor_name, v.phone as vendor_phone, v.contact_person, v.email as vendor_email
-       FROM vendor_orders vo
-       JOIN vendors v ON vo.vendor_id = v.id
-       ORDER BY vo.id DESC`
-    );
-
-    if (orders && orders.length > 0) {
-      const voIds = orders.map((o) => o.id);
-      const placeholders = voIds.map(() => "?").join(",");
-      const allItems = await query<any>(
-        `SELECT voi.*, p.name as catalog_product_name 
-         FROM vendor_order_items voi
-         JOIN products p ON voi.product_id = p.id
-         WHERE voi.vendor_order_id IN (${placeholders})`,
-        voIds
-      );
-
-      const itemsByVo: Record<number, any[]> = {};
-      (allItems || []).forEach((item) => {
-        if (!itemsByVo[item.vendor_order_id]) itemsByVo[item.vendor_order_id] = [];
-        itemsByVo[item.vendor_order_id].push(item);
-      });
-
-      orders.forEach((o) => {
-        o.items = itemsByVo[o.id] || [];
-      });
-    }
-
-    return res.json({ success: true, data: orders || [] });
-  } catch (error: any) {
-    console.error("Error fetching vendor orders:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-export const createVendorOrder = async (req: Request, res: Response) => {
-  const connection = await getConnection();
-  try {
-    const { vendor_id, po_number, deadline, notes, items } = req.body;
-    if (!vendor_id || !items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, error: "Vendor dan item pesanan wajib diisi" });
-    }
-
-    await connection.beginTransaction();
-
-    const poNum = po_number || `VO-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
-    let totalCost = 0;
-
-    const [voResult] = await connection.execute(
-      `INSERT INTO vendor_orders (po_number, vendor_id, status, total_cost, notes, deadline)
-       VALUES (?, ?, 'draft', 0, ?, ?)`,
-      [poNum, vendor_id, notes || null, deadline || null]
-    );
-    const vendorOrderId = (voResult as any).insertId;
-
-    for (const item of items) {
-      const unitCost = Number(item.unit_cost || 0);
-      const qty = Number(item.quantity || 1);
-      const subtotal = unitCost * qty;
-      totalCost += subtotal;
-
-      await connection.execute(
-        `INSERT INTO vendor_order_items (vendor_order_id, product_id, size, color, quantity, unit_cost, subtotal_cost, notes)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [vendorOrderId, item.product_id, item.size || null, item.color || null, qty, unitCost, subtotal, item.notes || null]
-      );
-    }
-
-    await connection.execute("UPDATE vendor_orders SET total_cost = ? WHERE id = ?", [totalCost, vendorOrderId]);
-    await connection.commit();
-
-    return res.json({ success: true, id: vendorOrderId, po_number: poNum, message: "Purchase Order vendor berhasil dibuat" });
-  } catch (error: any) {
-    await connection.rollback();
-    console.error("Error creating vendor order:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  } finally {
-    connection.release();
-  }
-};
-
-export const updateVendorOrderStatus = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    let dateUpdate = "";
-    if (status === "sent") {
-      dateUpdate = ", sent_at = NOW()";
-    } else if (status === "completed") {
-      dateUpdate = ", completed_at = NOW()";
-    }
-
-    await execute(
-      `UPDATE vendor_orders SET status = ? ${dateUpdate} WHERE id = ?`,
-      [status, id]
-    );
-
-    return res.json({ success: true, message: `Status PO berhasil diubah ke ${status}` });
-  } catch (error: any) {
-    console.error("Error updating vendor order status:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-export const deleteVendorOrder = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    await execute("DELETE FROM vendor_orders WHERE id = ?", [id]);
-    return res.json({ success: true, message: "PO Vendor berhasil dihapus" });
-  } catch (error: any) {
-    console.error("Error deleting vendor order:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// Financial Overview (Revenue vs COGS)
-export const getFinancialOverview = async (req: Request, res: Response) => {
-  try {
-    const { batch } = req.query;
-
-    let campaignFilter = "";
-    const params: any[] = [];
-    if (batch && batch !== "all") {
-      const targetCamp = await queryOne<any>("SELECT * FROM pre_order_campaigns WHERE id = ?", [batch]);
-      if (targetCamp) {
-        const effEnd = targetCamp.extended_end_date || targetCamp.end_date;
-        campaignFilter = "WHERE (o.pre_order_campaign_id = ? OR (o.created_at >= ? AND o.created_at <= ?))";
-        params.push(batch, targetCamp.start_date, effEnd);
-      } else {
-        campaignFilter = "WHERE o.pre_order_campaign_id = ?";
-        params.push(batch);
-      }
-    }
-
-    // 1. Total Revenue from paid/completed orders
-    const revQuery = await query<any>(
-      `SELECT COALESCE(SUM(o.gross_amount), 0) as total_revenue, COUNT(o.id) as total_orders
-       FROM orders o
-       ${campaignFilter} ${campaignFilter ? "AND" : "WHERE"} (o.payment_status = 'paid' OR o.order_status = 'completed' OR o.transaction_status = 'settlement')`,
-      params
-    );
-    const collectedRevenue = Number(revQuery[0]?.total_revenue || 0);
-
-    // 2. Total COGS from vendor orders
-    const cogsQuery = await query<any>(
-      "SELECT COALESCE(SUM(total_cost), 0) as total_cogs FROM vendor_orders WHERE status != 'cancelled'"
-    );
-    const totalCogsVendor = Number(cogsQuery[0]?.total_cogs || 0);
-
-    // 3. Breakdown per product
-    const productBreakdown = await query<any>(
-      `SELECT 
-        p.id as product_id,
-        p.name as product_name,
-        p.price,
-        p.original_price,
-        p.cost_price,
-        p.vendor_cost,
-        p.shipping_cost_per_pcs,
-        p.other_cost_per_pcs,
-        SUM(oi.quantity) as qty_sold,
-        SUM(oi.subtotal) as total_revenue
-       FROM order_items oi
-       JOIN orders o ON oi.order_id = o.order_id
-       JOIN products p ON oi.product_id = p.id
-       WHERE p.product_type != 'bundle' AND (o.payment_status = 'paid' OR o.order_status = 'completed' OR o.transaction_status = 'settlement')
-       ${campaignFilter ? `AND ${campaignFilter.replace(/^WHERE\s+/i, "")}` : ""}
-       GROUP BY p.id, p.name, p.price, p.original_price, p.cost_price, p.vendor_cost, p.shipping_cost_per_pcs, p.other_cost_per_pcs
-       ORDER BY total_revenue DESC`,
-      params
-    );
-
-    let totalFullRevenue = 0;
-    let totalCalculatedCogs = 0;
-
-    const formattedBreakdown = (productBreakdown || []).map((row: any) => {
-      const rev = Number(row.total_revenue || 0);
-      const qty = Number(row.qty_sold || 0);
-
-      const normPrice = Number(row.price || 0);
-      const origPrice = Number(row.original_price || 0);
-
-      // Check if product name explicitly contains DP and origPrice > normPrice
-      const isDp = (row.product_name && row.product_name.toLowerCase().includes("dp")) && origPrice > normPrice;
-      const fullUnitPrice = isDp ? (origPrice || (normPrice * 2)) : normPrice;
-      const effectiveRev = isDp ? (fullUnitPrice * qty) : rev;
-
-      const unitCogs = Number(row.cost_price) || ((Number(row.vendor_cost) || 0) + (Number(row.shipping_cost_per_pcs) || 0) + (Number(row.other_cost_per_pcs) || 0));
-      const totalCogs = unitCogs * qty;
-      const margin = effectiveRev - totalCogs;
-      const marginPercent = effectiveRev > 0 ? Number(((margin / effectiveRev) * 100).toFixed(1)) : 0;
-
-      totalFullRevenue += effectiveRev;
-      totalCalculatedCogs += totalCogs;
-
-      return {
-        product_id: row.product_id,
-        product_name: row.product_name,
-        qty_sold: qty,
-        avg_selling_price: qty > 0 ? Math.round(effectiveRev / qty) : 0,
-        revenue: effectiveRev,
-        dp_revenue: isDp ? rev : null,
-        is_dp: isDp,
-        unit_cogs: unitCogs,
-        total_cogs: totalCogs,
-        margin,
-        margin_percent: marginPercent,
-      };
-    });
-
-    const displayRevenue = totalFullRevenue || collectedRevenue;
-    const displayCogs = totalCogsVendor || totalCalculatedCogs;
-    const grossMargin = displayRevenue - displayCogs;
-    const marginPercent = displayRevenue > 0 ? Number(((grossMargin / displayRevenue) * 100).toFixed(1)) : 0;
-
-    return res.json({
-      success: true,
-      data: {
-        totalRevenue: displayRevenue,
-        collectedRevenue,
-        totalCogs: displayCogs,
-        grossMargin,
-        marginPercent,
-        productBreakdown: formattedBreakdown,
-      },
-    });
-  } catch (error: any) {
-    console.error("Error fetching financial overview:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-// Batch Product Prices Controllers
-export const getBatchProductPrices = async (req: Request, res: Response) => {
-  try {
-    const { campaignId } = req.params;
-    const prices = await query<any>(
-      `SELECT bpp.*, p.name as product_name, p.price as default_public_price, p.filkom_price as default_filkom_price
-       FROM batch_product_prices bpp
-       JOIN products p ON bpp.product_id = p.id
-       WHERE bpp.campaign_id = ?`,
-      [campaignId]
-    );
-    return res.json({ success: true, data: prices || [] });
-  } catch (error: any) {
-    console.error("Error fetching batch product prices:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  }
-};
-
-export const saveBatchProductPrices = async (req: Request, res: Response) => {
-  const connection = await getConnection();
-  try {
-    const { campaignId } = req.params;
-    const { prices } = req.body; // Array of { product_id, selling_price, filkom_price }
-
-    if (!prices || !Array.isArray(prices)) {
-      return res.status(400).json({ success: false, error: "Data harga wajib diisi" });
-    }
-
-    await connection.beginTransaction();
-
-    for (const p of prices) {
-      await connection.execute(
-        `INSERT INTO batch_product_prices (campaign_id, product_id, selling_price, filkom_price)
-         VALUES (?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE selling_price = VALUES(selling_price), filkom_price = VALUES(filkom_price)`,
-        [campaignId, p.product_id, p.selling_price, p.filkom_price || null]
-      );
-    }
-
-    await connection.commit();
-    return res.json({ success: true, message: "Harga produk batch berhasil disimpan" });
-  } catch (error: any) {
-    await connection.rollback();
-    console.error("Error saving batch product prices:", error);
-    return res.status(500).json({ success: false, error: error.message });
-  } finally {
-    connection.release();
-  }
-};
-

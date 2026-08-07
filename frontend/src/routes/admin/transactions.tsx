@@ -37,8 +37,6 @@ import {
   Filter,
   Upload,
   X,
-  Users,
-  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
@@ -52,7 +50,6 @@ import {
   deleteOrder,
   deleteOfflineSale,
   verifyPaymentProof,
-  getPreOrderCampaignsServerAction,
   type Order,
   type OfflineSale,
 } from "@backend/server-actions";
@@ -154,18 +151,6 @@ function AdminTransactionsPage() {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "verifying" | "dp" | "unpaid">("all");
-
-  // Batch Filter & Group by Customer States
-  const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>("all");
-  const [groupByCustomer, setGroupByCustomer] = useState<boolean>(false);
-  const [expandedCustomers, setExpandedCustomers] = useState<Record<string, boolean>>({});
-  const [campaigns, setCampaigns] = useState<any[]>([]);
-
-  useEffect(() => {
-    getPreOrderCampaignsServerAction().then((res) => {
-      if (res?.data) setCampaigns(res.data);
-    });
-  }, []);
 
   // Collapsible Row States
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -566,13 +551,6 @@ function AdminTransactionsPage() {
     return ordersList.filter((order) => {
       if (!order) return false;
 
-      // 0. Batch Filter
-      if (selectedBatchFilter === "ready_stock") {
-        if (order.pre_order_campaign_id !== null && order.pre_order_campaign_id !== undefined) return false;
-      } else if (selectedBatchFilter !== "all") {
-        if (String(order.pre_order_campaign_id) !== String(selectedBatchFilter)) return false;
-      }
-
       // Hide standalone LNS orders if their parent DP order exists in list (it will be rendered as sub-row)
       const isLns = String(order.order_id || "").startsWith("LNS") || (order.notes && order.notes.includes("Pelunasan untuk Order:"));
       if (isLns) {
@@ -616,51 +594,7 @@ function AdminTransactionsPage() {
 
       return true;
     });
-  }, [onlineOrders, searchQuery, statusFilter, selectedBatchFilter, dpPelunasanMap]);
-
-  const groupedCustomerOrders = useMemo(() => {
-    if (!groupByCustomer) return [];
-
-    const groupMap: Record<string, {
-      customer_name: string;
-      customer_email: string;
-      customer_phone: string;
-      customer_nim: string;
-      orders: Order[];
-      total_amount: number;
-      total_items: number;
-      batches: Set<string>;
-    }> = {};
-
-    filteredOnlineOrders.forEach((o) => {
-      const rawName = o.customer_name || "Pembeli Noname";
-      const key = rawName.trim().toLowerCase();
-
-      if (!groupMap[key]) {
-        groupMap[key] = {
-          customer_name: rawName,
-          customer_email: o.customer_email || "-",
-          customer_phone: o.customer_phone || "-",
-          customer_nim: o.customer_nim || "-",
-          orders: [],
-          total_amount: 0,
-          total_items: 0,
-          batches: new Set(),
-        };
-      }
-
-      const group = groupMap[key];
-      group.orders.push(o);
-      group.total_amount += Number(o.gross_amount || o.total_amount || 0);
-      group.total_items += (o.items || []).reduce((sum: number, item: any) => sum + Number(item.quantity || 1), 0);
-
-      const batchObj = campaigns.find((c) => String(c.id) === String(o.pre_order_campaign_id));
-      const batchName = batchObj ? batchObj.batch_name : (o.pre_order_campaign_id ? `Batch #${o.pre_order_campaign_id}` : "Ready Stock");
-      group.batches.add(batchName);
-    });
-
-    return Object.values(groupMap);
-  }, [filteredOnlineOrders, groupByCustomer, campaigns]);
+  }, [onlineOrders, searchQuery, statusFilter, dpPelunasanMap]);
 
   const filteredOfflineSales = useMemo(() => {
     const salesList = Array.isArray(offlineSales) ? offlineSales : [];
@@ -687,47 +621,14 @@ function AdminTransactionsPage() {
             Pesanan website dan POS Kasir.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
-          {/* Batch Filter Dropdown */}
-          <select
-            value={selectedBatchFilter}
-            onChange={(e) => setSelectedBatchFilter(e.target.value)}
-            className="px-3.5 py-2 border-2 border-ink rounded-xl text-xs font-bold bg-white text-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer focus:outline-none"
-          >
-            <option value="all">Semua Batch / Source</option>
-            <option value="ready_stock">Ready Stock (Non-PO)</option>
-            {campaigns.map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.batch_name}
-              </option>
-            ))}
-          </select>
-
-          {/* Group by Customer Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setGroupByCustomer(!groupByCustomer)}
-            className={`px-3.5 py-2 border-2 border-ink rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] ${
-              groupByCustomer
-                ? "bg-brand-orange text-cream border-ink"
-                : "bg-white text-ink hover:bg-cream/40"
-            }`}
-            title="Gabungkan pesanan per nama pembeli"
-          >
-            <Users className="w-4 h-4" />
-            {groupByCustomer ? "Gabung Customer: ON" : "Gabung Customer: OFF"}
-          </button>
-
-          {/* Search Bar */}
-          <div className="relative w-full md:w-60">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Cari transaksi..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 border-2 border-ink focus-visible:ring-0 focus-visible:ring-offset-0"
-            />
-          </div>
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Cari transaksi..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 border-2 border-ink focus-visible:ring-0 focus-visible:ring-offset-0"
+          />
         </div>
       </div>
 
@@ -905,130 +806,7 @@ function AdminTransactionsPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {groupByCustomer ? (
-                <div className="border border-ink rounded-xl overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-cream border-b border-ink">
-                      <tr>
-                        <th className="w-10 p-3"></th>
-                        <th className="p-3 text-left text-xs font-bold text-ink uppercase">Nama Pembeli</th>
-                        <th className="p-3 text-left text-xs font-bold text-ink uppercase">Kontak / NIM</th>
-                        <th className="p-3 text-center text-xs font-bold text-ink uppercase">Jumlah Transaksi</th>
-                        <th className="p-3 text-center text-xs font-bold text-ink uppercase">Batch PO</th>
-                        <th className="p-3 text-center text-xs font-bold text-ink uppercase">Total Item</th>
-                        <th className="p-3 text-right text-xs font-bold text-ink uppercase">Total Bayar Combined</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ink/10">
-                      {groupedCustomerOrders.length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="p-8 text-center text-muted-foreground text-xs font-bold">
-                            Tidak ada data customer ditemukan.
-                          </td>
-                        </tr>
-                      ) : (
-                        groupedCustomerOrders.map((group, gIdx) => {
-                          const isExpanded = !!expandedCustomers[group.customer_name];
-                          return (
-                            <tbody key={gIdx} className="divide-y divide-ink/10">
-                              <tr
-                                onClick={() =>
-                                  setExpandedCustomers((prev) => ({
-                                    ...prev,
-                                    [group.customer_name]: !isExpanded,
-                                  }))
-                                }
-                                className="hover:bg-cream/40 cursor-pointer transition-colors bg-white font-medium"
-                              >
-                                <td className="p-3 text-center font-bold">
-                                  {isExpanded ? <ChevronUp className="w-4 h-4 text-brand-orange" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-                                </td>
-                                <td className="p-3 font-extrabold text-ink text-sm">{group.customer_name}</td>
-                                <td className="p-3 text-xs text-muted-foreground">
-                                  {group.customer_phone} {group.customer_nim !== "-" ? `• NIM: ${group.customer_nim}` : ""}
-                                </td>
-                                <td className="p-3 text-center font-bold">
-                                  <span className="px-2.5 py-1 bg-brand-orange/10 border border-brand-orange/30 text-brand-orange rounded-full text-xs font-extrabold">
-                                    {group.orders.length} Transaksi
-                                  </span>
-                                </td>
-                                <td className="p-3 text-center">
-                                  <div className="flex flex-wrap gap-1 justify-center">
-                                    {Array.from(group.batches).map((b) => (
-                                      <span key={b} className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-200 text-[10px] font-bold rounded">
-                                        {b}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </td>
-                                <td className="p-3 text-center font-bold text-ink">{group.total_items} pcs</td>
-                                <td className="p-3 text-right font-black text-brand-orange text-sm">
-                                  Rp {group.total_amount.toLocaleString("id-ID")}
-                                </td>
-                              </tr>
-
-                              {isExpanded && (
-                                <tr>
-                                  <td colSpan={7} className="p-4 bg-cream/30 border-t-2 border-b-2 border-ink">
-                                    <div className="space-y-3">
-                                      <div className="text-xs font-black uppercase text-ink flex items-center justify-between">
-                                        <span>Rincian {group.orders.length} Transaksi Milik {group.customer_name}:</span>
-                                        <span className="text-muted-foreground font-normal">Klik tombol Kelola untuk melihat bukti transfer / verifikasi</span>
-                                      </div>
-                                      <div className="space-y-2">
-                                        {group.orders.map((ord) => {
-                                          const pBadge = getPaymentStatusBadge(ord, dpPelunasanMap[ord.order_id]);
-                                          return (
-                                            <div
-                                              key={ord.order_id}
-                                              className="bg-white border-2 border-ink/30 p-3.5 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
-                                            >
-                                              <div className="space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                  <span className="font-mono font-black text-ink">{ord.order_id}</span>
-                                                  <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${pBadge.color}`}>
-                                                    {pBadge.text}
-                                                  </span>
-                                                  <span className="text-[10px] text-muted-foreground font-bold">
-                                                    ({ord.created_at ? new Date(ord.created_at).toLocaleDateString("id-ID") : "-"})
-                                                  </span>
-                                                </div>
-                                                <div className="text-xs text-ink/80 font-medium">
-                                                  {(ord.items || []).map((i: any) => `${i.product_name} [${[i.size, i.color].filter(Boolean).join("/")}] (x${i.quantity})`).join(" | ")}
-                                                </div>
-                                              </div>
-                                              <div className="flex items-center gap-3 justify-between sm:justify-end">
-                                                <div className="text-right">
-                                                  <div className="text-xs font-black text-brand-orange font-mono">
-                                                    Rp {Number(ord.gross_amount || ord.total_amount || 0).toLocaleString("id-ID")}
-                                                  </div>
-                                                </div>
-                                                <Button
-                                                  variant="outline"
-                                                  size="sm"
-                                                  onClick={() => handleOpenManagement(ord.order_id, "online")}
-                                                  className="h-8 text-xs font-bold border-ink bg-cream hover:bg-brand-orange hover:text-white transition-all"
-                                                >
-                                                  Kelola Transaksi
-                                                </Button>
-                                              </div>
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="border rounded-lg overflow-x-auto">
+              <div className="border rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-cream">
                     <tr>
@@ -1285,7 +1063,6 @@ function AdminTransactionsPage() {
                   </tbody>
                 </table>
               </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
