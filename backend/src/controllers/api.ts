@@ -2935,9 +2935,38 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
 
     const startSql = formatSqlDate(campaign.start_date);
     const endSql = formatSqlDate(effectiveEndDate);
-    const isCampaignActive = Boolean(campaign.is_active);
 
-    // 2. Fetch all order items and orders for pre-order products within campaign date range or active campaign
+    // Helpers to clean product names & variant labels (matching Vendoring logic)
+    const cleanProductName = (name: string) => {
+      if (!name) return "Unknown Product";
+      return name
+        .replace(/^\[KOMPONEN BUNDLE\]\s*/gi, "")
+        .replace(/\s*\(DP\s*\d*%\)/gi, "")
+        .replace(/\s*\[DP\s*\d*%\]/gi, "")
+        .replace(/\s*\(Lunas\)/gi, "")
+        .replace(/\s*\[LUNAS\]/gi, "")
+        .replace(/\s*-\s*DP\b/gi, "")
+        .replace(/\s*-\s*LUNAS\b/gi, "")
+        .trim();
+    };
+
+    const cleanVariantLabel = (sz: string, clr: string) => {
+      let parts = [sz, clr].filter(Boolean);
+      let raw = parts.join(" / ").trim();
+      let cleaned = raw
+        .replace(/\s*\/\s*LUNAS/gi, "")
+        .replace(/\s*\/\s*DP/gi, "")
+        .replace(/\s*LUNAS/gi, "")
+        .replace(/\s*DP/gi, "")
+        .trim();
+
+      if (!cleaned || cleaned.toLowerCase() === "default" || cleaned.toLowerCase() === "one size / default" || cleaned.toLowerCase() === "one size" || cleaned.toLowerCase() === "all size") {
+        return "Standard";
+      }
+      return cleaned;
+    };
+
+    // 2. Fetch all order items and orders for pre-order products within campaign date range or direct campaign id (excluding bundle container rows)
     const items = await query<any>(
       `SELECT 
         oi.*,
@@ -2947,13 +2976,15 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         o.customer_phone,
         o.user_id,
         o.created_at as order_created_at,
+        o.pre_order_campaign_id as order_campaign_id,
         o.order_status,
         o.payment_status,
         o.fulfillment_status,
         o.payment_type as payment_method,
         o.payment_proof_url,
         o.gross_amount as grand_total,
-        p.name as connected_product_name,
+        p.name as catalog_product_name,
+        p.product_type,
         p.image_url as connected_product_image,
         p.price as prod_price,
         p.original_price as prod_original_price,
@@ -2969,9 +3000,10 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
        JOIN orders o ON oi.order_id = o.order_id
        JOIN products p ON oi.product_id = p.id
        LEFT JOIN users u ON o.user_id = u.id
-       WHERE (p.sale_type = 'pre_order' OR p.product_type = 'preorder' OR p.pre_order_campaign_id = ?)
-         AND o.created_at >= ?
-         AND o.created_at <= ?
+       WHERE p.product_type != 'bundle'
+         AND o.order_status != 'cancelled'
+         AND (o.payment_status IS NULL OR o.payment_status NOT IN ('failed', 'expired'))
+         AND (o.pre_order_campaign_id = ? OR (o.created_at >= ? AND o.created_at <= ?))
        ORDER BY o.created_at DESC`,
       [id, campaign.start_date, effectiveEndDate]
     );
@@ -2983,7 +3015,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
     let totalCogs = 0;
     let totalUnitsSold = 0;
 
-    const productSalesMap: Record<number, {
+    const productSalesMap: Record<string, {
       product_id: number;
       name: string;
       image_url: string | null;
@@ -2998,34 +3030,37 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       variants: Record<string, number>;
     }> = {};
 
-    // Initialize product map for connected products
+    // Initialize product map for connected products (using clean product names)
     for (const prod of connectedProducts) {
+      if (prod.product_type === 'bundle') continue;
+      const cleanName = cleanProductName(prod.name);
       const cogsPerUnit = Number(prod.cost_price) || ((Number(prod.vendor_cost) || 0) + (Number(prod.shipping_cost_per_pcs) || 0) + (Number(prod.other_cost_per_pcs) || 0));
       const origPrice = Number(prod.original_price || 0);
       const normalPrice = Number(prod.price || 0);
       const isDp = origPrice > normalPrice && (prod.name && prod.name.toLowerCase().includes("dp"));
       const fullUnitPrice = isDp ? (origPrice || (normalPrice * 2)) : normalPrice;
 
-      productSalesMap[prod.id] = {
-        product_id: prod.id,
-        name: prod.name,
-        image_url: prod.image_url,
-        unit_price: normalPrice,
-        full_unit_price: fullUnitPrice,
-        cogs_per_unit: cogsPerUnit,
-        total_qty: 0,
-        total_subtotal: 0,
-        total_full_subtotal: 0,
-        total_cogs: 0,
-        estimated_profit: 0,
-        variants: {},
-      };
+      if (!productSalesMap[cleanName]) {
+        productSalesMap[cleanName] = {
+          product_id: prod.id,
+          name: cleanName,
+          image_url: prod.image_url,
+          unit_price: normalPrice,
+          full_unit_price: fullUnitPrice,
+          cogs_per_unit: cogsPerUnit,
+          total_qty: 0,
+          total_subtotal: 0,
+          total_full_subtotal: 0,
+          total_cogs: 0,
+          estimated_profit: 0,
+          variants: {},
+        };
+      }
     }
 
     const uniqueBuyersSet = new Set<string>();
 
     for (const item of items) {
-      const isCancelled = item.order_status === "cancelled" || item.payment_status === "failed" || item.payment_status === "expired";
       const isPaid = item.payment_status === "paid" || item.payment_status === "settlement" || item.order_status === "completed";
       
       const buyerId = item.customer_email || item.user_email || item.customer_phone || `order-${item.order_id}`;
@@ -3058,7 +3093,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       ordersMap[item.order_id].items.push({
         order_item_id: item.id || item.order_item_id,
         product_id: item.product_id,
-        product_name: item.product_name || item.connected_product_name,
+        product_name: item.product_name || item.catalog_product_name,
         size: item.size || "-",
         color: item.color || "-",
         quantity: item.quantity,
@@ -3066,22 +3101,22 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         subtotal: Number(item.subtotal || (item.quantity * item.unit_price)),
       });
 
-      // Aggregate product sales & COGS
-      const pid = item.product_id;
+      // Aggregate product sales & COGS using clean product name
+      const cleanName = cleanProductName(item.product_name || item.catalog_product_name);
       const itemCogsPerUnit = Number(item.prod_cost_price) || ((Number(item.prod_vendor_cost) || 0) + (Number(item.prod_shipping_cost) || 0) + (Number(item.prod_other_cost) || 0));
       const itemCogsSubtotal = itemCogsPerUnit * item.quantity;
 
       const origPrice = Number(item.prod_original_price || 0);
       const normalPrice = Number(item.prod_price || item.unit_price || 0);
-      const hasDpName = (item.product_name && item.product_name.toLowerCase().includes("dp")) || (item.connected_product_name && item.connected_product_name.toLowerCase().includes("dp")) || (item.size && item.size.toLowerCase().includes("dp")) || (item.color && item.color.toLowerCase().includes("dp"));
+      const hasDpName = (item.product_name && item.product_name.toLowerCase().includes("dp")) || (item.catalog_product_name && item.catalog_product_name.toLowerCase().includes("dp")) || (item.size && item.size.toLowerCase().includes("dp")) || (item.color && item.color.toLowerCase().includes("dp"));
       const isDp = origPrice > normalPrice && hasDpName;
       const fullUnitPrice = isDp ? (origPrice || (normalPrice * 2)) : Math.max(normalPrice, Number(item.unit_price || 0));
       const itemFullSubtotal = fullUnitPrice * item.quantity;
 
-      if (!productSalesMap[pid]) {
-        productSalesMap[pid] = {
-          product_id: pid,
-          name: item.product_name || item.connected_product_name || `Product #${pid}`,
+      if (!productSalesMap[cleanName]) {
+        productSalesMap[cleanName] = {
+          product_id: item.product_id,
+          name: cleanName,
           image_url: item.connected_product_image || null,
           unit_price: Number(item.unit_price),
           full_unit_price: fullUnitPrice,
@@ -3095,20 +3130,18 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         };
       }
 
-      if (isPaid) {
-        totalUnitsSold += item.quantity;
-        totalCogs += itemCogsSubtotal;
-        totalFullRevenue += itemFullSubtotal;
+      totalUnitsSold += item.quantity;
+      totalCogs += itemCogsSubtotal;
+      totalFullRevenue += itemFullSubtotal;
 
-        productSalesMap[pid].total_qty += item.quantity;
-        productSalesMap[pid].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
-        productSalesMap[pid].total_full_subtotal += itemFullSubtotal;
-        productSalesMap[pid].total_cogs += itemCogsSubtotal;
-        productSalesMap[pid].estimated_profit = productSalesMap[pid].total_full_subtotal - productSalesMap[pid].total_cogs;
+      productSalesMap[cleanName].total_qty += item.quantity;
+      productSalesMap[cleanName].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
+      productSalesMap[cleanName].total_full_subtotal += itemFullSubtotal;
+      productSalesMap[cleanName].total_cogs += itemCogsSubtotal;
+      productSalesMap[cleanName].estimated_profit = productSalesMap[cleanName].total_full_subtotal - productSalesMap[cleanName].total_cogs;
 
-        const variantKey = [item.size, item.color].filter(Boolean).filter((x: string) => x !== "-").join(" / ") || "Default";
-        productSalesMap[pid].variants[variantKey] = (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
-      }
+      const variantKey = cleanVariantLabel(item.size, item.color);
+      productSalesMap[cleanName].variants[variantKey] = (productSalesMap[cleanName].variants[variantKey] || 0) + item.quantity;
     }
 
     const ordersList = Object.values(ordersMap);
@@ -3134,8 +3167,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           total_units_sold: totalUnitsSold,
           total_orders: ordersList.length,
           total_buyers: uniqueBuyersSet.size,
-          paid_orders_count: ordersList.filter(o => o.payment_status === 'paid' || o.payment_status === 'settlement' || o.order_status === 'completed').length,
-          pending_orders_count: ordersList.filter(o => o.payment_status === 'pending' || o.payment_status === 'unpaid').length,
+          total_unique_buyers: uniqueBuyersSet.size,
         },
         product_breakdown: productBreakdown,
         orders: ordersList,
@@ -5122,8 +5154,15 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
     let campaignFilter = "";
     const params: any[] = [];
     if (batch && batch !== "all") {
-      campaignFilter = "WHERE o.pre_order_campaign_id = ?";
-      params.push(batch);
+      const targetCamp = await queryOne<any>("SELECT * FROM pre_order_campaigns WHERE id = ?", [batch]);
+      if (targetCamp) {
+        const effEnd = targetCamp.extended_end_date || targetCamp.end_date;
+        campaignFilter = "WHERE (o.pre_order_campaign_id = ? OR (o.created_at >= ? AND o.created_at <= ?))";
+        params.push(batch, targetCamp.start_date, effEnd);
+      } else {
+        campaignFilter = "WHERE o.pre_order_campaign_id = ?";
+        params.push(batch);
+      }
     }
 
     // 1. Total Revenue from paid/completed orders
@@ -5158,7 +5197,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
        JOIN orders o ON oi.order_id = o.order_id
        JOIN products p ON oi.product_id = p.id
        WHERE p.product_type != 'bundle' AND (o.payment_status = 'paid' OR o.order_status = 'completed' OR o.transaction_status = 'settlement')
-       ${campaignFilter ? "AND o.pre_order_campaign_id = ?" : ""}
+       ${campaignFilter ? `AND ${campaignFilter.replace(/^WHERE\s+/i, "")}` : ""}
        GROUP BY p.id, p.name, p.price, p.original_price, p.cost_price, p.vendor_cost, p.shipping_cost_per_pcs, p.other_cost_per_pcs
        ORDER BY total_revenue DESC`,
       params
