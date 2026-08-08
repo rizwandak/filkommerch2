@@ -419,8 +419,9 @@ export async function runMigration() {
       const [pinTasRows] = await connection.query<any[]>("SELECT id, color FROM order_items WHERE (product_id = 17 OR product_name LIKE '%Pin Tas%')");
       for (const row of pinTasRows) {
         const cLower = (row.color || "").trim().toLowerCase();
-        const targetColor = pinTasMapping[cLower] || "FILKOM Oranye";
-        await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE id = ?", [targetColor, row.id]);
+        if (pinTasMapping[cLower]) {
+          await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE id = ?", [pinTasMapping[cLower], row.id]);
+        }
       }
       console.log("✅ Pin Tas order items fixed successfully!");
     } catch (err: any) {
