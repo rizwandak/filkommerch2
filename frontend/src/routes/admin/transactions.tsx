@@ -40,6 +40,9 @@ import {
   Users,
   Package,
   History,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
@@ -142,6 +145,54 @@ const getFulfillmentStatusBadge = (order: any) => {
 };
 
 const getStatusBadgeTextAndColor = getPaymentStatusBadge;
+
+type SortField = "no" | "order_id" | "customer_name" | "gross_amount" | "payment_status" | "fulfillment_status" | "created_at";
+type SortDirection = "asc" | "desc";
+
+const SortHeaderColumn = ({
+  label,
+  field,
+  currentField,
+  direction,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  field: SortField;
+  currentField: SortField;
+  direction: SortDirection;
+  onSort: (field: SortField) => void;
+  align?: "left" | "center" | "right";
+}) => {
+  const isActive = currentField === field;
+  const justifyClass =
+    align === "center"
+      ? "justify-center"
+      : align === "right"
+      ? "justify-end"
+      : "justify-start";
+
+  return (
+    <th
+      onClick={() => onSort(field)}
+      className={`p-3 text-${align} text-xs font-semibold tracking-wider text-ink uppercase cursor-pointer select-none hover:bg-black/5 transition-colors group`}
+      title={`Klik untuk mengurutkan ${direction === "asc" ? "Menurun (DESC)" : "Meningkat (ASC)"}`}
+    >
+      <div className={`inline-flex items-center gap-1.5 ${justifyClass} w-full`}>
+        <span>{label}</span>
+        {isActive ? (
+          direction === "asc" ? (
+            <ArrowUp className="w-3.5 h-3.5 text-brand-orange stroke-[3]" />
+          ) : (
+            <ArrowDown className="w-3.5 h-3.5 text-brand-orange stroke-[3]" />
+          )
+        ) : (
+          <ArrowUpDown className="w-3 h-3 text-muted-foreground/40 group-hover:text-ink transition-colors" />
+        )}
+      </div>
+    </th>
+  );
+};
 
 function AdminTransactionsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -804,9 +855,102 @@ function AdminTransactionsPage() {
     return groups;
   }, [filteredOnlineOrders, groupByCustomer]);
 
-  const filteredOfflineSales = useMemo(() => {
+  // Sorting state
+  const [sortField, setSortField] = useState<SortField>("created_at");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
+
+  const sortedOnlineOrders = useMemo(() => {
+    const list = [...filteredOnlineOrders];
+    list.sort((a, b) => {
+      let valA: any = "";
+      let valB: any = "";
+
+      switch (sortField) {
+        case "order_id":
+          valA = String(a.order_id || "");
+          valB = String(b.order_id || "");
+          break;
+        case "customer_name":
+          valA = String(a.customer_name || "").toLowerCase();
+          valB = String(b.customer_name || "").toLowerCase();
+          break;
+        case "gross_amount":
+          valA = Number(a.gross_amount || 0);
+          valB = Number(b.gross_amount || 0);
+          break;
+        case "payment_status":
+          valA = getPaymentStatusBadge(a, dpPelunasanMap[a.order_id]).text;
+          valB = getPaymentStatusBadge(b, dpPelunasanMap[b.order_id]).text;
+          break;
+        case "fulfillment_status":
+          valA = getFulfillmentStatusBadge(a).text;
+          valB = getFulfillmentStatusBadge(b).text;
+          break;
+        case "created_at":
+        case "no":
+        default:
+          valA = new Date(a.created_at || 0).getTime();
+          valB = new Date(b.created_at || 0).getTime();
+          break;
+      }
+
+      if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+      if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [filteredOnlineOrders, sortField, sortDirection, dpPelunasanMap]);
+
+  const sortedGroupedCustomerOrders = useMemo(() => {
+    const list = [...groupedCustomerOrders];
+    list.sort((a, b) => {
+      let valA: any = "";
+      let valB: any = "";
+
+      switch (sortField) {
+        case "order_id":
+          valA = a.orders.length;
+          valB = b.orders.length;
+          break;
+        case "customer_name":
+          valA = String(a.customer_name || "").toLowerCase();
+          valB = String(b.customer_name || "").toLowerCase();
+          break;
+        case "gross_amount":
+          valA = Number(a.total_amount || 0);
+          valB = Number(b.total_amount || 0);
+          break;
+        case "payment_status":
+          valA = a.paid_count;
+          valB = b.paid_count;
+          break;
+        case "created_at":
+        case "no":
+        default:
+          valA = new Date(a.latest_created_at || 0).getTime();
+          valB = new Date(b.latest_created_at || 0).getTime();
+          break;
+      }
+
+      if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+      if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+    return list;
+  }, [groupedCustomerOrders, sortField, sortDirection]);
+
+  const sortedOfflineSales = useMemo(() => {
     const salesList = Array.isArray(offlineSales) ? offlineSales : [];
-    return salesList.filter((sale) => {
+    const filtered = salesList.filter((sale) => {
       if (!sale) return false;
       const query = (searchQuery || "").toLowerCase();
       return (
@@ -818,7 +962,42 @@ function AdminTransactionsPage() {
         String(sale.status || "").toLowerCase().includes(query)
       );
     });
-  }, [offlineSales, searchQuery]);
+
+    filtered.sort((a, b) => {
+      let valA: any = "";
+      let valB: any = "";
+
+      switch (sortField) {
+        case "order_id":
+          valA = String(a.sale_id || "");
+          valB = String(b.sale_id || "");
+          break;
+        case "customer_name":
+          valA = String(a.customer_name || "").toLowerCase();
+          valB = String(b.customer_name || "").toLowerCase();
+          break;
+        case "gross_amount":
+          valA = Number(a.total || 0);
+          valB = Number(b.total || 0);
+          break;
+        case "payment_status":
+          valA = String(a.status || "");
+          valB = String(b.status || "");
+          break;
+        case "created_at":
+        case "no":
+        default:
+          valA = new Date(a.created_at || 0).getTime();
+          valB = new Date(b.created_at || 0).getTime();
+          break;
+      }
+
+      if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+      if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+    return filtered;
+  }, [offlineSales, searchQuery, sortField, sortDirection]);
 
   return (
     <div className="p-6 lg:p-8 space-y-6 bg-background min-h-screen">
@@ -1103,27 +1282,13 @@ function AdminTransactionsPage() {
                   <thead className="bg-cream">
                     <tr>
                       <th className="w-10 p-3"></th>
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        No
-                      </th>
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        Order ID
-                      </th>
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        Pelanggan
-                      </th>
-                      <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
-                        Total
-                      </th>
-                      <th className="p-3 text-center text-xs font-semibold tracking-wider text-ink uppercase">
-                        Status Pembayaran
-                      </th>
-                      <th className="p-3 text-center text-xs font-semibold tracking-wider text-ink uppercase">
-                        Status Penerimaan
-                      </th>
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        Tanggal
-                      </th>
+                      <SortHeaderColumn label="NO" field="no" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      <SortHeaderColumn label="ORDER ID" field="order_id" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      <SortHeaderColumn label="PELANGGAN" field="customer_name" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      <SortHeaderColumn label="TOTAL" field="gross_amount" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
+                      <SortHeaderColumn label="STATUS PEMBAYARAN" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                      <SortHeaderColumn label="STATUS PENERIMAAN" field="fulfillment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                      <SortHeaderColumn label="TANGGAL" field="created_at" currentField={sortField} direction={sortDirection} onSort={handleSort} />
                       <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
                         Aksi
                       </th>
@@ -1131,14 +1296,14 @@ function AdminTransactionsPage() {
                   </thead>
                   <tbody>
                     {groupByCustomer ? (
-                      groupedCustomerOrders.length === 0 ? (
+                      sortedGroupedCustomerOrders.length === 0 ? (
                         <tr>
                           <td colSpan={9} className="p-8 text-center text-muted-foreground font-bold">
                             Tidak ada data pembeli yang cocok dengan filter
                           </td>
                         </tr>
                       ) : (
-                        groupedCustomerOrders.map((group, idx) => {
+                        sortedGroupedCustomerOrders.map((group, idx) => {
                           const isExpanded = !!expandedRows[`group-${group.key}`];
                           return (
                             <Fragment key={group.key}>
@@ -1271,14 +1436,14 @@ function AdminTransactionsPage() {
                           );
                         })
                       )
-                    ) : filteredOnlineOrders.length === 0 ? (
+                    ) : sortedOnlineOrders.length === 0 ? (
                       <tr>
                         <td colSpan={9} className="p-8 text-center text-muted-foreground">
                           Tidak ada pesanan online yang cocok
                         </td>
                       </tr>
                     ) : (
-                      filteredOnlineOrders.map((order, idx) => (
+                      sortedOnlineOrders.map((order, idx) => (
                         <>
                           <tr
                             key={order.order_id}
@@ -1524,44 +1689,32 @@ function AdminTransactionsPage() {
                   <thead className="bg-cream">
                     <tr>
                       <th className="w-10 p-3"></th>
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        No
-                      </th>
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        Sale ID
-                      </th>
+                      <SortHeaderColumn label="NO" field="no" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      <SortHeaderColumn label="SALE ID" field="order_id" currentField={sortField} direction={sortDirection} onSort={handleSort} />
                       <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
                         Kasir
                       </th>
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        Pelanggan
-                      </th>
-                      <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
-                        Total
-                      </th>
+                      <SortHeaderColumn label="PELANGGAN" field="customer_name" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      <SortHeaderColumn label="TOTAL" field="gross_amount" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
                       <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
                         Pembayaran
                       </th>
-                      <th className="p-3 text-center text-xs font-semibold tracking-wider text-ink uppercase">
-                        Status
-                      </th>
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        Tanggal
-                      </th>
+                      <SortHeaderColumn label="STATUS" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                      <SortHeaderColumn label="TANGGAL" field="created_at" currentField={sortField} direction={sortDirection} onSort={handleSort} />
                       <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
                         Aksi
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOfflineSales.length === 0 ? (
+                    {sortedOfflineSales.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="p-8 text-center text-muted-foreground">
-                          Tidak ada penjualan offline yang cocok
+                        <td colSpan={10} className="p-8 text-center text-muted-foreground font-bold">
+                          Tidak ada penjualan offline
                         </td>
                       </tr>
                     ) : (
-                      filteredOfflineSales.map((sale, idx) => (
+                      sortedOfflineSales.map((sale, idx) => (
                         <>
                           <tr
                             key={sale.sale_id}
