@@ -1924,11 +1924,11 @@ export const verifyPaymentProof = async (req: Request, res: Response) => {
         `Pembayaran QRIS untuk Order ID ${id} diterima dan pesanan mulai diproses oleh ${userName || 'Sistem'}`
       );
     } else {
-      // Reject: set payment status to unpaid, order status to pending_payment, KEEP payment_proof_url, and set payment_proof_note
+      // Reject: set payment status to rejected, order status to pending_payment, KEEP payment_proof_url, and set payment_proof_note
       await connection.execute(
         `UPDATE orders 
          SET transaction_status = 'pending', 
-             payment_status = 'pending', 
+             payment_status = 'rejected', 
              order_status = 'pending_payment', 
              payment_proof_note = ? 
          WHERE order_id = ?`,
@@ -2760,9 +2760,35 @@ export const submitPaymentProof = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: "Bukti pembayaran wajib diunggah" });
     }
 
+    // Fetch existing order to store previous proof in history if replacing
+    const existingOrder = await queryOne<any>(
+      "SELECT payment_proof_url, payment_proof_note, payment_proof_history FROM orders WHERE order_id = ?",
+      [id]
+    );
+
+    let history: any[] = [];
+    if (existingOrder && existingOrder.payment_proof_history) {
+      try {
+        history = typeof existingOrder.payment_proof_history === "string"
+          ? JSON.parse(existingOrder.payment_proof_history)
+          : existingOrder.payment_proof_history;
+        if (!Array.isArray(history)) history = [];
+      } catch (e) {
+        history = [];
+      }
+    }
+
+    if (existingOrder && existingOrder.payment_proof_url && existingOrder.payment_proof_url !== paymentProofUrl) {
+      history.push({
+        url: existingOrder.payment_proof_url,
+        note: existingOrder.payment_proof_note || null,
+        replaced_at: new Date().toISOString()
+      });
+    }
+
     await execute(
-      "UPDATE orders SET payment_proof_url = ?, transaction_status = 'pending', payment_status = 'pending', payment_type = 'manual_qris', payment_proof_note = NULL WHERE order_id = ?",
-      [paymentProofUrl, id]
+      "UPDATE orders SET payment_proof_url = ?, transaction_status = 'pending', payment_status = 'pending', payment_type = 'manual_qris', payment_proof_note = NULL, payment_proof_history = ? WHERE order_id = ?",
+      [paymentProofUrl, JSON.stringify(history), id]
     );
 
     return res.json({ success: true });

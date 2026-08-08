@@ -123,6 +123,10 @@ export async function runMigration() {
         sql: "ALTER TABLE orders ADD COLUMN payment_proof_note VARCHAR(255) DEFAULT NULL"
       },
       {
+        name: "orders.payment_proof_history",
+        sql: "ALTER TABLE orders ADD COLUMN payment_proof_history LONGTEXT DEFAULT NULL"
+      },
+      {
         name: "product_variants.image_url",
         sql: "ALTER TABLE product_variants ADD COLUMN image_url VARCHAR(255) DEFAULT NULL"
       },

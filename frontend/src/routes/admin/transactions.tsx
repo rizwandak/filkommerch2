@@ -39,6 +39,7 @@ import {
   X,
   Users,
   Package,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
@@ -602,16 +603,27 @@ function AdminTransactionsPage() {
       order.payment_status === "paid" ||
       order.transaction_status === "settlement" ||
       order.order_status === "completed";
-    const hasProof = !!order.payment_proof_url && (order.payment_status as string) !== "rejected";
-    const lnsHasProof = linkedLns && !!linkedLns.payment_proof_url && linkedLns.payment_status !== "paid" && (linkedLns.payment_status as string) !== "rejected";
     const lnsIsPaid = linkedLns && (linkedLns.payment_status === "paid" || linkedLns.order_status === "completed");
 
     if (isPaid && (!linkedLns || lnsIsPaid)) {
       return "paid";
     }
-    if ((!isPaid && hasProof) || lnsHasProof) {
+
+    const isVerifyingOrder = (o: any) => {
+      if (!o) return false;
+      const oPaid = o.payment_status === "paid" || o.transaction_status === "settlement" || o.order_status === "completed";
+      if (oPaid) return false;
+
+      const hasProof = !!o.payment_proof_url;
+      const isRejected = (o.payment_status as string) === "rejected" || !!o.payment_proof_note;
+
+      return hasProof && !isRejected;
+    };
+
+    if (isVerifyingOrder(order) || (linkedLns && isVerifyingOrder(linkedLns))) {
       return "verifying";
     }
+
     return "unpaid";
   };
 
@@ -624,6 +636,17 @@ function AdminTransactionsPage() {
     let dpCount = 0;
     let unpaidCount = 0;
 
+    const isVerifyingOrder = (o: any) => {
+      if (!o) return false;
+      const oPaid = o.payment_status === "paid" || o.transaction_status === "settlement" || o.order_status === "completed";
+      if (oPaid) return false;
+
+      const hasProof = !!o.payment_proof_url;
+      const isRejected = (o.payment_status as string) === "rejected" || !!o.payment_proof_note;
+
+      return hasProof && !isRejected;
+    };
+
     baseFilteredOrders.forEach((o) => {
       if (!o) return;
 
@@ -633,19 +656,12 @@ function AdminTransactionsPage() {
         verifyingBarisCount++;
       } else if (cat === "unpaid") unpaidCount++;
 
-      // Count individual payment proofs needing verification (DP/regular proof + LNS pelunasan proof)
-      const isPaid =
-        o.payment_status === "paid" ||
-        o.transaction_status === "settlement" ||
-        o.order_status === "completed";
-      const hasProof = !!o.payment_proof_url && (o.payment_status as string) !== "rejected";
-      if (!isPaid && hasProof) {
+      if (isVerifyingOrder(o)) {
         totalVerifyingProofs++;
       }
 
       const linkedLns = dpPelunasanMap[o.order_id];
-      const lnsHasProof = linkedLns && !!linkedLns.payment_proof_url && linkedLns.payment_status !== "paid" && (linkedLns.payment_status as string) !== "rejected";
-      if (lnsHasProof) {
+      if (linkedLns && isVerifyingOrder(linkedLns)) {
         totalVerifyingProofs++;
       }
 
@@ -1762,11 +1778,21 @@ function AdminTransactionsPage() {
 
                         {managedTransaction.payment_proof_url ? (
                           <div className="space-y-2">
-                            <div className="w-full max-h-48 border border-border rounded overflow-hidden flex items-center justify-center bg-gray-50">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-extrabold uppercase text-ink">
+                                Bukti Pembayaran Terbaru:
+                              </span>
+                              {managedTransaction.payment_proof_note && (
+                                <Badge className="bg-red-100 text-red-800 border-red-200 text-[10px] uppercase font-bold">
+                                  Status: Ditolak Admin
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="w-full max-h-52 border-2 border-ink/30 rounded-xl overflow-hidden flex items-center justify-center bg-cream/30 p-2 relative group">
                               <img
                                 src={resolveImageUrl(managedTransaction.payment_proof_url)}
                                 alt="Bukti Transfer"
-                                className="max-h-48 object-contain cursor-zoom-in hover:scale-105 transition-transform"
+                                className="max-h-48 object-contain cursor-zoom-in group-hover:scale-105 transition-transform"
                                 onClick={() => window.open(resolveImageUrl(managedTransaction.payment_proof_url), "_blank")}
                               />
                             </div>
@@ -1774,9 +1800,9 @@ function AdminTransactionsPage() {
                               href={resolveImageUrl(managedTransaction.payment_proof_url)}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-brand-blue font-semibold hover:underline block text-[10px] text-center"
+                              className="text-brand-blue font-bold hover:underline block text-[10px] text-center"
                             >
-                              Buka Bukti Pembayaran di Tab Baru ↗
+                              Buka Bukti Pembayaran Terbaru di Tab Baru ↗
                             </a>
                           </div>
                         ) : (
@@ -1784,6 +1810,72 @@ function AdminTransactionsPage() {
                             Belum mengunggah bukti pembayaran.
                           </p>
                         )}
+
+                        {/* Proof History / Comparison Section */}
+                        {(() => {
+                          let historyList: Array<{ url: string; note?: string | null; replaced_at?: string }> = [];
+                          const rawHist = managedTransaction.payment_proof_history;
+                          if (rawHist) {
+                            if (Array.isArray(rawHist)) historyList = rawHist;
+                            else if (typeof rawHist === "string") {
+                              try {
+                                const parsed = JSON.parse(rawHist);
+                                if (Array.isArray(parsed)) historyList = parsed;
+                              } catch { historyList = []; }
+                            }
+                          }
+                          if (historyList.length === 0) return null;
+
+                          return (
+                            <div className="mt-4 pt-4 border-t border-dashed border-border space-y-3">
+                              <div className="flex items-center gap-1.5 text-amber-900">
+                                <History className="w-4 h-4 text-brand-orange" />
+                                <h5 className="text-[11px] font-extrabold uppercase tracking-wider text-ink">
+                                  Riwayat Bukti Ditolak Sebelumnya ({historyList.length}) — Pembanding
+                                </h5>
+                              </div>
+                              <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
+                                {historyList.map((hist, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="p-2.5 bg-red-50/70 border border-red-200 rounded-lg flex items-start gap-3 text-xs"
+                                  >
+                                    <a
+                                      href={resolveImageUrl(hist.url)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="w-16 h-16 border border-red-300 rounded overflow-hidden bg-white shrink-0 group relative cursor-pointer"
+                                    >
+                                      <img
+                                        src={resolveImageUrl(hist.url)}
+                                        alt={`Bukti Lama #${idx + 1}`}
+                                        className="w-full h-full object-cover group-hover:scale-105 transition"
+                                      />
+                                      <div className="absolute inset-0 bg-red-900/20 flex items-center justify-center">
+                                        <span className="text-[8px] font-black text-white bg-red-600 px-1 rounded uppercase">Lama</span>
+                                      </div>
+                                    </a>
+                                    <div className="flex-1 space-y-1 text-[11px]">
+                                      <div className="flex items-center justify-between">
+                                        <span className="font-extrabold text-red-900">Bukti #{idx + 1} (Ditolak)</span>
+                                        {hist.replaced_at && (
+                                          <span className="text-[9px] text-muted-foreground">
+                                            {new Date(hist.replaced_at).toLocaleString("id-ID")}
+                                          </span>
+                                        )}
+                                      </div>
+                                      {hist.note && (
+                                        <p className="text-red-800 bg-white/80 p-1.5 rounded border border-red-200 text-[10px]">
+                                          <strong className="text-red-900">Catatan/Alasan Ditolak:</strong> "{hist.note}"
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         {/* Display current status and annul option */}
                         {(managedTransaction.payment_status === "paid" || managedTransaction.transaction_status === "settlement") ? (

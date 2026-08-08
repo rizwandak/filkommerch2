@@ -32,6 +32,7 @@ import {
   Plus,
   Loader2,
   User as UserIcon,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -1173,6 +1174,70 @@ function OrderDetailComponent() {
                         )}
                       </div>
                     </div>
+
+                    {/* Proof History Section */}
+                    {(() => {
+                      let historyList: Array<{ url: string; note?: string | null; replaced_at?: string }> = [];
+                      const rawHist = order.payment_proof_history;
+                      if (rawHist) {
+                        if (Array.isArray(rawHist)) historyList = rawHist;
+                        else if (typeof rawHist === "string") {
+                          try {
+                            const parsed = JSON.parse(rawHist);
+                            if (Array.isArray(parsed)) historyList = parsed;
+                          } catch { historyList = []; }
+                        }
+                      }
+                      if (historyList.length === 0) return null;
+
+                      return (
+                        <div className="pt-3 border-t border-dashed border-ink/20 space-y-2.5">
+                          <div className="flex items-center gap-1.5 text-red-900 font-extrabold text-xs uppercase tracking-wide">
+                            <History className="w-4 h-4 text-red-600" />
+                            <span>Riwayat Bukti Ditolak Sebelumnya ({historyList.length})</span>
+                          </div>
+                          <div className="space-y-2">
+                            {historyList.map((hist, idx) => (
+                              <div
+                                key={idx}
+                                className="p-2.5 bg-red-50/80 border border-red-200 rounded-xl flex items-start gap-3 text-xs"
+                              >
+                                <a
+                                  href={resolveImageUrl(hist.url)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="w-16 h-16 border border-red-300 rounded-lg overflow-hidden bg-white shrink-0 group relative cursor-pointer"
+                                >
+                                  <img
+                                    src={resolveImageUrl(hist.url)}
+                                    alt={`Bukti Ditolak #${idx + 1}`}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition"
+                                  />
+                                  <div className="absolute inset-0 bg-red-900/20 flex items-center justify-center">
+                                    <span className="text-[8px] font-black text-white bg-red-600 px-1 rounded uppercase">Lama</span>
+                                  </div>
+                                </a>
+                                <div className="flex-1 space-y-1 text-[11px]">
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-extrabold text-red-900">Bukti #{idx + 1} (Ditolak)</span>
+                                    {hist.replaced_at && (
+                                      <span className="text-[9px] text-muted-foreground">
+                                        {new Date(hist.replaced_at).toLocaleString("id-ID")}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {hist.note && (
+                                    <p className="text-red-800 bg-white/90 p-1.5 rounded border border-red-200 text-[10px]">
+                                      <strong className="text-red-900">Alasan Ditolak:</strong> "{hist.note}"
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 ) : (
                   <div className="space-y-4">
