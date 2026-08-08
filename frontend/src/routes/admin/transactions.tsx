@@ -43,6 +43,10 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Truck,
+  Store,
+  SlidersHorizontal,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
@@ -208,8 +212,28 @@ function AdminTransactionsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "verifying" | "dp" | "unpaid">("all");
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
-  const [productFilter, setProductFilter] = useState<string>("all");
+  const [productFilter, setProductFilter] = useState<string[]>([]);
+  const [shippingFilter, setShippingFilter] = useState<"all" | "pickup" | "delivery">("all");
   const [groupByCustomer, setGroupByCustomer] = useState<boolean>(false);
+
+  // Filter Modal state
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (campaignFilter !== "all") count++;
+    if (productFilter.length > 0) count++;
+    if (shippingFilter !== "all") count++;
+    if (statusFilter !== "all") count++;
+    return count;
+  }, [campaignFilter, productFilter, shippingFilter, statusFilter]);
+
+  const handleResetAllFilters = () => {
+    setCampaignFilter("all");
+    setProductFilter([]);
+    setShippingFilter("all");
+    setStatusFilter("all");
+  };
 
   // Collapsible Row States
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -619,16 +643,33 @@ function AdminTransactionsPage() {
         }
       }
 
-      // Product Filter: check if order contains items matching the selected product
-      if (productFilter !== "all") {
+      // Product Filter: check if order contains items matching ANY of the selected products
+      if (productFilter.length > 0) {
         const orderItems = (order as any).items || [];
-        const selectedProduct = products.find((p) => String(p.id) === productFilter);
-        const filterName = selectedProduct ? String(selectedProduct.name).trim().toLowerCase() : productFilter.toLowerCase();
+        const selectedProductNames = products
+          .filter((p) => productFilter.includes(String(p.id)))
+          .map((p) => String(p.name).trim().toLowerCase());
+
         const hasMatchingProduct = orderItems.some((item: any) => {
           const itemName = String(item.product_name || "").trim().toLowerCase();
-          return itemName.includes(filterName) || itemName.replace(/\s*\(?(dp|pelunasan|lunas|full)\)?\s*$/i, "").replace(/\s*-\s*(dp|pelunasan|lunas|full)\s*$/i, "").trim().toLowerCase() === filterName;
+          const cleanItemName = itemName
+            .replace(/\s*\(?(dp|pelunasan|lunas|full)\)?\s*$/i, "")
+            .replace(/\s*-\s*(dp|pelunasan|lunas|full)\s*$/i, "")
+            .trim();
+
+          return selectedProductNames.some(
+            (filterName) => itemName.includes(filterName) || cleanItemName === filterName
+          );
         });
         if (!hasMatchingProduct) return false;
+      }
+
+      // Shipping Method Filter (Ambil di FILKOM Merch vs Diantar)
+      if (shippingFilter !== "all") {
+        const addr = String((order as any).shipping_address || "").toLowerCase();
+        const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
+        if (shippingFilter === "pickup" && !isPickup) return false;
+        if (shippingFilter === "delivery" && isPickup) return false;
       }
 
       // Search Query Filter
@@ -646,7 +687,7 @@ function AdminTransactionsPage() {
 
       return matchesQuery;
     });
-  }, [onlineOrders, searchQuery, campaignFilter, productFilter, dpPelunasanMap]);
+  }, [onlineOrders, searchQuery, campaignFilter, productFilter, shippingFilter, dpPelunasanMap]);
 
   const getOrderCategory = (order: Order): "paid" | "verifying" | "unpaid" => {
     const linkedLns = dpPelunasanMap[order.order_id];
@@ -1157,7 +1198,7 @@ function AdminTransactionsPage() {
         </button>
       </div>
 
-      {(statusFilter !== "all" || productFilter !== "all") && (
+      {(statusFilter !== "all" || productFilter.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 bg-brand-orange/10 border border-brand-orange/30 px-3.5 py-2 rounded-xl text-xs text-brand-orange font-bold">
           <Filter className="w-4 h-4" />
           <div className="flex flex-wrap items-center gap-1.5">
@@ -1175,18 +1216,21 @@ function AdminTransactionsPage() {
                 </strong>
               </span>
             )}
-            {statusFilter !== "all" && productFilter !== "all" && (
+            {statusFilter !== "all" && productFilter.length > 0 && (
               <span className="text-brand-orange/50">•</span>
             )}
-            {productFilter !== "all" && (
+            {productFilter.length > 0 && (
               <span>
-                Produk:{" "}
-                <strong className="uppercase underline">{products.find((p) => String(p.id) === productFilter)?.name || productFilter}</strong>
+                Produk ({productFilter.length}):{" "}
+                <strong className="uppercase underline">
+                  {productFilter.map((id) => products.find((p) => String(p.id) === id)?.name || id).slice(0, 2).join(", ")}
+                  {productFilter.length > 2 ? "..." : ""}
+                </strong>
               </span>
             )}
           </div>
           <button
-            onClick={() => { setStatusFilter("all"); setProductFilter("all"); }}
+            onClick={() => { setStatusFilter("all"); setProductFilter([]); }}
             className="ml-auto text-[10px] uppercase bg-brand-orange text-white px-2.5 py-1 rounded hover:bg-brand-orange/90 font-black cursor-pointer"
           >
             Reset Semua Filter
@@ -1214,52 +1258,41 @@ function AdminTransactionsPage() {
                   })
                 </CardTitle>
 
-                {/* Filter Controls: Batch Dropdown & Grouping Toggle */}
+                {/* Clean Control Bar with Filter Modal Trigger */}
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <div className="flex items-center gap-1.5 bg-cream/80 border-2 border-ink px-3 py-1 rounded-xl">
-                    <Filter className="w-3.5 h-3.5 text-brand-orange" />
-                    <span className="text-[11px] font-black text-ink uppercase">Batch:</span>
-                    <select
-                      value={campaignFilter}
-                      onChange={(e) => setCampaignFilter(e.target.value)}
-                      className="text-xs font-bold text-ink bg-white border border-ink/30 rounded-md px-2 py-1 focus:outline-none cursor-pointer"
-                    >
-                      <option value="all">Semua Batch / Tipe</option>
-                      {campaigns.map((c) => (
-                        <option key={c.id} value={String(c.id)}>
-                          {c.batch_name || `Batch #${c.id}`}
-                        </option>
-                      ))}
-                      <option value="none">Ready Stock</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 bg-cream/80 border-2 border-ink px-3 py-1 rounded-xl">
-                    <Package className="w-3.5 h-3.5 text-brand-orange" />
-                    <span className="text-[11px] font-black text-ink uppercase">Produk:</span>
-                    <select
-                      value={productFilter}
-                      onChange={(e) => setProductFilter(e.target.value)}
-                      className="text-xs font-bold text-ink bg-white border border-ink/30 rounded-md px-2 py-1 focus:outline-none cursor-pointer max-w-[180px]"
-                    >
-                      <option value="all">Semua Produk</option>
-                      {uniqueProductNames.map((p) => (
-                        <option key={p.id} value={String(p.id)}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    {productFilter !== "all" && (
-                      <button
-                        type="button"
-                        onClick={() => setProductFilter("all")}
-                        className="ml-0.5 p-0.5 rounded hover:bg-red-100 text-red-500 cursor-pointer"
-                        title="Reset filter produk"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                  <Button
+                    type="button"
+                    variant={activeFilterCount > 0 ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setFilterModalOpen(true)}
+                    className={`h-9 text-xs font-black border-2 border-ink transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-2 ${
+                      activeFilterCount > 0
+                        ? "bg-brand-orange text-white hover:bg-brand-orange/90"
+                        : "bg-white text-ink hover:bg-cream"
+                    }`}
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Filter Transaksi</span>
+                    {activeFilterCount > 0 && (
+                      <span className="bg-white text-brand-orange text-[10px] font-extrabold px-1.5 py-0.2 rounded-full min-w-[18px] text-center border border-brand-orange/30">
+                        {activeFilterCount}
+                      </span>
                     )}
-                  </div>
+                  </Button>
+
+                  {activeFilterCount > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleResetAllFilters}
+                      className="h-9 px-2 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 flex items-center gap-1 cursor-pointer"
+                      title="Reset semua filter"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Reset Filter</span>
+                    </Button>
+                  )}
 
                   <Button
                     type="button"
@@ -1267,7 +1300,7 @@ function AdminTransactionsPage() {
                     size="sm"
                     onClick={() => setGroupByCustomer(!groupByCustomer)}
                     className={`h-9 text-xs font-black border-2 border-ink transition-all cursor-pointer ${
-                      groupByCustomer ? "bg-brand-orange text-white hover:bg-brand-orange/90 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-white text-ink hover:bg-cream"
+                      groupByCustomer ? "bg-purple-600 text-white hover:bg-purple-700 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-white text-ink hover:bg-cream"
                     }`}
                   >
                     <Users className="w-3.5 h-3.5 mr-1.5" />
@@ -1275,6 +1308,41 @@ function AdminTransactionsPage() {
                   </Button>
                 </div>
               </div>
+
+              {/* Active Filter Chips Summary */}
+              {activeFilterCount > 0 && (
+                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-dashed border-border mt-3">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Filter Aktif:
+                  </span>
+                  {campaignFilter !== "all" && (
+                    <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 text-[10px] font-bold flex items-center gap-1">
+                      Batch: {campaignFilter === "none" ? "Ready Stock" : campaigns.find(c => String(c.id) === campaignFilter)?.batch_name || `#${campaignFilter}`}
+                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setCampaignFilter("all")} />
+                    </Badge>
+                  )}
+                  {productFilter.length > 0 && (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-900 border-blue-300 text-[10px] font-bold flex items-center gap-1">
+                      Produk ({productFilter.length}): {
+                        productFilter.map(id => uniqueProductNames.find(p => String(p.id) === id)?.name || id).slice(0, 2).join(", ")
+                      }{productFilter.length > 2 ? "..." : ""}
+                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setProductFilter([])} />
+                    </Badge>
+                  )}
+                  {shippingFilter !== "all" && (
+                    <Badge variant="outline" className="bg-emerald-50 text-emerald-900 border-emerald-300 text-[10px] font-bold flex items-center gap-1">
+                      Pengiriman: {shippingFilter === "pickup" ? "Ambil Store" : "Diantar"}
+                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setShippingFilter("all")} />
+                    </Badge>
+                  )}
+                  {statusFilter !== "all" && (
+                    <Badge variant="outline" className="bg-purple-50 text-purple-900 border-purple-300 text-[10px] font-bold flex items-center gap-1">
+                      Status: {statusFilter === "paid" ? "Lunas" : statusFilter === "verifying" ? "ACC Admin" : statusFilter === "dp" ? "Pesanan DP" : "Belum Bayar"}
+                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setStatusFilter("all")} />
+                    </Badge>
+                  )}
+                </div>
+              )}
             </CardHeader>
             <CardContent>
               <div className="border rounded-lg overflow-x-auto">
@@ -1483,6 +1551,19 @@ function AdminTransactionsPage() {
                                     + Pelunasan
                                   </Badge>
                                 )}
+                                {(() => {
+                                  const addr = String((order as any).shipping_address || "").toLowerCase();
+                                  const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
+                                  return isPickup ? (
+                                    <Badge className="bg-emerald-50 text-emerald-950 border-emerald-300 text-[9px] px-1.5 py-0 uppercase font-extrabold flex items-center gap-1">
+                                      <Store className="w-2.5 h-2.5 text-emerald-700" /> Ambil Store
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-blue-50 text-blue-950 border-blue-300 text-[9px] px-1.5 py-0 uppercase font-extrabold flex items-center gap-1" title={order.shipping_address || undefined}>
+                                      <Truck className="w-2.5 h-2.5 text-blue-700" /> Diantar
+                                    </Badge>
+                                  );
+                                })()}
                               </div>
                             </td>
                             <td className="p-3">
@@ -2455,6 +2536,161 @@ function AdminTransactionsPage() {
               className="bg-ink text-white font-bold uppercase tracking-wider text-xs px-6"
             >
               Tutup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Filter Modal Dialog */}
+      <Dialog open={filterModalOpen} onOpenChange={setFilterModalOpen}>
+        <DialogContent className="max-w-md bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5">
+          <DialogHeader>
+            <DialogTitle className="display text-lg tracking-wide text-ink flex items-center gap-2 uppercase">
+              <SlidersHorizontal className="w-5 h-5 text-brand-orange" />
+              Filter &amp; Penyaringan Transaksi
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-xs">
+            {/* 1. Batch PO Filter */}
+            <div className="space-y-1.5">
+              <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
+                <Filter className="w-3.5 h-3.5 text-brand-orange" />
+                Batch / Kampanye Pre-Order
+              </label>
+              <select
+                value={campaignFilter}
+                onChange={(e) => setCampaignFilter(e.target.value)}
+                className="w-full text-xs font-bold text-ink bg-cream/40 border-2 border-ink rounded-lg p-2.5 focus:outline-none cursor-pointer"
+              >
+                <option value="all">Semua Batch / Tipe</option>
+                {campaigns.map((c) => (
+                  <option key={c.id} value={String(c.id)}>
+                    {c.batch_name || `Batch #${c.id}`}
+                  </option>
+                ))}
+                <option value="none">Ready Stock</option>
+              </select>
+            </div>
+
+            {/* 2. Product Filter (Multi-Select Checkboxes) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
+                  <Package className="w-3.5 h-3.5 text-brand-orange" />
+                  Filter Produk (Pilih Lebih Dari 1)
+                </label>
+                {productFilter.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setProductFilter([])}
+                    className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
+                  >
+                    Reset Produk ({productFilter.length})
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-cream/40 border-2 border-ink rounded-lg p-2.5 max-h-48 overflow-y-auto space-y-1">
+                <label
+                  className={`flex items-center gap-2.5 p-1.5 rounded-md cursor-pointer text-xs font-bold transition-colors select-none ${
+                    productFilter.length === 0 ? "bg-brand-orange/10 text-brand-orange" : "hover:bg-black/5 text-ink"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={productFilter.length === 0}
+                    onChange={() => setProductFilter([])}
+                    className="w-4 h-4 accent-brand-orange cursor-pointer rounded"
+                  />
+                  <span>Semua Produk (Tanpa Filter)</span>
+                </label>
+
+                <div className="border-t border-dashed border-ink/20 my-1"></div>
+
+                {uniqueProductNames.map((p) => {
+                  const pIdStr = String(p.id);
+                  const isChecked = productFilter.includes(pIdStr);
+                  return (
+                    <label
+                      key={p.id}
+                      className={`flex items-center gap-2.5 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${
+                        isChecked ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300" : "hover:bg-black/5 text-ink font-semibold"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setProductFilter((prev) => [...prev, pIdStr]);
+                          } else {
+                            setProductFilter((prev) => prev.filter((id) => id !== pIdStr));
+                          }
+                        }}
+                        className="w-4 h-4 accent-brand-orange cursor-pointer rounded"
+                      />
+                      <span className="truncate">{p.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* 3. Shipping Method Filter */}
+            <div className="space-y-1.5">
+              <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
+                <Truck className="w-3.5 h-3.5 text-brand-orange" />
+                Metode Pengiriman
+              </label>
+              <select
+                value={shippingFilter}
+                onChange={(e) => setShippingFilter(e.target.value as "all" | "pickup" | "delivery")}
+                className="w-full text-xs font-bold text-ink bg-cream/40 border-2 border-ink rounded-lg p-2.5 focus:outline-none cursor-pointer"
+              >
+                <option value="all">Semua Metode Pengiriman</option>
+                <option value="pickup">Ambil di Store (FILKOM Merch)</option>
+                <option value="delivery">Diantar (Kurir / Alamat)</option>
+              </select>
+            </div>
+
+            {/* 4. Payment Status Filter */}
+            <div className="space-y-1.5">
+              <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
+                <CreditCard className="w-3.5 h-3.5 text-brand-orange" />
+                Status Pembayaran
+              </label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value as any)}
+                className="w-full text-xs font-bold text-ink bg-cream/40 border-2 border-ink rounded-lg p-2.5 focus:outline-none cursor-pointer"
+              >
+                <option value="all">Semua Status Pembayaran</option>
+                <option value="paid">Lunas Terbayar</option>
+                <option value="verifying">Butuh ACC Admin (Bukti QRIS)</option>
+                <option value="dp">Pesanan DP</option>
+                <option value="unpaid">Belum Bayar / Ditolak</option>
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-row items-center justify-between gap-2 pt-3 border-t border-dashed border-border">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleResetAllFilters}
+              disabled={activeFilterCount === 0}
+              className="border-2 border-ink text-xs font-black uppercase h-9 disabled:opacity-40 cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5 mr-1" />
+              Reset All
+            </Button>
+            <Button
+              type="button"
+              onClick={() => setFilterModalOpen(false)}
+              className="bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold text-xs uppercase h-9 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+            >
+              Terapkan Filter
             </Button>
           </DialogFooter>
         </DialogContent>
