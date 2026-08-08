@@ -38,6 +38,7 @@ import {
   Upload,
   X,
   Users,
+  Package,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
@@ -148,12 +149,14 @@ function AdminTransactionsPage() {
   const [onlineOrders, setOnlineOrders] = useState<Order[]>([]);
   const [offlineSales, setOfflineSales] = useState<OfflineSale[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "verifying" | "dp" | "unpaid">("all");
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
+  const [productFilter, setProductFilter] = useState<string>("all");
   const [groupByCustomer, setGroupByCustomer] = useState<boolean>(false);
 
   // Collapsible Row States
@@ -223,6 +226,15 @@ function AdminTransactionsPage() {
       }
     } catch (err) {
       console.error("Error fetching campaigns:", err);
+    }
+
+    try {
+      const prodRes = await fetchJson<{ products: any[] }>(`${API_BASE_URL}/api/products`);
+      if (prodRes?.products) {
+        setProducts(prodRes.products);
+      }
+    } catch (err) {
+      console.error("Error fetching products:", err);
     }
 
     try {
@@ -498,6 +510,14 @@ function AdminTransactionsPage() {
     return map;
   }, [onlineOrders]);
 
+  // Extract unique product names from products table for the filter dropdown
+  const uniqueProductNames = useMemo(() => {
+    return products
+      .filter((p) => p.name)
+      .map((p) => ({ id: p.id, name: String(p.name).trim() }))
+      .sort((a, b) => a.name.localeCompare(b.name, "id"));
+  }, [products]);
+
   // 1. Base filtered list (respects campaign batch filter and search query)
   const baseFilteredOrders = useMemo(() => {
     const ordersList = Array.isArray(onlineOrders) ? onlineOrders : [];
@@ -545,6 +565,18 @@ function AdminTransactionsPage() {
         }
       }
 
+      // Product Filter: check if order contains items matching the selected product
+      if (productFilter !== "all") {
+        const orderItems = (order as any).items || [];
+        const selectedProduct = products.find((p) => String(p.id) === productFilter);
+        const filterName = selectedProduct ? String(selectedProduct.name).trim().toLowerCase() : productFilter.toLowerCase();
+        const hasMatchingProduct = orderItems.some((item: any) => {
+          const itemName = String(item.product_name || "").trim().toLowerCase();
+          return itemName.includes(filterName) || itemName.replace(/\s*\(?(dp|pelunasan|lunas|full)\)?\s*$/i, "").replace(/\s*-\s*(dp|pelunasan|lunas|full)\s*$/i, "").trim().toLowerCase() === filterName;
+        });
+        if (!hasMatchingProduct) return false;
+      }
+
       // Search Query Filter
       const query = (searchQuery || "").toLowerCase();
       const linkedLns = dpPelunasanMap[order.order_id];
@@ -560,7 +592,7 @@ function AdminTransactionsPage() {
 
       return matchesQuery;
     });
-  }, [onlineOrders, searchQuery, campaignFilter, dpPelunasanMap]);
+  }, [onlineOrders, searchQuery, campaignFilter, productFilter, dpPelunasanMap]);
 
   const getOrderCategory = (order: Order): "paid" | "verifying" | "unpaid" => {
     const linkedLns = dpPelunasanMap[order.order_id];
@@ -928,26 +960,39 @@ function AdminTransactionsPage() {
         </button>
       </div>
 
-      {statusFilter !== "all" && (
-        <div className="flex items-center gap-2 bg-brand-orange/10 border border-brand-orange/30 px-3.5 py-2 rounded-xl text-xs text-brand-orange font-bold">
+      {(statusFilter !== "all" || productFilter !== "all") && (
+        <div className="flex flex-wrap items-center gap-2 bg-brand-orange/10 border border-brand-orange/30 px-3.5 py-2 rounded-xl text-xs text-brand-orange font-bold">
           <Filter className="w-4 h-4" />
-          <span>
-            Filter Status Aktif:{" "}
-            <strong className="uppercase underline">
-              {statusFilter === "verifying"
-                ? "Menunggu Verifikasi"
-                : statusFilter === "paid"
-                  ? "Lunas / Selesai"
-                  : statusFilter === "dp"
-                    ? "Pesanan DP"
-                    : "Belum Dibayar"}
-            </strong>
-          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {statusFilter !== "all" && (
+              <span>
+                Status:{" "}
+                <strong className="uppercase underline">
+                  {statusFilter === "verifying"
+                    ? "Menunggu Verifikasi"
+                    : statusFilter === "paid"
+                      ? "Lunas / Selesai"
+                      : statusFilter === "dp"
+                        ? "Pesanan DP"
+                        : "Belum Dibayar"}
+                </strong>
+              </span>
+            )}
+            {statusFilter !== "all" && productFilter !== "all" && (
+              <span className="text-brand-orange/50">•</span>
+            )}
+            {productFilter !== "all" && (
+              <span>
+                Produk:{" "}
+                <strong className="uppercase underline">{products.find((p) => String(p.id) === productFilter)?.name || productFilter}</strong>
+              </span>
+            )}
+          </div>
           <button
-            onClick={() => setStatusFilter("all")}
+            onClick={() => { setStatusFilter("all"); setProductFilter("all"); }}
             className="ml-auto text-[10px] uppercase bg-brand-orange text-white px-2.5 py-1 rounded hover:bg-brand-orange/90 font-black cursor-pointer"
           >
-            Reset Filter (Tampilkan Semua)
+            Reset Semua Filter
           </button>
         </div>
       )}
@@ -990,6 +1035,33 @@ function AdminTransactionsPage() {
                       ))}
                       <option value="none">Ready Stock</option>
                     </select>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 bg-cream/80 border-2 border-ink px-3 py-1 rounded-xl">
+                    <Package className="w-3.5 h-3.5 text-brand-orange" />
+                    <span className="text-[11px] font-black text-ink uppercase">Produk:</span>
+                    <select
+                      value={productFilter}
+                      onChange={(e) => setProductFilter(e.target.value)}
+                      className="text-xs font-bold text-ink bg-white border border-ink/30 rounded-md px-2 py-1 focus:outline-none cursor-pointer max-w-[180px]"
+                    >
+                      <option value="all">Semua Produk</option>
+                      {uniqueProductNames.map((p) => (
+                        <option key={p.id} value={String(p.id)}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    {productFilter !== "all" && (
+                      <button
+                        type="button"
+                        onClick={() => setProductFilter("all")}
+                        className="ml-0.5 p-0.5 rounded hover:bg-red-100 text-red-500 cursor-pointer"
+                        title="Reset filter produk"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
 
                   <Button
