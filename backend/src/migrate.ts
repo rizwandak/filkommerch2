@@ -319,6 +319,30 @@ export async function runMigration() {
       console.warn("Notice: product_reviews table status:", err.message);
     }
 
+    // Auto-fix Keychain variant names in order_items for historical imported CSV items
+    try {
+      console.log("Fixing Keychain order items variant names...");
+      const keychainMapping: Record<string, { color: string; variant_id: number }> = {
+        "desain 1": { color: "Bara", variant_id: 120 },
+        "desain 2": { color: "Satu hati satu jiwa filkom", variant_id: 121 },
+        "desain 3": { color: "filkom buddies", variant_id: 122 },
+        "desain 4": { color: "error code", variant_id: 123 },
+        "desain 5": { color: "FILKOM", variant_id: 124 },
+      };
+
+      for (const [key, target] of Object.entries(keychainMapping)) {
+        await connection.query(
+          `UPDATE order_items 
+           SET color = ?, variant_id = ? 
+           WHERE (product_name LIKE '%keychain%' OR product_id = 19) AND LOWER(TRIM(color)) = ?`,
+          [target.color, target.variant_id, key]
+        );
+      }
+      console.log("✅ Keychain order items variant names fixed successfully!");
+    } catch (err: any) {
+      console.warn("Notice: Keychain variant fix status:", err.message);
+    }
+
     console.log("Schema migration finished successfully!");
   } catch (err) {
     console.error("Fatal connection error during migration:", err);
