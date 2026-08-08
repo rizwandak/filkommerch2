@@ -5379,6 +5379,12 @@ export const importOrders = async (req: Request, res: Response) => {
               color = specParts[1] || "";
             }
 
+            let itemPrice = matchedProd 
+              ? Number(matchedProd.filkom_price && Number(matchedProd.filkom_price) > 0 ? matchedProd.filkom_price : (matchedProd.promo_price && Number(matchedProd.promo_price) > 0 ? matchedProd.promo_price : matchedProd.price))
+              : Math.round(grandTotal / (itemTokens.length || 1));
+
+            const itemSubtotal = itemPrice * qty;
+
             await connection.query(
               `INSERT INTO order_items (
                 order_id, product_id, product_name, size, color, quantity, unit_price, subtotal
@@ -5390,8 +5396,8 @@ export const importOrders = async (req: Request, res: Response) => {
                 size,
                 color,
                 qty,
-                Math.round(grandTotal / (itemTokens.length || 1)),
-                Math.round(grandTotal / (itemTokens.length || 1)),
+                itemPrice,
+                itemSubtotal,
               ]
             );
           }

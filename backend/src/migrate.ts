@@ -532,6 +532,16 @@ export async function runMigration() {
       console.warn("Notice: Batch #1 price update status:", err.message);
     }
 
+    try {
+      console.log("Syncing order_items subtotal = unit_price * quantity...");
+      await connection.query(
+        "UPDATE order_items SET subtotal = unit_price * quantity WHERE (subtotal != (unit_price * quantity) OR subtotal IS NULL) AND unit_price > 0"
+      );
+      console.log("✅ Order items subtotal synced successfully!");
+    } catch (err: any) {
+      console.warn("Notice: Subtotal sync status:", err.message);
+    }
+
     console.log("Schema migration finished successfully!");
   } catch (err) {
     console.error("Fatal connection error during migration:", err);
