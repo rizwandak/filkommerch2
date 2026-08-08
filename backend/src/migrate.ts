@@ -399,7 +399,7 @@ export async function runMigration() {
       console.warn("Notice: Pin Enamel variant fix status:", err.message);
     }
 
-    // Auto-fix Pin Tas variant names
+    // Auto-fix Pin Tas variant names and imported items distribution
     try {
       console.log("Fixing Pin Tas order items and variants...");
       const pinTasMapping: Record<string, string> = {
@@ -416,11 +416,34 @@ export async function runMigration() {
         await connection.query("UPDATE product_variants SET color = ?, size = 'One Size' WHERE product_id = 17 AND LOWER(TRIM(color)) = ?", [v, k]);
       }
 
-      const [pinTasRows] = await connection.query<any[]>("SELECT id, color FROM order_items WHERE (product_id = 17 OR product_name LIKE '%Pin Tas%')");
-      for (const row of pinTasRows) {
-        const cLower = (row.color || "").trim().toLowerCase();
-        if (pinTasMapping[cLower]) {
-          await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE id = ?", [pinTasMapping[cLower], row.id]);
+      // Update non-imported items based on their variant_id
+      const [pvList] = await connection.query<any[]>("SELECT id, color FROM product_variants WHERE product_id = 17");
+      for (const pv of pvList) {
+        await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE (product_id = 17 OR product_name LIKE '%Pin Tas%') AND variant_id = ?", [pv.color, pv.id]);
+      }
+
+      // Distribute imported items (where order_id LIKE 'IMP-%') according to exact target counts
+      const [importedItems] = await connection.query<any[]>(
+        "SELECT id FROM order_items WHERE (product_id = 17 OR product_name LIKE '%Pin Tas%') AND order_id LIKE 'IMP-%' ORDER BY id ASC"
+      );
+
+      if (importedItems.length > 0) {
+        const targets = [
+          { color: "FILKOM Oranye", vId: 36, count: 8 },
+          { color: "FILKOM Blue", vId: 37, count: 16 },
+          { color: "Let's Stay Connected", vId: 38, count: 2 },
+          { color: "It's My First Time Ngoding", vId: 39, count: 11 },
+          { color: "I ❤️ Coding", vId: 40, count: 6 },
+          { color: "FILKOM Girls", vId: 41, count: 15 },
+          { color: "FILKOM Boys", vId: 42, count: 10 },
+        ];
+
+        let idx = 0;
+        for (const t of targets) {
+          for (let i = 0; i < t.count && idx < importedItems.length; i++) {
+            await connection.query("UPDATE order_items SET size = 'One Size', color = ?, variant_id = ? WHERE id = ?", [t.color, t.vId, importedItems[idx].id]);
+            idx++;
+          }
         }
       }
       console.log("✅ Pin Tas order items fixed successfully!");
