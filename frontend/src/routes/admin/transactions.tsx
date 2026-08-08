@@ -1241,13 +1241,16 @@ function AdminTransactionsPage() {
                                               <span className="font-black text-ink">
                                                 Rp {Number(subOrder.gross_amount).toLocaleString("id-ID")}
                                               </span>
-                                              <span
-                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${
-                                                  getStatusBadgeTextAndColor(subOrder).color
-                                                }`}
-                                              >
-                                                {getStatusBadgeTextAndColor(subOrder).text}
-                                              </span>
+                                              {(() => {
+                                                const payBadge = getPaymentStatusBadge(subOrder, dpPelunasanMap[subOrder.order_id]);
+                                                return (
+                                                  <span
+                                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold border ${payBadge.color}`}
+                                                  >
+                                                    {payBadge.text}
+                                                  </span>
+                                                );
+                                              })()}
                                               <Button
                                                 variant="outline"
                                                 size="sm"
@@ -1767,6 +1770,82 @@ function AdminTransactionsPage() {
                       </div>
                     )}
                   </div>
+
+                  {/* Informasi Pelunasan for DP Orders (FILKOM-...) */}
+                  {dpPelunasanMap[managedTransaction.order_id] && (() => {
+                    const linkedLns = dpPelunasanMap[managedTransaction.order_id];
+                    const lnsBadge = getPaymentStatusBadge(linkedLns);
+                    return (
+                      <div className="bg-purple-50/90 border-2 border-purple-300 p-4 rounded-lg text-xs space-y-3 shadow-xs">
+                        <div className="flex items-center justify-between">
+                          <p className="font-extrabold uppercase tracking-wider text-purple-950 flex items-center gap-1.5 text-[11px]">
+                            <CreditCard className="w-4 h-4 text-purple-700" />
+                            INFORMASI PELUNASAN (SISA TAGIHAN)
+                          </p>
+                          <Badge className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${lnsBadge.color}`}>
+                            {lnsBadge.text}
+                          </Badge>
+                        </div>
+
+                        <div className="bg-white p-3 rounded-md border border-purple-200 space-y-1.5 text-xs">
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground text-[11px]">ID Pelunasan:</span>
+                            <span className="font-mono font-black text-purple-950">{linkedLns.order_id}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground text-[11px]">Sisa Nominal Pelunasan:</span>
+                            <span className="font-extrabold font-mono text-purple-950 text-sm">
+                              Rp {Number(linkedLns.gross_amount).toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-muted-foreground text-[11px]">Waktu Dibuat:</span>
+                            <span className="text-muted-foreground font-medium text-[11px]">
+                              {new Date(linkedLns.created_at).toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                          {linkedLns.payment_proof_note && (
+                            <div className="text-red-700 bg-red-50 p-2 rounded border border-red-200 text-[10px] mt-1">
+                              <strong className="block text-red-900">Catatan Penolakan:</strong> "{linkedLns.payment_proof_note}"
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Bukti Pelunasan Thumbnail if uploaded */}
+                        {linkedLns.payment_proof_url && (
+                          <div className="space-y-1.5 pt-1">
+                            <span className="text-[10px] font-extrabold text-purple-950 uppercase block">
+                              Bukti Transfer Pelunasan:
+                            </span>
+                            <div className="w-full max-h-36 border border-purple-200 rounded-lg overflow-hidden bg-white flex items-center justify-center p-1 relative group">
+                              <img
+                                src={resolveImageUrl(linkedLns.payment_proof_url)}
+                                alt="Bukti Transfer Pelunasan"
+                                className="max-h-32 object-contain cursor-zoom-in group-hover:scale-105 transition-transform"
+                                onClick={() => window.open(resolveImageUrl(linkedLns.payment_proof_url), "_blank")}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="flex justify-end pt-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => {
+                              setManagementOpen(false);
+                              setTimeout(() => {
+                                void handleOpenManagement(linkedLns.order_id, "online");
+                              }, 150);
+                            }}
+                            className="border-2 border-purple-900 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[10px] uppercase tracking-wider h-8 shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                          >
+                            Kelola Transaksi Pelunasan Ini ↗
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Payment Verification Proof section (Online QRIS Manual) */}
                   {managedType === "online" &&
