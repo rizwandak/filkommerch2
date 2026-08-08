@@ -259,6 +259,12 @@ function OrderConfirmationPage() {
         setIsEditingProof(false);
         toast.success("Bukti transfer berhasil terkirim. Menunggu verifikasi admin.");
 
+        try {
+          window.history.replaceState({}, "", `/order-confirmation?orderId=${encodeURIComponent(targetOrderId)}`);
+        } catch (e) {
+          // ignore error if any
+        }
+
         // Fetch updated order from DB
         const updated = await getOrderById({ data: targetOrderId });
         if (updated.success && updated.order) {

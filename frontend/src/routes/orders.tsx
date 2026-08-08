@@ -192,26 +192,8 @@ function UserOrdersPage() {
     }
   };
 
-  const [creatingPelunasanId, setCreatingPelunasanId] = useState<string | null>(null);
-
-  const handleCreatePelunasan = async (originalOrderId: string) => {
-    try {
-      setCreatingPelunasanId(originalOrderId);
-      const res = await createPelunasanOrderServerAction({ data: { originalOrderId } });
-
-      if (res.success && res.orderId) {
-        toast.success("Pesanan pelunasan berhasil dibuat!");
-        await fetchOrders();
-        navigate({ to: "/order-confirmation", search: { orderId: res.orderId } });
-      } else {
-        toast.error(res.error || "Gagal membuat pesanan pelunasan");
-      }
-    } catch (err: any) {
-      console.error(err);
-      toast.error("Gagal memproses pelunasan");
-    } finally {
-      setCreatingPelunasanId(null);
-    }
+  const handleCreatePelunasan = (originalOrderId: string) => {
+    navigate({ to: "/order-confirmation", search: { originalOrderId } });
   };
 
   const isPelunasanOrder = (order: any) => {
@@ -867,15 +849,10 @@ function UserOrdersPage() {
                           ) : (
                             <button
                               onClick={() => handleCreatePelunasan(order.order_id)}
-                              disabled={creatingPelunasanId === order.order_id}
-                              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-brand-orange hover:bg-brand-orange/95 text-white font-extrabold border-2 border-ink rounded-lg text-xs uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition disabled:opacity-50 cursor-pointer"
+                              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-brand-orange hover:bg-brand-orange/95 text-white font-extrabold border-2 border-ink rounded-lg text-xs uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition cursor-pointer"
                             >
-                              {creatingPelunasanId === order.order_id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                              ) : (
-                                <Plus className="w-3.5 h-3.5" />
-                              )}
-                              {creatingPelunasanId === order.order_id ? "Memproses..." : "Bayar Pelunasan"}
+                              <Plus className="w-3.5 h-3.5" />
+                              Bayar Pelunasan
                             </button>
                           )}
                         </div>

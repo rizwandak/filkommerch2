@@ -466,6 +466,8 @@ function AdminTransactionsPage() {
     }
   };
 
+
+
   const isDpOrder = (o: any) => {
     if (!o) return false;
     if (o.is_dp !== undefined && o.is_dp !== null) return !!o.is_dp;
@@ -1397,6 +1399,17 @@ function AdminTransactionsPage() {
                                       >
                                         Kelola Pelunasan ↗
                                       </Button>
+                                      {!isCashier && (
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 text-red-600 hover:bg-red-100/80 cursor-pointer"
+                                          title="Hapus transaksi pelunasan ini"
+                                          onClick={() => void handleDeleteOrder(linkedLns.order_id)}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                      )}
                                     </div>
                                   </div>
                                 </td>

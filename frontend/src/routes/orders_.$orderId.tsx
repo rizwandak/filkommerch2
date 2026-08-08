@@ -303,21 +303,9 @@ function OrderDetailComponent() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const handleCreatePelunasanDetail = async () => {
-    try {
-      setCreatingPelunasan(true);
-      const res = await createPelunasanOrderServerAction({ data: { originalOrderId: order.order_id } });
-      if (res.success && res.orderId) {
-        toast.success("Pesanan pelunasan berhasil dibuat!");
-        await fetchLinkedPelunasan();
-        navigate({ to: "/order-confirmation", search: { orderId: res.orderId } });
-      } else {
-        toast.error(res.error || "Gagal membuat pesanan pelunasan");
-      }
-    } catch (err: any) {
-      toast.error("Gagal memproses pelunasan");
-    } finally {
-      setCreatingPelunasan(false);
+  const handleCreatePelunasanDetail = () => {
+    if (order?.order_id) {
+      navigate({ to: "/order-confirmation", search: { originalOrderId: order.order_id } });
     }
   };
 
@@ -903,20 +891,10 @@ function OrderDetailComponent() {
                 ) : (
                   <button
                     onClick={handleCreatePelunasanDetail}
-                    disabled={creatingPelunasan}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold border-2 border-ink rounded-lg text-xs uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:translate-x-[1px] active:translate-y-[1px] transition cursor-pointer disabled:opacity-50"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold border-2 border-ink rounded-lg text-xs uppercase shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:translate-x-[1px] active:translate-y-[1px] transition cursor-pointer"
                   >
-                    {creatingPelunasan ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        Memproses...
-                      </>
-                    ) : (
-                      <>
-                        <Plus className="w-3.5 h-3.5" />
-                        BAYAR PELUNASAN
-                      </>
-                    )}
+                    <Plus className="w-3.5 h-3.5" />
+                    BAYAR PELUNASAN
                   </button>
                 )}
               </div>
