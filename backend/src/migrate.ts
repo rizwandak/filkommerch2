@@ -343,6 +343,115 @@ export async function runMigration() {
       console.warn("Notice: Keychain variant fix status:", err.message);
     }
 
+    // Auto-fix T-Shirt Kaos variant names in order_items for historical imported CSV items
+    try {
+      console.log("Fixing T-Shirt Kaos order items variant names...");
+      const tshirtMapping: Record<string, string> = {
+        "desain 1": "COMPUTER SCIENCE",
+        "desain 2": "SATU HATI SATU JIWA",
+      };
+
+      for (const [key, targetColor] of Object.entries(tshirtMapping)) {
+        await connection.query(
+          `UPDATE order_items 
+           SET color = ? 
+           WHERE (product_name LIKE '%Kaos%' OR product_name LIKE '%T-Shirt%' OR product_id = 25) AND LOWER(TRIM(color)) = ?`,
+          [targetColor, key]
+        );
+      }
+      console.log("✅ T-Shirt Kaos order items variant names fixed successfully!");
+    } catch (err: any) {
+      console.warn("Notice: T-Shirt Kaos variant fix status:", err.message);
+    }
+
+    // Auto-fix Pin Enamel department normalization
+    try {
+      console.log("Fixing Pin Enamel order items and variants...");
+      const pinEnamelDeptMap: Record<string, string> = {
+        "SISTEM INFORMASI": "Sistem Informasi",
+        "TEKNIK INFORMATIKA": "Teknik Informatika",
+        "TEKNIK KOMPUTER": "Teknik Komputer",
+        "TEKNOLOGI INFORMASI": "Teknologi Informasi",
+        "PENDIDIKAN TEKNOLOGI INFORMASI": "Pendidikan Teknologi Informasi",
+        "FILKOM": "FILKOM",
+      };
+
+      const [enamelRows] = await connection.query<any[]>(
+        "SELECT id, size, color FROM order_items WHERE (product_id = 16 OR product_name LIKE '%Pin Enamel%')"
+      );
+
+      for (const row of enamelRows) {
+        const sizeUpper = (row.size || "").trim().toUpperCase();
+        const colorUpper = (row.color || "").trim().toUpperCase();
+
+        let targetColor = pinEnamelDeptMap[sizeUpper] || pinEnamelDeptMap[colorUpper] || "FILKOM";
+        if (row.size === "Sistem Informasi" || row.color === "Sistem Informasi") targetColor = "Sistem Informasi";
+        if (row.size === "Teknik Informatika" || row.color === "Teknik Informatika") targetColor = "Teknik Informatika";
+        if (row.size === "Teknik Komputer" || row.color === "Teknik Komputer") targetColor = "Teknik Komputer";
+        if (row.size === "Teknologi Informasi" || row.color === "Teknologi Informasi") targetColor = "Teknologi Informasi";
+        if (row.size === "Pendidikan Teknologi Informasi" || row.color === "Pendidikan Teknologi Informasi") targetColor = "Pendidikan Teknologi Informasi";
+        if (row.size === "FILKOM" || row.color === "FILKOM") targetColor = "FILKOM";
+
+        await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE id = ?", [targetColor, row.id]);
+      }
+      console.log("✅ Pin Enamel order items fixed successfully!");
+    } catch (err: any) {
+      console.warn("Notice: Pin Enamel variant fix status:", err.message);
+    }
+
+    // Auto-fix Pin Tas variant names
+    try {
+      console.log("Fixing Pin Tas order items and variants...");
+      const pinTasMapping: Record<string, string> = {
+        "desain 1": "FILKOM Oranye",
+        "desain 2": "FILKOM Blue",
+        "desain 3": "Let's Stay Connected",
+        "desain 4": "It's My First Time Ngoding",
+        "desain 5": "I ❤️ Coding",
+        "desain 6": "FILKOM Girls",
+        "desain 7": "FILKOM Boys",
+      };
+
+      for (const [k, v] of Object.entries(pinTasMapping)) {
+        await connection.query("UPDATE product_variants SET color = ?, size = 'One Size' WHERE product_id = 17 AND LOWER(TRIM(color)) = ?", [v, k]);
+      }
+
+      const [pinTasRows] = await connection.query<any[]>("SELECT id, color FROM order_items WHERE (product_id = 17 OR product_name LIKE '%Pin Tas%')");
+      for (const row of pinTasRows) {
+        const cLower = (row.color || "").trim().toLowerCase();
+        const targetColor = pinTasMapping[cLower] || "FILKOM Oranye";
+        await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE id = ?", [targetColor, row.id]);
+      }
+      console.log("✅ Pin Tas order items fixed successfully!");
+    } catch (err: any) {
+      console.warn("Notice: Pin Tas variant fix status:", err.message);
+    }
+
+    // Auto-fix Totebag variant names
+    try {
+      console.log("Fixing Totebag order items and variants...");
+      const totebagMapping: Record<string, string> = {
+        "desain 1": "FILKOM BRAWIJAYA Outline",
+        "desain 2": "FILKOM BRAWIJAYA Signature",
+        "desain 3": "FILKOM 2011 Vintage",
+        "desain 4": "FILKOM Bold",
+      };
+
+      for (const [k, v] of Object.entries(totebagMapping)) {
+        await connection.query("UPDATE product_variants SET color = ?, size = 'One Size' WHERE product_id = 22 AND LOWER(TRIM(color)) = ?", [v, k]);
+      }
+
+      const [totebagRows] = await connection.query<any[]>("SELECT id, color FROM order_items WHERE (product_id = 22 OR product_name LIKE '%Totebag%')");
+      for (const row of totebagRows) {
+        const cLower = (row.color || "").trim().toLowerCase();
+        const targetColor = totebagMapping[cLower] || row.color || "FILKOM BRAWIJAYA Outline";
+        await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE id = ?", [targetColor, row.id]);
+      }
+      console.log("✅ Totebag order items fixed successfully!");
+    } catch (err: any) {
+      console.warn("Notice: Totebag variant fix status:", err.message);
+    }
+
     console.log("Schema migration finished successfully!");
   } catch (err) {
     console.error("Fatal connection error during migration:", err);

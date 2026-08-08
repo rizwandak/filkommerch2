@@ -4837,20 +4837,27 @@ export const getProductionSummary = async (req: Request, res: Response) => {
       });
     }
 
-    let whereClause = "WHERE o.order_status != 'cancelled' AND o.order_id NOT LIKE 'LNS%'";
+    let whereClause = "WHERE o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed') AND o.order_id NOT LIKE 'LNS%'";
     const queryParams: any[] = [];
     if (batchFilter !== "all") {
       if (batchFilter === "none") {
         whereClause += " AND (o.pre_order_campaign_id IS NULL OR o.pre_order_campaign_id = 0)";
       } else {
-        whereClause += " AND o.pre_order_campaign_id = ?";
-        queryParams.push(batchFilter);
+        const selectedC = campaigns.find((c) => Number(c.id) === Number(batchFilter));
+        if (selectedC && selectedC.start_date && (selectedC.extended_end_date || selectedC.end_date)) {
+          whereClause += " AND (o.pre_order_campaign_id = ? OR (o.created_at >= ? AND o.created_at <= ?))";
+          queryParams.push(batchFilter, selectedC.start_date, selectedC.extended_end_date || selectedC.end_date);
+        } else {
+          whereClause += " AND o.pre_order_campaign_id = ?";
+          queryParams.push(batchFilter);
+        }
       }
     }
 
     const rows = await query<any>(
       `SELECT 
         oi.*,
+        oi.product_name as raw_product_name,
         COALESCE(p.name, oi.product_name) as product_name,
         o.created_at as order_created_at,
         o.pre_order_campaign_id,
@@ -4868,7 +4875,7 @@ export const getProductionSummary = async (req: Request, res: Response) => {
     const formatVariantKey = (rawSize?: string, rawColor?: string) => {
       const parts = [rawSize, rawColor]
         .map((s) => (s || "").trim())
-        .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard");
+        .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard" && s !== "Ukuran Tidak Diisi");
       return parts.join(" / ") || "Standard";
     };
 
@@ -4891,10 +4898,6 @@ export const getProductionSummary = async (req: Request, res: Response) => {
     for (const r of rows) {
       const pId = r.product_id || 0;
       const pName = r.product_name;
-
-      const isComponentItem =
-        (r.product_name && r.product_name.includes("[KOMPONEN BUNDLE]")) ||
-        Number(r.unit_price || r.price) === 0;
 
       const varKey = formatVariantKey(r.size, r.color);
 
@@ -4922,23 +4925,34 @@ export const getProductionSummary = async (req: Request, res: Response) => {
       }
 
       if (r.connected_product_type === "bundle") {
-        // Expand bundle container item into component physical products
-        const comps = bundleComponentsMap[pId];
-        if (comps && comps.length > 0) {
-          for (const comp of comps) {
-            const cid = comp.component_product_id;
-            const compProductRows = await query<any>("SELECT name FROM products WHERE id = ?", [cid]);
-            const compName = compProductRows[0]?.name || `Product #${cid}`;
-            const addedQty = Number(r.quantity || 1) * comp.comp_qty;
+        // Only expand bundle container row if component items are NOT present in rows for this order_id
+        const hasComponentRows = rows.some(
+          (i: any) =>
+            i.order_id === r.order_id &&
+            ((i.raw_product_name && i.raw_product_name.includes("[KOMPONEN BUNDLE]")) ||
+             (i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")) ||
+             Number(i.unit_price || i.price) === 0)
+        );
 
-            const targetGroup = getOrCreateGroup(cid, compName);
-            targetGroup.variants_breakdown[varKey] = (targetGroup.variants_breakdown[varKey] || 0) + addedQty;
-            targetGroup.batch_breakdown[bName] = (targetGroup.batch_breakdown[bName] || 0) + addedQty;
-            targetGroup.total_qty += addedQty;
+        if (!hasComponentRows) {
+          const comps = bundleComponentsMap[pId];
+          if (comps && comps.length > 0) {
+            for (const comp of comps) {
+              const cid = comp.component_product_id;
+              const compProductRows = await query<any>("SELECT name FROM products WHERE id = ?", [cid]);
+              const compName = compProductRows[0]?.name || `Product #${cid}`;
+              const addedQty = Number(r.quantity || 1) * comp.comp_qty;
+
+              const targetGroup = getOrCreateGroup(cid, compName);
+              targetGroup.variants_breakdown[varKey] = (targetGroup.variants_breakdown[varKey] || 0) + addedQty;
+              targetGroup.batch_breakdown[bName] = (targetGroup.batch_breakdown[bName] || 0) + addedQty;
+              targetGroup.total_qty += addedQty;
+            }
           }
         }
       } else {
-        const targetGroup = getOrCreateGroup(pId, pName);
+        const cleanName = pName.replace(/^\[KOMPONEN BUNDLE\]\s*/i, "").replace(/^Pelunasan\s*—\s*/i, "");
+        const targetGroup = getOrCreateGroup(pId, cleanName);
         targetGroup.variants_breakdown[varKey] = (targetGroup.variants_breakdown[varKey] || 0) + Number(r.quantity || 1);
         targetGroup.batch_breakdown[bName] = (targetGroup.batch_breakdown[bName] || 0) + Number(r.quantity || 1);
         targetGroup.total_qty += Number(r.quantity || 1);
