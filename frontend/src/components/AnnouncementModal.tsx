@@ -1,55 +1,133 @@
 import React, { useState, useEffect, useRef } from "react";
-import { X, Sparkles, ShoppingBag, Users, CheckCircle2 } from "lucide-react";
+import { X, Sparkles, ShoppingBag, Users, CheckCircle2, PartyPopper } from "lucide-react";
+import confetti from "canvas-confetti";
 import baraSmile from "@/assets/bara-smile.png";
 
 interface Props {
   delayMs?: number;
-  durationMs?: number;
 }
 
-export function AnnouncementModal({ delayMs = 600, durationMs = 10000 }: Props) {
+export function AnnouncementModal({ delayMs = 600 }: Props) {
   const [isVisible, setIsVisible] = useState(false);
-  const [progress, setProgress] = useState(100);
   const animFrameRef = useRef<number | null>(null);
+  const isRainingRef = useRef(false);
+
+  // Synthesize crowd cheers & celebratory melody using Web Audio API
+  const playCheersSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+
+      // 1. Triumphant 4-note celebratory chime melody (C5 - E5 - G5 - C6)
+      const notes = [523.25, 659.25, 783.99, 1046.5];
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+
+        gain.gain.setValueAtTime(0, ctx.currentTime + idx * 0.12);
+        gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + idx * 0.12 + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.12 + 0.8);
+
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc.start(ctx.currentTime + idx * 0.12);
+        osc.stop(ctx.currentTime + idx * 0.12 + 0.8);
+      });
+
+      // 2. Crowd applause / cheering noise simulation
+      const bufferSize = ctx.sampleRate * 1.5;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = Math.random() * 2 - 1;
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const filter = ctx.createBiquadFilter();
+      filter.type = "bandpass";
+      filter.frequency.value = 1200;
+      filter.Q.value = 0.5;
+
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0, ctx.currentTime);
+      noiseGain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.2);
+      noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.5);
+
+      noise.connect(filter);
+      filter.connect(noiseGain);
+      noiseGain.connect(ctx.destination);
+
+      noise.start(ctx.currentTime + 0.2);
+    } catch (e) {
+      console.error("Audio playback error:", e);
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setIsVisible(true);
+      playCheersSound();
+      isRainingRef.current = true;
+
+      // Continuous Confetti Rain Animation Loop
+      try {
+        const colors = ["#ff5e00", "#10b981", "#3b82f6", "#f59e0b", "#1b1b1b", "#ffffff"];
+
+        const frame = () => {
+          if (!isRainingRef.current) return;
+
+          confetti({
+            particleCount: 2,
+            angle: 60,
+            spread: 50,
+            origin: { x: 0, y: 0.65 },
+            colors,
+            ticks: 120,
+          });
+
+          confetti({
+            particleCount: 2,
+            angle: 120,
+            spread: 50,
+            origin: { x: 1, y: 0.65 },
+            colors,
+            ticks: 120,
+          });
+
+          animFrameRef.current = requestAnimationFrame(frame);
+        };
+
+        frame();
+      } catch (e) {
+        console.error("Confetti error:", e);
+      }
     }, delayMs);
 
-    return () => clearTimeout(timer);
-  }, [delayMs]);
-
-  useEffect(() => {
-    if (!isVisible) return;
-
-    const startTime = performance.now();
-
-    const updateProgress = (now: number) => {
-      const elapsed = now - startTime;
-      const remaining = Math.max(0, durationMs - elapsed);
-      const pct = (remaining / durationMs) * 100;
-      setProgress(pct);
-
-      if (remaining > 0) {
-        animFrameRef.current = requestAnimationFrame(updateProgress);
-      } else {
-        setIsVisible(false);
-      }
-    };
-
-    animFrameRef.current = requestAnimationFrame(updateProgress);
-
     return () => {
+      clearTimeout(timer);
+      isRainingRef.current = false;
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current);
       }
     };
-  }, [isVisible, durationMs]);
+  }, [delayMs]);
 
   const handleClose = () => {
+    isRainingRef.current = false;
     if (animFrameRef.current) {
       cancelAnimationFrame(animFrameRef.current);
+      animFrameRef.current = null;
+    }
+    try {
+      confetti.reset();
+    } catch {
+      // ignore
     }
     setIsVisible(false);
   };
@@ -57,13 +135,19 @@ export function AnnouncementModal({ delayMs = 600, durationMs = 10000 }: Props) 
   if (!isVisible) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-xs animate-fade-in">
-      <div className="bg-background border-4 border-ink rounded-3xl w-full max-w-lg overflow-hidden shadow-[10px_10px_0px_0px_rgba(27,27,27,1)] relative animate-scale-in flex flex-col">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-xs animate-fade-in"
+      onClick={handleClose}
+    >
+      <div
+        className="bg-background border-4 border-ink rounded-3xl w-full max-w-lg overflow-hidden shadow-[12px_12px_0px_0px_rgba(27,27,27,1)] relative animate-scale-in flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header Bar */}
         <div className="bg-cream border-b-2 border-ink p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="px-2.5 py-1 bg-brand-orange text-cream text-[10px] font-black rounded-full border border-ink uppercase tracking-wider shadow-xs flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-cream animate-pulse" /> PENGUMUMAN PO
+            <span className="px-3 py-1 bg-brand-orange text-cream text-[11px] font-black rounded-full border border-ink uppercase tracking-wider shadow-xs flex items-center gap-1.5">
+              <PartyPopper className="w-3.5 h-3.5 text-cream animate-bounce" /> PRE ORDER
             </span>
             <span className="text-[10px] font-black text-ink uppercase tracking-wider">
               BATCH #1 &amp; #2
@@ -82,14 +166,14 @@ export function AnnouncementModal({ delayMs = 600, durationMs = 10000 }: Props) 
         {/* Card Body */}
         <div className="p-5 sm:p-7 space-y-4 text-ink relative">
           {/* Bara Mascot & Graphic Header */}
-          <div className="flex items-center gap-3.5 bg-orange-50/80 border-2 border-brand-orange/40 p-3.5 rounded-2xl">
+          <div className="flex items-center gap-3.5 bg-orange-50/90 border-2 border-brand-orange/40 p-3.5 rounded-2xl shadow-xs">
             <img
               src={baraSmile}
               alt="Bara Filkom Merch"
               className="w-20 h-20 sm:w-24 sm:h-24 object-contain shrink-0 drop-shadow-md animate-bounce"
             />
             <div className="space-y-1 min-w-0">
-              <h3 className="display text-base sm:text-lg font-black uppercase text-ink leading-tight">
+              <h3 className="display text-base sm:text-lg font-black uppercase text-ink leading-tight flex items-center gap-1.5">
                 Terima Kasih KBMFILKOM! 🎉
               </h3>
               <p className="text-[11px] sm:text-xs text-muted-foreground font-semibold leading-relaxed">
@@ -105,7 +189,7 @@ export function AnnouncementModal({ delayMs = 600, durationMs = 10000 }: Props) 
                 <Users className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-base sm:text-lg font-black text-ink">150+</div>
+                <div className="text-base sm:text-lg font-black text-ink">210+</div>
                 <div className="text-[9px] font-bold text-muted-foreground uppercase">Pembeli PO</div>
               </div>
             </div>
@@ -115,7 +199,7 @@ export function AnnouncementModal({ delayMs = 600, durationMs = 10000 }: Props) 
                 <ShoppingBag className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-base sm:text-lg font-black text-ink">300+</div>
+                <div className="text-base sm:text-lg font-black text-ink">500+</div>
                 <div className="text-[9px] font-bold text-muted-foreground uppercase">Items Dibeli</div>
               </div>
             </div>
@@ -143,18 +227,15 @@ export function AnnouncementModal({ delayMs = 600, durationMs = 10000 }: Props) 
           {/* Action Close Button */}
           <button
             onClick={handleClose}
-            className="w-full py-3 px-4 bg-ink hover:bg-brand-orange text-cream font-black text-xs uppercase tracking-wider rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2"
+            className="w-full py-3.5 px-4 bg-ink hover:bg-brand-orange text-cream font-black text-xs uppercase tracking-wider rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer flex items-center justify-center gap-2"
           >
-            <CheckCircle2 className="w-4 h-4 text-brand-orange" /> SAYA MENGERTI
+            <CheckCircle2 className="w-4.5 h-4.5 text-brand-orange" /> SAYA MENGERTI
           </button>
         </div>
 
-        {/* Animated Progress Bar at the bottom edge */}
-        <div className="w-full bg-cream h-2.5 border-t-2 border-ink relative overflow-hidden">
-          <div
-            className="h-full bg-brand-orange transition-all duration-75 ease-linear"
-            style={{ width: `${progress}%` }}
-          />
+        {/* Celebratory Bottom Footer Bar */}
+        <div className="w-full bg-cream py-2 px-4 border-t-2 border-ink text-center text-[10px] font-black uppercase text-brand-orange tracking-widest flex items-center justify-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 animate-spin" /> OFFICIAL ANNOUNCEMENT — FILKOM MERCH STORE <Sparkles className="w-3.5 h-3.5 animate-spin" />
         </div>
       </div>
     </div>

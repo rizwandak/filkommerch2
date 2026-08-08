@@ -298,12 +298,29 @@ function AdminPreOrderBatchPage() {
     setIsModalOpen(true);
   };
 
+  const formatForDatetimeInput = (dateStr?: string | null) => {
+    if (!dateStr) return "";
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return "";
+      const pad = (n: number) => String(n).padStart(2, "0");
+      const year = date.getFullYear();
+      const month = pad(date.getMonth() + 1);
+      const day = pad(date.getDate());
+      const hours = pad(date.getHours());
+      const minutes = pad(date.getMinutes());
+      return `${year}-${month}-${day}T${hours}:${minutes}`;
+    } catch {
+      return "";
+    }
+  };
+
   const openEditModal = (c: PreOrderCampaign) => {
     setEditingCampaign(c);
     setBatchName(c.batch_name);
-    setStartDate(c.start_date ? c.start_date.substring(0, 16) : "");
-    setEndDate(c.end_date ? c.end_date.substring(0, 16) : "");
-    setExtendedEndDate(c.extended_end_date ? c.extended_end_date.substring(0, 16) : "");
+    setStartDate(formatForDatetimeInput(c.start_date));
+    setEndDate(formatForDatetimeInput(c.end_date));
+    setExtendedEndDate(formatForDatetimeInput(c.extended_end_date));
     setIsActive(Boolean(c.is_active));
     setIsModalOpen(true);
   };
