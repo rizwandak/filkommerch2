@@ -516,12 +516,32 @@ function AdminTransactionsPage() {
         }
       }
 
-      // Campaign Batch Filter
+      // Campaign Batch Filter (Match by explicit campaign ID or order creation date within campaign window)
       if (campaignFilter !== "all") {
+        const orderCampaignId = (order as any).pre_order_campaign_id;
+        const matchedCampaign = campaigns.find((c) => {
+          if (orderCampaignId && Number(orderCampaignId) === Number(c.id)) {
+            return true;
+          }
+          if (c.start_date && (c.extended_end_date || c.end_date) && order.created_at) {
+            const dt = new Date(order.created_at).getTime();
+            const s = new Date(c.start_date).getTime();
+            const e = new Date(c.extended_end_date || c.end_date).getTime();
+            if (!isNaN(dt) && !isNaN(s) && !isNaN(e)) {
+              return dt >= s && dt <= e;
+            }
+          }
+          return false;
+        });
+
         if (campaignFilter === "none") {
-          if ((order as any).pre_order_campaign_id) return false;
+          // Ready Stock (orders not belonging to any pre-order campaign)
+          if (matchedCampaign) return false;
         } else {
-          if (String((order as any).pre_order_campaign_id || "") !== String(campaignFilter)) return false;
+          // Specific campaign batch (e.g. Batch #2)
+          if (!matchedCampaign || String(matchedCampaign.id) !== String(campaignFilter)) {
+            return false;
+          }
         }
       }
 
