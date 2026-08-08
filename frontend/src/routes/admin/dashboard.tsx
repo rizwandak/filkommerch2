@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { getApiBaseUrl } from "@/lib/api-config";
@@ -36,7 +36,12 @@ import {
   Smartphone,
   ChevronRight,
   Package,
-  Award
+  Award,
+  Filter,
+  Layers,
+  ShieldCheck,
+  ExternalLink,
+  Factory
 } from "lucide-react";
 import { type InventoryItem } from "@backend/server-actions";
 
@@ -60,6 +65,20 @@ interface SalesSummary {
   total_discount: number;
   total_tax: number;
   total_subtotal: number;
+  civitas_count?: number;
+}
+
+interface CampaignOption {
+  id: number;
+  batch_name: string;
+}
+
+interface CampaignBreakdownItem {
+  id: string | number;
+  name: string;
+  revenue: number;
+  orders: number;
+  items: number;
 }
 
 interface ProductVariantSummary {
@@ -107,6 +126,8 @@ interface SalesTrendPoint {
 interface OrdersSummaryResponse {
   success: boolean;
   summary: SalesSummary;
+  campaigns_list?: CampaignOption[];
+  campaigns_breakdown?: CampaignBreakdownItem[];
   products: ProductSummary[];
   buyers: BuyerSummary[];
   sales_trend: SalesTrendPoint[];
@@ -117,7 +138,10 @@ function AdminDashboardPage() {
   const API_BASE_URL = getApiBaseUrl().replace(/\/api\/?$/, "").replace(/\/$/, "");
   
   const [period, setPeriod] = useState<"today" | "7" | "30" | "all">("30");
+  const [batchFilter, setBatchFilter] = useState<string>("all");
   const [summary, setSummary] = useState<SalesSummary | null>(null);
+  const [campaignsList, setCampaignsList] = useState<CampaignOption[]>([]);
+  const [campaignsBreakdown, setCampaignsBreakdown] = useState<CampaignBreakdownItem[]>([]);
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [buyers, setBuyers] = useState<BuyerSummary[]>([]);
   const [salesTrend, setSalesTrend] = useState<SalesTrendPoint[]>([]);
@@ -165,11 +189,13 @@ function AdminDashboardPage() {
 
       // Fetch summary and trend metrics
       const summaryResult = await fetchJson<OrdersSummaryResponse>(
-        `${API_BASE_URL}/api/analytics/orders-summary?days=${period}`
+        `${API_BASE_URL}/api/analytics/orders-summary?days=${period}&batch=${batchFilter}`
       );
 
       if (summaryResult.success) {
         setSummary(summaryResult.summary);
+        setCampaignsList(summaryResult.campaigns_list || []);
+        setCampaignsBreakdown(summaryResult.campaigns_breakdown || []);
         setProducts(summaryResult.products || []);
         setBuyers(summaryResult.buyers || []);
         setSalesTrend(summaryResult.sales_trend || []);
@@ -200,7 +226,7 @@ function AdminDashboardPage() {
   useEffect(() => {
     if (authLoading) return;
     void loadData();
-  }, [authLoading, user, period]);
+  }, [authLoading, user, period, batchFilter]);
 
   const toggleProductExpand = (productId: number) => {
     setExpandedProducts(prev => ({
@@ -250,24 +276,59 @@ function AdminDashboardPage() {
     { name: "Offline POS", value: summary.pos_revenue, count: summary.pos_orders, color: "#f97316" }
   ] : [];
 
+  const BATCH_COLORS = ["#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#ec4899"];
+
+  const batchChartData = campaignsBreakdown.map((cb, idx) => ({
+    name: cb.name,
+    value: cb.revenue,
+    orders: cb.orders,
+    items: cb.items,
+    color: BATCH_COLORS[idx % BATCH_COLORS.length]
+  }));
+
   return (
     <div className="p-6 lg:p-8 space-y-8 bg-background min-h-screen">
       {/* Header Panel */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-border pb-6">
         <div>
-          <h1 className="display text-3xl font-bold text-ink tracking-wider">Rekapan & Analisis Pesanan</h1>
+          <h1 className="display text-3xl font-bold text-ink tracking-wider flex items-center gap-2">
+            <span>Rekapan & Analisis Terpusat</span>
+            <span className="text-xs bg-brand-orange text-white px-2.5 py-0.5 rounded-full font-bold uppercase tracking-normal">
+              Admin Hub
+            </span>
+          </h1>
           <p className="text-xs text-muted-foreground uppercase tracking-widest mt-1">
-            Ringkasan data penjualan online & POS, varian produk, dan pembeli
+            Ringkasan terpadu penjualan online & POS, Batch Pre-Order, Vendoring, dan Civitas UB
           </p>
         </div>
 
         {/* Filter Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex bg-muted p-1 rounded-md text-xs">
+          {/* Batch Filter Dropdown */}
+          <div className="flex items-center gap-1.5 bg-muted p-1 rounded-md text-xs border border-border">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground ml-1" />
+            <select
+              value={batchFilter}
+              onChange={(e) => setBatchFilter(e.target.value)}
+              aria-label="Filter Batch Penjualan"
+              className="bg-card border-none text-ink font-bold rounded px-2.5 py-1 text-xs focus:outline-none cursor-pointer"
+            >
+              <option value="all">⚡ Semua Batch & Ready Stock</option>
+              {campaignsList.map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  📦 {c.batch_name}
+                </option>
+              ))}
+              <option value="ready_stock">🛍️ Ready Stock (Luar Batch)</option>
+            </select>
+          </div>
+
+          {/* Time Period Buttons */}
+          <div className="flex bg-muted p-1 rounded-md text-xs border border-border">
             <button
               onClick={() => setPeriod("today")}
               className={`px-3 py-1.5 rounded-sm font-medium transition-all ${
-                period === "today" ? "bg-card text-ink shadow-sm" : "text-muted-foreground hover:text-ink"
+                period === "today" ? "bg-card text-ink shadow-sm font-bold" : "text-muted-foreground hover:text-ink"
               }`}
             >
               Hari Ini
@@ -275,7 +336,7 @@ function AdminDashboardPage() {
             <button
               onClick={() => setPeriod("7")}
               className={`px-3 py-1.5 rounded-sm font-medium transition-all ${
-                period === "7" ? "bg-card text-ink shadow-sm" : "text-muted-foreground hover:text-ink"
+                period === "7" ? "bg-card text-ink shadow-sm font-bold" : "text-muted-foreground hover:text-ink"
               }`}
             >
               7 Hari
@@ -283,7 +344,7 @@ function AdminDashboardPage() {
             <button
               onClick={() => setPeriod("30")}
               className={`px-3 py-1.5 rounded-sm font-medium transition-all ${
-                period === "30" ? "bg-card text-ink shadow-sm" : "text-muted-foreground hover:text-ink"
+                period === "30" ? "bg-card text-ink shadow-sm font-bold" : "text-muted-foreground hover:text-ink"
               }`}
             >
               30 Hari
@@ -291,7 +352,7 @@ function AdminDashboardPage() {
             <button
               onClick={() => setPeriod("all")}
               className={`px-3 py-1.5 rounded-sm font-medium transition-all ${
-                period === "all" ? "bg-card text-ink shadow-sm" : "text-muted-foreground hover:text-ink"
+                period === "all" ? "bg-card text-ink shadow-sm font-bold" : "text-muted-foreground hover:text-ink"
               }`}
             >
               Semua
@@ -301,12 +362,59 @@ function AdminDashboardPage() {
           <button
             onClick={() => void loadData(true)}
             disabled={refreshing}
-            className="flex items-center gap-2 text-xs border border-border bg-card px-3 py-2 rounded-md hover:bg-muted font-medium transition-colors cursor-pointer disabled:opacity-50"
+            className="flex items-center gap-2 text-xs border border-border bg-card px-3 py-2 rounded-md hover:bg-muted font-bold transition-colors cursor-pointer disabled:opacity-50"
           >
             <RefreshCw className={`h-3 w-3 ${refreshing ? "animate-spin" : ""}`} />
             Perbarui
           </button>
         </div>
+      </div>
+
+      {/* Admin Quick Module Access Navigation */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <Link
+          to="/admin/pre-order"
+          className="p-3 bg-blue-50/60 hover:bg-blue-100/70 border border-blue-200 rounded-lg flex items-center justify-between text-blue-950 transition-all shadow-2xs group"
+        >
+          <div className="flex items-center gap-2.5">
+            <Layers className="h-4 w-4 text-blue-600" />
+            <span className="text-xs font-bold">Pre-Order Campaign</span>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-blue-500 group-hover:translate-x-0.5 transition-transform" />
+        </Link>
+
+        <Link
+          to="/admin/vendoring"
+          className="p-3 bg-amber-50/60 hover:bg-amber-100/70 border border-amber-200 rounded-lg flex items-center justify-between text-amber-950 transition-all shadow-2xs group"
+        >
+          <div className="flex items-center gap-2.5">
+            <Factory className="h-4 w-4 text-amber-600" />
+            <span className="text-xs font-bold">Vendoring Produksi</span>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-amber-500 group-hover:translate-x-0.5 transition-transform" />
+        </Link>
+
+        <Link
+          to="/admin/transactions"
+          className="p-3 bg-purple-50/60 hover:bg-purple-100/70 border border-purple-200 rounded-lg flex items-center justify-between text-purple-950 transition-all shadow-2xs group"
+        >
+          <div className="flex items-center gap-2.5">
+            <ShoppingBag className="h-4 w-4 text-purple-600" />
+            <span className="text-xs font-bold">Daftar Transaksi</span>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-purple-500 group-hover:translate-x-0.5 transition-transform" />
+        </Link>
+
+        <Link
+          to="/pos"
+          className="p-3 bg-emerald-50/60 hover:bg-emerald-100/70 border border-emerald-200 rounded-lg flex items-center justify-between text-emerald-950 transition-all shadow-2xs group"
+        >
+          <div className="flex items-center gap-2.5">
+            <Store className="h-4 w-4 text-emerald-600" />
+            <span className="text-xs font-bold">Kasir POS Store</span>
+          </div>
+          <ChevronRight className="h-3.5 w-3.5 text-emerald-500 group-hover:translate-x-0.5 transition-transform" />
+        </Link>
       </div>
 
       {/* KPI Cards Grid */}
@@ -397,26 +505,27 @@ function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* KPI 4: Total Discounts */}
+        {/* KPI 4: Civitas UB & Diskon */}
         <Card className="shadow-sm border-border bg-card overflow-hidden relative">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-[var(--brand-orange)]" />
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
-              Diskon Diberikan
-              <Tag className="h-4 w-4 text-[var(--brand-orange)]" />
+              Civitas & Diskon
+              <ShieldCheck className="h-4 w-4 text-[var(--brand-orange)]" />
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-extrabold text-[var(--brand-orange)]">
-              Rp {(summary?.total_discount || 0).toLocaleString("id-ID")}
+            <div className="text-3xl font-extrabold text-[var(--brand-orange)] flex items-center gap-1">
+              <span>{summary?.civitas_count || 0}</span>
+              <span className="text-xs font-bold text-ink uppercase tracking-normal">Pembeli UB</span>
             </div>
             <div className="text-[11px] text-muted-foreground mt-2 space-y-1">
               <div className="flex items-center justify-between">
-                <span>PPN Terkumpul (Tax):</span>
-                <span className="font-semibold">Rp {(summary?.total_tax || 0).toLocaleString("id-ID")}</span>
+                <span>Total Diskon Diberikan:</span>
+                <span className="font-semibold text-ink">Rp {(summary?.total_discount || 0).toLocaleString("id-ID")}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span>Subtotal kotor:</span>
+                <span>Subtotal Kotor:</span>
                 <span className="font-semibold">Rp {(summary?.total_subtotal || 0).toLocaleString("id-ID")}</span>
               </div>
             </div>
@@ -556,6 +665,47 @@ function AdminDashboardPage() {
                         })}
                       </div>
                     </>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Batch / Campaign Distribution Breakdown Card */}
+              <Card className="shadow-sm border-border bg-card">
+                <CardHeader className="pb-3">
+                  <CardTitle className="display text-sm tracking-wider text-ink flex items-center justify-between">
+                    <span>Kontribusi Batch & Ready Stock</span>
+                    <Layers className="h-4 w-4 text-blue-600" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {campaignsBreakdown.length === 0 ? (
+                    <div className="text-xs text-muted-foreground text-center py-4">Belum ada data batch</div>
+                  ) : (
+                    campaignsBreakdown.map((cb, index) => {
+                      const totalBatchRev = campaignsBreakdown.reduce((acc, c) => acc + c.revenue, 0);
+                      const percent = totalBatchRev > 0 ? ((cb.revenue / totalBatchRev) * 100).toFixed(1) : "0";
+                      const color = BATCH_COLORS[index % BATCH_COLORS.length];
+                      return (
+                        <div key={cb.id} className="p-3 bg-muted/40 rounded-lg border border-border space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2 font-bold text-ink">
+                              <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+                              <span>{cb.name}</span>
+                            </div>
+                            <span className="font-bold text-ink">Rp {cb.revenue.toLocaleString("id-ID")}</span>
+                          </div>
+
+                          <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${percent}%`, backgroundColor: color }} />
+                          </div>
+
+                          <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
+                            <span>{cb.orders} Orders • {cb.items} Pcs Terjual</span>
+                            <span className="font-bold text-ink">{percent}% Total</span>
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </CardContent>
               </Card>

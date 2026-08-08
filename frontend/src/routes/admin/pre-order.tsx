@@ -907,73 +907,80 @@ function AdminPreOrderBatchPage() {
                                 <td className="p-3 font-semibold">
                                   Rp {Number(p.unit_price || 0).toLocaleString("id-ID")}
                                 </td>
-                                <td className="p-3 font-bold text-xs">
-                                  <div className="font-black text-brand-orange text-sm">
-                                    {p.total_qty} pcs
-                                  </div>
-                                  {p.bundle_qty > 0 ? (
-                                    <div className="text-[10px] space-y-0.5 mt-0.5">
-                                      <span className="text-muted-foreground">
-                                        Langsung: <strong className="text-ink">{p.direct_qty} pcs</strong>
-                                      </span>
-                                      <div className="text-blue-700 font-black flex items-center gap-1">
-                                        <span>+{p.bundle_qty} pcs (Bundle)</span>
-                                      </div>
-                                      {Object.entries(p.bundle_source_breakdown || {}).map(([bName, bQty]) => (
-                                        <div key={bName} className="text-[9px] text-neutral-600 pl-1.5 font-medium">
-                                          • {bName}: <strong className="text-ink">{String(bQty)} pcs</strong>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <span className="text-[10px] text-muted-foreground font-medium">Penjualan Langsung</span>
-                                  )}
-                                </td>
-                                <td className="p-3 space-y-2">
-                                   {/* Block 1: Direct Purchase Variants */}
-                                   {Object.keys(p.direct_variants || {}).length > 0 && (
-                                     <div className="space-y-1">
-                                       {p.bundle_qty > 0 && (
-                                         <div className="text-[9px] font-black uppercase text-neutral-500 tracking-wider">
-                                           PENJUALAN LANGSUNG ({p.direct_qty} PCS):
+                                <td className="p-3 align-top font-bold text-xs">
+                                   <div className="inline-flex flex-col gap-1">
+                                     {/* Main Total Pill */}
+                                     <div className="bg-brand-orange text-cream px-2.5 py-1 rounded-lg border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] inline-flex items-center gap-1.5 font-black text-xs w-fit">
+                                       <Package className="w-3.5 h-3.5" />
+                                       <span>{p.total_qty} pcs</span>
+                                     </div>
+
+                                     {p.bundle_qty > 0 ? (
+                                       <div className="text-[10px] space-y-1 mt-1 font-semibold">
+                                         <div className="flex items-center gap-1 text-ink bg-cream/70 px-2 py-0.5 rounded border border-ink/20 w-fit">
+                                           <span className="text-muted-foreground font-medium">Satuan / Langsung:</span>
+                                           <strong className="text-ink font-bold">{p.direct_qty} pcs</strong>
                                          </div>
-                                       )}
-                                       <div className="flex flex-wrap gap-1">
-                                         {Object.entries(p.direct_variants || {}).map(([vName, vQty]) => (
-                                           <span
-                                             key={vName}
-                                             className="px-2 py-0.5 bg-neutral-100 border border-ink/20 rounded font-bold text-[10px] text-ink"
-                                           >
-                                             {vName}: <strong>{String(vQty)}</strong>
-                                           </span>
-                                         ))}
+                                         <div className="flex items-center gap-1 text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 w-fit font-bold">
+                                           <span>+ {p.bundle_qty} pcs (Dari Paket Bundle)</span>
+                                         </div>
                                        </div>
-                                     </div>
-                                   )}
+                                     ) : (
+                                       <span className="text-[10px] text-muted-foreground font-medium block mt-0.5">
+                                         Penjualan Langsung
+                                       </span>
+                                     )}
+                                   </div>
+                                 </td>
+                                 <td className="p-3 space-y-2.5 align-top">
+                                    {/* Block 1: Direct Purchase Variants */}
+                                    {Object.keys(p.direct_variants || {}).length > 0 && (
+                                      <div className="space-y-1">
+                                        {p.bundle_qty > 0 && (
+                                          <div className="text-[9px] font-black uppercase text-neutral-600 tracking-wider flex items-center gap-1">
+                                            <span>🛒 PENJUALAN LANGSUNG ({p.direct_qty} PCS):</span>
+                                          </div>
+                                        )}
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {Object.entries(p.direct_variants || {}).map(([vName, vQty]) => (
+                                            <span
+                                              key={vName}
+                                              className="px-2.5 py-1 bg-white border-2 border-ink/30 rounded-md font-bold text-[11px] text-ink shadow-2xs"
+                                            >
+                                              {vName}: <strong className="text-brand-orange">{String(vQty)} pcs</strong>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
 
-                                   {/* Block 2: Bundle Purchase Variants */}
-                                   {p.bundle_qty > 0 && (
-                                     <div className="space-y-1 pt-1.5 border-t border-ink/10">
-                                       <div className="text-[9px] font-black uppercase text-blue-700 tracking-wider">
-                                         DARI PAKET BUNDLE (+{p.bundle_qty} PCS):
-                                       </div>
-                                       <div className="flex flex-wrap gap-1">
-                                         {Object.entries(p.bundle_variants || p.bundle_source_breakdown || {}).map(([bName, bQty]) => (
-                                           <span
-                                             key={bName}
-                                             className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-300 rounded font-bold text-[10px]"
-                                           >
-                                             {bName}: <strong>{String(bQty)}</strong>
-                                           </span>
-                                         ))}
-                                       </div>
-                                     </div>
-                                   )}
+                                    {/* Block 2: Bundle Purchase Items / Package Source */}
+                                    {p.bundle_qty > 0 && (
+                                      <div className="space-y-1.5 pt-2 border-t border-ink/15">
+                                        <div className="text-[9px] font-black uppercase text-blue-800 tracking-wider flex items-center gap-1">
+                                          <span>🎁 TERKANDUNG DALAM PAKET BUNDLE (+{p.bundle_qty} PCS):</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {Object.entries(p.bundle_variants || p.bundle_source_breakdown || {}).map(([bName, bQty]) => (
+                                            <span
+                                              key={bName}
+                                              className="px-2.5 py-1 bg-blue-50 text-blue-950 border-2 border-blue-300 rounded-md font-extrabold text-[10px] shadow-2xs flex items-center gap-1"
+                                            >
+                                              <span className="text-blue-700 font-semibold">Asal Paket:</span>
+                                              <span>{bName}</span>
+                                              <strong className="bg-blue-600 text-white px-1.5 py-0.2 rounded text-[9px] ml-0.5">
+                                                {String(bQty)} pcs
+                                              </strong>
+                                            </span>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    )}
 
-                                   {/* Fallback if no variants */}
-                                   {Object.keys(p.direct_variants || {}).length === 0 && p.bundle_qty === 0 && (
-                                     <span className="text-muted-foreground italic text-[11px]">-</span>
-                                   )}
+                                    {/* Fallback if no variants */}
+                                    {Object.keys(p.direct_variants || {}).length === 0 && p.bundle_qty === 0 && (
+                                      <span className="text-muted-foreground italic text-[11px]">-</span>
+                                    )}
                                  </td>
                                 <td className="p-3 text-right font-black text-ink">
                                   Rp {Number(p.total_subtotal || 0).toLocaleString("id-ID")}

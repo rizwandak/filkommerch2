@@ -3131,8 +3131,10 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           productSalesMap[pid].total_qty += item.quantity;
 
           const parentOrderItems = items.filter((i) => i.order_id === item.order_id);
-          const parentBundle = parentOrderItems.find((i) => i.connected_product_type === "bundle" || (i.product_name && !i.product_name.includes("[KOMPONEN BUNDLE]")));
-          const parentBundleName = parentBundle ? (parentBundle.product_name || parentBundle.connected_product_name) : "Bundle";
+          const parentBundle = parentOrderItems.find(
+            (i) => i.connected_product_type === "bundle" || Boolean(bundleComponentsMap[i.product_id])
+          );
+          const parentBundleName = parentBundle ? (parentBundle.product_name || parentBundle.connected_product_name) : "Paket Bundle";
 
           const bKey = `${parentBundleName}${cleanedVar ? ` — ${cleanedVar}` : ""}`;
 
@@ -3575,35 +3577,83 @@ export const regeneratePaymentToken = async (req: Request, res: Response) => {
 export const getOrdersSummary = async (req: Request, res: Response) => {
   try {
     const days = req.query.days as string || "30";
+    const batch = (req.query.batch as string || "all").trim();
     
-    let dateConstraint = "created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+    let dateConstraint = "o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
     
     if (days === "today") {
-      dateConstraint = "created_at >= CURDATE()";
+      dateConstraint = "o.created_at >= CURDATE()";
     } else if (days === "7") {
-      dateConstraint = "created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
+      dateConstraint = "o.created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)";
     } else if (days === "30") {
-      dateConstraint = "created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
+      dateConstraint = "o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
     } else if (days === "365") {
-      dateConstraint = "created_at >= DATE_SUB(NOW(), INTERVAL 365 DAY)";
+      dateConstraint = "o.created_at >= DATE_SUB(NOW(), INTERVAL 365 DAY)";
     } else if (days === "all") {
       dateConstraint = "1=1";
     }
 
+    // Fetch active/past campaigns for batch filtering and breakdown
+    const campaigns = await query<any>(
+      "SELECT id, batch_name, start_date, end_date, extended_end_date FROM pre_order_campaigns ORDER BY id ASC"
+    );
+
+    const formatSqlDate = (d: any) => {
+      if (!d) return null;
+      try {
+        const dt = new Date(d);
+        if (isNaN(dt.getTime())) return String(d);
+        const pad = (n: number) => String(n).padStart(2, "0");
+        return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}:${pad(dt.getSeconds())}`;
+      } catch {
+        return String(d);
+      }
+    };
+
+    // Build batch SQL filter constraint
+    let batchConstraint = "1=1";
+    if (batch && batch !== "all") {
+      if (batch === "ready_stock") {
+        if (campaigns.length > 0) {
+          const campRanges = campaigns.map((c: any) => {
+            const startD = formatSqlDate(c.start_date);
+            const endD = formatSqlDate(c.extended_end_date || c.end_date);
+            return `(o.created_at >= '${startD}' AND o.created_at <= '${endD}')`;
+          }).join(" OR ");
+          batchConstraint = `(o.pre_order_campaign_id IS NULL AND NOT (${campRanges}))`;
+        } else {
+          batchConstraint = "o.pre_order_campaign_id IS NULL";
+        }
+      } else {
+        // Specific campaign ID or name
+        const matchedCamp = campaigns.find((c: any) => String(c.id) === batch || c.batch_name.toLowerCase() === batch.toLowerCase());
+        if (matchedCamp) {
+          const startD = formatSqlDate(matchedCamp.start_date);
+          const endD = formatSqlDate(matchedCamp.extended_end_date || matchedCamp.end_date);
+          batchConstraint = `(o.pre_order_campaign_id = ${matchedCamp.id} OR (o.pre_order_campaign_id IS NULL AND o.created_at >= '${startD}' AND o.created_at <= '${endD}'))`;
+        } else if (!isNaN(Number(batch))) {
+          batchConstraint = `o.pre_order_campaign_id = ${Number(batch)}`;
+        }
+      }
+    }
+
+    // Valid paid condition matching transactions.tsx
+    const validPaidCondition = "(o.payment_status = 'paid' OR o.order_status IN ('completed', 'settlement', 'capture')) AND o.order_status NOT IN ('cancelled', 'cancel')";
+
     // 1. General financial and order summary
     const summary = await queryOne<any>(
       `SELECT 
-        COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) AS total_orders,
-        COUNT(CASE WHEN payment_status = 'paid' AND channel = 'online' THEN 1 END) AS online_orders,
-        COUNT(CASE WHEN payment_status = 'paid' AND channel = 'pos' THEN 1 END) AS pos_orders,
-        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN gross_amount ELSE 0 END), 0) AS total_revenue,
-        COALESCE(SUM(CASE WHEN payment_status = 'paid' AND channel = 'online' THEN gross_amount ELSE 0 END), 0) AS online_revenue,
-        COALESCE(SUM(CASE WHEN payment_status = 'paid' AND channel = 'pos' THEN gross_amount ELSE 0 END), 0) AS pos_revenue,
-        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN discount_amount ELSE 0 END), 0) AS total_discount,
-        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN tax_amount ELSE 0 END), 0) AS total_tax,
-        COALESCE(SUM(CASE WHEN payment_status = 'paid' THEN subtotal ELSE 0 END), 0) AS total_subtotal
-       FROM orders
-       WHERE ${dateConstraint}`
+        COUNT(CASE WHEN ${validPaidCondition} AND o.order_id NOT LIKE 'LNS%' THEN 1 END) AS total_orders,
+        COUNT(CASE WHEN ${validPaidCondition} AND o.channel = 'online' AND o.order_id NOT LIKE 'LNS%' THEN 1 END) AS online_orders,
+        COUNT(CASE WHEN ${validPaidCondition} AND o.channel = 'pos' AND o.order_id NOT LIKE 'LNS%' THEN 1 END) AS pos_orders,
+        COALESCE(SUM(CASE WHEN ${validPaidCondition} THEN o.gross_amount ELSE 0 END), 0) AS total_revenue,
+        COALESCE(SUM(CASE WHEN ${validPaidCondition} AND o.channel = 'online' THEN o.gross_amount ELSE 0 END), 0) AS online_revenue,
+        COALESCE(SUM(CASE WHEN ${validPaidCondition} AND o.channel = 'pos' THEN o.gross_amount ELSE 0 END), 0) AS pos_revenue,
+        COALESCE(SUM(CASE WHEN ${validPaidCondition} THEN o.discount_amount ELSE 0 END), 0) AS total_discount,
+        COALESCE(SUM(CASE WHEN ${validPaidCondition} THEN o.tax_amount ELSE 0 END), 0) AS total_tax,
+        COALESCE(SUM(CASE WHEN ${validPaidCondition} THEN o.subtotal ELSE 0 END), 0) AS total_subtotal
+       FROM orders o
+       WHERE ${dateConstraint} AND ${batchConstraint}`
     );
 
     // 2. Product and Variant Sales Breakdown
@@ -3618,7 +3668,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         SUM(oi.subtotal) AS total_revenue
        FROM order_items oi
        JOIN orders o ON o.order_id = oi.order_id
-       WHERE o.payment_status = 'paid' AND o.${dateConstraint}
+       WHERE ${validPaidCondition} AND ${dateConstraint} AND ${batchConstraint}
        GROUP BY oi.product_id, oi.product_name, oi.variant_id, oi.size, oi.color
        ORDER BY total_quantity DESC`
     );
@@ -3662,15 +3712,15 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
     // 3. Buyer Purchase Summary
     const buyerRows = await query<any>(
       `SELECT 
-        customer_name,
-        customer_email,
-        customer_phone,
-        customer_nim,
-        COUNT(id) AS total_orders,
-        SUM(gross_amount) AS total_spent
-       FROM orders
-       WHERE payment_status = 'paid' AND ${dateConstraint}
-       GROUP BY customer_email, customer_name, customer_phone, customer_nim
+        o.customer_name,
+        o.customer_email,
+        o.customer_phone,
+        o.customer_nim,
+        COUNT(CASE WHEN o.order_id NOT LIKE 'LNS%' THEN 1 END) AS total_orders,
+        SUM(CASE WHEN ${validPaidCondition} THEN o.gross_amount ELSE 0 END) AS total_spent
+       FROM orders o
+       WHERE ${validPaidCondition} AND ${dateConstraint} AND ${batchConstraint}
+       GROUP BY o.customer_email, o.customer_name, o.customer_phone, o.customer_nim
        ORDER BY total_spent DESC`
     );
 
@@ -3685,7 +3735,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         SUM(oi.subtotal) AS total_spent
        FROM orders o
        JOIN order_items oi ON o.order_id = oi.order_id
-       WHERE o.payment_status = 'paid' AND o.${dateConstraint}
+       WHERE ${validPaidCondition} AND ${dateConstraint} AND ${batchConstraint}
        GROUP BY o.customer_email, o.customer_name, oi.product_name, oi.size, oi.color`
     );
 
@@ -3726,28 +3776,90 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
     if (days === "today") {
       trendRows = await query<any>(
         `SELECT 
-          HOUR(created_at) AS hour,
-          DATE_FORMAT(created_at, '%H:00') AS label,
-          COALESCE(SUM(gross_amount), 0) AS revenue,
-          COUNT(id) AS orders_count
-         FROM orders
-         WHERE payment_status = 'paid' AND created_at >= CURDATE()
-         GROUP BY HOUR(created_at), DATE_FORMAT(created_at, '%H:00')
+          HOUR(o.created_at) AS hour,
+          DATE_FORMAT(o.created_at, '%H:00') AS label,
+          COALESCE(SUM(o.gross_amount), 0) AS revenue,
+          COUNT(CASE WHEN o.order_id NOT LIKE 'LNS%' THEN 1 END) AS orders_count
+         FROM orders o
+         WHERE ${validPaidCondition} AND o.created_at >= CURDATE() AND ${batchConstraint}
+         GROUP BY HOUR(o.created_at), DATE_FORMAT(o.created_at, '%H:00')
          ORDER BY hour ASC`
       );
     } else {
       trendRows = await query<any>(
         `SELECT 
-          DATE(created_at) AS date,
-          DATE_FORMAT(created_at, '%d %b') AS label,
-          COALESCE(SUM(gross_amount), 0) AS revenue,
-          COUNT(id) AS orders_count
-         FROM orders
-         WHERE payment_status = 'paid' AND ${dateConstraint}
-         GROUP BY DATE(created_at), DATE_FORMAT(created_at, '%d %b')
+          DATE(o.created_at) AS date,
+          DATE_FORMAT(o.created_at, '%d %b') AS label,
+          COALESCE(SUM(o.gross_amount), 0) AS revenue,
+          COUNT(CASE WHEN o.order_id NOT LIKE 'LNS%' THEN 1 END) AS orders_count
+         FROM orders o
+         WHERE ${validPaidCondition} AND ${dateConstraint} AND ${batchConstraint}
+         GROUP BY DATE(o.created_at), DATE_FORMAT(o.created_at, '%d %b')
          ORDER BY date ASC`
       );
     }
+
+    // 5. Calculate Batch / Campaign Distribution breakdown across all paid orders
+    const batchBreakdownMap: Record<string, { id: string | number; name: string; revenue: number; orders: number; items: number }> = {};
+    
+    // Initialize entries for all campaigns
+    for (const c of campaigns) {
+      batchBreakdownMap[String(c.id)] = {
+        id: c.id,
+        name: c.batch_name || `Batch #${c.id}`,
+        revenue: 0,
+        orders: 0,
+        items: 0
+      };
+    }
+    batchBreakdownMap["ready_stock"] = {
+      id: "ready_stock",
+      name: "Ready Stock / Outside PO",
+      revenue: 0,
+      orders: 0,
+      items: 0
+    };
+
+    // Fetch overall paid orders with item counts to compute campaign share
+    const allPaidOrders = await query<any>(
+      `SELECT 
+        o.id,
+        o.order_id,
+        o.pre_order_campaign_id,
+        o.created_at,
+        o.gross_amount,
+        COALESCE((SELECT SUM(quantity) FROM order_items WHERE order_id = o.order_id), 0) as items_qty
+       FROM orders o
+       WHERE ${validPaidCondition} AND ${dateConstraint}`
+    );
+
+    for (const ord of allPaidOrders) {
+      let matchedId = "ready_stock";
+      if (ord.pre_order_campaign_id && batchBreakdownMap[String(ord.pre_order_campaign_id)]) {
+        matchedId = String(ord.pre_order_campaign_id);
+      } else {
+        const ordTime = new Date(ord.created_at).getTime();
+        for (const c of campaigns) {
+          const sTime = new Date(c.start_date).getTime();
+          const endStr = c.extended_end_date || c.end_date;
+          const eTime = new Date(endStr).getTime();
+          if (ordTime >= sTime && ordTime <= eTime) {
+            matchedId = String(c.id);
+            break;
+          }
+        }
+      }
+      if (batchBreakdownMap[matchedId]) {
+        batchBreakdownMap[matchedId].revenue += Number(ord.gross_amount || 0);
+        if (!String(ord.order_id).startsWith("LNS")) {
+          batchBreakdownMap[matchedId].orders += 1;
+        }
+        batchBreakdownMap[matchedId].items += Number(ord.items_qty || 0);
+      }
+    }
+
+    const campaignsBreakdown = Object.values(batchBreakdownMap);
+    const civitasCount = buyerRows.filter((b: any) => b.customer_nim && String(b.customer_nim).trim() !== "").length;
 
     return res.json({
       success: true,
@@ -3761,18 +3873,21 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         total_discount: Number(summary?.total_discount || 0),
         total_tax: Number(summary?.total_tax || 0),
         total_subtotal: Number(summary?.total_subtotal || 0),
+        civitas_count: civitasCount
       },
+      campaigns_list: campaigns.map((c: any) => ({ id: c.id, batch_name: c.batch_name })),
+      campaigns_breakdown: campaignsBreakdown,
       products: productsSummary,
       buyers: buyersSummary,
-      sales_trend: trendRows.map(row => ({
-        label: row.label,
-        revenue: Number(row.revenue),
-        orders_count: Number(row.orders_count)
+      sales_trend: trendRows.map((r: any) => ({
+        label: r.label,
+        revenue: Number(r.revenue),
+        orders_count: Number(r.orders_count)
       }))
     });
   } catch (error: any) {
     console.error("Error fetching orders summary:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to fetch orders summary" });
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 
