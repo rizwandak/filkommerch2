@@ -2772,11 +2772,10 @@ export const submitPaymentProof = async (req: Request, res: Response) => {
   }
 };
 
-// ============ PRE-ORDER CAMPAIGNS ============
 
 export const getPreOrderCampaigns = async (req: Request, res: Response) => {
   try {
-    const campaigns = await query("SELECT * FROM pre_order_campaigns ORDER BY created_at DESC");
+    const campaigns = await query<any>("SELECT * FROM pre_order_campaigns ORDER BY created_at DESC");
     return res.json({ success: true, data: campaigns });
   } catch (error: any) {
     console.error("Error fetching pre-order campaigns:", error);
@@ -2786,8 +2785,8 @@ export const getPreOrderCampaigns = async (req: Request, res: Response) => {
 
 export const getAllPreOrderCampaigns = async (req: Request, res: Response) => {
   try {
-    const campaigns = await query("SELECT * FROM pre_order_campaigns ORDER BY id DESC");
-    return res.json({ success: true, data: campaigns || [] });
+    const campaigns = await query<any>("SELECT * FROM pre_order_campaigns ORDER BY id DESC");
+    return res.json({ success: true, data: campaigns });
   } catch (error: any) {
     console.error("Error fetching pre-order campaigns:", error);
     return res.status(500).json({ success: false, error: error.message });
@@ -2796,7 +2795,8 @@ export const getAllPreOrderCampaigns = async (req: Request, res: Response) => {
 
 export const getActivePreOrderCampaign = async (req: Request, res: Response) => {
   try {
-    const campaign = await queryOne("SELECT * FROM pre_order_campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+    const campaign = await queryOne<any>("SELECT * FROM pre_order_campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+
     return res.json({ success: true, data: campaign || null });
   } catch (error: any) {
     console.error("Error fetching active pre-order campaign:", error);
@@ -2806,10 +2806,12 @@ export const getActivePreOrderCampaign = async (req: Request, res: Response) => 
 
 export const createPreOrderCampaign = async (req: Request, res: Response) => {
   try {
-    const { batch_name, start_date, end_date, extended_end_date, is_active, description } = req.body;
+    let { batch_name, start_date, end_date, extended_end_date, is_active, description } = req.body;
     if (!batch_name || !start_date || !end_date) {
       return res.status(400).json({ success: false, error: "Nama batch, tanggal mulai, dan tanggal selesai wajib diisi" });
     }
+
+
 
     if (is_active) {
       await execute("UPDATE pre_order_campaigns SET is_active = 0");
@@ -2831,11 +2833,13 @@ export const createPreOrderCampaign = async (req: Request, res: Response) => {
 export const updatePreOrderCampaign = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { batch_name, start_date, end_date, extended_end_date, is_active, description } = req.body;
+    let { batch_name, start_date, end_date, extended_end_date, is_active, description } = req.body;
 
     if (!batch_name || !start_date || !end_date) {
       return res.status(400).json({ success: false, error: "Nama batch, tanggal mulai, dan tanggal selesai wajib diisi" });
     }
+
+
 
     if (is_active) {
       await execute("UPDATE pre_order_campaigns SET is_active = 0 WHERE id != ?", [id]);
@@ -2890,7 +2894,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: "Campaign Pre-Order tidak ditemukan" });
     }
 
-    // 1. Fetch connected products (all products with pre_order sale_type or product_type, or matched to this campaign)
+    // 1. Fetch connected products
     const connectedProducts = await query<any>(
       `SELECT p.*, c.name as category_name 
        FROM products p 
@@ -2898,6 +2902,46 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
        WHERE p.sale_type = 'pre_order' OR p.product_type = 'preorder' OR p.pre_order_campaign_id = ?`,
       [id]
     );
+
+    // Fetch bundle component mappings
+    const bundleItemsRows = await query<any>(
+      `SELECT bi.bundle_product_id, bi.component_product_id, COALESCE(bi.quantity, 1) as comp_qty,
+              bp.name as bundle_name
+       FROM bundle_items bi
+       JOIN products bp ON bi.bundle_product_id = bp.id`
+    );
+
+    const bundleComponentsMap: Record<number, Array<{ component_product_id: number; comp_qty: number; bundle_name: string }>> = {};
+    for (const bi of bundleItemsRows) {
+      const bId = Number(bi.bundle_product_id);
+      if (!bundleComponentsMap[bId]) bundleComponentsMap[bId] = [];
+      bundleComponentsMap[bId].push({
+        component_product_id: Number(bi.component_product_id),
+        comp_qty: Number(bi.comp_qty) || 1,
+        bundle_name: bi.bundle_name,
+      });
+    }
+
+    // Fetch all active variants to allow matching variant names for components inside bundles
+    const allProductVariants = await query<any>(
+      `SELECT pv.*, p.name as product_name 
+       FROM product_variants pv 
+       JOIN products p ON pv.product_id = p.id 
+       WHERE pv.is_active = TRUE`
+    );
+
+    const componentVariantsMap: Record<number, string[]> = {};
+    for (const pv of allProductVariants) {
+      const pId = Number(pv.product_id);
+      if (!componentVariantsMap[pId]) componentVariantsMap[pId] = [];
+      const vLabel = [pv.size, pv.color]
+        .map((s) => (s || "").trim())
+        .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard")
+        .join(" / ");
+      if (vLabel && !componentVariantsMap[pId].includes(vLabel)) {
+        componentVariantsMap[pId].push(vLabel);
+      }
+    }
 
     const effectiveEndDate = campaign.extended_end_date || campaign.end_date;
 
@@ -2913,11 +2957,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       }
     };
 
-    const startSql = formatSqlDate(campaign.start_date);
-    const endSql = formatSqlDate(effectiveEndDate);
-    const isCampaignActive = Boolean(campaign.is_active);
-
-    // 2. Fetch all order items and orders for pre-order products within campaign date range or active campaign
+    // 2. Fetch order items ONLY for initial orders (order_id NOT LIKE 'LNS%')
     const items = await query<any>(
       `SELECT 
         oi.*,
@@ -2935,6 +2975,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         o.gross_amount as grand_total,
         p.name as connected_product_name,
         p.image_url as connected_product_image,
+        p.product_type as connected_product_type,
         u.name as user_full_name,
         u.email as user_email,
         u.phone as user_phone,
@@ -2943,11 +2984,14 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
        JOIN orders o ON oi.order_id = o.order_id
        JOIN products p ON oi.product_id = p.id
        LEFT JOIN users u ON o.user_id = u.id
-       WHERE (p.sale_type = 'pre_order' OR p.product_type = 'preorder' OR p.pre_order_campaign_id = ?)
-         AND o.created_at >= ?
-         AND o.created_at <= ?
+       WHERE (
+         o.pre_order_campaign_id = ? OR 
+         ( (p.sale_type = 'pre_order' OR p.product_type = 'preorder' OR p.pre_order_campaign_id = ?) 
+           AND o.created_at >= ? AND o.created_at <= ? )
+       )
+         AND o.order_id NOT LIKE 'LNS%'
        ORDER BY o.created_at DESC`,
-      [id, campaign.start_date, effectiveEndDate]
+      [id, id, campaign.start_date, effectiveEndDate]
     );
 
     // Group items by order_id
@@ -2959,10 +3003,16 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       product_id: number;
       name: string;
       image_url: string | null;
+      product_type: string;
       unit_price: number;
       total_qty: number;
+      direct_qty: number;
+      bundle_qty: number;
       total_subtotal: number;
       variants: Record<string, number>;
+      direct_variants: Record<string, number>;
+      bundle_variants: Record<string, number>;
+      bundle_source_breakdown: Record<string, number>;
     }> = {};
 
     // Initialize product map for connected products
@@ -2971,17 +3021,22 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         product_id: prod.id,
         name: prod.name,
         image_url: prod.image_url,
+        product_type: prod.product_type || "single",
         unit_price: Number(prod.price),
         total_qty: 0,
+        direct_qty: 0,
+        bundle_qty: 0,
         total_subtotal: 0,
         variants: {},
+        direct_variants: {},
+        bundle_variants: {},
+        bundle_source_breakdown: {},
       };
     }
 
     const uniqueBuyersSet = new Set<string>();
 
     for (const item of items) {
-      const isCancelled = item.order_status === "cancelled" || item.payment_status === "failed" || item.payment_status === "expired";
       const isPaid = item.payment_status === "paid" || item.payment_status === "settlement" || item.order_status === "completed";
       
       const buyerId = item.customer_email || item.user_email || item.customer_phone || `order-${item.order_id}`;
@@ -3029,20 +3084,108 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           product_id: pid,
           name: item.product_name || item.connected_product_name || `Product #${pid}`,
           image_url: item.connected_product_image || null,
+          product_type: item.connected_product_type || "single",
           unit_price: Number(item.unit_price),
           total_qty: 0,
+          direct_qty: 0,
+          bundle_qty: 0,
           total_subtotal: 0,
           variants: {},
+          direct_variants: {},
+          bundle_variants: {},
+          bundle_source_breakdown: {},
         };
       }
 
       if (isPaid) {
-        totalUnitsSold += item.quantity;
-        productSalesMap[pid].total_qty += item.quantity;
-        productSalesMap[pid].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
+        // Clean variant string to strip redundant placeholder words like "One Size", "Default", "-", "Standard"
+        const formatVariantKey = (rawSize?: string, rawColor?: string) => {
+          const parts = [rawSize, rawColor]
+            .map((s) => (s || "").trim())
+            .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard");
+          return parts.join(" / ");
+        };
 
-        const variantKey = [item.size, item.color].filter(Boolean).filter((x: string) => x !== "-").join(" / ") || "Default";
-        productSalesMap[pid].variants[variantKey] = (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
+        const cleanedVar = formatVariantKey(item.size, item.color);
+        const variantKey = cleanedVar || "Standard";
+
+        const isComponentItem =
+          (item.product_name && item.product_name.includes("[KOMPONEN BUNDLE]")) ||
+          Number(item.unit_price || item.price) === 0;
+
+        if (isComponentItem) {
+          // This item is a component item generated by a bundle purchase!
+          productSalesMap[pid].bundle_qty += item.quantity;
+          productSalesMap[pid].total_qty += item.quantity;
+
+          const parentOrderItems = items.filter((i) => i.order_id === item.order_id);
+          const parentBundle = parentOrderItems.find((i) => i.connected_product_type === "bundle" || (i.product_name && !i.product_name.includes("[KOMPONEN BUNDLE]")));
+          const parentBundleName = parentBundle ? (parentBundle.product_name || parentBundle.connected_product_name) : "Bundle";
+
+          const bKey = `${parentBundleName}${cleanedVar ? ` — ${cleanedVar}` : ""}`;
+
+          productSalesMap[pid].bundle_source_breakdown[bKey] =
+            (productSalesMap[pid].bundle_source_breakdown[bKey] || 0) + item.quantity;
+
+          productSalesMap[pid].bundle_variants[bKey] =
+            (productSalesMap[pid].bundle_variants[bKey] || 0) + item.quantity;
+
+          productSalesMap[pid].variants[`Dari ${bKey}`] =
+            (productSalesMap[pid].variants[`Dari ${bKey}`] || 0) + item.quantity;
+        } else if (item.connected_product_type === "bundle") {
+          totalUnitsSold += item.quantity;
+          productSalesMap[pid].direct_qty += item.quantity;
+          productSalesMap[pid].total_qty += item.quantity;
+          productSalesMap[pid].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
+          productSalesMap[pid].variants[variantKey] = (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
+          productSalesMap[pid].direct_variants[variantKey] = (productSalesMap[pid].direct_variants[variantKey] || 0) + item.quantity;
+
+          const hasComponentRows = items.some((i) => i.order_id === item.order_id && ((i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")) || Number(i.unit_price || i.price) === 0));
+
+          if (!hasComponentRows) {
+            const comps = bundleComponentsMap[pid];
+            if (comps && comps.length > 0) {
+              for (const comp of comps) {
+                const cid = comp.component_product_id;
+                const addedQty = item.quantity * comp.comp_qty;
+                if (productSalesMap[cid]) {
+                  let matchedCompVar = cleanedVar;
+                  if (!matchedCompVar && componentVariantsMap[cid]) {
+                    const searchStr = `${item.size || ""} ${item.color || ""} ${item.product_name || ""} ${item.notes || ""}`.toLowerCase();
+                    for (const vName of componentVariantsMap[cid]) {
+                      if (searchStr.includes(vName.toLowerCase())) {
+                        matchedCompVar = vName;
+                        break;
+                      }
+                    }
+                  }
+
+                  productSalesMap[cid].bundle_qty += addedQty;
+                  productSalesMap[cid].total_qty += addedQty;
+
+                  const varSpecStr = matchedCompVar ? ` — ${matchedCompVar}` : "";
+                  const bKey = `${comp.bundle_name}${varSpecStr}`;
+
+                  productSalesMap[cid].bundle_source_breakdown[bKey] =
+                    (productSalesMap[cid].bundle_source_breakdown[bKey] || 0) + addedQty;
+
+                  productSalesMap[cid].bundle_variants[bKey] =
+                    (productSalesMap[cid].bundle_variants[bKey] || 0) + addedQty;
+
+                  productSalesMap[cid].variants[`Dari ${bKey}`] =
+                    (productSalesMap[cid].variants[`Dari ${bKey}`] || 0) + addedQty;
+                }
+              }
+            }
+          }
+        } else {
+          totalUnitsSold += item.quantity;
+          productSalesMap[pid].direct_qty += item.quantity;
+          productSalesMap[pid].total_qty += item.quantity;
+          productSalesMap[pid].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
+          productSalesMap[pid].variants[variantKey] = (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
+          productSalesMap[pid].direct_variants[variantKey] = (productSalesMap[pid].direct_variants[variantKey] || 0) + item.quantity;
+        }
       }
     }
 
@@ -4475,5 +4618,540 @@ export const getProductReviews = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error fetching product reviews:", error);
     return res.status(500).json({ success: false, reviews: [], totalReviews: 0, avgRating: 0 });
+  }
+};
+
+
+// ============ VENDORS & VENDORING FEATURE CONTROLLERS ============
+
+// Get All Vendors
+export const getVendors = async (req: Request, res: Response) => {
+  try {
+    const vendors = await query<any>("SELECT * FROM vendors ORDER BY id DESC");
+    return res.json({ success: true, data: vendors });
+  } catch (error: any) {
+    console.error("Error fetching vendors:", error);
+    return res.status(500).json({ success: false, error: error.message, data: [] });
+  }
+};
+
+// Create Vendor
+export const createVendor = async (req: Request, res: Response) => {
+  try {
+    const { name, contact_person, phone, email, notes } = req.body;
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, error: "Nama vendor wajib diisi" });
+    }
+    const result = await execute(
+      "INSERT INTO vendors (name, contact_person, phone, email, notes) VALUES (?, ?, ?, ?, ?)",
+      [name.trim(), contact_person || null, phone || null, email || null, notes || null]
+    );
+    return res.json({ success: true, id: result.insertId, message: "Vendor berhasil ditambahkan" });
+  } catch (error: any) {
+    console.error("Error creating vendor:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Update Vendor
+export const updateVendor = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, contact_person, phone, email, notes } = req.body;
+    await execute(
+      "UPDATE vendors SET name = ?, contact_person = ?, phone = ?, email = ?, notes = ? WHERE id = ?",
+      [name, contact_person || null, phone || null, email || null, notes || null, id]
+    );
+    return res.json({ success: true, message: "Vendor berhasil diperbarui" });
+  } catch (error: any) {
+    console.error("Error updating vendor:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Delete Vendor
+export const deleteVendor = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await execute("DELETE FROM vendors WHERE id = ?", [id]);
+    return res.json({ success: true, message: "Vendor berhasil dihapus" });
+  } catch (error: any) {
+    console.error("Error deleting vendor:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Get Production Summary (Aggregation of pre-order items)
+export const getProductionSummary = async (req: Request, res: Response) => {
+  try {
+    const batchFilter = (req.query.batch as string) || "all";
+    
+    let whereClause = "WHERE o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed')";
+    const queryParams: any[] = [];
+    if (batchFilter !== "all") {
+      whereClause += " AND o.pre_order_campaign_id = ?";
+      queryParams.push(batchFilter);
+    }
+
+    const rows = await query<any>(
+      `SELECT 
+        oi.product_id,
+        COALESCE(p.name, oi.product_name) as product_name,
+        COALESCE(oi.size, 'Standard') as size,
+        COALESCE(oi.color, '') as color,
+        c.batch_name,
+        c.id as campaign_id,
+        SUM(oi.quantity) as qty
+       FROM order_items oi
+       JOIN orders o ON oi.order_id = o.order_id
+       LEFT JOIN products p ON oi.product_id = p.id
+       LEFT JOIN pre_order_campaigns c ON o.pre_order_campaign_id = c.id
+       ${whereClause}
+       GROUP BY oi.product_id, product_name, size, color, campaign_id, c.batch_name
+       ORDER BY product_name ASC, size ASC`,
+      queryParams
+    );
+
+    // Aggregate by product
+    const groupedMap: Record<number, any> = {};
+    for (const r of rows) {
+      const pId = r.product_id || 0;
+      if (!groupedMap[pId]) {
+        groupedMap[pId] = {
+          product_id: pId,
+          product_name: r.product_name,
+          variants_breakdown: {},
+          batch_breakdown: {},
+          total_qty: 0,
+        };
+      }
+
+      const varKey = [r.size, r.color].filter(Boolean).join(" / ") || "Standard";
+      groupedMap[pId].variants_breakdown[varKey] = (groupedMap[pId].variants_breakdown[varKey] || 0) + Number(r.qty);
+
+      const bName = r.batch_name || `Batch #${r.campaign_id || "Unassigned"}`;
+      groupedMap[pId].batch_breakdown[bName] = (groupedMap[pId].batch_breakdown[bName] || 0) + Number(r.qty);
+
+      groupedMap[pId].total_qty += Number(r.qty);
+    }
+
+    const resultList = Object.values(groupedMap);
+    return res.json({ success: true, data: resultList });
+  } catch (error: any) {
+    console.error("Error fetching production summary:", error);
+    return res.status(500).json({ success: false, error: error.message, data: [] });
+  }
+};
+
+// Get Vendor Orders (PO)
+export const getVendorOrders = async (req: Request, res: Response) => {
+  try {
+    const orders = await query<any>(
+      `SELECT vo.*, v.name as vendor_name, v.phone as vendor_phone, v.contact_person
+       FROM vendor_orders vo
+       JOIN vendors v ON vo.vendor_id = v.id
+       ORDER BY vo.id DESC`
+    );
+
+    for (const o of orders) {
+      const items = await query<any>(
+        `SELECT voi.*, p.name as catalog_product_name
+         FROM vendor_order_items voi
+         LEFT JOIN products p ON voi.product_id = p.id
+         WHERE voi.vendor_order_id = ?`,
+        [o.id]
+      );
+      o.items = items;
+    }
+
+    return res.json({ success: true, data: orders });
+  } catch (error: any) {
+    console.error("Error fetching vendor orders:", error);
+    return res.status(500).json({ success: false, error: error.message, data: [] });
+  }
+};
+
+// Create Vendor Order (PO)
+export const createVendorOrder = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const { vendor_id, deadline, notes, items } = req.body;
+    if (!vendor_id || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: "Vendor ID dan minimal 1 item pesanan wajib diisi" });
+    }
+
+    await connection.beginTransaction();
+
+    const [cntRows] = await connection.query("SELECT COUNT(*) as cnt FROM vendor_orders");
+    const count = ((cntRows as any[])[0]?.cnt || 0) + 1;
+    const poNumber = `VO-${new Date().getFullYear()}-${String(count).padStart(3, "0")}`;
+
+    let totalCost = 0;
+    for (const item of items) {
+      totalCost += (Number(item.unit_cost) || 0) * (Number(item.quantity) || 0);
+    }
+
+    const [voRes] = await connection.query(
+      "INSERT INTO vendor_orders (po_number, vendor_id, status, total_cost, notes, deadline) VALUES (?, ?, 'draft', ?, ?, ?)",
+      [poNumber, vendor_id, totalCost, notes || null, deadline || null]
+    );
+    const vendorOrderId = (voRes as any).insertId;
+
+    for (const item of items) {
+      const uCost = Number(item.unit_cost) || 0;
+      const qty = Number(item.quantity) || 0;
+      const sub = uCost * qty;
+      await connection.query(
+        "INSERT INTO vendor_order_items (vendor_order_id, product_id, size, color, quantity, unit_cost, subtotal_cost, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [vendorOrderId, item.product_id, item.size || null, item.color || null, qty, uCost, sub, item.notes || null]
+      );
+    }
+
+    await connection.commit();
+    return res.json({ success: true, id: vendorOrderId, po_number: poNumber, message: "Purchase Order berhasil diterbitkan" });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error creating vendor order:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+// Update Vendor Order Status
+export const updateVendorOrderStatus = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    let extraSql = "";
+    if (status === "sent") {
+      extraSql = ", sent_at = NOW()";
+    } else if (status === "completed") {
+      extraSql = ", completed_at = NOW()";
+    }
+    await execute(`UPDATE vendor_orders SET status = ? ${extraSql} WHERE id = ?`, [status, id]);
+    return res.json({ success: true, message: "Status PO berhasil diperbarui" });
+  } catch (error: any) {
+    console.error("Error updating vendor order status:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Delete Vendor Order
+export const deleteVendorOrder = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await execute("DELETE FROM vendor_orders WHERE id = ?", [id]);
+    return res.json({ success: true, message: "PO Vendor berhasil dihapus" });
+  } catch (error: any) {
+    console.error("Error deleting vendor order:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Financial Overview
+export const getFinancialOverview = async (req: Request, res: Response) => {
+  try {
+    const batchFilter = (req.query.batch as string) || "all";
+
+    let orderWhere = "WHERE o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed')";
+    const orderParams: any[] = [];
+    if (batchFilter !== "all") {
+      orderWhere += " AND o.pre_order_campaign_id = ?";
+      orderParams.push(batchFilter);
+    }
+
+    const revRows = await query<any>(
+      `SELECT COALESCE(SUM(o.grand_total), 0) as total_rev FROM orders o ${orderWhere}`,
+      orderParams
+    );
+    const totalRevenue = Number(revRows[0]?.total_rev || 0);
+
+    const cogsRows = await query<any>(
+      "SELECT COALESCE(SUM(total_cost), 0) as total_cogs FROM vendor_orders WHERE status != 'cancelled'"
+    );
+    const totalCogs = Number(cogsRows[0]?.total_cogs || 0);
+
+    const grossMargin = totalRevenue - totalCogs;
+    const marginPercent = totalRevenue > 0 ? Number(((grossMargin / totalRevenue) * 100).toFixed(1)) : 0;
+
+    // Per-product breakdown
+    const productRevRows = await query<any>(
+      `SELECT 
+        oi.product_id,
+        COALESCE(p.name, oi.product_name) as product_name,
+        SUM(oi.quantity) as qty_sold,
+        SUM(oi.subtotal) as revenue,
+        COALESCE(p.vendor_cost, 0) as unit_cogs
+       FROM order_items oi
+       JOIN orders o ON oi.order_id = o.order_id
+       LEFT JOIN products p ON oi.product_id = p.id
+       ${orderWhere}
+       GROUP BY oi.product_id, product_name, p.vendor_cost`,
+      orderParams
+    );
+
+    const productBreakdown = productRevRows.map((r: any) => {
+      const rev = Number(r.revenue || 0);
+      const uCogs = Number(r.unit_cogs || 0);
+      const totCogs = uCogs * Number(r.qty_sold || 0);
+      const margin = rev - totCogs;
+      const mPct = rev > 0 ? Number(((margin / rev) * 100).toFixed(1)) : 0;
+
+      return {
+        product_id: r.product_id,
+        product_name: r.product_name,
+        qty_sold: Number(r.qty_sold || 0),
+        revenue: rev,
+        unit_cogs: uCogs,
+        total_cogs: totCogs,
+        margin,
+        margin_percent: mPct,
+      };
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        totalRevenue,
+        totalCogs,
+        grossMargin,
+        marginPercent,
+        productBreakdown,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error fetching financial overview:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const deleteImportedOrders = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const { campaignId } = req.params;
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query(
+      "SELECT order_id FROM orders WHERE pre_order_campaign_id = ? AND batch_source = 'csv_import'",
+      [campaignId]
+    );
+    const orders = rows as any[];
+    
+    if (orders.length > 0) {
+      const oldIds = orders.map((o) => o.order_id);
+      const placeholders = oldIds.map(() => "?").join(",");
+      await connection.query(`DELETE FROM order_items WHERE order_id IN (${placeholders})`, oldIds);
+      await connection.query(`DELETE FROM orders WHERE order_id IN (${placeholders})`, oldIds);
+    }
+    
+    await connection.commit();
+    return res.json({ success: true, message: `Berhasil menghapus ${orders.length} pesanan import.` });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error deleting imported orders:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+// Import CSV Orders Endpoint
+export const importOrders = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const { campaignId, cleanReimport, rows } = req.body;
+    if (!campaignId || !Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json({ success: false, error: "Campaign ID dan data pesanan CSV wajib diisi!" });
+    }
+
+    await connection.beginTransaction();
+
+    if (cleanReimport) {
+      const oldOrders = await query<any>(
+        "SELECT order_id FROM orders WHERE pre_order_campaign_id = ? AND batch_source = 'csv_import'",
+        [campaignId]
+      );
+      if (oldOrders.length > 0) {
+        const oldIds = oldOrders.map((o) => o.order_id);
+        const placeholders = oldIds.map(() => "?").join(",");
+        await connection.query(`DELETE FROM order_items WHERE order_id IN (${placeholders})`, oldIds);
+        await connection.query(`DELETE FROM orders WHERE order_id IN (${placeholders})`, oldIds);
+      }
+    }
+
+    const [productsRows] = await connection.query("SELECT id, name FROM products");
+    const allProducts = productsRows as any[];
+
+    let importedCount = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const orderId =
+        row.order_id ||
+        row["No Order"] ||
+        row.no_order ||
+        row["order_id"] ||
+        `IMP-${Date.now()}-${i}-${Math.floor(Math.random() * 1000)}`;
+
+      const rawCreatedAt =
+        row.created_at || row["Tanggal Order"] || row.tanggal_order || row["tanggal"] || new Date();
+      
+      let formattedDate: string;
+      try {
+        const d = new Date(rawCreatedAt);
+        if (isNaN(d.getTime())) {
+          formattedDate = new Date().toISOString().slice(0, 19).replace("T", " ");
+        } else {
+          formattedDate = d.toISOString().slice(0, 19).replace("T", " ");
+        }
+      } catch {
+        formattedDate = new Date().toISOString().slice(0, 19).replace("T", " ");
+      }
+
+      const customerName =
+        row.customer_name || row["Nama Pembeli"] || row.nama_pembeli || row["Nama"] || "Pembeli CSV";
+      const customerEmail =
+        row.customer_email || row["Email Pembeli"] || row.email_pembeli || row["Email"] || row.email || "";
+      const customerPhone =
+        row.customer_phone || row["No HP Pembeli"] || row.no_hp_pembeli || row["No HP"] || row.no_hp || "";
+      const customerNim =
+        row.customer_nim || row["NIM Pembeli"] || row.nim_pembeli || row["NIM"] || row.nim || "";
+      const itemsStr =
+        row.items_formatted ||
+        row["Rincian Produk (Item / Size / Qty)"] ||
+        row.rincian_produk ||
+        row["Rincian Produk"] ||
+        "";
+      const rawPaymentStatus = String(
+        row.payment_status || row["Status Pembayaran"] || row.status_pembayaran || "settlement"
+      ).toLowerCase();
+      const rawOrderStatus = String(
+        row.order_status || row["Status Pesanan"] || row.status_pesanan || "processing"
+      ).toLowerCase();
+      const grandTotal =
+        parseInt(
+          String(
+            row.grand_total || row["Total Bayar (Rp)"] || row.total_bayar || row["Total Bayar"] || "0"
+          ).replace(/\D/g, ""),
+          10
+        ) || 0;
+
+      const paymentStatus =
+        rawPaymentStatus.includes("paid") || rawPaymentStatus.includes("settlement") || rawPaymentStatus.includes("lunas")
+          ? "paid"
+          : "unpaid";
+          
+      const orderStatus =
+        rawOrderStatus.includes("completed") || rawOrderStatus.includes("selesai") 
+          ? "completed"
+          : rawOrderStatus.includes("processing") || rawOrderStatus.includes("proses") || rawOrderStatus.includes("dikemas")
+          ? "processing"
+          : rawOrderStatus.includes("ready") || rawOrderStatus.includes("siap") || rawOrderStatus.includes("pickup")
+          ? "ready_for_pickup"
+          : rawOrderStatus.includes("shipped") || rawOrderStatus.includes("kirim")
+          ? "shipped"
+          : rawOrderStatus.includes("cancel") || rawOrderStatus.includes("batal")
+          ? "cancelled"
+          : rawOrderStatus.includes("paid") || rawOrderStatus.includes("lunas")
+          ? "paid"
+          : "pending_payment";
+
+      await connection.query(
+        `INSERT INTO orders (
+          order_id, customer_name, customer_email, customer_phone, customer_nim,
+          subtotal, gross_amount, payment_status, order_status, fulfillment_status,
+          channel, batch_source, pre_order_campaign_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'online', 'csv_import', ?, ?)
+        ON DUPLICATE KEY UPDATE 
+          customer_name = VALUES(customer_name),
+          customer_email = VALUES(customer_email),
+          customer_phone = VALUES(customer_phone),
+          customer_nim = VALUES(customer_nim),
+          gross_amount = VALUES(gross_amount),
+          payment_status = VALUES(payment_status),
+          order_status = VALUES(order_status),
+          pre_order_campaign_id = VALUES(pre_order_campaign_id),
+          created_at = VALUES(created_at)`,
+        [
+          orderId,
+          customerName,
+          customerEmail,
+          customerPhone,
+          customerNim,
+          grandTotal,
+          grandTotal,
+          paymentStatus,
+          orderStatus,
+          orderStatus === "completed" ? "completed" : "unfulfilled",
+          campaignId,
+          formattedDate,
+        ]
+      );
+
+      await connection.query("DELETE FROM order_items WHERE order_id = ?", [orderId]);
+
+      if (itemsStr) {
+        const itemTokens = String(itemsStr)
+          .split(/[|\n;]+/)
+          .map((s: string) => s.trim())
+          .filter(Boolean);
+
+        for (const token of itemTokens) {
+          const match = token.match(/^(.+?)(?:\s*\[(.*?)\])?(?:\s*\(x(\d+)\))?$/);
+          if (match) {
+            const rawProdName = match[1].trim();
+            const rawVarSpec = match[2] ? match[2].trim() : "";
+            const qty = parseInt(match[3] || "1", 10) || 1;
+
+            const matchedProd = allProducts.find(
+              (p) =>
+                p.name.toLowerCase() === rawProdName.toLowerCase() ||
+                rawProdName.toLowerCase().includes(p.name.toLowerCase()) ||
+                p.name.toLowerCase().includes(rawProdName.toLowerCase())
+            );
+
+            let size = "Standard";
+            let color = "";
+            if (rawVarSpec) {
+              const specParts = rawVarSpec.split("/").map((s) => s.trim());
+              size = specParts[0] || "Standard";
+              color = specParts[1] || "";
+            }
+
+            await connection.query(
+              `INSERT INTO order_items (
+                order_id, product_id, product_name, size, color, quantity, unit_price, subtotal
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+              [
+                orderId,
+                matchedProd ? matchedProd.id : null,
+                rawProdName,
+                size,
+                color,
+                qty,
+                Math.round(grandTotal / (itemTokens.length || 1)),
+                Math.round(grandTotal / (itemTokens.length || 1)),
+              ]
+            );
+          }
+        }
+      }
+
+      importedCount++;
+    }
+
+    await connection.commit();
+    return res.json({
+      success: true,
+      message: `Berhasil meng-import ${importedCount} pesanan ke Batch PO #${campaignId}`,
+      importedCount,
+    });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error importing orders CSV:", error);
+    return res.status(500).json({ success: false, error: error.message || "Gagal meng-import data CSV" });
+  } finally {
+    connection.release();
   }
 };

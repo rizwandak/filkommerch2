@@ -19,6 +19,8 @@ import {
   Search,
   Package,
   X,
+  Upload,
+  FileText,
 } from "lucide-react";
 import {
   getPreOrderCampaignsServerAction,
@@ -27,6 +29,8 @@ import {
   deletePreOrderCampaignServerAction,
   togglePreOrderCampaignActiveServerAction,
   getPreOrderCampaignStatsServerAction,
+  importOrdersServerAction,
+  deleteImportedOrdersServerAction,
   type PreOrderCampaign,
 } from "@backend/server-actions";
 
@@ -43,6 +47,144 @@ function AdminPreOrderBatchPage() {
   const [selectedBatchForStats, setSelectedBatchForStats] = useState<PreOrderCampaign | null>(null);
   const [statsTab, setStatsTab] = useState<"products" | "orders" | "connected">("products");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
+
+  // CSV Import Modal state
+  const [selectedCampaignForImport, setSelectedCampaignForImport] = useState<PreOrderCampaign | null>(null);
+  const [importFileName, setImportFileName] = useState("");
+  const [parsedImportRows, setParsedImportRows] = useState<any[]>([]);
+  const [cleanReimport, setCleanReimport] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const openImportModal = (c: PreOrderCampaign) => {
+    setSelectedCampaignForImport(c);
+    setImportFileName("");
+    setParsedImportRows([]);
+    setCleanReimport(false);
+  };
+
+  const closeImportModal = () => {
+    setSelectedCampaignForImport(null);
+    setImportFileName("");
+    setParsedImportRows([]);
+  };
+
+  const handleCsvFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        let text = (evt.target?.result as string) || "";
+        if (!text) return;
+        text = text.replace(/^\uFEFF/, "");
+
+        // Parse CSV robustly
+        const lines: string[] = [];
+        let currentLine = "";
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+          const char = text[i];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+            currentLine += char;
+          } else if ((char === '\n' || char === '\r') && !inQuotes) {
+            if (currentLine.trim()) {
+              lines.push(currentLine);
+            }
+            currentLine = "";
+            if (char === '\r' && text[i + 1] === '\n') i++;
+          } else {
+            currentLine += char;
+          }
+        }
+        if (currentLine.trim()) lines.push(currentLine);
+
+        if (lines.length <= 1) {
+          alert("File CSV kosong atau tidak memiliki data!");
+          return;
+        }
+
+        const parseCsvLine = (lineStr: string) => {
+          const cells: string[] = [];
+          let currentCell = "";
+          let inside = false;
+          for (let i = 0; i < lineStr.length; i++) {
+            const ch = lineStr[i];
+            if (ch === '"') {
+              if (inside && lineStr[i + 1] === '"') {
+                currentCell += '"';
+                i++;
+              } else {
+                inside = !inside;
+              }
+            } else if (ch === ',' && !inside) {
+              cells.push(currentCell.trim());
+              currentCell = "";
+            } else {
+              currentCell += ch;
+            }
+          }
+          cells.push(currentCell.trim());
+          return cells;
+        };
+
+        const headers = parseCsvLine(lines[0]).map((h) => h.replace(/^"|"$/g, "").trim());
+        const dataRows: any[] = [];
+
+        for (let i = 1; i < lines.length; i++) {
+          const rowVals = parseCsvLine(lines[i]).map((v) => v.replace(/^"|"$/g, "").trim());
+          if (rowVals.length === 0 || (rowVals.length === 1 && !rowVals[0])) continue;
+
+          const rowObj: Record<string, string> = {};
+          headers.forEach((h, idx) => {
+            rowObj[h] = rowVals[idx] || "";
+          });
+          dataRows.push(rowObj);
+        }
+
+        setParsedImportRows(dataRows);
+      } catch (err: any) {
+        alert("Gagal membaca file CSV: " + err.message);
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
+  const handleExecuteImport = async () => {
+    if (!selectedCampaignForImport || parsedImportRows.length === 0) {
+      alert("Pilih file CSV yang valid terlebih dahulu!");
+      return;
+    }
+
+    try {
+      setIsImporting(true);
+      const res = await importOrdersServerAction({
+        data: {
+          campaignId: selectedCampaignForImport.id,
+          cleanReimport,
+          rows: parsedImportRows,
+        },
+      });
+
+      if (res?.success) {
+        alert(`Sukses! ${res.message || "Data CSV berhasil di-import."}`);
+        queryClient.invalidateQueries({ queryKey: ["adminPreOrderCampaigns"] });
+        queryClient.invalidateQueries({ queryKey: ["preOrderCampaignStats"] });
+        queryClient.invalidateQueries({ queryKey: ["productionSummary"] });
+        queryClient.invalidateQueries({ queryKey: ["financialOverview"] });
+        closeImportModal();
+      } else {
+        alert(`Gagal meng-import: ${res?.error || "Terjadi kesalahan server"}`);
+      }
+    } catch (err: any) {
+      alert(`Gagal meng-import: ${err.message || "Terjadi kesalahan"}`);
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   // Form states
   const [batchName, setBatchName] = useState("");
@@ -110,6 +252,30 @@ function AdminPreOrderBatchPage() {
       }
     },
   });
+
+  const deleteImportMutation = useMutation({
+    mutationFn: (campaignId: number) => deleteImportedOrdersServerAction({ data: campaignId }),
+    onSuccess: (res: any) => {
+      if (res?.success) {
+        alert(`Sukses! ${res.message || "Data import batch ini berhasil dihapus."}`);
+        queryClient.invalidateQueries({ queryKey: ["adminPreOrderCampaigns"] });
+        queryClient.invalidateQueries({ queryKey: ["preOrderCampaignStats"] });
+        queryClient.invalidateQueries({ queryKey: ["productionSummary"] });
+        queryClient.invalidateQueries({ queryKey: ["financialOverview"] });
+        setParsedImportRows([]);
+        setImportFileName("");
+      } else {
+        alert("Gagal menghapus data import: " + (res?.error || res?.message));
+      }
+    },
+  });
+
+  const handleDeleteImport = () => {
+    if (!selectedCampaignForImport) return;
+    if (confirm("Apakah Anda yakin ingin menghapus semua data pesanan yang berasal dari file CSV untuk batch ini? Tindakan ini tidak dapat dibatalkan!")) {
+      deleteImportMutation.mutate(selectedCampaignForImport.id);
+    }
+  };
 
   const toggleActiveMutation = useMutation({
     mutationFn: ({ id, is_active }: { id: number; is_active: boolean }) =>
@@ -372,7 +538,7 @@ function AdminPreOrderBatchPage() {
                   <tr key={c.id} className="hover:bg-cream/40 transition-colors">
                     <td className="p-4 font-bold text-ink text-sm">
                       {c.batch_name}
-                      {c.is_active && (
+                      {Boolean(c.is_active) && (
                         <span className="ml-2 px-2 py-0.5 bg-emerald-500 text-cream text-[9px] font-black rounded uppercase">
                           AKTIF DI FRONTEND
                         </span>
@@ -392,6 +558,13 @@ function AdminPreOrderBatchPage() {
                           title="Lihat Laporan & Detail Batch"
                         >
                           <BarChart3 className="w-3.5 h-3.5" /> Laporan &amp; Detail
+                        </button>
+                        <button
+                          onClick={() => openImportModal(c)}
+                          className="px-3 py-1.5 rounded-lg border-2 border-ink bg-blue-600 text-white hover:bg-ink font-extrabold text-[11px] transition-all cursor-pointer flex items-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                          title="Import Data Transaksi CSV ke Batch Ini"
+                        >
+                          <Upload className="w-3.5 h-3.5" /> Import CSV
                         </button>
                         <button
                           onClick={() =>
@@ -630,7 +803,7 @@ function AdminPreOrderBatchPage() {
                           : "bg-cream text-ink hover:bg-neutral-200"
                       }`}
                     >
-                      📦 Breakdown Produk ({statsData?.product_breakdown?.length || 0})
+                      Breakdown Produk ({statsData?.product_breakdown?.length || 0})
                     </button>
                     <button
                       onClick={() => setStatsTab("orders")}
@@ -640,7 +813,7 @@ function AdminPreOrderBatchPage() {
                           : "bg-cream text-ink hover:bg-neutral-200"
                       }`}
                     >
-                      👥 Daftar Pembeli ({statsData?.orders?.length || 0})
+                      Daftar Pembeli ({statsData?.orders?.length || 0})
                     </button>
                     <button
                       onClick={() => setStatsTab("connected")}
@@ -650,7 +823,7 @@ function AdminPreOrderBatchPage() {
                           : "bg-cream text-ink hover:bg-neutral-200"
                       }`}
                     >
-                      🏷️ Katalog Produk ({statsData?.connected_products?.length || 0})
+                      Katalog Produk ({statsData?.connected_products?.length || 0})
                     </button>
                   </div>
 
@@ -704,24 +877,74 @@ function AdminPreOrderBatchPage() {
                                 <td className="p-3 font-semibold">
                                   Rp {Number(p.unit_price || 0).toLocaleString("id-ID")}
                                 </td>
-                                <td className="p-3 font-black text-brand-orange text-sm">
-                                  {p.total_qty} pcs
-                                </td>
-                                <td className="p-3">
-                                  <div className="flex flex-wrap gap-1">
-                                    {Object.entries(p.variants || {}).map(([vName, vQty]) => (
-                                      <span
-                                        key={vName}
-                                        className="px-2 py-0.5 bg-neutral-100 border border-ink/20 rounded font-bold text-[10px] text-ink"
-                                      >
-                                        {vName}: <strong>{String(vQty)}</strong>
-                                      </span>
-                                    ))}
-                                    {Object.keys(p.variants || {}).length === 0 && (
-                                      <span className="text-muted-foreground italic text-[11px]">-</span>
-                                    )}
+                                <td className="p-3 font-bold text-xs">
+                                  <div className="font-black text-brand-orange text-sm">
+                                    {p.total_qty} pcs
                                   </div>
+                                  {p.bundle_qty > 0 ? (
+                                    <div className="text-[10px] space-y-0.5 mt-0.5">
+                                      <span className="text-muted-foreground">
+                                        Langsung: <strong className="text-ink">{p.direct_qty} pcs</strong>
+                                      </span>
+                                      <div className="text-blue-700 font-black flex items-center gap-1">
+                                        <span>+{p.bundle_qty} pcs (Bundle)</span>
+                                      </div>
+                                      {Object.entries(p.bundle_source_breakdown || {}).map(([bName, bQty]) => (
+                                        <div key={bName} className="text-[9px] text-neutral-600 pl-1.5 font-medium">
+                                          • {bName}: <strong className="text-ink">{String(bQty)} pcs</strong>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-[10px] text-muted-foreground font-medium">Penjualan Langsung</span>
+                                  )}
                                 </td>
+                                <td className="p-3 space-y-2">
+                                   {/* Block 1: Direct Purchase Variants */}
+                                   {Object.keys(p.direct_variants || {}).length > 0 && (
+                                     <div className="space-y-1">
+                                       {p.bundle_qty > 0 && (
+                                         <div className="text-[9px] font-black uppercase text-neutral-500 tracking-wider">
+                                           PENJUALAN LANGSUNG ({p.direct_qty} PCS):
+                                         </div>
+                                       )}
+                                       <div className="flex flex-wrap gap-1">
+                                         {Object.entries(p.direct_variants || {}).map(([vName, vQty]) => (
+                                           <span
+                                             key={vName}
+                                             className="px-2 py-0.5 bg-neutral-100 border border-ink/20 rounded font-bold text-[10px] text-ink"
+                                           >
+                                             {vName}: <strong>{String(vQty)}</strong>
+                                           </span>
+                                         ))}
+                                       </div>
+                                     </div>
+                                   )}
+
+                                   {/* Block 2: Bundle Purchase Variants */}
+                                   {p.bundle_qty > 0 && (
+                                     <div className="space-y-1 pt-1.5 border-t border-ink/10">
+                                       <div className="text-[9px] font-black uppercase text-blue-700 tracking-wider">
+                                         DARI PAKET BUNDLE (+{p.bundle_qty} PCS):
+                                       </div>
+                                       <div className="flex flex-wrap gap-1">
+                                         {Object.entries(p.bundle_variants || p.bundle_source_breakdown || {}).map(([bName, bQty]) => (
+                                           <span
+                                             key={bName}
+                                             className="px-2 py-0.5 bg-blue-50 text-blue-800 border border-blue-300 rounded font-bold text-[10px]"
+                                           >
+                                             {bName}: <strong>{String(bQty)}</strong>
+                                           </span>
+                                         ))}
+                                       </div>
+                                     </div>
+                                   )}
+
+                                   {/* Fallback if no variants */}
+                                   {Object.keys(p.direct_variants || {}).length === 0 && p.bundle_qty === 0 && (
+                                     <span className="text-muted-foreground italic text-[11px]">-</span>
+                                   )}
+                                 </td>
                                 <td className="p-3 text-right font-black text-ink">
                                   Rp {Number(p.total_subtotal || 0).toLocaleString("id-ID")}
                                 </td>
@@ -861,6 +1084,173 @@ function AdminPreOrderBatchPage() {
                 )}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      {/* CSV IMPORT MODAL */}
+      {selectedCampaignForImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-[#fcfaf8] border-[3px] border-ink rounded-xl w-full max-w-4xl my-8 p-6 sm:p-8 space-y-6 relative max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b-2 border-ink pb-4">
+              <div>
+                <span className="px-3 py-1 bg-blue-600 text-white text-[11px] font-black rounded uppercase tracking-wider">
+                  IMPORT CSV PESANAN BATCH
+                </span>
+                <h2 className="text-4xl font-black text-ink uppercase mt-2 font-display tracking-tight">
+                  IMPORT KE {selectedCampaignForImport.batch_name.toUpperCase()}
+                </h2>
+                <p className="text-sm text-neutral-600 font-medium mt-1">
+                  Upload file CSV (format standar export 10-kolom atau 8-kolom) untuk memasukkan transaksi historis.
+                </p>
+              </div>
+              <button
+                onClick={closeImportModal}
+                className="p-1.5 border-2 border-ink rounded-lg bg-white hover:bg-neutral-100 transition-all cursor-pointer shadow-sm"
+              >
+                <X className="w-6 h-6 text-ink" />
+              </button>
+            </div>
+
+            {/* File Picker Dropzone */}
+            <div className="border-[2px] border-dashed border-ink p-10 rounded-xl text-center space-y-4 relative bg-transparent">
+              <input
+                type="file"
+                accept=".csv"
+                onChange={handleCsvFileUpload}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              />
+              <div className="flex justify-center">
+                <div className="text-brand-orange">
+                  <FileText className="w-12 h-12" />
+                </div>
+              </div>
+              
+              <div className="flex justify-center">
+                <button className="px-6 py-2.5 bg-brand-orange text-white font-bold text-sm uppercase rounded-lg border-[3px] border-ink shadow-[4px_4px_0px_0px_#1b1b1b] pointer-events-none">
+                  PILIH FILE CSV...
+                </button>
+              </div>
+
+              {importFileName && (
+                <div className="text-sm font-bold text-ink mt-2">
+                  📄 File terpilih: <span className="text-brand-blue font-mono">{importFileName}</span>
+                </div>
+              )}
+
+              <p className="text-xs text-neutral-500 font-medium max-w-2xl mx-auto pt-2">
+                Format kolom: No Order, Tanggal Order, Nama Pembeli, Email, No HP, NIM, Rincian Produk, Status Bayar, Status Pesanan, Total Bayar.
+              </p>
+            </div>
+
+            {/* Preview Table */}
+            {parsedImportRows.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-black text-xs text-ink uppercase tracking-wider">
+                    Preview Data ({parsedImportRows.length} Pesanan SIAP DI-IMPORT):
+                  </h3>
+                  <span className="bg-emerald-100 text-emerald-800 border border-emerald-300 text-[10px] font-black px-2.5 py-0.5 rounded-full">
+                    ✓ Valid Format
+                  </span>
+                </div>
+
+                <div className="border-2 border-ink rounded-xl overflow-hidden bg-white">
+                  <div className="max-h-60 overflow-y-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-cream border-b-2 border-ink text-ink font-black uppercase">
+                          <th className="p-2.5 w-20">No Order</th>
+                          <th className="p-2.5">Pembeli</th>
+                          <th className="p-2.5">No HP / NIM</th>
+                          <th className="p-2.5">Rincian Produk</th>
+                          <th className="p-2.5 text-right">Total Bayar</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-ink/10">
+                        {parsedImportRows.slice(0, 10).map((r: any, idx: number) => {
+                          const orderId = r["No Order"] || r.no_order || r.order_id || `Row ${idx + 1}`;
+                          const buyer = r["Nama Pembeli"] || r.nama_pembeli || r.customer_name || "-";
+                          const phone = r["No HP Pembeli"] || r.no_hp_pembeli || r.customer_phone || "";
+                          const nim = r["NIM Pembeli"] || r.nim_pembeli || r.customer_nim || "";
+                          const items = r["Rincian Produk (Item / Size / Qty)"] || r.rincian_produk || r.items_formatted || "-";
+                          const total = r["Total Bayar (Rp)"] || r.total_bayar || r.grand_total || "0";
+
+                          return (
+                            <tr key={idx} className="hover:bg-cream/30">
+                              <td className="p-2.5 font-bold text-ink font-mono">{orderId}</td>
+                              <td className="p-2.5 font-bold text-ink">{buyer}</td>
+                              <td className="p-2.5 font-mono text-[11px]">
+                                {phone} {nim ? `(${nim})` : ""}
+                              </td>
+                              <td className="p-2.5 text-[11px] font-medium">{items}</td>
+                              <td className="p-2.5 text-right font-black text-brand-orange">
+                                Rp {Number(String(total).replace(/\D/g, "") || 0).toLocaleString("id-ID")}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  {parsedImportRows.length > 10 && (
+                    <div className="bg-cream/40 p-2 text-center text-[10px] font-bold text-muted-foreground border-t border-ink/20">
+                      ...dan {parsedImportRows.length - 10} baris pesanan lainnya
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Clean Re-Import Checkbox */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-4 border-t-2 border-ink">
+              <label className="flex items-center gap-3 text-sm font-bold text-ink cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={cleanReimport}
+                  onChange={(e) => setCleanReimport(e.target.checked)}
+                  className="w-5 h-5 accent-blue-600 border-[3px] border-ink rounded cursor-pointer"
+                />
+                <span>Hapus &amp; Timpa Data CSV Import Sebelumnya (Clean Re-Import)</span>
+              </label>
+              
+              <button 
+                type="button" 
+                onClick={handleDeleteImport}
+                disabled={deleteImportMutation.isPending}
+                className="text-rose-600 hover:text-rose-700 font-bold text-sm flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" /> 
+                {deleteImportMutation.isPending ? "Menghapus..." : "Hapus Data Import Batch Ini"}
+              </button>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex justify-end gap-3 pt-6 border-t-2 border-ink">
+              <button
+                type="button"
+                onClick={closeImportModal}
+                className="px-6 py-2.5 border-2 border-ink rounded-lg bg-white text-sm font-bold hover:bg-neutral-100 uppercase transition-all"
+              >
+                BATAL
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteImport}
+                disabled={parsedImportRows.length === 0 || isImporting}
+                className="px-6 py-2.5 bg-[#8da9ec] hover:bg-blue-400 disabled:opacity-50 text-white font-bold text-sm uppercase tracking-wider rounded-lg border-2 border-ink shadow-sm transition-all cursor-pointer flex items-center gap-2"
+              >
+                {isImporting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" /> MENG-IMPORT PESANAN...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" /> KONFIRMASI IMPORT
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -103,6 +103,7 @@ const serverFetch = async (url: string, init?: RequestInit) => {
   }
   return fetch(finalUrl, {
     ...init,
+    cache: "no-store",
     headers: {
       ...authHeaders,
       ...init?.headers,
@@ -1769,5 +1770,250 @@ export const getProductReviewsServerAction = createServerFn({ method: "POST" })
       return { success: false, reviews: [], totalReviews: 0, avgRating: 0 };
     }
   });
+
+
+// ============ VENDORING & CSV IMPORT SERVER ACTIONS ============
+
+export interface Vendor {
+  id: number;
+  name: string;
+  contact_person?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  is_active?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface VendorOrderItem {
+  id?: number;
+  vendor_order_id?: number;
+  product_id: number;
+  catalog_product_name?: string;
+  size?: string;
+  color?: string;
+  quantity: number;
+  unit_cost: number;
+  subtotal_cost?: number;
+  notes?: string | null;
+}
+
+export interface VendorOrder {
+  id: number;
+  po_number: string;
+  vendor_id: number;
+  vendor_name?: string;
+  vendor_phone?: string;
+  contact_person?: string;
+  status: "draft" | "sent" | "in_production" | "completed" | "cancelled";
+  total_cost: number;
+  notes?: string | null;
+  deadline?: string | null;
+  sent_at?: string | null;
+  completed_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  items?: VendorOrderItem[];
+}
+
+// Fetch All Vendors
+export const getVendorsServerAction = createServerFn({ method: "GET" })
+  .handler(async () => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendors`);
+      if (!res.ok) return { success: false, data: [] };
+      return await res.json();
+    } catch (e) {
+      console.warn("getVendorsServerAction error:", e);
+      return { success: false, data: [] };
+    }
+  });
+
+// Create Vendor
+export const createVendorServerAction = createServerFn({ method: "POST" })
+  .validator((data: Omit<Vendor, "id">) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendors`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("createVendorServerAction error:", e);
+      return { success: false, error: e.message || "Failed to create vendor" };
+    }
+  });
+
+// Update Vendor
+export const updateVendorServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number } & Partial<Vendor>) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendors/${data.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("updateVendorServerAction error:", e);
+      return { success: false, error: e.message || "Failed to update vendor" };
+    }
+  });
+
+// Delete Vendor
+export const deleteVendorServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendors/${data.id}`, {
+        method: "DELETE",
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("deleteVendorServerAction error:", e);
+      return { success: false, error: e.message || "Failed to delete vendor" };
+    }
+  });
+
+// Get Production Summary
+export const getProductionSummaryServerAction = createServerFn({ method: "POST" })
+  .validator((data: { batch?: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const batchParam = data?.batch ? `?batch=${encodeURIComponent(data.batch)}` : "";
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/summary${batchParam}`);
+      if (!res.ok) return { success: false, data: [] };
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getProductionSummaryServerAction error:", e);
+      return { success: false, data: [] };
+    }
+  });
+
+// Get Vendor Orders (PO)
+export const getVendorOrdersServerAction = createServerFn({ method: "GET" })
+  .handler(async () => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders`);
+      if (!res.ok) return { success: false, data: [] };
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getVendorOrdersServerAction error:", e);
+      return { success: false, data: [] };
+    }
+  });
+
+// Create Vendor Order (PO)
+export const createVendorOrderServerAction = createServerFn({ method: "POST" })
+  .validator((data: { vendor_id: number; deadline?: string | null; notes?: string | null; items: any[] }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("createVendorOrderServerAction error:", e);
+      return { success: false, error: e.message || "Failed to create vendor order" };
+    }
+  });
+
+// Update Vendor Order Status
+export const updateVendorOrderStatusServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number; status: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders/${data.id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: data.status }),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("updateVendorOrderStatusServerAction error:", e);
+      return { success: false, error: e.message || "Failed to update vendor order status" };
+    }
+  });
+
+// Delete Vendor Order
+export const deleteVendorOrderServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders/${data.id}`, {
+        method: "DELETE",
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("deleteVendorOrderServerAction error:", e);
+      return { success: false, error: e.message || "Failed to delete vendor order" };
+    }
+  });
+
+// Get Financial Overview
+export const getFinancialOverviewServerAction = createServerFn({ method: "POST" })
+  .validator((data: { batch?: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const batchParam = data?.batch ? `?batch=${encodeURIComponent(data.batch)}` : "";
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/financials${batchParam}`);
+      if (!res.ok) return { success: false, error: "Failed to fetch financial overview" };
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getFinancialOverviewServerAction error:", e);
+      return { success: false, error: e.message || "Failed to fetch financial overview" };
+    }
+  });
+
+// Import Orders CSV Server Action
+export const importOrdersServerAction = createServerFn({ method: "POST" })
+  .validator((data: { campaignId: number; cleanReimport: boolean; rows: any[] }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/import/orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("importOrdersServerAction error:", e);
+      return { success: false, error: e.message || "Gagal meng-import pesanan dari CSV" };
+    }
+  });
+
+// Delete Imported Orders Server Action
+export const deleteImportedOrdersServerAction = createServerFn({ method: "POST" })
+  .validator((campaignId: number) => campaignId)
+  .handler(async ({ data: campaignId }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/import/orders/${campaignId}`, {
+        method: "DELETE",
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("deleteImportedOrdersServerAction error:", e);
+      return { success: false, error: e.message || "Gagal menghapus pesanan import" };
+    }
+  });
+
 
 

@@ -164,6 +164,86 @@ export async function runMigration() {
       {
         name: "vouchers.usage_limit_per_user",
         sql: "ALTER TABLE vouchers ADD COLUMN usage_limit_per_user INT NOT NULL DEFAULT 1"
+      },
+      {
+        name: "vendors",
+        sql: `CREATE TABLE IF NOT EXISTS vendors (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(150) NOT NULL,
+          contact_person VARCHAR(100) DEFAULT NULL,
+          phone VARCHAR(20) DEFAULT NULL,
+          email VARCHAR(100) DEFAULT NULL,
+          notes TEXT DEFAULT NULL,
+          is_active TINYINT(1) DEFAULT 1,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        )`
+      },
+      {
+        name: "vendor_orders",
+        sql: `CREATE TABLE IF NOT EXISTS vendor_orders (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          po_number VARCHAR(50) NOT NULL UNIQUE,
+          vendor_id INT NOT NULL,
+          status ENUM('draft','sent','in_production','completed','cancelled') DEFAULT 'draft',
+          total_cost INT DEFAULT 0,
+          notes TEXT DEFAULT NULL,
+          deadline DATE DEFAULT NULL,
+          sent_at TIMESTAMP NULL,
+          completed_at TIMESTAMP NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          FOREIGN KEY (vendor_id) REFERENCES vendors(id) ON DELETE CASCADE
+        )`
+      },
+      {
+        name: "vendor_order_items",
+        sql: `CREATE TABLE IF NOT EXISTS vendor_order_items (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          vendor_order_id INT NOT NULL,
+          product_id INT NOT NULL,
+          size VARCHAR(30) DEFAULT NULL,
+          color VARCHAR(50) DEFAULT NULL,
+          quantity INT NOT NULL,
+          unit_cost INT NOT NULL DEFAULT 0,
+          subtotal_cost INT NOT NULL DEFAULT 0,
+          notes TEXT DEFAULT NULL,
+          FOREIGN KEY (vendor_order_id) REFERENCES vendor_orders(id) ON DELETE CASCADE,
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+        )`
+      },
+      {
+        name: "batch_product_prices",
+        sql: `CREATE TABLE IF NOT EXISTS batch_product_prices (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          campaign_id INT NOT NULL,
+          product_id INT NOT NULL,
+          selling_price INT NOT NULL,
+          filkom_price INT DEFAULT NULL,
+          FOREIGN KEY (campaign_id) REFERENCES pre_order_campaigns(id) ON DELETE CASCADE,
+          FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
+          UNIQUE KEY unique_batch_product (campaign_id, product_id)
+        )`
+      },
+      {
+        name: "orders.batch_source",
+        sql: "ALTER TABLE orders ADD COLUMN batch_source ENUM('web','csv_import','manual') DEFAULT 'web'"
+      },
+      {
+        name: "orders.pre_order_campaign_id",
+        sql: "ALTER TABLE orders ADD COLUMN pre_order_campaign_id INT DEFAULT NULL"
+      },
+      {
+        name: "products.vendor_cost",
+        sql: "ALTER TABLE products ADD COLUMN vendor_cost INT DEFAULT 0"
+      },
+      {
+        name: "fix_pre_order_campaign_batch_name_zero",
+        sql: "UPDATE pre_order_campaigns SET batch_name = 'Batch #1' WHERE batch_name = 'Batch #10'"
+      },
+      {
+        name: "fix_pre_order_campaign_batch_name_two_zero",
+        sql: "UPDATE pre_order_campaigns SET batch_name = 'Batch #2' WHERE batch_name = 'Batch #20'"
       }
     ];
 

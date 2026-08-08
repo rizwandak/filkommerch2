@@ -495,7 +495,7 @@ function AdminVendoringPage() {
         size: "All Size",
         color: "",
         quantity: 10,
-        unit_cost: productsList[0]?.cost_price || 50000,
+        unit_cost: (productsList[0] as any)?.cost_price || (productsList[0] as any)?.vendor_cost || 50000,
       },
     ]);
     setIsPoModalOpen(true);
@@ -514,7 +514,7 @@ function AdminVendoringPage() {
         size: "M",
         color: "",
         quantity: 10,
-        unit_cost: defaultProd?.cost_price || 50000,
+        unit_cost: (defaultProd as any)?.cost_price || (defaultProd as any)?.vendor_cost || 50000,
       },
     ]);
   };
@@ -1219,7 +1219,7 @@ function AdminVendoringPage() {
                           const matchedP = productsList.find((p) => p.id === pId);
                           setPoItems((prev) =>
                             prev.map((it, i) =>
-                              i === idx ? { ...it, product_id: pId, unit_cost: matchedP?.cost_price || it.unit_cost } : it
+                              i === idx ? { ...it, product_id: pId, unit_cost: (matchedP as any)?.cost_price || (matchedP as any)?.vendor_cost || it.unit_cost } : it
                             )
                           );
                         }}

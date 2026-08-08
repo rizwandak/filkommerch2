@@ -394,6 +394,23 @@ app.get("/api/analytics/top-products", checkRole(["admin", "cashier"]), apiContr
 app.get("/api/analytics/inventory", checkRole(["admin", "cashier"]), apiControllers.getInventory);
 app.get("/api/analytics/orders-summary", checkRole(["admin", "cashier"]), apiControllers.getOrdersSummary);
 
+// Vendoring & Vendor Mitra API Routes
+app.get("/api/admin/vendors", checkRole(["admin"]), apiControllers.getVendors);
+app.post("/api/admin/vendors", checkRole(["admin"]), apiControllers.createVendor);
+app.put("/api/admin/vendors/:id", checkRole(["admin"]), apiControllers.updateVendor);
+app.delete("/api/admin/vendors/:id", checkRole(["admin"]), apiControllers.deleteVendor);
+
+app.get("/api/admin/vendoring/summary", checkRole(["admin"]), apiControllers.getProductionSummary);
+app.get("/api/admin/vendoring/orders", checkRole(["admin"]), apiControllers.getVendorOrders);
+app.post("/api/admin/vendoring/orders", checkRole(["admin"]), apiControllers.createVendorOrder);
+app.put("/api/admin/vendoring/orders/:id/status", checkRole(["admin"]), apiControllers.updateVendorOrderStatus);
+app.delete("/api/admin/vendoring/orders/:id", checkRole(["admin"]), apiControllers.deleteVendorOrder);
+app.get("/api/admin/vendoring/financials", checkRole(["admin"]), apiControllers.getFinancialOverview);
+
+// CSV Import API Route
+app.post("/api/admin/import/orders", checkRole(["admin"]), apiControllers.importOrders);
+app.delete("/api/admin/import/orders/:campaignId", checkRole(["admin"]), apiControllers.deleteImportedOrders);
+
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error("[Error Handler]", err);
