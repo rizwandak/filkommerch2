@@ -1680,7 +1680,7 @@ function AdminTransactionsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="display text-sm tracking-wider text-ink">
-                Penjualan Offline / POS ({filteredOfflineSales.length})
+                Penjualan Offline / POS ({sortedOfflineSales.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
