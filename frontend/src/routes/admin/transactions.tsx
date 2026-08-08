@@ -968,7 +968,7 @@ function AdminTransactionsPage() {
                           {c.batch_name || `Batch #${c.id}`}
                         </option>
                       ))}
-                      <option value="none">Tanpa Batch (Transaksi Reguler)</option>
+                      <option value="none">Ready Stock</option>
                     </select>
                   </div>
 
