@@ -12,6 +12,7 @@ import {
   History,
   CalendarClock,
   Ticket,
+  Home,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, type AdminRole } from "@/lib/auth";
@@ -54,7 +55,7 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-card">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-5">
+      <div className="flex items-center gap-3 border-b border-border px-5 py-5 shrink-0">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
           <Store className="h-5 w-5" />
         </div>
@@ -66,7 +67,7 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 p-3">
+      <nav className="flex-1 overflow-y-auto space-y-1 p-3">
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const active = currentPath === item.to || currentPath.startsWith(`${item.to}/`);
@@ -108,22 +109,32 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
         )}
       </nav>
 
-      <div className="border-t border-border p-4">
-        <div className="mb-3 px-1">
-          <p className="text-sm font-medium truncate">{user.username}</p>
-          <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+      <div className="border-t border-border p-4 mt-auto space-y-2 shrink-0 bg-card">
+        <div className="mb-2 px-1">
+          <p className="text-xs font-bold text-ink truncate">{user.username}</p>
+          <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
         </div>
+
+        <Link
+          to="/"
+          onClick={onNavigate}
+          className="flex items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground hover:bg-accent transition-colors"
+        >
+          <Home className="h-4 w-4 text-primary" />
+          Kembali ke Beranda
+        </Link>
+
         <Button
           variant="outline"
           size="sm"
-          className="w-full justify-start gap-2"
+          className="w-full justify-start gap-2 border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800 font-bold text-xs"
           onClick={() => {
             logout();
             window.location.href = "/login";
           }}
         >
           <LogOut className="h-4 w-4" />
-          Keluar
+          Keluar / Logout
         </Button>
       </div>
     </aside>

@@ -753,7 +753,20 @@ function AdminPreOrderBatchPage() {
                     <div className="text-xl sm:text-2xl font-black text-ink">
                       Rp {Number(statsData?.summary?.total_revenue || 0).toLocaleString("id-ID")}
                     </div>
-                    <p className="text-[10px] text-muted-foreground font-medium">Dari transaksi terbayar</p>
+                    {Number(statsData?.summary?.total_discount || 0) > 0 ? (
+                      <div className="text-[11px] font-semibold text-stone-700 pt-1.5 border-t border-orange-200/90 mt-1 space-y-0.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">Kotor (Subtotal):</span>
+                          <span className="font-bold">Rp {Number(statsData?.summary?.total_subtotal || 0).toLocaleString("id-ID")}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-rose-600">
+                          <span>Diskon Voucher:</span>
+                          <span className="font-bold">- Rp {Number(statsData?.summary?.total_discount || 0).toLocaleString("id-ID")}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-[10px] text-muted-foreground font-medium">Dari transaksi terbayar</p>
+                    )}
                   </div>
 
                   <div className="bg-blue-50/60 border-2 border-brand-blue p-4 rounded-xl space-y-1 shadow-xs">

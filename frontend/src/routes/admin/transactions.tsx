@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, Fragment } from "react";
 import { useAuth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
@@ -37,6 +37,7 @@ import {
   Filter,
   Upload,
   X,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
@@ -146,11 +147,14 @@ function AdminTransactionsPage() {
   const API_BASE_URL = getApiBaseUrl().replace(/\/api\/?$/, "").replace(/\/$/, "");
   const [onlineOrders, setOnlineOrders] = useState<Order[]>([]);
   const [offlineSales, setOfflineSales] = useState<OfflineSale[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "verifying" | "dp" | "unpaid">("all");
+  const [campaignFilter, setCampaignFilter] = useState<string>("all");
+  const [groupByCustomer, setGroupByCustomer] = useState<boolean>(false);
 
   // Collapsible Row States
   const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
@@ -210,6 +214,15 @@ function AdminTransactionsPage() {
       console.error("Error fetching online orders:", error);
       toast.error("Gagal memuat pesanan online");
       setOnlineOrders([]);
+    }
+
+    try {
+      const campRes = await fetchJson<{ success: boolean; data: any[] }>(`${API_BASE_URL}/api/pre-order-campaigns`);
+      if (campRes?.data) {
+        setCampaigns(campRes.data);
+      }
+    } catch (err) {
+      console.error("Error fetching campaigns:", err);
     }
 
     try {
@@ -485,66 +498,8 @@ function AdminTransactionsPage() {
     return map;
   }, [onlineOrders]);
 
-  const stats = useMemo(() => {
-    const ordersList = Array.isArray(onlineOrders) ? onlineOrders : [];
-    const parentIdsInList = new Set(ordersList.map((o) => o.order_id));
-
-    // Exclude child LNS sub-orders whose parent DP order is in onlineOrders (they are displayed embedded under the parent order)
-    const mainOrders = ordersList.filter((o) => {
-      if (!o) return false;
-      const isLns = String(o.order_id || "").startsWith("LNS") || (o.notes && o.notes.includes("Pelunasan untuk Order:"));
-      if (isLns) {
-        const match = o.notes && o.notes.match(/Pelunasan untuk Order:\s*([A-Za-z0-9-]+)/);
-        const parentId = match ? match[1] : (o.order_id || "").split("-").slice(1, -1).join("-");
-        if (parentId && parentIdsInList.has(parentId)) {
-          return false;
-        }
-      }
-      return true;
-    });
-
-    const total = mainOrders.length;
-    let paidCount = 0;
-    let verifyingCount = 0;
-    let dpCount = 0;
-    let unpaidCount = 0;
-
-    mainOrders.forEach((o) => {
-      if (!o) return;
-
-      const oStatus = o.order_status || o.transaction_status;
-      const isCancelled = String(oStatus) === "cancelled" || String(oStatus) === "cancel" || String(oStatus) === "expire";
-
-      const isPaid =
-        o.payment_status === "paid" ||
-        o.transaction_status === "settlement" ||
-        o.order_status === "completed";
-      const hasProof = !!o.payment_proof_url;
-      const linkedLns = dpPelunasanMap[o.order_id];
-      const lnsHasProof = linkedLns && !!linkedLns.payment_proof_url && linkedLns.payment_status !== "paid";
-      const lnsIsPaid = linkedLns && (linkedLns.payment_status === "paid" || linkedLns.order_status === "completed");
-
-      if (isCancelled) {
-        return;
-      }
-
-      if (isPaid && (!linkedLns || lnsIsPaid)) {
-        paidCount++;
-      } else if ((hasProof && !isPaid) || lnsHasProof) {
-        verifyingCount++;
-      } else {
-        unpaidCount++;
-      }
-
-      if (isDpOrder(o)) {
-        dpCount++;
-      }
-    });
-
-    return { total, paidCount, verifyingCount, dpCount, unpaidCount };
-  }, [onlineOrders, dpPelunasanMap]);
-
-  const filteredOnlineOrders = useMemo(() => {
+  // 1. Base filtered list (respects campaign batch filter and search query)
+  const baseFilteredOrders = useMemo(() => {
     const ordersList = Array.isArray(onlineOrders) ? onlineOrders : [];
     const parentIdsInList = new Set(ordersList.map((o) => o.order_id));
 
@@ -561,7 +516,16 @@ function AdminTransactionsPage() {
         }
       }
 
-      // 1. Search Query Filter
+      // Campaign Batch Filter
+      if (campaignFilter !== "all") {
+        if (campaignFilter === "none") {
+          if ((order as any).pre_order_campaign_id) return false;
+        } else {
+          if (String((order as any).pre_order_campaign_id || "") !== String(campaignFilter)) return false;
+        }
+      }
+
+      // Search Query Filter
       const query = (searchQuery || "").toLowerCase();
       const linkedLns = dpPelunasanMap[order.order_id];
       const matchesQuery =
@@ -574,27 +538,201 @@ function AdminTransactionsPage() {
         String(order.transaction_status || "").toLowerCase().includes(query) ||
         (linkedLns && String(linkedLns.order_id || "").toLowerCase().includes(query));
 
-      if (!matchesQuery) return false;
+      return matchesQuery;
+    });
+  }, [onlineOrders, searchQuery, campaignFilter, dpPelunasanMap]);
 
-      // 2. Status Filter
-      if (statusFilter === "all") return true;
+  const getOrderCategory = (order: Order): "paid" | "verifying" | "unpaid" => {
+    const linkedLns = dpPelunasanMap[order.order_id];
+    const isPaid =
+      order.payment_status === "paid" ||
+      order.transaction_status === "settlement" ||
+      order.order_status === "completed";
+    const hasProof = !!order.payment_proof_url && (order.payment_status as string) !== "rejected";
+    const lnsHasProof = linkedLns && !!linkedLns.payment_proof_url && linkedLns.payment_status !== "paid" && (linkedLns.payment_status as string) !== "rejected";
+    const lnsIsPaid = linkedLns && (linkedLns.payment_status === "paid" || linkedLns.order_status === "completed");
+
+    if (isPaid && (!linkedLns || lnsIsPaid)) {
+      return "paid";
+    }
+    if ((!isPaid && hasProof) || lnsHasProof) {
+      return "verifying";
+    }
+    return "unpaid";
+  };
+
+  // 2. Stats summary computed strictly from baseFilteredOrders (always matches active batch filter & search)
+  const stats = useMemo(() => {
+    const total = baseFilteredOrders.length;
+    let paidCount = 0;
+    let verifyingBarisCount = 0;
+    let totalVerifyingProofs = 0;
+    let dpCount = 0;
+    let unpaidCount = 0;
+
+    baseFilteredOrders.forEach((o) => {
+      if (!o) return;
+
+      const cat = getOrderCategory(o);
+      if (cat === "paid") paidCount++;
+      else if (cat === "verifying") {
+        verifyingBarisCount++;
+      } else if (cat === "unpaid") unpaidCount++;
+
+      // Count individual payment proofs needing verification (DP/regular proof + LNS pelunasan proof)
+      const isPaid =
+        o.payment_status === "paid" ||
+        o.transaction_status === "settlement" ||
+        o.order_status === "completed";
+      const hasProof = !!o.payment_proof_url && (o.payment_status as string) !== "rejected";
+      if (!isPaid && hasProof) {
+        totalVerifyingProofs++;
+      }
+
+      const linkedLns = dpPelunasanMap[o.order_id];
+      const lnsHasProof = linkedLns && !!linkedLns.payment_proof_url && linkedLns.payment_status !== "paid" && (linkedLns.payment_status as string) !== "rejected";
+      if (lnsHasProof) {
+        totalVerifyingProofs++;
+      }
+
+      if (isDpOrder(o)) {
+        dpCount++;
+      }
+    });
+
+    return {
+      total,
+      paidCount,
+      verifyingCount: totalVerifyingProofs, // 10 Total Proofs needing ACC
+      verifyingBarisCount, // 8 Main Rows in Table
+      dpCount,
+      unpaidCount,
+    };
+  }, [baseFilteredOrders, dpPelunasanMap]);
+
+  // 3. Final filtered orders list applying status filter
+  const filteredOnlineOrders = useMemo(() => {
+    if (statusFilter === "all") return baseFilteredOrders;
+
+    return baseFilteredOrders.filter((order) => {
+      if (statusFilter === "dp") return isDpOrder(order);
+      return getOrderCategory(order) === statusFilter;
+    });
+  }, [baseFilteredOrders, statusFilter, dpPelunasanMap]);
+
+  const groupedCustomerOrders = useMemo(() => {
+    if (!groupByCustomer) return [];
+
+    const groups: Array<{
+      key: string;
+      customer_name: string;
+      customer_email: string;
+      customer_phone: string;
+      customer_nim: string;
+      words: string[];
+      emails: Set<string>;
+      phones: Set<string>;
+      orders: Order[];
+      total_amount: number;
+      paid_count: number;
+      pending_count: number;
+      latest_created_at: string;
+    }> = [];
+
+    const getCleanWords = (name: string) => {
+      return String(name || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, "")
+        .split(/\s+/)
+        .filter((w) => w.length >= 2);
+    };
+
+    const getCleanPhone = (phone: string) => {
+      const digits = String(phone || "").replace(/\D/g, "");
+      return digits.length >= 8 ? digits.slice(-9) : "";
+    };
+
+    filteredOnlineOrders.forEach((o) => {
+      const rawName = (o.customer_name || o.customer_email || "Pelanggan").trim();
+      const rawEmail = String(o.customer_email || "").trim().toLowerCase();
+      const rawPhone = String(o.customer_phone || "").trim();
+      const cleanPhone = getCleanPhone(rawPhone);
+      const words = getCleanWords(rawName);
+
+      // Find existing group that matches by email, phone, or >=2 words in name
+      let matchedGroup = groups.find((g) => {
+        if (rawEmail && rawEmail !== "-" && g.emails.has(rawEmail)) {
+          return true;
+        }
+        if (cleanPhone && g.phones.has(cleanPhone)) {
+          return true;
+        }
+        if (words.length >= 2 && g.words.length >= 2) {
+          const sharedWords = words.filter((w) => g.words.includes(w));
+          if (sharedWords.length >= 2) {
+            return true;
+          }
+        }
+        return false;
+      });
+
+      if (!matchedGroup) {
+        matchedGroup = {
+          key: `group-${groups.length + 1}-${rawName.toLowerCase().replace(/[^a-z0-9]/g, "")}`,
+          customer_name: rawName,
+          customer_email: rawEmail && rawEmail !== "-" ? rawEmail : "-",
+          customer_phone: rawPhone && rawPhone !== "-" ? rawPhone : "-",
+          customer_nim: (o as any).user_nim || (o as any).customer_nim || "-",
+          words,
+          emails: new Set(rawEmail && rawEmail !== "-" ? [rawEmail] : []),
+          phones: new Set(cleanPhone ? [cleanPhone] : []),
+          orders: [],
+          total_amount: 0,
+          paid_count: 0,
+          pending_count: 0,
+          latest_created_at: o.created_at,
+        };
+        groups.push(matchedGroup);
+      } else {
+        if (rawName.length > matchedGroup.customer_name.length) {
+          matchedGroup.customer_name = rawName;
+        }
+        if (rawEmail && rawEmail !== "-" && matchedGroup.customer_email === "-") {
+          matchedGroup.customer_email = rawEmail;
+        }
+        if (rawPhone && rawPhone !== "-" && matchedGroup.customer_phone === "-") {
+          matchedGroup.customer_phone = rawPhone;
+        }
+        if (rawEmail && rawEmail !== "-") matchedGroup.emails.add(rawEmail);
+        if (cleanPhone) matchedGroup.phones.add(cleanPhone);
+
+        words.forEach((w) => {
+          if (!matchedGroup!.words.includes(w)) {
+            matchedGroup!.words.push(w);
+          }
+        });
+      }
+
+      matchedGroup.orders.push(o);
+      matchedGroup.total_amount += Number(o.gross_amount || 0);
 
       const isPaid =
-        order.payment_status === "paid" ||
-        order.transaction_status === "settlement" ||
-        order.order_status === "completed";
-      const hasProof = !!order.payment_proof_url;
-      const lnsHasProof = linkedLns && !!linkedLns.payment_proof_url && linkedLns.payment_status !== "paid";
-      const lnsIsPaid = linkedLns && linkedLns.payment_status === "paid";
+        o.payment_status === "paid" ||
+        o.transaction_status === "settlement" ||
+        o.order_status === "completed";
+      if (isPaid) {
+        matchedGroup.paid_count++;
+      } else {
+        matchedGroup.pending_count++;
+      }
 
-      if (statusFilter === "paid") return isPaid && (!linkedLns || lnsIsPaid);
-      if (statusFilter === "verifying") return (!isPaid && hasProof) || lnsHasProof;
-      if (statusFilter === "unpaid") return !isPaid && !hasProof;
-      if (statusFilter === "dp") return isDpOrder(order);
-
-      return true;
+      if (new Date(o.created_at) > new Date(matchedGroup.latest_created_at)) {
+        matchedGroup.latest_created_at = o.created_at;
+      }
     });
-  }, [onlineOrders, searchQuery, statusFilter, dpPelunasanMap]);
+
+    return groups;
+  }, [filteredOnlineOrders, groupByCustomer]);
 
   const filteredOfflineSales = useMemo(() => {
     const salesList = Array.isArray(offlineSales) ? offlineSales : [];
@@ -687,7 +825,9 @@ function AdminTransactionsPage() {
               {stats.verifyingCount}
             </span>
             <span className="text-[10px] font-bold block mt-1 text-blue-700">
-              Menunggu Verifikasi
+              {stats.verifyingCount !== stats.verifyingBarisCount
+                ? `${stats.verifyingCount} Bukti (${stats.verifyingBarisCount} Pesanan)`
+                : "Menunggu Verifikasi"}
             </span>
           </div>
         </button>
@@ -801,9 +941,51 @@ function AdminTransactionsPage() {
         <TabsContent value="online">
           <Card>
             <CardHeader>
-              <CardTitle className="display text-sm tracking-wider text-ink">
-                Pesanan Online ({filteredOnlineOrders.length})
-              </CardTitle>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <CardTitle className="display text-sm tracking-wider text-ink">
+                  Pesanan Online ({
+                    groupByCustomer
+                      ? `${groupedCustomerOrders.length} Pembeli`
+                      : statusFilter === "verifying" && stats.verifyingCount !== stats.verifyingBarisCount
+                        ? `${filteredOnlineOrders.length} Pesanan (${stats.verifyingCount} Bukti ACC)`
+                        : `${filteredOnlineOrders.length} Transaksi`
+                  })
+                </CardTitle>
+
+                {/* Filter Controls: Batch Dropdown & Grouping Toggle */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <div className="flex items-center gap-1.5 bg-cream/80 border-2 border-ink px-3 py-1 rounded-xl">
+                    <Filter className="w-3.5 h-3.5 text-brand-orange" />
+                    <span className="text-[11px] font-black text-ink uppercase">Batch:</span>
+                    <select
+                      value={campaignFilter}
+                      onChange={(e) => setCampaignFilter(e.target.value)}
+                      className="text-xs font-bold text-ink bg-white border border-ink/30 rounded-md px-2 py-1 focus:outline-none cursor-pointer"
+                    >
+                      <option value="all">Semua Batch / Tipe</option>
+                      {campaigns.map((c) => (
+                        <option key={c.id} value={String(c.id)}>
+                          {c.batch_name || `Batch #${c.id}`}
+                        </option>
+                      ))}
+                      <option value="none">Tanpa Batch (Website Direct)</option>
+                    </select>
+                  </div>
+
+                  <Button
+                    type="button"
+                    variant={groupByCustomer ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setGroupByCustomer(!groupByCustomer)}
+                    className={`h-9 text-xs font-black border-2 border-ink transition-all cursor-pointer ${
+                      groupByCustomer ? "bg-brand-orange text-white hover:bg-brand-orange/90 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-white text-ink hover:bg-cream"
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5 mr-1.5" />
+                    {groupByCustomer ? "Gabung Pembeli (Aktif)" : "Gabungkan Nama Pembeli Sama"}
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="border rounded-lg overflow-x-auto">
@@ -838,7 +1020,145 @@ function AdminTransactionsPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredOnlineOrders.length === 0 ? (
+                    {groupByCustomer ? (
+                      groupedCustomerOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="p-8 text-center text-muted-foreground font-bold">
+                            Tidak ada data pembeli yang cocok dengan filter
+                          </td>
+                        </tr>
+                      ) : (
+                        groupedCustomerOrders.map((group, idx) => {
+                          const isExpanded = !!expandedRows[`group-${group.key}`];
+                          return (
+                            <Fragment key={group.key}>
+                              <tr className="border-t border-border hover:bg-cream/20 transition-colors">
+                                <td className="p-3 text-center">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 hover:bg-muted"
+                                    onClick={() => {
+                                      setExpandedRows((prev) => ({ ...prev, [`group-${group.key}`]: !isExpanded }));
+                                    }}
+                                  >
+                                    {isExpanded ? (
+                                      <ChevronUp className="h-4 w-4 text-ink" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-ink" />
+                                    )}
+                                  </Button>
+                                </td>
+                                <td className="p-3 font-semibold text-xs text-ink">{idx + 1}</td>
+                                <td className="p-3 font-mono text-xs">
+                                  <Badge className="bg-blue-100 text-blue-900 border-blue-300 font-bold text-[10px] uppercase">
+                                    {group.orders.length} Transaksi
+                                  </Badge>
+                                  <div className="text-[10px] text-muted-foreground mt-0.5 max-w-[200px] truncate font-mono">
+                                    {group.orders.map((o) => o.order_id).join(", ")}
+                                  </div>
+                                </td>
+                                <td className="p-3">
+                                  <p className="font-bold text-ink uppercase text-xs tracking-wide">
+                                    {group.customer_name}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {group.customer_email} {group.customer_phone !== "-" ? `• ${group.customer_phone}` : ""}
+                                  </p>
+                                </td>
+                                <td className="p-3 text-right font-black text-ink">
+                                  Rp {Number(group.total_amount).toLocaleString("id-ID")}
+                                </td>
+                                <td className="p-3 text-center">
+                                  {group.pending_count === 0 ? (
+                                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold text-[10px]">
+                                      {group.paid_count} Lunas Terbayar
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="bg-amber-100 text-amber-950 border-amber-300 font-bold text-[10px]">
+                                      {group.paid_count} Lunas • {group.pending_count} Pending
+                                    </Badge>
+                                  )}
+                                </td>
+                                <td className="p-3 text-center text-xs text-muted-foreground font-bold">
+                                  {group.orders.length} Transaksi Tergabung
+                                </td>
+                                <td className="p-3 text-xs text-muted-foreground font-medium">
+                                  {new Date(group.latest_created_at).toLocaleString("id-ID")}
+                                </td>
+                                <td className="p-3 text-right">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 border-2 border-ink text-xs font-bold"
+                                    onClick={() => {
+                                      setExpandedRows((prev) => ({ ...prev, [`group-${group.key}`]: !isExpanded }));
+                                    }}
+                                  >
+                                    {isExpanded ? "Tutup Detail" : "Lihat Rincian"}
+                                  </Button>
+                                </td>
+                              </tr>
+
+                              {isExpanded && (
+                                <tr>
+                                  <td colSpan={9} className="p-4 bg-amber-50/40 border-t border-b border-border">
+                                    <div className="space-y-3 pl-2 sm:pl-4">
+                                      <p className="text-xs font-black uppercase text-ink tracking-wider flex items-center gap-2">
+                                        <Users className="w-4 h-4 text-brand-orange" />
+                                        Rincian Transaksi Dari: <span className="text-brand-orange">{group.customer_name}</span> ({group.orders.length} Transaksi)
+                                      </p>
+                                      <div className="space-y-2">
+                                        {group.orders.map((subOrder) => (
+                                          <div
+                                            key={subOrder.order_id}
+                                            className="p-3 bg-white border-2 border-ink/20 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-xs"
+                                          >
+                                            <div className="space-y-0.5">
+                                              <div className="font-mono font-bold text-brand-blue flex items-center gap-2">
+                                                <span>{subOrder.order_id}</span>
+                                                {(subOrder as any).pre_order_campaign_id && (
+                                                  <Badge variant="outline" className="text-[9px] font-bold border-ink/30 bg-cream/50">
+                                                    Batch #{(subOrder as any).pre_order_campaign_id}
+                                                  </Badge>
+                                                )}
+                                              </div>
+                                              <div className="text-[10px] text-muted-foreground">
+                                                Waktu: {new Date(subOrder.created_at).toLocaleString("id-ID")}
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                              <span className="font-black text-ink">
+                                                Rp {Number(subOrder.gross_amount).toLocaleString("id-ID")}
+                                              </span>
+                                              <span
+                                                className={`px-2.5 py-1 rounded-lg text-[10px] font-bold border ${
+                                                  getStatusBadgeTextAndColor(subOrder).color
+                                                }`}
+                                              >
+                                                {getStatusBadgeTextAndColor(subOrder).text}
+                                              </span>
+                                              <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-8 text-xs font-black border-2 border-ink bg-white hover:bg-cream"
+                                                onClick={() => void handleOpenManagement(subOrder.order_id, "online")}
+                                              >
+                                                Kelola
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })
+                      )
+                    ) : filteredOnlineOrders.length === 0 ? (
                       <tr>
                         <td colSpan={9} className="p-8 text-center text-muted-foreground">
                           Tidak ada pesanan online yang cocok

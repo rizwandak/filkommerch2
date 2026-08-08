@@ -29,13 +29,13 @@ function AdminLayout() {
   }
 
   return (
-    <div className="flex min-h-screen bg-background">
-      <div className="hidden md:block">
+    <div className="flex h-screen w-screen overflow-hidden bg-background">
+      <div className="hidden md:block h-full shrink-0">
         <AdminSidebar />
       </div>
 
-      <div className="flex flex-1 flex-col min-w-0">
-        <header className="flex md:hidden items-center gap-3 border-b border-border bg-card px-4 py-3">
+      <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
+        <header className="flex md:hidden items-center gap-3 border-b border-border bg-card px-4 py-3 shrink-0">
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon">
@@ -49,7 +49,7 @@ function AdminLayout() {
           <span className="font-semibold">Admin Panel</span>
         </header>
 
-        <main className="flex-1 overflow-auto">
+        <main className="flex-1 overflow-y-auto">
           <Outlet />
         </main>
       </div>

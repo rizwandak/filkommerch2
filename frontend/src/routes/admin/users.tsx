@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Search, User } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Plus, Pencil, Trash2, Search, User, Users, ShieldCheck, MonitorSmartphone, GraduationCap, BadgeCheck } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { getApiBaseUrl } from "@/lib/api-config";
@@ -62,6 +62,7 @@ function AdminUsersPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilters, setRoleFilters] = useState<string[]>([]);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [form, setForm] = useState<UserForm>(emptyForm());
   const [saving, setSaving] = useState(false);
@@ -82,6 +83,26 @@ function AdminUsersPage() {
     if (name) headers["x-user-name"] = name;
     return headers;
   };
+
+  const stats = useMemo(() => {
+    const total = users.length;
+    let adminCount = 0;
+    let cashierCount = 0;
+    let customerCount = 0;
+    let verifiedCount = 0;
+
+    users.forEach((u) => {
+      if (u.role === "admin") adminCount++;
+      else if (u.role === "cashier") cashierCount++;
+      else if (u.role === "customer") customerCount++;
+
+      if (Number(u.is_filkom_verified) === 1) {
+        verifiedCount++;
+      }
+    });
+
+    return { total, adminCount, cashierCount, customerCount, verifiedCount };
+  }, [users]);
 
   const fetchAdminUsers = async () => {
     const res = await fetch(`${API_BASE_URL}/api/admin/users`, {
@@ -282,6 +303,7 @@ function AdminUsersPage() {
 
   const filteredUsers = users.filter((u) => {
     const matchRole = roleFilters.length === 0 || roleFilters.includes(u.role);
+    const matchVerified = !verifiedOnly || Number(u.is_filkom_verified) === 1;
     const q = searchQuery.toLowerCase().trim();
     const matchSearch =
       !q ||
@@ -290,7 +312,7 @@ function AdminUsersPage() {
       (u.nim && u.nim.includes(q)) ||
       (u.phone && u.phone.includes(q));
 
-    return matchRole && matchSearch;
+    return matchRole && matchVerified && matchSearch;
   });
 
   if (loading && users.length === 0) {
@@ -319,6 +341,151 @@ function AdminUsersPage() {
             Tambah Pengguna
           </Button>
         )}
+      </div>
+
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        {/* Total Semua */}
+        <button
+          type="button"
+          onClick={() => {
+            setRoleFilters([]);
+            setVerifiedOnly(false);
+          }}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${
+            roleFilters.length === 0 && !verifiedOnly
+              ? "bg-ink text-white border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] scale-[1.02]"
+              : "bg-white text-ink border-ink/30 hover:border-ink hover:shadow-[3px_3px_0px_0px_rgba(27,27,27,0.8)]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider opacity-80">
+              Total Semua
+            </span>
+            <Users className="w-4 h-4 opacity-70" />
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none">
+              {stats.total}
+            </span>
+            <span className="text-[10px] font-bold block mt-1 opacity-70">
+              Semua Pengguna
+            </span>
+          </div>
+        </button>
+
+        {/* Administrator */}
+        <button
+          type="button"
+          onClick={() => {
+            setVerifiedOnly(false);
+            toggleRoleFilter("admin");
+          }}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${
+            roleFilters.includes("admin") && roleFilters.length === 1 && !verifiedOnly
+              ? "bg-rose-700 text-white border-rose-950 shadow-[4px_4px_0px_0px_rgba(136,19,55,1)] scale-[1.02]"
+              : "bg-rose-50/70 text-rose-950 border-rose-200 hover:border-rose-500 hover:shadow-[3px_3px_0px_0px_rgba(244,63,94,0.3)]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              Administrator
+            </span>
+            <ShieldCheck className="w-4 h-4 text-rose-600" />
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none">
+              {stats.adminCount}
+            </span>
+            <span className="text-[10px] font-bold block mt-1 text-rose-700">
+              Akses Penuh Admin
+            </span>
+          </div>
+        </button>
+
+        {/* Kasir POS */}
+        <button
+          type="button"
+          onClick={() => {
+            setVerifiedOnly(false);
+            toggleRoleFilter("cashier");
+          }}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${
+            roleFilters.includes("cashier") && roleFilters.length === 1 && !verifiedOnly
+              ? "bg-amber-600 text-white border-amber-950 shadow-[4px_4px_0px_0px_rgba(120,53,15,1)] scale-[1.02]"
+              : "bg-amber-50/70 text-amber-950 border-amber-200 hover:border-amber-500 hover:shadow-[3px_3px_0px_0px_rgba(245,158,11,0.3)]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              Kasir POS
+            </span>
+            <MonitorSmartphone className="w-4 h-4 text-amber-600" />
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none">
+              {stats.cashierCount}
+            </span>
+            <span className="text-[10px] font-bold block mt-1 text-amber-800">
+              Operasional Kasir
+            </span>
+          </div>
+        </button>
+
+        {/* Customer / Mahasiswa */}
+        <button
+          type="button"
+          onClick={() => {
+            setVerifiedOnly(false);
+            toggleRoleFilter("customer");
+          }}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${
+            roleFilters.includes("customer") && roleFilters.length === 1 && !verifiedOnly
+              ? "bg-blue-600 text-white border-blue-900 shadow-[4px_4px_0px_0px_rgba(30,58,138,1)] scale-[1.02]"
+              : "bg-blue-50/70 text-blue-950 border-blue-200 hover:border-blue-500 hover:shadow-[3px_3px_0px_0px_rgba(59,130,246,0.3)]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              Customer
+            </span>
+            <GraduationCap className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none">
+              {stats.customerCount}
+            </span>
+            <span className="text-[10px] font-bold block mt-1 text-blue-700">
+              Mahasiswa / Pembeli
+            </span>
+          </div>
+        </button>
+
+        {/* Civitas Verified */}
+        <button
+          type="button"
+          onClick={() => setVerifiedOnly(!verifiedOnly)}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${
+            verifiedOnly
+              ? "bg-emerald-700 text-white border-emerald-950 shadow-[4px_4px_0px_0px_rgba(6,78,59,1)] scale-[1.02]"
+              : "bg-emerald-50/70 text-emerald-950 border-emerald-200 hover:border-emerald-500 hover:shadow-[3px_3px_0px_0px_rgba(16,185,129,0.3)]"
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-black uppercase tracking-wider">
+              Verified Civitas
+            </span>
+            <BadgeCheck className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="mt-3">
+            <span className="text-2xl sm:text-3xl font-black font-mono leading-none">
+              {stats.verifiedCount}
+            </span>
+            <span className="text-[10px] font-bold block mt-1 text-emerald-700">
+              Terverifikasi UB
+            </span>
+          </div>
+        </button>
       </div>
 
       {/* Filters & Search */}

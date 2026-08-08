@@ -1668,7 +1668,7 @@ export const getOnlineOrders = async (req: Request, res: Response) => {
     }
 
     const orders = await query<any>(
-      "SELECT * FROM orders WHERE channel = 'online' ORDER BY created_at DESC LIMIT 150"
+      "SELECT * FROM orders WHERE channel = 'online' ORDER BY created_at DESC LIMIT 10000"
     );
 
     if (orders && orders.length > 0) {
@@ -2972,6 +2972,8 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         o.fulfillment_status,
         o.payment_type as payment_method,
         o.payment_proof_url,
+        o.subtotal as order_subtotal,
+        o.discount_amount as order_discount_amount,
         o.gross_amount as grand_total,
         p.name as connected_product_name,
         p.image_url as connected_product_image,
@@ -2997,6 +2999,8 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
     // Group items by order_id
     const ordersMap: Record<string, any> = {};
     let totalRevenue = 0;
+    let totalGrossSubtotal = 0;
+    let totalDiscountAmount = 0;
     let totalUnitsSold = 0;
 
     const productSalesMap: Record<number, {
@@ -3045,6 +3049,10 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       }
 
       if (!ordersMap[item.order_id]) {
+        const orderGrandTotal = Number(item.grand_total || 0);
+        const orderDiscount = Number(item.order_discount_amount || 0);
+        const orderSubtotal = Number(item.order_subtotal || (orderGrandTotal + orderDiscount));
+
         ordersMap[item.order_id] = {
           order_id: item.order_id,
           customer_name: item.customer_name || item.user_full_name || "Guest",
@@ -3057,12 +3065,16 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           fulfillment_status: item.fulfillment_status,
           payment_method: item.payment_method,
           payment_proof_url: item.payment_proof_url,
-          grand_total: Number(item.grand_total || 0),
+          grand_total: orderGrandTotal,
+          order_subtotal: orderSubtotal,
+          order_discount_amount: orderDiscount,
           items: [],
         };
 
         if (isPaid) {
-          totalRevenue += Number(item.grand_total || 0);
+          totalRevenue += orderGrandTotal;
+          totalGrossSubtotal += orderSubtotal;
+          totalDiscountAmount += orderDiscount;
         }
       }
 
@@ -3199,6 +3211,8 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         connected_products: connectedProducts,
         summary: {
           total_revenue: totalRevenue,
+          total_subtotal: totalGrossSubtotal,
+          total_discount: totalDiscountAmount,
           total_units_sold: totalUnitsSold,
           total_orders: ordersList.length,
           total_buyers: uniqueBuyersSet.size,
