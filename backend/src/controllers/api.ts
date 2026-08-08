@@ -4818,7 +4818,26 @@ export const getProductionSummary = async (req: Request, res: Response) => {
     // Fetch all campaigns for smart date-range batch mapping
     const campaigns = await query<any>("SELECT * FROM pre_order_campaigns ORDER BY id ASC");
 
-    let whereClause = "WHERE o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed')";
+    // Fetch bundle component mappings to expand bundle container products into physical components
+    const bundleItemsRows = await query<any>(
+      `SELECT bi.bundle_product_id, bi.component_product_id, COALESCE(bi.quantity, 1) as comp_qty,
+              bp.name as bundle_name
+       FROM bundle_items bi
+       JOIN products bp ON bi.bundle_product_id = bp.id`
+    );
+
+    const bundleComponentsMap: Record<number, Array<{ component_product_id: number; comp_qty: number; bundle_name: string }>> = {};
+    for (const bi of bundleItemsRows) {
+      const bId = Number(bi.bundle_product_id);
+      if (!bundleComponentsMap[bId]) bundleComponentsMap[bId] = [];
+      bundleComponentsMap[bId].push({
+        component_product_id: Number(bi.component_product_id),
+        comp_qty: Number(bi.comp_qty) || 1,
+        bundle_name: bi.bundle_name,
+      });
+    }
+
+    let whereClause = "WHERE o.order_status != 'cancelled' AND o.order_id NOT LIKE 'LNS%'";
     const queryParams: any[] = [];
     if (batchFilter !== "all") {
       if (batchFilter === "none") {
@@ -4831,14 +4850,12 @@ export const getProductionSummary = async (req: Request, res: Response) => {
 
     const rows = await query<any>(
       `SELECT 
-        oi.product_id,
+        oi.*,
         COALESCE(p.name, oi.product_name) as product_name,
-        COALESCE(oi.size, 'Standard') as size,
-        COALESCE(oi.color, '') as color,
         o.created_at as order_created_at,
         o.pre_order_campaign_id,
         c.batch_name as explicit_batch_name,
-        oi.quantity as qty
+        p.product_type as connected_product_type
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
        LEFT JOIN products p ON oi.product_id = p.id
@@ -4848,22 +4865,38 @@ export const getProductionSummary = async (req: Request, res: Response) => {
       queryParams
     );
 
+    const formatVariantKey = (rawSize?: string, rawColor?: string) => {
+      const parts = [rawSize, rawColor]
+        .map((s) => (s || "").trim())
+        .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard");
+      return parts.join(" / ") || "Standard";
+    };
+
     // Aggregate by product
     const groupedMap: Record<number, any> = {};
-    for (const r of rows) {
-      const pId = r.product_id || 0;
+
+    const getOrCreateGroup = (pId: number, pName: string) => {
       if (!groupedMap[pId]) {
         groupedMap[pId] = {
           product_id: pId,
-          product_name: r.product_name,
+          product_name: pName,
           variants_breakdown: {},
           batch_breakdown: {},
           total_qty: 0,
         };
       }
+      return groupedMap[pId];
+    };
 
-      const varKey = [r.size, r.color].filter(Boolean).join(" / ") || "Standard";
-      groupedMap[pId].variants_breakdown[varKey] = (groupedMap[pId].variants_breakdown[varKey] || 0) + Number(r.qty);
+    for (const r of rows) {
+      const pId = r.product_id || 0;
+      const pName = r.product_name;
+
+      const isComponentItem =
+        (r.product_name && r.product_name.includes("[KOMPONEN BUNDLE]")) ||
+        Number(r.unit_price || r.price) === 0;
+
+      const varKey = formatVariantKey(r.size, r.color);
 
       // Determine batch name
       let bName = r.explicit_batch_name;
@@ -4888,8 +4921,28 @@ export const getProductionSummary = async (req: Request, res: Response) => {
         bName = "Ready Stock";
       }
 
-      groupedMap[pId].batch_breakdown[bName] = (groupedMap[pId].batch_breakdown[bName] || 0) + Number(r.qty);
-      groupedMap[pId].total_qty += Number(r.qty);
+      if (r.connected_product_type === "bundle") {
+        // Expand bundle container item into component physical products
+        const comps = bundleComponentsMap[pId];
+        if (comps && comps.length > 0) {
+          for (const comp of comps) {
+            const cid = comp.component_product_id;
+            const compProductRows = await query<any>("SELECT name FROM products WHERE id = ?", [cid]);
+            const compName = compProductRows[0]?.name || `Product #${cid}`;
+            const addedQty = Number(r.quantity || 1) * comp.comp_qty;
+
+            const targetGroup = getOrCreateGroup(cid, compName);
+            targetGroup.variants_breakdown[varKey] = (targetGroup.variants_breakdown[varKey] || 0) + addedQty;
+            targetGroup.batch_breakdown[bName] = (targetGroup.batch_breakdown[bName] || 0) + addedQty;
+            targetGroup.total_qty += addedQty;
+          }
+        }
+      } else {
+        const targetGroup = getOrCreateGroup(pId, pName);
+        targetGroup.variants_breakdown[varKey] = (targetGroup.variants_breakdown[varKey] || 0) + Number(r.quantity || 1);
+        targetGroup.batch_breakdown[bName] = (targetGroup.batch_breakdown[bName] || 0) + Number(r.quantity || 1);
+        targetGroup.total_qty += Number(r.quantity || 1);
+      }
     }
 
     const resultList = Object.values(groupedMap);
