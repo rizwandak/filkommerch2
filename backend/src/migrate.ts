@@ -452,6 +452,58 @@ export async function runMigration() {
       console.warn("Notice: Totebag variant fix status:", err.message);
     }
 
+    // Auto-fix Batch #1 official product prices
+    try {
+      console.log("Updating Batch #1 official product prices...");
+      const [campaigns] = await connection.query<any[]>("SELECT * FROM pre_order_campaigns ORDER BY id ASC");
+      const b1 = campaigns.find((c) => c.batch_name.includes("1"));
+      if (b1) {
+        const priceMap = [
+          { names: ["Pin Enamel"], price: 26000 },
+          { names: ["Pin Tas"], price: 4000 },
+          { names: ["Sticker Pack"], price: 8000 },
+          { names: ["Keychain"], price: 10000 },
+          { names: ["Totebag"], price: 40000 },
+          { names: ["Topi Baseball", "Topi"], price: 80000 },
+          { names: ["T-Shirt Kaos", "Kaos", "T-Shirt"], price: 105000 },
+        ];
+
+        const [b1Orders] = await connection.query<any[]>(
+          `SELECT DISTINCT o.order_id
+           FROM orders o
+           JOIN order_items oi ON o.order_id = oi.order_id
+           WHERE o.order_status != 'cancelled'
+             AND (o.pre_order_campaign_id = ? OR (o.created_at >= ? AND o.created_at <= ?))`,
+          [b1.id, b1.start_date, b1.extended_end_date || b1.end_date]
+        );
+
+        for (const rule of priceMap) {
+          for (const namePattern of rule.names) {
+            await connection.query(
+              `UPDATE order_items oi
+               JOIN orders o ON oi.order_id = o.order_id
+               SET oi.unit_price = ?
+               WHERE (oi.product_name LIKE ? OR oi.product_id IN (SELECT id FROM products WHERE name LIKE ?))
+                 AND (o.pre_order_campaign_id = ? OR (o.created_at >= ? AND o.created_at <= ?))`,
+              [rule.price, `%${namePattern}%`, `%${namePattern}%`, b1.id, b1.start_date, b1.extended_end_date || b1.end_date]
+            );
+          }
+        }
+
+        for (const oRow of b1Orders) {
+          const [sumRes] = await connection.query<any[]>(
+            "SELECT SUM(COALESCE(unit_price, 0) * COALESCE(quantity, 1)) as new_total FROM order_items WHERE order_id = ?",
+            [oRow.order_id]
+          );
+          const newTotal = Number(sumRes[0]?.new_total || 0);
+          await connection.query("UPDATE orders SET gross_amount = ? WHERE order_id = ?", [newTotal, oRow.order_id]);
+        }
+        console.log("✅ Batch #1 official product prices updated successfully!");
+      }
+    } catch (err: any) {
+      console.warn("Notice: Batch #1 price update status:", err.message);
+    }
+
     console.log("Schema migration finished successfully!");
   } catch (err) {
     console.error("Fatal connection error during migration:", err);
