@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { HackerModeToggle } from "./HackerModeToggle";
+import { NotificationBell } from "./NotificationBell";
+import { PushPermissionBanner } from "./PushPermissionBanner";
 import { useQuery } from "@tanstack/react-query";
 import { getStoreSettings, getActivePreOrderCampaignServerAction } from "@/backend/server-actions";
 import { isPreOrderOpen } from "@/lib/pre-order-utils";
@@ -312,6 +314,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
   return (
     <>
       <header className="fixed top-0 left-0 right-0 z-50 w-full bg-background/95 backdrop-blur border-b-2 border-ink shadow-md">
+        <PushPermissionBanner />
         {!isHideMarquee && (
           <div className="bg-ink text-cream overflow-hidden border-b border-ink h-9 sm:h-10 flex items-center shadow-sm">
             <div className="flex marquee-track whitespace-nowrap text-xs sm:text-xs tracking-[0.18em] font-extrabold h-full items-center">
@@ -403,6 +406,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
           <div className="flex items-center gap-1 sm:gap-1.5 text-ink">
             {/* Desktop Action Tools (Hidden on mobile < sm to prevent overlapping logos) */}
             <div className="hidden sm:flex items-center gap-1 sm:gap-1.5">
+              <NotificationBell />
               <HackerModeToggle />
               <button
                 aria-label="Search"

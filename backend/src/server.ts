@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
 import { validateConfig } from "./config/config";
 import * as apiControllers from "./controllers/api";
+import * as notificationControllers from "./controllers/notificationController";
 import { validateBody, createOrderSchema } from "./middleware/validation";
 import { checkRole } from "./middleware/auth";
 import { verifyFilkomUser } from "./controllers/verification";
@@ -410,6 +411,14 @@ app.get("/api/admin/vendoring/financials", checkRole(["admin"]), apiControllers.
 // CSV Import API Route
 app.post("/api/admin/import/orders", checkRole(["admin"]), apiControllers.importOrders);
 app.delete("/api/admin/import/orders/:campaignId", checkRole(["admin"]), apiControllers.deleteImportedOrders);
+
+// Notification API Routes
+app.get("/api/notifications/vapid-key", notificationControllers.getVapidKey);
+app.post("/api/notifications/subscribe", notificationControllers.subscribePush);
+app.get("/api/notifications", notificationControllers.getUserNotifications);
+app.put("/api/notifications/:id/read", notificationControllers.markAsRead);
+app.post("/api/admin/notifications/send", checkRole(["admin", "cashier"]), notificationControllers.adminSendNotification);
+app.post("/api/admin/notifications/broadcast", checkRole(["admin"]), notificationControllers.adminBroadcastNotification);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

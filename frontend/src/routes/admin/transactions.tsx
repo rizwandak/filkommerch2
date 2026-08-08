@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@frontend/components/ui/dialog";
+import { SendNotificationModal } from "@/components/SendNotificationModal";
 import {
   Select,
   SelectContent,
@@ -47,7 +48,9 @@ import {
   Store,
   SlidersHorizontal,
   RotateCcw,
+  Megaphone,
 } from "lucide-react";
+import { BroadcastNotificationModal } from "@/components/BroadcastNotificationModal";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -257,6 +260,18 @@ function AdminTransactionsPage() {
   const [verificationNote, setVerificationNote] = useState<string>("");
   const [submittingVerification, setSubmittingVerification] = useState(false);
   const [showRejectReason, setShowRejectReason] = useState(false);
+
+  // Notification Modal States
+  const [notifModalOpen, setNotifModalOpen] = useState(false);
+  const [notifTargetUser, setNotifTargetUser] = useState<{ id: number; name: string; trxId: string }>({
+    id: 0,
+    name: "",
+    trxId: "",
+  });
+  const [notifDefaultTitle, setNotifDefaultTitle] = useState("");
+  const [notifDefaultMessage, setNotifDefaultMessage] = useState("");
+  const [notifDefaultType, setNotifDefaultType] = useState("CUSTOM_DIRECT");
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
   const [zoomMedia, setZoomMedia] = useState<{url: string, type: string} | null>(null);
 
   const getAdminRequestHeaders = () => {
@@ -429,6 +444,31 @@ function AdminTransactionsPage() {
     } finally {
       setSavingManaged(false);
     }
+  };
+
+  const openNotifModalForOrder = (order: any, presetType: string = "CUSTOM_DIRECT") => {
+    const userId = order?.user_id || 0;
+    const userName = order?.customer_name || order?.user_name || "Pembeli";
+    const trxId = order?.order_id || "";
+
+    setNotifTargetUser({ id: userId, name: userName, trxId });
+
+    if (presetType === "PREORDER_READY") {
+      setNotifDefaultTitle(`📦 Pesanan #${trxId} Siap Diambil!`);
+      setNotifDefaultMessage(`Halo Kak ${userName}! Barang Pre-Order kamu sudah siap diambil di booth Filkom Merch (Gedung F). Silakan tunjukkan QR / ID pesanan.`);
+      setNotifDefaultType("PREORDER_READY");
+    } else if (presetType === "PAYMENT_REJECTED") {
+      setNotifDefaultTitle(`⚠️ Bukti Pembayaran Perlu Diupload Ulang (#${trxId})`);
+      setNotifDefaultMessage(`Bukti pembayaran kamu belum sesuai (buram/nominal tidak cocok). Mohon lakukan upload ulang bukti transfer.`);
+      setNotifDefaultType("PAYMENT_REJECTED");
+    } else {
+      setNotifDefaultTitle(`Info Pesanan #${trxId}`);
+      setNotifDefaultMessage("");
+      setNotifDefaultType("CUSTOM_DIRECT");
+    }
+
+    setManagementOpen(false);
+    setNotifModalOpen(true);
   };
 
   const handleUploadFulfillmentProofFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1049,14 +1089,24 @@ function AdminTransactionsPage() {
             Pesanan website dan POS Kasir.
           </p>
         </div>
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Cari transaksi..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 border-2 border-ink focus-visible:ring-0 focus-visible:ring-offset-0"
-          />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          <button
+            type="button"
+            onClick={() => setIsBroadcastModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2 border-2 border-ink rounded-xl text-xs font-extrabold bg-brand-orange text-white shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer hover:bg-brand-orange/90 transition-all active:scale-95 shrink-0"
+          >
+            <Megaphone className="w-4 h-4" />
+            Broadcast Push Notif
+          </button>
+          <div className="relative w-full sm:w-72 md:w-80">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Cari transaksi..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 border-2 border-ink focus-visible:ring-0 focus-visible:ring-offset-0"
+            />
+          </div>
         </div>
       </div>
 
@@ -2514,13 +2564,23 @@ function AdminTransactionsPage() {
                           />
                         </div>
 
-                        <Button
-                          onClick={() => void handleSaveManagedStatus()}
-                          disabled={savingManaged}
-                          className="w-full bg-ink text-white font-bold uppercase tracking-wider text-xs h-9"
-                        >
-                          {savingManaged ? "Menyimpan..." : "Simpan Perubahan Status"}
-                        </Button>
+                        <div className="pt-2 flex flex-col gap-2">
+                          <Button
+                            onClick={() => void handleSaveManagedStatus()}
+                            disabled={savingManaged}
+                            className="w-full bg-ink text-white font-bold uppercase tracking-wider text-xs h-9 cursor-pointer"
+                          >
+                            {savingManaged ? "Menyimpan..." : "Simpan Perubahan Status"}
+                          </Button>
+
+                          <Button
+                            type="button"
+                            onClick={() => openNotifModalForOrder(managedTransaction)}
+                            className="w-full bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold uppercase tracking-wider text-xs h-9 cursor-pointer shadow-sm"
+                          >
+                            📱 Kirim Push Notifikasi ke Pembeli
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -2530,7 +2590,15 @@ function AdminTransactionsPage() {
             </div>
           )}
 
-          <DialogFooter className="mt-4 border-t pt-4">
+          <DialogFooter className="mt-4 border-t pt-4 flex items-center justify-between">
+            <Button
+              type="button"
+              onClick={() => openNotifModalForOrder(managedTransaction)}
+              variant="outline"
+              className="border-2 border-brand-orange text-brand-orange hover:bg-brand-orange/10 font-bold text-xs"
+            >
+              💬 Custom Message
+            </Button>
             <Button
               onClick={() => setManagementOpen(false)}
               className="bg-ink text-white font-bold uppercase tracking-wider text-xs px-6"
@@ -2716,6 +2784,32 @@ function AdminTransactionsPage() {
           )}
         </div>
       )}
+
+      {/* Send Push Notification Modal */}
+      <SendNotificationModal
+        isOpen={notifModalOpen}
+        onClose={() => setNotifModalOpen(false)}
+        targetUserId={notifTargetUser.id}
+        targetUserName={notifTargetUser.name}
+        targetTrxId={notifTargetUser.trxId}
+        defaultTitle={notifDefaultTitle}
+        defaultMessage={notifDefaultMessage}
+        defaultType={notifDefaultType}
+        onSuccess={() => {
+          toast.success("Notifikasi berhasil terkirim ke HP pembeli!");
+        }}
+      />
+
+      {/* Broadcast Push Notification Modal */}
+      <BroadcastNotificationModal
+        isOpen={isBroadcastModalOpen}
+        onClose={() => setIsBroadcastModalOpen(false)}
+        products={products.map((p: any) => ({ id: p.id, name: p.name }))}
+        campaigns={campaigns.map((c: any) => ({ id: c.id, batch_name: c.batch_name }))}
+        onSuccess={() => {
+          toast.success("Broadcast push notification berhasil disiarkan!");
+        }}
+      />
     </div>
   );
 }

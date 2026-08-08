@@ -323,6 +323,46 @@ export async function runMigration() {
       console.warn("Notice: product_reviews table status:", err.message);
     }
 
+    // Create notifications table
+    try {
+      console.log("Creating notifications table if not exists...");
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS notifications (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          title VARCHAR(255) NOT NULL,
+          message TEXT NOT NULL,
+          type VARCHAR(50) DEFAULT 'GENERAL',
+          link VARCHAR(255) DEFAULT NULL,
+          is_read TINYINT(1) DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `);
+      console.log("✅ notifications table ready!");
+    } catch (err: any) {
+      console.warn("Notice: notifications table status:", err.message);
+    }
+
+    // Create push_subscriptions table
+    try {
+      console.log("Creating push_subscriptions table if not exists...");
+      await connection.query(`
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          endpoint TEXT NOT NULL,
+          p256dh VARCHAR(255) NOT NULL,
+          auth VARCHAR(255) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+      `);
+      console.log("✅ push_subscriptions table ready!");
+    } catch (err: any) {
+      console.warn("Notice: push_subscriptions table status:", err.message);
+    }
+
     // Auto-fix Keychain variant names in order_items for historical imported CSV items
     try {
       console.log("Fixing Keychain order items variant names...");

@@ -10,6 +10,7 @@
     "test:load": "autocannon -c 100 -d 10 https://filkommerch.com/api/products"
   },
   "dependencies": {
+    "@types/web-push": "^3.6.4",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -19,6 +20,7 @@
     "midtrans-client": "^1.3.1",
     "multer": "^2.2.0",
     "mysql2": "^3.9.7",
+    "web-push": "^3.6.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {

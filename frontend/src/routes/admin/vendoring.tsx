@@ -74,6 +74,8 @@ function AdminVendoringPage() {
   const [paymentScheme, setPaymentScheme] = useState<string>("50_50");
   const [customPaymentNotes, setCustomPaymentNotes] = useState<string>("");
 
+
+
   const openSpkModal = (po: VendorOrder) => {
     setSelectedSpkPo(po);
     setIsSpkModalOpen(true);
@@ -1696,6 +1698,7 @@ function AdminVendoringPage() {
           </div>
         </div>
       )}
+
     </div>
   );
 }
