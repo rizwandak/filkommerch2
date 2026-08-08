@@ -3110,6 +3110,10 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       }
 
       if (isPaid) {
+        if (Number(item.unit_price || 0) > 0) {
+          productSalesMap[pid].unit_price = Number(item.unit_price);
+        }
+
         // Clean variant string to strip redundant placeholder words like "One Size", "Default", "-", "Standard"
         const formatVariantKey = (rawSize?: string, rawColor?: string) => {
           const parts = [rawSize, rawColor]
@@ -3200,6 +3204,12 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           productSalesMap[pid].variants[variantKey] = (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
           productSalesMap[pid].direct_variants[variantKey] = (productSalesMap[pid].direct_variants[variantKey] || 0) + item.quantity;
         }
+      }
+    }
+
+    for (const p of Object.values(productSalesMap)) {
+      if (p.unit_price > 0 && p.total_qty > 0) {
+        p.total_subtotal = p.unit_price * p.total_qty;
       }
     }
 
