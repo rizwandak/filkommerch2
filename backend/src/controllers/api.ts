@@ -4700,11 +4700,18 @@ export const getProductionSummary = async (req: Request, res: Response) => {
   try {
     const batchFilter = (req.query.batch as string) || "all";
     
+    // Fetch all campaigns for smart date-range batch mapping
+    const campaigns = await query<any>("SELECT * FROM pre_order_campaigns ORDER BY id ASC");
+
     let whereClause = "WHERE o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed')";
     const queryParams: any[] = [];
     if (batchFilter !== "all") {
-      whereClause += " AND o.pre_order_campaign_id = ?";
-      queryParams.push(batchFilter);
+      if (batchFilter === "none") {
+        whereClause += " AND (o.pre_order_campaign_id IS NULL OR o.pre_order_campaign_id = 0)";
+      } else {
+        whereClause += " AND o.pre_order_campaign_id = ?";
+        queryParams.push(batchFilter);
+      }
     }
 
     const rows = await query<any>(
@@ -4713,15 +4720,15 @@ export const getProductionSummary = async (req: Request, res: Response) => {
         COALESCE(p.name, oi.product_name) as product_name,
         COALESCE(oi.size, 'Standard') as size,
         COALESCE(oi.color, '') as color,
-        c.batch_name,
-        c.id as campaign_id,
-        SUM(oi.quantity) as qty
+        o.created_at as order_created_at,
+        o.pre_order_campaign_id,
+        c.batch_name as explicit_batch_name,
+        oi.quantity as qty
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
        LEFT JOIN products p ON oi.product_id = p.id
        LEFT JOIN pre_order_campaigns c ON o.pre_order_campaign_id = c.id
        ${whereClause}
-       GROUP BY oi.product_id, product_name, size, color, campaign_id, c.batch_name
        ORDER BY product_name ASC, size ASC`,
       queryParams
     );
@@ -4743,9 +4750,30 @@ export const getProductionSummary = async (req: Request, res: Response) => {
       const varKey = [r.size, r.color].filter(Boolean).join(" / ") || "Standard";
       groupedMap[pId].variants_breakdown[varKey] = (groupedMap[pId].variants_breakdown[varKey] || 0) + Number(r.qty);
 
-      const bName = r.batch_name || `Batch #${r.campaign_id || "Unassigned"}`;
-      groupedMap[pId].batch_breakdown[bName] = (groupedMap[pId].batch_breakdown[bName] || 0) + Number(r.qty);
+      // Determine batch name
+      let bName = r.explicit_batch_name;
+      if (!bName && r.pre_order_campaign_id) {
+        const foundC = campaigns.find((c) => Number(c.id) === Number(r.pre_order_campaign_id));
+        if (foundC) bName = foundC.batch_name;
+      }
+      if (!bName && r.order_created_at) {
+        const dt = new Date(r.order_created_at).getTime();
+        for (const c of campaigns) {
+          if (c.start_date && (c.extended_end_date || c.end_date)) {
+            const s = new Date(c.start_date).getTime();
+            const e = new Date(c.extended_end_date || c.end_date).getTime();
+            if (!isNaN(dt) && !isNaN(s) && !isNaN(e) && dt >= s && dt <= e) {
+              bName = c.batch_name;
+              break;
+            }
+          }
+        }
+      }
+      if (!bName) {
+        bName = "Ready Stock";
+      }
 
+      groupedMap[pId].batch_breakdown[bName] = (groupedMap[pId].batch_breakdown[bName] || 0) + Number(r.qty);
       groupedMap[pId].total_qty += Number(r.qty);
     }
 
