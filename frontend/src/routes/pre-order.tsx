@@ -486,10 +486,6 @@ function PreOrderPage() {
               <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
-        ) : !canSeeProducts ? (
-          <div className="py-8">
-            <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
-          </div>
         ) : (
           <div className="space-y-16">
             {/* 1. SEGMEN OUR MAIN HERO (Full Width Container) */}

@@ -16,11 +16,8 @@ export function isProductVisibleToUser(
   user: any,
   campaign: PreOrderCampaign | null
 ): boolean {
-  // Admin & Cashier can always see all products
-  const isAdminOrCashier =
-    user?.type === "admin" || user?.role === "admin" || user?.role === "cashier";
-  if (isAdminOrCashier) return true;
-
-  return isPreOrderOpen(campaign);
+  // Produk selalu terlihat oleh semua user.
+  // Pembelian diatur terpisah via isPreOrderOpen().
+  return true;
 }
 

@@ -1487,6 +1487,13 @@ export const updateProduct = async (req: Request, res: Response) => {
     // Set the first image from images array as main image_url if provided
     const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
 
+    // Preserve existing pre_order_campaign_id if not explicitly provided in input
+    const existingProd = await queryOne<any>(
+      "SELECT pre_order_campaign_id FROM products WHERE id = ?",
+      [input.id]
+    );
+    const campaignIdToSave = input.pre_order_campaign_id || existingProd?.pre_order_campaign_id || null;
+
     await execute(
       `UPDATE products 
        SET category_id = ?, name = ?, slug = ?, description = ?, price = ?, original_price = ?, filkom_price = ?, promo_price = ?,
@@ -1518,7 +1525,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         input.asal || null,
         input.aplikasi || null,
         input.size_chart_url || null,
-        input.pre_order_campaign_id || null,
+        campaignIdToSave,
         input.id,
       ]
     );

@@ -288,10 +288,6 @@ function CheckoutPage() {
   };
 
   const validateStep = (): boolean => {
-    if (!isPoOpen) {
-      toast.error("Periode Pre-Order saat ini telah ditutup. Pesanan tidak dapat diproses.");
-      return false;
-    }
     if (currentStep === 1) {
       if (cartItems.length === 0) {
         toast.error("Your cart is empty");

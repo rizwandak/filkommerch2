@@ -1156,10 +1156,6 @@ function Index() {
                               {el.config.title}
                             </h2>
                           </div>
-
-                          {!canSeeProducts ? (
-                            <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
-                          ) : (
                             <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                               {heroProductsToRender.map((p) => {
                                 let discountText = null;
@@ -1268,7 +1264,6 @@ function Index() {
                                 );
                               })}
                             </div>
-                          )}
                         </div>
                       </section>
                     ) : (
@@ -1285,9 +1280,6 @@ function Index() {
                             </h2>
                           </div>
 
-                          {!canSeeProducts ? (
-                            <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
-                          ) : (
                             <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                               {gridProducts.map((p) => {
                                 let discountText = null;
@@ -1391,7 +1383,6 @@ function Index() {
                                 );
                               })}
                             </div>
-                          )}
                         </div>
                       </section>
                     )
@@ -1819,9 +1810,6 @@ function Index() {
                               {el.config.title || "Exclusive Bundles"}
                             </h2>
                           </div>
-                          {!canSeeProducts ? (
-                            <PreOrderNotOpenPlaceholder campaign={activePoCampaign} />
-                          ) : (
                             <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                               {bundlesToRender.map((bundle: any, bIdx: number) => (
                               <div
@@ -1946,7 +1934,6 @@ function Index() {
                               </div>
                             ))}
                           </div>
-                          )}
                         </div>
                       </section>
 

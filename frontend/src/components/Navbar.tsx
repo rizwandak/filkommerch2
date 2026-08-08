@@ -218,11 +218,6 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
       return;
     }
 
-    if (!isPoOpen) {
-      toast.error("Periode Pre-Order saat ini telah ditutup. Pesanan tidak dapat dilanjutkan.");
-      return;
-    }
-
     if (!user) {
       toast.error("Please sign in to checkout");
       navigate({ to: "/login" });
@@ -837,11 +832,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
 
             {cart.length > 0 && (
               <div className="border-t border-border p-6 bg-secondary/30">
-                {!isPoOpen && (
-                  <div className="mb-3 p-2.5 bg-rose-100 border border-rose-300 rounded-xl text-[11px] font-extrabold text-rose-800 flex items-center justify-center gap-1.5 text-center">
-                    <span>🔒 Pre-Order saat ini telah DITUTUP.</span>
-                  </div>
-                )}
+
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-xs tracking-[0.2em] font-bold uppercase text-muted-foreground">
                     Subtotal
