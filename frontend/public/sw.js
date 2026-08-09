@@ -5,14 +5,34 @@ self.addEventListener("push", function (event) {
 
   try {
     const data = event.data.json();
+
+    // Skenario Unsend / Recall Notifikasi (Tarik Notifikasi HP)
+    if (data.action === "CANCEL" || data.type === "CANCEL") {
+      const tagToCancel = data.tag || (data.notifId ? `notif-${data.notifId}` : null);
+      event.waitUntil(
+        self.registration.getNotifications().then(function (notifications) {
+          notifications.forEach(function (notification) {
+            if (!tagToCancel || notification.tag === tagToCancel || notification.data?.notifId === data.notifId) {
+              notification.close();
+            }
+          });
+        })
+      );
+      return;
+    }
+
     const title = data.title || "Filkom Merch Notification";
+    const notifTag = data.tag || (data.id ? `notif-${data.id}` : undefined);
+
     const options = {
       body: data.body || "",
       icon: data.icon || "/pwa-192x192.png",
       badge: data.badge || "/pwa-192x192.png",
+      tag: notifTag,
       vibrate: [100, 50, 100],
       data: {
-        url: data.data?.url || "/",
+        url: data.data?.url || data.url || "/",
+        notifId: data.id,
       },
     };
 

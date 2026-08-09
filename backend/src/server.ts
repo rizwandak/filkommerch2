@@ -419,6 +419,9 @@ app.get("/api/notifications", notificationControllers.getUserNotifications);
 app.put("/api/notifications/:id/read", notificationControllers.markAsRead);
 app.post("/api/admin/notifications/send", checkRole(["admin", "cashier"]), notificationControllers.adminSendNotification);
 app.post("/api/admin/notifications/broadcast", checkRole(["admin"]), notificationControllers.adminBroadcastNotification);
+app.get("/api/admin/notifications/history", checkRole(["admin"]), notificationControllers.adminGetSentNotifications);
+app.delete("/api/admin/notifications/:id", checkRole(["admin"]), notificationControllers.adminDeleteNotification);
+app.post("/api/admin/notifications/delete-batch", checkRole(["admin"]), notificationControllers.adminDeleteBroadcastBatch);
 
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

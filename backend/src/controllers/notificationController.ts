@@ -272,3 +272,126 @@ export async function adminBroadcastNotification(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
+
+/**
+ * Admin Endpoint: Delete (Unsend/Recall) notification and trigger silent cancel push
+ */
+export async function adminDeleteNotification(req: Request, res: Response) {
+  try {
+    const pool = getPool();
+    const id = req.params.id;
+
+    if (!id) {
+      return res.status(400).json({ success: false, error: "Notification ID is required" });
+    }
+
+    // 1. Fetch notification info before deleting
+    const [rows] = await pool.query<any[]>("SELECT * FROM notifications WHERE id = ?", [id]);
+    const notif = rows[0];
+
+    if (!notif) {
+      return res.status(404).json({ success: false, error: "Notification not found" });
+    }
+
+    // 2. Delete notification from DB
+    await pool.query("DELETE FROM notifications WHERE id = ?", [id]);
+
+    // 3. Send silent CANCEL push to target user's devices
+    if (notif.user_id) {
+      await sendPushToUser(pool, notif.user_id, {
+        action: "CANCEL",
+        notifId: notif.id,
+        tag: `notif-${notif.id}`,
+      } as any);
+    }
+
+    return res.json({
+      success: true,
+      message: "Notification recalled (unsent) successfully",
+    });
+  } catch (err: any) {
+    console.error("[NotificationController] adminDeleteNotification error:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+/**
+ * Admin Endpoint: Get sent notifications history
+ */
+export async function adminGetSentNotifications(req: Request, res: Response) {
+  try {
+    const pool = getPool();
+    const [rows] = await pool.query<any[]>(
+      `SELECT n.*, u.name as user_name, u.email as user_email 
+       FROM notifications n 
+       LEFT JOIN users u ON n.user_id = u.id 
+       ORDER BY n.id DESC LIMIT 100`
+    );
+
+    return res.json({
+      success: true,
+      notifications: rows,
+    });
+  } catch (err: any) {
+    console.error("[NotificationController] adminGetSentNotifications error:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+/**
+ * Admin Endpoint: Delete all notifications matching ids array or title (Bulk Broadcast Unsend)
+ */
+export async function adminDeleteBroadcastBatch(req: Request, res: Response) {
+  try {
+    const pool = getPool();
+    const { ids, title, createdAt } = req.body;
+
+    let rows: any[] = [];
+    if (Array.isArray(ids) && ids.length > 0) {
+      const [r] = await pool.query<any[]>("SELECT * FROM notifications WHERE id IN (?)", [ids]);
+      rows = r;
+    } else if (title) {
+      if (createdAt) {
+        const [r] = await pool.query<any[]>(
+          "SELECT * FROM notifications WHERE title = ? AND created_at = ?",
+          [title, createdAt]
+        );
+        rows = r;
+      }
+      if (rows.length === 0) {
+        const [r] = await pool.query<any[]>(
+          "SELECT * FROM notifications WHERE title = ? AND type = 'BROADCAST'",
+          [title]
+        );
+        rows = r;
+      }
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ success: false, error: "No matching broadcast notifications found" });
+    }
+
+    const targetIds = rows.map((r: any) => r.id);
+    const userIds = Array.from(new Set(rows.map((r: any) => r.user_id).filter(Boolean)));
+
+    // 2. Delete all matching notifications
+    await pool.query("DELETE FROM notifications WHERE id IN (?)", [targetIds]);
+
+    // 3. Send silent CANCEL push to all target users
+    for (const uId of userIds) {
+      await sendPushToUser(pool, uId, {
+        action: "CANCEL",
+        tag: title ? `broadcast-${title.replace(/[^a-zA-Z0-9]/g, "")}` : undefined,
+      } as any);
+    }
+
+    return res.json({
+      success: true,
+      message: `Successfully recalled broadcast to ${rows.length} buyers`,
+      count: rows.length,
+    });
+  } catch (err: any) {
+    console.error("[NotificationController] adminDeleteBroadcastBatch error:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}

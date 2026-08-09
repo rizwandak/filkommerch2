@@ -51,6 +51,7 @@ import {
   Megaphone,
 } from "lucide-react";
 import { BroadcastNotificationModal } from "@/components/BroadcastNotificationModal";
+import { SentNotificationsHistoryModal } from "@/components/SentNotificationsHistoryModal";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -272,6 +273,7 @@ function AdminTransactionsPage() {
   const [notifDefaultMessage, setNotifDefaultMessage] = useState("");
   const [notifDefaultType, setNotifDefaultType] = useState("CUSTOM_DIRECT");
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [zoomMedia, setZoomMedia] = useState<{ url: string, type: string } | null>(null);
 
   const getAdminRequestHeaders = () => {
@@ -1090,6 +1092,15 @@ function AdminTransactionsPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+          <button
+            type="button"
+            onClick={() => setIsHistoryModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-3.5 py-2 border-2 border-ink rounded-xl text-xs font-extrabold bg-white text-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer hover:bg-gray-100 transition-all active:scale-95 shrink-0"
+            title="Kelola & Tarik Notifikasi Terkirim"
+          >
+            <History className="w-4 h-4 text-brand-orange" />
+            Riwayat / Tarik Notif
+          </button>
           <button
             type="button"
             onClick={() => setIsBroadcastModalOpen(true)}
@@ -2804,6 +2815,12 @@ function AdminTransactionsPage() {
         onSuccess={() => {
           toast.success("Broadcast push notification berhasil disiarkan!");
         }}
+      />
+
+      {/* Sent Notifications History & Unsend Modal */}
+      <SentNotificationsHistoryModal
+        isOpen={isHistoryModalOpen}
+        onClose={() => setIsHistoryModalOpen(false)}
       />
     </div>
   );

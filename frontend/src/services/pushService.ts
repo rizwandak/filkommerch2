@@ -34,7 +34,10 @@ export async function subscribeUserToPush(): Promise<{ success: boolean; error?:
       return { success: false, error: "Notifikasi Push tidak didukung oleh browser ini." };
     }
 
-    const permission = await Notification.requestPermission();
+    let permission = Notification.permission;
+    if (permission === "default") {
+      permission = await Notification.requestPermission();
+    }
     if (permission !== "granted") {
       return { success: false, error: "Izin notifikasi ditolak oleh pengguna." };
     }
@@ -53,11 +56,26 @@ export async function subscribeUserToPush(): Promise<{ success: boolean; error?:
 
     const convertedVapidKey = urlBase64ToUint8Array(vapidData.publicKey);
 
-    // Subscribe to PushManager
-    const subscription = await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: convertedVapidKey,
-    });
+    // Subscribe to PushManager safely handling key changes
+    let subscription: PushSubscription | null = null;
+    try {
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedVapidKey,
+      });
+    } catch (subErr: any) {
+      // If subscription failed (e.g. InvalidStateError due to different VAPID key), unsubscribe old & resubscribe
+      const existingSub = await reg.pushManager.getSubscription();
+      if (existingSub) {
+        await existingSub.unsubscribe();
+        subscription = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: convertedVapidKey,
+        });
+      } else {
+        throw subErr;
+      }
+    }
 
     const userJson = localStorage.getItem("user");
     const user = userJson ? JSON.parse(userJson) : null;

@@ -132,18 +132,18 @@ export function NotificationBell({ variant = "header" }: NotificationBellProps) 
     <div className={isFloating ? "fixed bottom-5 right-5 z-[95] sm:hidden flex flex-col items-end" : "relative"}>
       {/* Chat Bubble / Tooltip Hint for Mobile Floating Button */}
       {isFloating && showTooltip && !isOpen && (
-        <div className="relative mb-2 mr-0.5 flex items-center gap-2 bg-ink text-white text-[11px] font-bold py-1.5 px-3 rounded-2xl shadow-[3px_3px_0px_0px_rgba(255,107,0,1)] border-2 border-brand-orange animate-bounce">
-          <span>Cek notifikasi di sini! 🔔</span>
+        <div className="relative mb-2.5 mr-1 flex items-center gap-2 bg-ink text-white text-xs font-extrabold py-2 px-3.5 rounded-2xl shadow-[4px_4px_0px_0px_rgba(255,107,0,1)] border-2 border-brand-orange animate-bounce">
+          <span className="tracking-wide">Cek notifikasi di sini! 🔔</span>
           <button
             type="button"
             onClick={dismissTooltip}
-            className="p-0.5 text-white/70 hover:text-white rounded-full hover:bg-white/20 transition-colors cursor-pointer"
+            className="p-1 text-white/70 hover:text-white rounded-full hover:bg-white/20 transition-colors cursor-pointer shrink-0"
             title="Tutup petunjuk"
           >
             <X className="w-3.5 h-3.5" />
           </button>
           {/* Arrow pointing down */}
-          <div className="absolute -bottom-1.5 right-4 w-3 h-3 bg-ink border-r-2 border-b-2 border-brand-orange rotate-45" />
+          <div className="absolute -bottom-1.5 right-5 w-3 h-3 bg-ink border-r-2 border-b-2 border-brand-orange rotate-45" />
         </div>
       )}
 
@@ -157,19 +157,19 @@ export function NotificationBell({ variant = "header" }: NotificationBellProps) 
         }}
         className={
           isFloating
-            ? "relative flex items-center justify-center w-13 h-13 bg-brand-orange text-white rounded-2xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] active:scale-95 hover:scale-105 transition-all cursor-pointer"
+            ? "relative flex items-center justify-center w-14 h-14 bg-gradient-to-br from-brand-orange via-orange-500 to-amber-600 text-white rounded-2xl border-[2.5px] border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] active:scale-95 hover:scale-105 transition-all cursor-pointer"
             : "relative p-2 text-gray-700 hover:text-primary transition-colors rounded-full hover:bg-gray-100 dark:hover:bg-gray-800"
         }
         title="Notifikasi"
       >
-        <Bell className="w-6 h-6" />
+        <Bell className={isFloating ? `w-7 h-7 ${unreadCount > 0 ? "animate-wiggle" : ""}` : "w-6 h-6"} />
 
         {/* Circle Badge with message count */}
         {unreadCount > 0 ? (
           <span
             className={
               isFloating
-                ? "absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[22px] h-[22px] text-[10px] font-black text-white bg-red-500 border-2 border-white rounded-full px-1 shadow-md animate-bounce"
+                ? "absolute -top-2 -right-2 flex items-center justify-center min-w-[26px] h-[26px] text-[11px] font-black text-white bg-red-500 border-2 border-white rounded-full px-1.5 shadow-lg animate-bounce"
                 : "absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] text-[10px] font-bold text-white bg-red-500 rounded-full px-1 animate-pulse"
             }
           >
@@ -179,7 +179,7 @@ export function NotificationBell({ variant = "header" }: NotificationBellProps) 
           <span
             className={
               isFloating
-                ? "absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[22px] h-[22px] text-[10px] font-black text-ink bg-white border-2 border-ink rounded-full px-1 shadow-sm"
+                ? "absolute -top-2 -right-2 flex items-center justify-center min-w-[26px] h-[26px] text-[11px] font-black text-ink bg-white border-2 border-ink rounded-full px-1.5 shadow-md"
                 : "absolute top-1 right-1 flex items-center justify-center min-w-[18px] h-[18px] text-[10px] font-bold text-ink bg-white border border-ink rounded-full px-1"
             }
           >
