@@ -1,9 +1,7 @@
 import React, { useState } from "react";
 import { Megaphone, X, Send, Sparkles, Smartphone, Check } from "lucide-react";
 
-import { getApiBaseUrl } from "@/lib/api-config";
-
-const getAPI_URL = () => `${getApiBaseUrl()}/api`;
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
 
 export interface BroadcastNotificationModalProps {
   isOpen: boolean;
@@ -24,9 +22,9 @@ export function BroadcastNotificationModal({
   const [selectedCampaign, setSelectedCampaign] = useState<string>("");
   const [title, setTitle] = useState("Pengumuman Pengambilan Filkom Merch 📦");
   const [message, setMessage] = useState(
-    "Halo Pembeli Pre-Order! Pengambilan barang sudah dapat dilakukan di booth Gedung F. Silakan cek detail transaksi kamu."
+    "Halo Pembeli Pre-Order! Pengambilan barang sudah dapat dilakukan di FILKOM Merch (Belakang Tulisan FILKOM dekat FTP). Silakan cek detail transaksi kamu."
   );
-  const [link, setLink] = useState("/orders");
+  const [link, setLink] = useState("/profile/orders");
   const [loading, setLoading] = useState(false);
   const [sentResult, setSentResult] = useState<{ count: number } | null>(null);
 
@@ -42,7 +40,7 @@ export function BroadcastNotificationModal({
 
     try {
       setLoading(true);
-      const res = await fetch(`${getAPI_URL()}/admin/notifications/broadcast`, {
+      const res = await fetch(`${API_URL}/admin/notifications/broadcast`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

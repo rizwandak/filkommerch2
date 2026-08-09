@@ -18,6 +18,10 @@ export function PushPermissionBanner() {
       // If notification permission is already granted or denied, hide banner automatically
       if (Notification.permission === "granted" || Notification.permission === "denied") {
         setShowBanner(false);
+        if (Notification.permission === "granted") {
+          // Silently sync push subscription to backend
+          subscribeUserToPush();
+        }
         return;
       }
 

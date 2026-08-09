@@ -41,14 +41,14 @@ export function SendNotificationModal({
     if (isOpen) {
       setTitle(
         defaultTitle ||
-          (targetTrxId
-            ? `Info Pesanan #${targetTrxId}`
-            : "Pemberitahuan Filkom Merch")
+        (targetTrxId
+          ? `Info Pesanan #${targetTrxId}`
+          : "Pemberitahuan Filkom Merch")
       );
       setMessage(defaultMessage);
       setLink(
         defaultLink ||
-          (targetTrxId ? `/orders/${targetTrxId}` : "/orders")
+        (targetTrxId ? `/orders/${targetTrxId}` : "/orders")
       );
       setType(defaultType);
       setSentSuccess(false);
@@ -62,9 +62,8 @@ export function SendNotificationModal({
     if (presetType === "PREORDER_READY") {
       setTitle(`📦 Pesanan #${targetTrxId || "TRX"} Siap Diambil!`);
       setMessage(
-        `Halo${
-          targetUserName ? ` Kak ${targetUserName}` : ""
-        }! Barang Pre-Order kamu sudah siap diambil di booth Filkom Merch (Gedung F). Silakan tunjukkan QR / ID pesanan.`
+        `Halo${targetUserName ? ` Kak ${targetUserName}` : ""
+        }! Barang Pre-Order kamu sudah siap diambil di FILKOM Merch (Belakang Tulisan FILKOM dekat FTP). Silakan tunjukkan QR / ID pesanan.`
       );
       setLink(targetTrxId ? `/orders/${targetTrxId}` : "/orders");
     } else if (presetType === "PAYMENT_REJECTED") {

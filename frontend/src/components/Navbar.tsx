@@ -406,7 +406,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
           <div className="flex items-center gap-1 sm:gap-1.5 text-ink">
             {/* Desktop Action Tools (Hidden on mobile < sm to prevent overlapping logos) */}
             <div className="hidden sm:flex items-center gap-1 sm:gap-1.5">
-              <NotificationBell />
+              <NotificationBell variant="header" />
               <HackerModeToggle />
               <button
                 aria-label="Search"
@@ -862,6 +862,9 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
         isOpen={isVerifyOpen}
         onClose={() => setIsVerifyOpen(false)}
       />
+
+      {/* Floating Notification Bell for Mobile */}
+      <NotificationBell variant="floating" />
     </>
   );
 }

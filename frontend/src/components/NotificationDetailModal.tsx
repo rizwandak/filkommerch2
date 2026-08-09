@@ -86,6 +86,28 @@ export function NotificationDetailModal({
     }
   };
 
+  const renderMessageWithLinks = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+
+    return parts.map((part, index) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={index}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 dark:text-blue-400 font-semibold underline hover:text-blue-800 break-all inline-flex items-center gap-0.5"
+          >
+            {part} ↗
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   return (
     <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white dark:bg-gray-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 dark:border-gray-800 text-left overflow-hidden">
@@ -121,7 +143,7 @@ export function NotificationDetailModal({
         <div className="py-5">
           <div className="p-4 bg-gray-50 dark:bg-gray-800/60 rounded-2xl border border-gray-100 dark:border-gray-800">
             <p className="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-line leading-relaxed font-normal">
-              {notification.message}
+              {renderMessageWithLinks(notification.message)}
             </p>
           </div>
         </div>

@@ -176,8 +176,8 @@ const SortHeaderColumn = ({
     align === "center"
       ? "justify-center"
       : align === "right"
-      ? "justify-end"
-      : "justify-start";
+        ? "justify-end"
+        : "justify-start";
 
   return (
     <th
@@ -272,7 +272,7 @@ function AdminTransactionsPage() {
   const [notifDefaultMessage, setNotifDefaultMessage] = useState("");
   const [notifDefaultType, setNotifDefaultType] = useState("CUSTOM_DIRECT");
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
-  const [zoomMedia, setZoomMedia] = useState<{url: string, type: string} | null>(null);
+  const [zoomMedia, setZoomMedia] = useState<{ url: string, type: string } | null>(null);
 
   const getAdminRequestHeaders = () => {
     const role = user?.type === "admin" ? user.role : undefined;
@@ -455,7 +455,7 @@ function AdminTransactionsPage() {
 
     if (presetType === "PREORDER_READY") {
       setNotifDefaultTitle(`📦 Pesanan #${trxId} Siap Diambil!`);
-      setNotifDefaultMessage(`Halo Kak ${userName}! Barang Pre-Order kamu sudah siap diambil di booth Filkom Merch (Gedung F). Silakan tunjukkan QR / ID pesanan.`);
+      setNotifDefaultMessage(`Halo Kak ${userName}! Barang Pre-Order kamu sudah siap diambil di FILKOM Merch (Belakang Tulisan FILKOM dekat FTP). Silakan tunjukkan QR / ID pesanan.`);
       setNotifDefaultType("PREORDER_READY");
     } else if (presetType === "PAYMENT_REJECTED") {
       setNotifDefaultTitle(`⚠️ Bukti Pembayaran Perlu Diupload Ulang (#${trxId})`);
@@ -1117,8 +1117,8 @@ function AdminTransactionsPage() {
           type="button"
           onClick={() => setStatusFilter("all")}
           className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "all"
-              ? "bg-ink text-white border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] scale-[1.02]"
-              : "bg-white text-ink border-ink/30 hover:border-ink hover:shadow-[3px_3px_0px_0px_rgba(27,27,27,0.8)]"
+            ? "bg-ink text-white border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] scale-[1.02]"
+            : "bg-white text-ink border-ink/30 hover:border-ink hover:shadow-[3px_3px_0px_0px_rgba(27,27,27,0.8)]"
             }`}
         >
           <div className="flex items-center justify-between">
@@ -1145,8 +1145,8 @@ function AdminTransactionsPage() {
           type="button"
           onClick={() => setStatusFilter(statusFilter === "verifying" ? "all" : "verifying")}
           className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "verifying"
-              ? "bg-blue-600 text-white border-blue-900 shadow-[4px_4px_0px_0px_rgba(30,58,138,1)] scale-[1.02]"
-              : "bg-blue-50/70 text-blue-950 border-blue-200 hover:border-blue-500 hover:shadow-[3px_3px_0px_0px_rgba(59,130,246,0.3)]"
+            ? "bg-blue-600 text-white border-blue-900 shadow-[4px_4px_0px_0px_rgba(30,58,138,1)] scale-[1.02]"
+            : "bg-blue-50/70 text-blue-950 border-blue-200 hover:border-blue-500 hover:shadow-[3px_3px_0px_0px_rgba(59,130,246,0.3)]"
             }`}
         >
           <div className="flex items-center justify-between">
@@ -1177,8 +1177,8 @@ function AdminTransactionsPage() {
           type="button"
           onClick={() => setStatusFilter(statusFilter === "paid" ? "all" : "paid")}
           className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "paid"
-              ? "bg-emerald-700 text-white border-emerald-950 shadow-[4px_4px_0px_0px_rgba(6,78,59,1)] scale-[1.02]"
-              : "bg-emerald-50/70 text-emerald-950 border-emerald-200 hover:border-emerald-500 hover:shadow-[3px_3px_0px_0px_rgba(16,185,129,0.3)]"
+            ? "bg-emerald-700 text-white border-emerald-950 shadow-[4px_4px_0px_0px_rgba(6,78,59,1)] scale-[1.02]"
+            : "bg-emerald-50/70 text-emerald-950 border-emerald-200 hover:border-emerald-500 hover:shadow-[3px_3px_0px_0px_rgba(16,185,129,0.3)]"
             }`}
         >
           <div className="flex items-center justify-between">
@@ -1202,8 +1202,8 @@ function AdminTransactionsPage() {
           type="button"
           onClick={() => setStatusFilter(statusFilter === "dp" ? "all" : "dp")}
           className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "dp"
-              ? "bg-amber-600 text-white border-amber-950 shadow-[4px_4px_0px_0px_rgba(120,53,15,1)] scale-[1.02]"
-              : "bg-amber-50/70 text-amber-950 border-amber-200 hover:border-amber-500 hover:shadow-[3px_3px_0px_0px_rgba(245,158,11,0.3)]"
+            ? "bg-amber-600 text-white border-amber-950 shadow-[4px_4px_0px_0px_rgba(120,53,15,1)] scale-[1.02]"
+            : "bg-amber-50/70 text-amber-950 border-amber-200 hover:border-amber-500 hover:shadow-[3px_3px_0px_0px_rgba(245,158,11,0.3)]"
             }`}
         >
           <div className="flex items-center justify-between">
@@ -1227,8 +1227,8 @@ function AdminTransactionsPage() {
           type="button"
           onClick={() => setStatusFilter(statusFilter === "unpaid" ? "all" : "unpaid")}
           className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "unpaid"
-              ? "bg-rose-700 text-white border-rose-950 shadow-[4px_4px_0px_0px_rgba(136,19,55,1)] scale-[1.02]"
-              : "bg-rose-50/70 text-rose-950 border-rose-200 hover:border-rose-500 hover:shadow-[3px_3px_0px_0px_rgba(244,63,94,0.3)]"
+            ? "bg-rose-700 text-white border-rose-950 shadow-[4px_4px_0px_0px_rgba(136,19,55,1)] scale-[1.02]"
+            : "bg-rose-50/70 text-rose-950 border-rose-200 hover:border-rose-500 hover:shadow-[3px_3px_0px_0px_rgba(244,63,94,0.3)]"
             }`}
         >
           <div className="flex items-center justify-between">
@@ -1315,11 +1315,10 @@ function AdminTransactionsPage() {
                     variant={activeFilterCount > 0 ? "default" : "outline"}
                     size="sm"
                     onClick={() => setFilterModalOpen(true)}
-                    className={`h-9 text-xs font-black border-2 border-ink transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-2 ${
-                      activeFilterCount > 0
-                        ? "bg-brand-orange text-white hover:bg-brand-orange/90"
-                        : "bg-white text-ink hover:bg-cream"
-                    }`}
+                    className={`h-9 text-xs font-black border-2 border-ink transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-2 ${activeFilterCount > 0
+                      ? "bg-brand-orange text-white hover:bg-brand-orange/90"
+                      : "bg-white text-ink hover:bg-cream"
+                      }`}
                   >
                     <SlidersHorizontal className="w-3.5 h-3.5" />
                     <span>Filter Transaksi</span>
@@ -1349,9 +1348,8 @@ function AdminTransactionsPage() {
                     variant={groupByCustomer ? "default" : "outline"}
                     size="sm"
                     onClick={() => setGroupByCustomer(!groupByCustomer)}
-                    className={`h-9 text-xs font-black border-2 border-ink transition-all cursor-pointer ${
-                      groupByCustomer ? "bg-purple-600 text-white hover:bg-purple-700 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-white text-ink hover:bg-cream"
-                    }`}
+                    className={`h-9 text-xs font-black border-2 border-ink transition-all cursor-pointer ${groupByCustomer ? "bg-purple-600 text-white hover:bg-purple-700 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]" : "bg-white text-ink hover:bg-cream"
+                      }`}
                   >
                     <Users className="w-3.5 h-3.5 mr-1.5" />
                     {groupByCustomer ? "Gabung Pembeli (Aktif)" : "Gabungkan Nama Pembeli Sama"}
@@ -1565,11 +1563,10 @@ function AdminTransactionsPage() {
                         <>
                           <tr
                             key={order.order_id}
-                            className={`border-t border-border transition-colors ${
-                              order.voucher_code || order.discount_amount > 0
-                                ? "bg-orange-50/50 hover:bg-orange-100/60"
-                                : "hover:bg-cream/10"
-                            }`}
+                            className={`border-t border-border transition-colors ${order.voucher_code || order.discount_amount > 0
+                              ? "bg-orange-50/50 hover:bg-orange-100/60"
+                              : "hover:bg-cream/10"
+                              }`}
                           >
                             <td className="p-3 text-center">
                               <Button
@@ -1774,7 +1771,7 @@ function AdminTransactionsPage() {
                                         </tbody>
                                       </table>
                                     </div>
-                                    { (order.voucher_code || order.discount_amount > 0) && (
+                                    {(order.voucher_code || order.discount_amount > 0) && (
                                       <div className="flex justify-between items-center pt-2 text-xs font-bold text-brand-orange">
                                         <span className="flex items-center gap-1.5">
                                           {order.voucher_code ? (
@@ -2453,7 +2450,7 @@ function AdminTransactionsPage() {
                                       {url.match(/\.(mp4|mov|webm)$/i) ? (
                                         <video src={resolveImageUrl(url)} className="w-full h-full object-cover" />
                                       ) : (
-                                        <img src={resolveImageUrl(url)} alt={`Bukti ${idx+1}`} className="w-full h-full object-cover hover:scale-110 transition" />
+                                        <img src={resolveImageUrl(url)} alt={`Bukti ${idx + 1}`} className="w-full h-full object-cover hover:scale-110 transition" />
                                       )}
                                     </div>
                                   ));
@@ -2661,9 +2658,8 @@ function AdminTransactionsPage() {
 
               <div className="bg-cream/40 border-2 border-ink rounded-lg p-2.5 max-h-48 overflow-y-auto space-y-1">
                 <label
-                  className={`flex items-center gap-2.5 p-1.5 rounded-md cursor-pointer text-xs font-bold transition-colors select-none ${
-                    productFilter.length === 0 ? "bg-brand-orange/10 text-brand-orange" : "hover:bg-black/5 text-ink"
-                  }`}
+                  className={`flex items-center gap-2.5 p-1.5 rounded-md cursor-pointer text-xs font-bold transition-colors select-none ${productFilter.length === 0 ? "bg-brand-orange/10 text-brand-orange" : "hover:bg-black/5 text-ink"
+                    }`}
                 >
                   <input
                     type="checkbox"
@@ -2682,9 +2678,8 @@ function AdminTransactionsPage() {
                   return (
                     <label
                       key={p.id}
-                      className={`flex items-center gap-2.5 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${
-                        isChecked ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300" : "hover:bg-black/5 text-ink font-semibold"
-                      }`}
+                      className={`flex items-center gap-2.5 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${isChecked ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300" : "hover:bg-black/5 text-ink font-semibold"
+                        }`}
                     >
                       <input
                         type="checkbox"

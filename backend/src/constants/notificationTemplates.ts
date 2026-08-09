@@ -8,7 +8,7 @@ export interface NotificationTemplate {
 export const NOTIFICATION_TEMPLATES = {
   PREORDER_READY: (trxId: string, productName?: string): NotificationTemplate => ({
     title: `📦 Pesanan #${trxId} Siap Diambil!`,
-    message: `Halo! Produk ${productName ? `"${productName}"` : "Pre-Order kamu"} sudah siap diambil di FILKOM Merch (Samping Gedung A dekat FTAB). Silakan tunjukkan QR / ID pesanan saat pengambilan.`,
+    message: `Halo! Produk ${productName ? `"${productName}"` : "Pre-Order kamu"} sudah siap diambil di toko FILKOM Merch (belakang tulisan FILKOM Parkiran FTP - https://maps.app.goo.gl/EBTPU6qqZEMJVwyS7). Silakan tunjukkan QR / ID pesanan saat pengambilan.`,
     link: `/orders/${trxId}`,
     type: "PREORDER_READY",
   }),
