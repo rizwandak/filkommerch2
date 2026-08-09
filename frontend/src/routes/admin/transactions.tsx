@@ -217,6 +217,7 @@ function AdminTransactionsPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "verifying" | "dp" | "unpaid">("all");
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [productFilter, setProductFilter] = useState<string[]>([]);
+  const [productFilterMode, setProductFilterMode] = useState<"include" | "exclude">("include");
   const [shippingFilter, setShippingFilter] = useState<"all" | "pickup" | "delivery">("all");
   const [groupByCustomer, setGroupByCustomer] = useState<boolean>(false);
 
@@ -235,6 +236,7 @@ function AdminTransactionsPage() {
   const handleResetAllFilters = () => {
     setCampaignFilter("all");
     setProductFilter([]);
+    setProductFilterMode("include");
     setShippingFilter("all");
     setStatusFilter("all");
   };
@@ -703,7 +705,14 @@ function AdminTransactionsPage() {
             (filterName) => itemName.includes(filterName) || cleanItemName === filterName
           );
         });
-        if (!hasMatchingProduct) return false;
+
+        if (productFilterMode === "exclude") {
+          // Exclude mode: hide orders that contain ANY of the selected products
+          if (hasMatchingProduct) return false;
+        } else {
+          // Include mode (default): only show orders containing selected products
+          if (!hasMatchingProduct) return false;
+        }
       }
 
       // Shipping Method Filter (Ambil di FILKOM Merch vs Diantar)
@@ -729,7 +738,7 @@ function AdminTransactionsPage() {
 
       return matchesQuery;
     });
-  }, [onlineOrders, searchQuery, campaignFilter, productFilter, shippingFilter, dpPelunasanMap]);
+  }, [onlineOrders, searchQuery, campaignFilter, productFilter, productFilterMode, shippingFilter, dpPelunasanMap]);
 
   const getOrderCategory = (order: Order): "paid" | "verifying" | "unpaid" => {
     const linkedLns = dpPelunasanMap[order.order_id];
@@ -1282,7 +1291,7 @@ function AdminTransactionsPage() {
             )}
             {productFilter.length > 0 && (
               <span>
-                Produk ({productFilter.length}):{" "}
+                Produk {productFilterMode === "exclude" ? "TANPA" : "BERISI"} ({productFilter.length}):{" "}
                 <strong className="uppercase underline">
                   {productFilter.map((id) => products.find((p) => String(p.id) === id)?.name || id).slice(0, 2).join(", ")}
                   {productFilter.length > 2 ? "..." : ""}
@@ -1291,7 +1300,7 @@ function AdminTransactionsPage() {
             )}
           </div>
           <button
-            onClick={() => { setStatusFilter("all"); setProductFilter([]); }}
+            onClick={() => { setStatusFilter("all"); setProductFilter([]); setProductFilterMode("include"); }}
             className="ml-auto text-[10px] uppercase bg-brand-orange text-white px-2.5 py-1 rounded hover:bg-brand-orange/90 font-black cursor-pointer"
           >
             Reset Semua Filter
@@ -1381,11 +1390,11 @@ function AdminTransactionsPage() {
                     </Badge>
                   )}
                   {productFilter.length > 0 && (
-                    <Badge variant="outline" className="bg-blue-50 text-blue-900 border-blue-300 text-[10px] font-bold flex items-center gap-1">
-                      Produk ({productFilter.length}): {
+                    <Badge variant="outline" className={`${productFilterMode === "exclude" ? "bg-red-50 text-red-900 border-red-300" : "bg-blue-50 text-blue-900 border-blue-300"} text-[10px] font-bold flex items-center gap-1`}>
+                      {productFilterMode === "exclude" ? "TANPA" : "Produk"} ({productFilter.length}): {
                         productFilter.map(id => uniqueProductNames.find(p => String(p.id) === id)?.name || id).slice(0, 2).join(", ")
                       }{productFilter.length > 2 ? "..." : ""}
-                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setProductFilter([])} />
+                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => { setProductFilter([]); setProductFilterMode("include"); }} />
                     </Badge>
                   )}
                   {shippingFilter !== "all" && (
@@ -2666,6 +2675,37 @@ function AdminTransactionsPage() {
                   </button>
                 )}
               </div>
+
+              {/* Include / Exclude Mode Toggle */}
+              <div className="flex items-center gap-1 bg-cream/40 border-2 border-ink rounded-lg p-1.5">
+                <button
+                  type="button"
+                  onClick={() => setProductFilterMode("include")}
+                  className={`flex-1 text-[10px] font-black uppercase tracking-wider py-1.5 rounded-md transition-all cursor-pointer ${
+                    productFilterMode === "include"
+                      ? "bg-brand-orange text-white shadow-sm"
+                      : "text-ink hover:bg-black/5"
+                  }`}
+                >
+                  ✅ Berisi (Include)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setProductFilterMode("exclude")}
+                  className={`flex-1 text-[10px] font-black uppercase tracking-wider py-1.5 rounded-md transition-all cursor-pointer ${
+                    productFilterMode === "exclude"
+                      ? "bg-red-600 text-white shadow-sm"
+                      : "text-ink hover:bg-black/5"
+                  }`}
+                >
+                  🚫 Tanpa (Exclude)
+                </button>
+              </div>
+              {productFilterMode === "exclude" && productFilter.length > 0 && (
+                <div className="text-[10px] font-bold text-red-600 bg-red-50 border border-red-200 rounded-md px-2 py-1.5">
+                  ⚠️ Mode EXCLUDE aktif — menampilkan transaksi yang <strong>TIDAK berisi</strong> produk yang dipilih di bawah.
+                </div>
+              )}
 
               <div className="bg-cream/40 border-2 border-ink rounded-lg p-2.5 max-h-48 overflow-y-auto space-y-1">
                 <label
