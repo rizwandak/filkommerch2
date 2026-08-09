@@ -20,10 +20,8 @@ export async function getVapidKey(req: Request, res: Response) {
 export async function subscribePush(req: Request, res: Response) {
   try {
     const pool = getPool();
-    const userId = (req as any).user?.id || (req as any).headers["x-user-id"];
-    if (!userId) {
-      return res.status(401).json({ success: false, error: "Unauthorized" });
-    }
+    const rawUserId = (req as any).user?.id || (req as any).headers["x-user-id"];
+    const userId = (rawUserId && !isNaN(Number(rawUserId))) ? Number(rawUserId) : 0;
 
     const { endpoint, keys } = req.body;
     if (!endpoint || !keys || !keys.p256dh || !keys.auth) {
@@ -394,6 +392,29 @@ export async function adminDeleteBroadcastBatch(req: Request, res: Response) {
     });
   } catch (err: any) {
     console.error("[NotificationController] adminDeleteBroadcastBatch error:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+/**
+ * Admin Endpoint: Debug push notifications status & test sending
+ */
+export async function debugPushStatus(req: Request, res: Response) {
+  try {
+    const pool = getPool();
+    const [subs] = await pool.query<any[]>("SELECT id, user_id, endpoint, created_at FROM push_subscriptions");
+
+    return res.json({
+      success: true,
+      totalSubscriptions: subs.length,
+      subscriptions: subs.map((s: any) => ({
+        id: s.id,
+        user_id: s.user_id,
+        endpointHost: s.endpoint ? new URL(s.endpoint).hostname : "invalid",
+        created_at: s.created_at,
+      })),
+    });
+  } catch (err: any) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }

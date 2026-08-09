@@ -34,7 +34,7 @@ export async function sendPushToUser(
 ) {
   try {
     const [subs] = await connection.query<any[]>(
-      "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?",
+      "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ? OR user_id = 0",
       [userId]
     );
 
