@@ -26,10 +26,16 @@ self.addEventListener("push", function (event) {
 
     const options = {
       body: data.body || "",
-      icon: data.icon || "/pwa-192x192.png",
-      badge: data.badge || "/pwa-192x192.png",
+      icon: data.icon || "/logo-fm.png",
+      badge: data.badge || "/logo-fm.png",
       tag: notifTag,
       vibrate: [100, 50, 100],
+      actions: [
+        {
+          action: "open",
+          title: "📱 Buka Pesanan",
+        },
+      ],
       data: {
         url: data.data?.url || data.url || "/",
         notifId: data.id,

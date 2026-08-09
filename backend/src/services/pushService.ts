@@ -4,23 +4,10 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Load or generate VAPID keys
-let vapidPublicKey = process.env.VAPID_PUBLIC_KEY || "";
-let vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || "";
+// Load or set static VAPID keys
+let vapidPublicKey = process.env.VAPID_PUBLIC_KEY || "BGmHQBD7ZxZ_SYEFSx30LOwo2Rfj4NZbZxIupm3sKdbRKnjaDADJqlDhx0rvxSzcA39BTnrjB_Pnvd5_E8L8j20";
+let vapidPrivateKey = process.env.VAPID_PRIVATE_KEY || "71FHCC1d2oiKPCTbi0SwSsHg0hc1cJCAGJjx1xufuMk";
 let vapidEmail = process.env.VAPID_EMAIL || "mailto:admin@filkommerch.com";
-
-if (!vapidPublicKey || !vapidPrivateKey) {
-  // Generate VAPID keys dynamically if missing in env
-  const keys = webPush.generateVAPIDKeys();
-  vapidPublicKey = keys.publicKey;
-  vapidPrivateKey = keys.privateKey;
-  console.log("--------------------------------------------------");
-  console.log("⚡ Auto-generated VAPID Keys for Web Push Notifications:");
-  console.log("VAPID_PUBLIC_KEY =", vapidPublicKey);
-  console.log("VAPID_PRIVATE_KEY =", vapidPrivateKey);
-  console.log("Add these to your backend .env file to persist across restarts.");
-  console.log("--------------------------------------------------");
-}
 
 webPush.setVapidDetails(vapidEmail, vapidPublicKey, vapidPrivateKey);
 
@@ -59,8 +46,8 @@ export async function sendPushToUser(
     const notificationData = JSON.stringify({
       title: payload.title,
       body: payload.body,
-      icon: payload.icon || "/pwa-192x192.png",
-      badge: payload.badge || "/pwa-192x192.png",
+      icon: payload.icon || "/logo-fm.png",
+      badge: payload.badge || "/logo-fm.png",
       data: {
         url: payload.url || "/",
         ...(payload.data || {}),
@@ -132,8 +119,8 @@ export async function sendPushBroadcast(
     const notificationData = JSON.stringify({
       title: payload.title,
       body: payload.body,
-      icon: payload.icon || "/pwa-192x192.png",
-      badge: payload.badge || "/pwa-192x192.png",
+      icon: payload.icon || "/logo-fm.png",
+      badge: payload.badge || "/logo-fm.png",
       data: {
         url: payload.url || "/",
         ...(payload.data || {}),

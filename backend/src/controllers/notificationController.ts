@@ -173,6 +173,8 @@ export async function adminSendNotification(req: Request, res: Response) {
       success: true,
       message: "Notification sent successfully",
       pushSent: pushResult.sentCount > 0,
+      pushSentCount: pushResult.sentCount,
+      pushReason: pushResult.reason || pushResult.error,
     });
   } catch (err: any) {
     console.error("[NotificationController] adminSendNotification error:", err);

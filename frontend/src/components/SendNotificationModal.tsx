@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Send, X, Smartphone, Check, Sparkles } from "lucide-react";
 
 import { getApiBaseUrl } from "@/lib/api-config";
+import { toast } from "sonner";
 
 const getAPI_URL = () => `${getApiBaseUrl()}/api`;
 
@@ -110,12 +111,21 @@ export function SendNotificationModal({
       const data = await res.json();
       if (data.success) {
         setSentSuccess(true);
+        if (data.pushSent) {
+          toast.success("Notifikasi Push terkirim ke HP penerima!");
+        } else {
+          toast.info(
+            `Notifikasi tersimpan di web lonceng. (Push HP: ${
+              data.pushReason || "Belum ada langganan notifikasi HP dari pembeli ini"
+            })`
+          );
+        }
         if (onSuccess) onSuccess();
         setTimeout(() => {
           onClose();
         }, 1800);
       } else {
-        alert(`Gagal mengirim notifikasi: ${data.error}`);
+        toast.error(`Gagal mengirim notifikasi: ${data.error}`);
       }
     } catch (err: any) {
       alert(`Terjadi kesalahan: ${err.message}`);
