@@ -10,6 +10,16 @@ export interface SentNotificationsHistoryModalProps {
   onClose: () => void;
 }
 
+const formatNotificationTitle = (title: string): string => {
+  if (!title) return "";
+  if (title.startsWith("? PESANAN")) return title.replace("? PESANAN", "📦 PESANAN");
+  if (title.startsWith("? Bukti")) return title.replace("? Bukti", "⚠️ Bukti");
+  if (title.startsWith("? Pembayaran")) return title.replace("? Pembayaran", "✅ Pembayaran");
+  if (title.startsWith("? Update")) return title.replace("? Update", "💬 Update");
+  if (title.startsWith("? ")) return title.replace("? ", "📦 ");
+  return title;
+};
+
 export function SentNotificationsHistoryModal({
   isOpen,
   onClose,
@@ -260,7 +270,7 @@ export function SentNotificationsHistoryModal({
                       </div>
 
                       <h4 className="text-sm font-bold text-ink dark:text-white leading-snug">
-                        {item.title}
+                        {formatNotificationTitle(item.title)}
                       </h4>
 
                       <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2">
@@ -316,7 +326,7 @@ export function SentNotificationsHistoryModal({
                     </div>
 
                     <h4 className="text-sm font-bold text-ink dark:text-white leading-snug">
-                      {item.title}
+                      {formatNotificationTitle(item.title)}
                     </h4>
 
                     <p className="text-xs text-gray-600 dark:text-gray-300 line-clamp-2">

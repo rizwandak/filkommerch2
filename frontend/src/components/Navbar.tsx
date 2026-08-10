@@ -407,7 +407,6 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
             {/* Desktop Action Tools (Hidden on mobile < sm to prevent overlapping logos) */}
             <div className="hidden sm:flex items-center gap-1 sm:gap-1.5">
               <NotificationBell variant="header" />
-              <HackerModeToggle />
               <button
                 aria-label="Search"
                 onClick={() => setSearchOpen((v) => !v)}
@@ -424,7 +423,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                   <User className="w-5 h-5" />
                 </button>
                 {userMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-lg shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] z-50 animate-scale-in">
+                  <div className="absolute right-0 top-full mt-2 min-w-[240px] w-max max-w-[320px] bg-background border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] z-50 animate-scale-in overflow-hidden">
                     {user ? (
                       <>
                         <div className="px-5 py-3 border-b border-border">
@@ -455,6 +454,13 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                             </div>
                           )}
                         </div>
+
+                        {/* Theme Switcher inside User Dropdown */}
+                        <div className="px-4 py-2.5 flex items-center justify-between border-b border-border bg-secondary/40">
+                          <span className="text-xs font-bold text-foreground">Mode Tampilan</span>
+                          <HackerModeToggle />
+                        </div>
+
                         {user.type === "admin" && (
                           <Link
                             to="/admin/dashboard"
@@ -478,7 +484,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                         {user && (
                           <Link
                             to="/orders"
-                            className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border"
+                            className="block px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 border-b border-border font-bold"
                             onClick={() => setUserMenuOpen(false)}
                           >
                             <ShoppingBag className="w-4 h-4" />
@@ -491,20 +497,26 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                             setUserMenuOpen(false);
                             toast.success("Logged out");
                           }}
-                          className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 pointer-events-auto"
+                          className="w-full px-4 py-3 text-left text-sm text-foreground hover:bg-secondary flex items-center gap-2 pointer-events-auto font-bold text-red-600 dark:text-red-400"
                         >
                           <LogOut className="w-4 h-4" />
                           Logout
                         </button>
                       </>
                     ) : (
-                      <Link
-                        to="/login"
-                        className="block px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary"
-                        onClick={() => setUserMenuOpen(false)}
-                      >
-                        Sign In
-                      </Link>
+                      <>
+                        <div className="px-4 py-3 border-b border-border bg-secondary/40 flex items-center justify-between">
+                          <span className="text-xs font-bold text-foreground">Mode Tampilan</span>
+                          <HackerModeToggle />
+                        </div>
+                        <Link
+                          to="/login"
+                          className="block px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary"
+                          onClick={() => setUserMenuOpen(false)}
+                        >
+                          Sign In Akun UB
+                        </Link>
+                      </>
                     )}
                   </div>
                 )}
@@ -718,6 +730,11 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                 {n.label}
               </Link>
             ))}
+
+            <div className="mt-auto pt-6 border-t border-cream/20 flex items-center justify-between">
+              <span className="text-sm font-bold text-cream">Mode Tampilan</span>
+              <HackerModeToggle />
+            </div>
           </nav>
         </div>
       )}

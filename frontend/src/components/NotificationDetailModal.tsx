@@ -15,6 +15,16 @@ export interface NotificationDetailModalProps {
   } | null;
 }
 
+const formatNotificationTitle = (title: string): string => {
+  if (!title) return "";
+  if (title.startsWith("? PESANAN")) return title.replace("? PESANAN", "📦 PESANAN");
+  if (title.startsWith("? Bukti")) return title.replace("? Bukti", "⚠️ Bukti");
+  if (title.startsWith("? Pembayaran")) return title.replace("? Pembayaran", "✅ Pembayaran");
+  if (title.startsWith("? Update")) return title.replace("? Update", "💬 Update");
+  if (title.startsWith("? ")) return title.replace("? ", "📦 ");
+  return title;
+};
+
 export function NotificationDetailModal({
   isOpen,
   onClose,
@@ -126,7 +136,7 @@ export function NotificationDetailModal({
                 })}
               </span>
               <h3 className="font-bold text-gray-900 dark:text-white text-base leading-snug mt-0.5">
-                {notification.title}
+                {formatNotificationTitle(notification.title)}
               </h3>
             </div>
           </div>

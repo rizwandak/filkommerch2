@@ -118,33 +118,33 @@ function CountdownTimer({ targetDate }: { targetDate: string }) {
 
   return (
     <div className="flex gap-2 sm:gap-3 text-center font-mono select-none">
-      <div className="bg-background text-ink p-2.5 sm:p-3.5 rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
-        <span className="display text-xl sm:text-3xl block leading-none font-black text-ink">
+      <div className="bg-card text-foreground p-2.5 sm:p-3.5 rounded-xl border-2 border-border shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
+        <span className="display text-xl sm:text-3xl block leading-none font-black text-foreground">
           {String(timeLeft.days).padStart(2, "0")}
         </span>
         <span className="text-[8px] sm:text-[9px] tracking-widest uppercase text-brand-orange font-bold mt-1 block">
           HARI
         </span>
       </div>
-      <div className="display text-xl sm:text-3xl text-ink flex items-center font-black">:</div>
-      <div className="bg-background text-ink p-2.5 sm:p-3.5 rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
-        <span className="display text-xl sm:text-3xl block leading-none font-black text-ink">
+      <div className="display text-xl sm:text-3xl text-foreground flex items-center font-black">:</div>
+      <div className="bg-card text-foreground p-2.5 sm:p-3.5 rounded-xl border-2 border-border shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
+        <span className="display text-xl sm:text-3xl block leading-none font-black text-foreground">
           {String(timeLeft.hours).padStart(2, "0")}
         </span>
         <span className="text-[8px] sm:text-[9px] tracking-widest uppercase text-brand-orange font-bold mt-1 block">
           JAM
         </span>
       </div>
-      <div className="display text-xl sm:text-3xl text-ink flex items-center font-black">:</div>
-      <div className="bg-background text-ink p-2.5 sm:p-3.5 rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
-        <span className="display text-xl sm:text-3xl block leading-none font-black text-ink">
+      <div className="display text-xl sm:text-3xl text-foreground flex items-center font-black">:</div>
+      <div className="bg-card text-foreground p-2.5 sm:p-3.5 rounded-xl border-2 border-border shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
+        <span className="display text-xl sm:text-3xl block leading-none font-black text-foreground">
           {String(timeLeft.minutes).padStart(2, "0")}
         </span>
         <span className="text-[8px] sm:text-[9px] tracking-widest uppercase text-brand-orange font-bold mt-1 block">
           MENIT
         </span>
       </div>
-      <div className="display text-xl sm:text-3xl text-ink flex items-center font-black">:</div>
+      <div className="display text-xl sm:text-3xl text-foreground flex items-center font-black">:</div>
       <div className="bg-brand-orange text-cream p-2.5 sm:p-3.5 rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] min-w-[58px] sm:min-w-[76px]">
         <span className="display text-xl sm:text-3xl block leading-none font-black text-cream">
           {String(timeLeft.seconds).padStart(2, "0")}

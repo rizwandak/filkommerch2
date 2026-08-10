@@ -21,6 +21,16 @@ export interface NotificationBellProps {
   variant?: "header" | "floating";
 }
 
+const formatNotificationTitle = (title: string): string => {
+  if (!title) return "";
+  if (title.startsWith("? PESANAN")) return title.replace("? PESANAN", "📦 PESANAN");
+  if (title.startsWith("? Bukti")) return title.replace("? Bukti", "⚠️ Bukti");
+  if (title.startsWith("? Pembayaran")) return title.replace("? Pembayaran", "✅ Pembayaran");
+  if (title.startsWith("? Update")) return title.replace("? Update", "💬 Update");
+  if (title.startsWith("? ")) return title.replace("? ", "📦 ");
+  return title;
+};
+
 export function NotificationBell({ variant = "header" }: NotificationBellProps) {
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState<number>(0);
@@ -249,7 +259,7 @@ export function NotificationBell({ variant = "header" }: NotificationBellProps) 
                               : "text-gray-700 dark:text-gray-300"
                           }`}
                         >
-                          {notif.title}
+                          {formatNotificationTitle(notif.title)}
                         </h4>
                         {!notif.is_read && (
                           <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1" />

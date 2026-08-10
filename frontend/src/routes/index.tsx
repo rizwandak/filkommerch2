@@ -345,39 +345,39 @@ function CountdownTimer({ targetDate }: { targetDate: string }) {
   if (!timeLeft) return <div className="h-10 animate-pulse bg-neutral-200 rounded max-w-[200px]" />;
 
   return (
-    <div className="flex gap-2 sm:gap-3 text-center font-mono">
-      <div className="bg-ink text-cream p-1.5 sm:p-2.5 rounded border border-cream/20 shadow-md">
-        <span className="display text-base sm:text-2xl block leading-none">
+    <div className="flex gap-2 sm:gap-3 text-center font-mono select-none">
+      <div className="bg-card text-foreground p-2 sm:p-3 rounded-xl border-2 border-border shadow-md min-w-[48px] sm:min-w-[64px]">
+        <span className="display text-base sm:text-2xl block leading-none font-black text-foreground">
           {String(timeLeft.days).padStart(2, "0")}
         </span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-cream/60 font-bold">
+        <span className="text-[7.5px] sm:text-[9.5px] tracking-widest uppercase text-brand-orange font-extrabold mt-1 block">
           Hari
         </span>
       </div>
-      <div className="display text-lg sm:text-2xl text-ink flex items-center">:</div>
-      <div className="bg-ink text-cream p-1.5 sm:p-2.5 rounded border border-cream/20 shadow-md">
-        <span className="display text-base sm:text-2xl block leading-none">
+      <div className="display text-lg sm:text-2xl text-foreground flex items-center font-black">:</div>
+      <div className="bg-card text-foreground p-2 sm:p-3 rounded-xl border-2 border-border shadow-md min-w-[48px] sm:min-w-[64px]">
+        <span className="display text-base sm:text-2xl block leading-none font-black text-foreground">
           {String(timeLeft.hours).padStart(2, "0")}
         </span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-cream/60 font-bold">
+        <span className="text-[7.5px] sm:text-[9.5px] tracking-widest uppercase text-brand-orange font-extrabold mt-1 block">
           Jam
         </span>
       </div>
-      <div className="display text-lg sm:text-2xl text-ink flex items-center">:</div>
-      <div className="bg-ink text-cream p-1.5 sm:p-2.5 rounded border border-cream/20 shadow-md">
-        <span className="display text-base sm:text-2xl block leading-none">
+      <div className="display text-lg sm:text-2xl text-foreground flex items-center font-black">:</div>
+      <div className="bg-card text-foreground p-2 sm:p-3 rounded-xl border-2 border-border shadow-md min-w-[48px] sm:min-w-[64px]">
+        <span className="display text-base sm:text-2xl block leading-none font-black text-foreground">
           {String(timeLeft.minutes).padStart(2, "0")}
         </span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-cream/60 font-bold">
+        <span className="text-[7.5px] sm:text-[9.5px] tracking-widest uppercase text-brand-orange font-extrabold mt-1 block">
           Min
         </span>
       </div>
-      <div className="display text-lg sm:text-2xl text-ink flex items-center">:</div>
-      <div className="bg-ink text-cream p-1.5 sm:p-2.5 rounded border border-cream/20 shadow-md">
-        <span className="display text-base sm:text-2xl block leading-none">
+      <div className="display text-lg sm:text-2xl text-foreground flex items-center font-black">:</div>
+      <div className="bg-brand-orange text-cream p-2 sm:p-3 rounded-xl border-2 border-ink shadow-md min-w-[48px] sm:min-w-[64px]">
+        <span className="display text-base sm:text-2xl block leading-none font-black text-cream">
           {String(timeLeft.seconds).padStart(2, "0")}
         </span>
-        <span className="text-[7px] sm:text-[9px] tracking-widest uppercase text-cream/60 font-bold">
+        <span className="text-[7.5px] sm:text-[9.5px] tracking-widest uppercase text-cream/90 font-extrabold mt-1 block">
           Det
         </span>
       </div>

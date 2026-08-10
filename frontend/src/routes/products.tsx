@@ -269,7 +269,7 @@ function ProductsCatalogPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FCFAF7] text-ink font-sans">
+    <div className="min-h-screen bg-background text-foreground font-sans">
       <Navbar searchQuery={searchTerm} onSearchQueryChange={setSearchTerm} />
 
 

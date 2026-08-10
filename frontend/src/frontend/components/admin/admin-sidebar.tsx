@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
@@ -14,6 +15,8 @@ import {
   Ticket,
   Home,
   Truck,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, type AdminRole } from "@/lib/auth";
@@ -48,6 +51,28 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
   const { user, logout } = useAuth();
   const routerState = useRouterState();
   const currentPath = routerState.location.pathname;
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    const checkTheme = () => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    };
+    checkTheme();
+
+    const observer = new MutationObserver(checkTheme);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+
+  const toggleTheme = () => {
+    if (document.documentElement.classList.contains("dark")) {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    } else {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    }
+  };
 
   if (!user || user.type !== "admin") return null;
 
@@ -57,16 +82,28 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border bg-card">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-5 shrink-0">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-          <Store className="h-5 w-5" />
+      <div className="flex items-center justify-between border-b border-border px-5 py-5 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-xs">
+            <Store className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="display text-sm tracking-wider leading-tight text-ink">FILKOM Merch</p>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider capitalize">
+              {role} panel
+            </p>
+          </div>
         </div>
-        <div>
-          <p className="display text-sm tracking-wider leading-tight text-ink">FILKOM Merch</p>
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider capitalize">
-            {role} panel
-          </p>
-        </div>
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
+          aria-label="Toggle Dark Mode"
+          className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors cursor-pointer"
+        >
+          {isDark ? <Sun className="h-4 w-4 text-amber-400" /> : <Moon className="h-4 w-4 text-indigo-400" />}
+        </button>
       </div>
 
       <nav className="flex-1 overflow-y-auto space-y-1 p-3">
@@ -117,6 +154,20 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
           <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
         </div>
 
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="w-full flex items-center justify-between gap-2.5 rounded-lg border border-border bg-background px-3 py-2 text-xs font-bold text-foreground hover:bg-accent transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2">
+            {isDark ? <Sun className="h-3.5 w-3.5 text-amber-400" /> : <Moon className="h-3.5 w-3.5 text-indigo-400" />}
+            <span>{isDark ? "Mode Gelap (Aktif)" : "Mode Terang (Aktif)"}</span>
+          </div>
+          <div className={cn("w-7 h-4 rounded-full p-0.5 transition-colors", isDark ? "bg-brand-orange" : "bg-muted-foreground/30")}>
+            <div className={cn("w-3 h-3 rounded-full bg-white transition-transform", isDark ? "translate-x-3" : "translate-x-0")} />
+          </div>
+        </button>
+
         <Link
           to="/"
           onClick={onNavigate}
@@ -129,7 +180,7 @@ export function AdminSidebar({ onNavigate }: AdminSidebarProps) {
         <Button
           variant="outline"
           size="sm"
-          className="w-full justify-start gap-2 border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800 font-bold text-xs"
+          className="w-full justify-start gap-2 border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800 dark:border-rose-900/60 dark:text-rose-400 dark:hover:bg-rose-950/40 font-bold text-xs"
           onClick={() => {
             logout();
             window.location.href = "/login";

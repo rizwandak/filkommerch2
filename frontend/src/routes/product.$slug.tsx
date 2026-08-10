@@ -1528,14 +1528,14 @@ function ProductDetailPage() {
                   <button
                     onClick={() => handleAddToCart(false)}
                     disabled={currentStock <= 0 || isPreOrderClosed}
-                    className="w-full py-3 px-4 bg-brand-orange hover:bg-brand-orange/90 text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-200"
+                    className="w-full py-3 px-4 bg-brand-orange hover:bg-brand-orange/90 text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 dark:disabled:border-zinc-700"
                   >
                     <Plus className="w-4 h-4" /> {currentStock <= 0 ? "Stok Habis" : "+ Keranjang"}
                   </button>
                   <button
                     onClick={() => handleAddToCart(true)}
                     disabled={currentStock <= 0 || isPreOrderClosed}
-                    className="w-full py-3 px-4 bg-white hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full py-3 px-4 bg-card hover:bg-secondary text-foreground font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 dark:disabled:border-zinc-700"
                   >
                     {currentStock <= 0 ? "Stok Habis" : (isPreOrder ? "Pesan Sekarang" : "Beli Langsung")}
                   </button>
@@ -1761,19 +1761,19 @@ function ProductDetailPage() {
         </div>
       )}
       {/* Sticky Bottom Dock for Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t-2 border-ink p-3 md:hidden shadow-[0_-4px_15px_rgba(0,0,0,0.08)]">
+      <div className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t-2 border-border p-3 md:hidden shadow-[0_-4px_15px_rgba(0,0,0,0.2)]">
         <div className="grid grid-cols-2 gap-2.5">
           <button
             onClick={() => handleAddToCart(false)}
             disabled={currentStock <= 0 || isPreOrderClosed}
-            className="py-3 px-3 bg-brand-orange hover:bg-cream text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer text-center"
+            className="py-3 px-3 bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 flex items-center justify-center gap-2 cursor-pointer text-center"
           >
             <ShoppingBag className="w-4 h-4" /> {isPreOrderClosed ? "Ditutup" : (currentStock <= 0 ? "Habis" : "Masuk Bag")}
           </button>
           <button
             onClick={() => handleAddToCart(true)}
             disabled={currentStock <= 0 || isPreOrderClosed}
-            className="py-3 px-3 bg-ink hover:bg-ink/80 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,0.4)] active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer text-center"
+            className="py-3 px-3 bg-ink text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,0.4)] active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 flex items-center justify-center gap-2 cursor-pointer text-center"
           >
             <Zap className="w-4 h-4" /> {isPreOrderClosed ? "Ditutup" : (currentStock <= 0 ? "Habis" : (isPreOrder ? "Pesan Sekarang" : "Beli Sekarang"))}
           </button>

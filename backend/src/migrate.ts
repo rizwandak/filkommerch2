@@ -10,6 +10,7 @@ const dbConfig = {
   password: process.env.DB_PASSWORD || "",
   database: process.env.DB_NAME || "db_filkommerch",
   port: parseInt(process.env.DB_PORT || "3306"),
+  charset: "utf8mb4",
 };
 
 export async function runMigration() {
@@ -337,9 +338,16 @@ export async function runMigration() {
           is_read TINYINT(1) DEFAULT 0,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-        )
+        ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
       `);
       console.log("✅ notifications table ready!");
+
+      // Ensure notifications table charset is utf8mb4 & restore any mangled ? emojis
+      await connection.query(`ALTER TABLE notifications CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+      await connection.query(`UPDATE notifications SET title = REPLACE(title, '? PESANAN', '📦 PESANAN') WHERE title LIKE '? PESANAN%'`);
+      await connection.query(`UPDATE notifications SET title = REPLACE(title, '? Bukti', '⚠️ Bukti') WHERE title LIKE '? Bukti%'`);
+      await connection.query(`UPDATE notifications SET title = REPLACE(title, '? Pembayaran', '✅ Pembayaran') WHERE title LIKE '? Pembayaran%'`);
+      await connection.query(`UPDATE notifications SET title = REPLACE(title, '? Update', '💬 Update') WHERE title LIKE '? Update%'`);
     } catch (err: any) {
       console.warn("Notice: notifications table status:", err.message);
     }

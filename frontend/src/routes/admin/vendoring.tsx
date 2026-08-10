@@ -1385,6 +1385,7 @@ function AdminVendoringPage() {
           `}</style>
           <div
             id="spk-printable-area"
+            data-keep-white="true"
             className="bg-white border-4 border-ink rounded-2xl w-full max-w-3xl max-h-[88vh] flex flex-col shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] relative overflow-hidden print:max-h-none print:h-auto print:border-none print:shadow-none print:w-full print:p-0"
           >
             
