@@ -2127,16 +2127,39 @@ export const createSale = async (req: Request, res: Response) => {
     const resolvedItems: any[] = [];
     let calculatedSubtotal = 0;
     const customerEmail = input.customer_email || "pos@filkommerch.com";
-    let isUb = isUbEmail(customerEmail);
-    if (input.customer_email) {
+    
+    let targetUserId: number | null = input.user_id ? Number(input.user_id) : null;
+    let customerNim: string | null = input.customer_nim || null;
+    let isUb = false;
+
+    if (input.is_filkom_verified) {
+      isUb = true;
+    }
+
+    if (targetUserId) {
+      const [uRows] = await connection.execute(
+        "SELECT id, is_filkom_verified, nim, email FROM users WHERE id = ?",
+        [targetUserId]
+      );
+      const uRow = (uRows as any[])[0];
+      if (uRow) {
+        if (uRow.is_filkom_verified === 1) isUb = true;
+        if (!customerNim && uRow.nim) customerNim = uRow.nim;
+      }
+    } else if (input.customer_email) {
       const [userRows] = await connection.execute(
-        "SELECT is_filkom_verified FROM users WHERE email = ?",
+        "SELECT id, is_filkom_verified, nim FROM users WHERE email = ?",
         [input.customer_email]
       );
       const userRow = (userRows as any[])[0];
-      if (userRow && userRow.is_filkom_verified === 1) {
-        isUb = true;
+      if (userRow) {
+        targetUserId = userRow.id;
+        if (userRow.is_filkom_verified === 1) isUb = true;
+        if (!customerNim && userRow.nim) customerNim = userRow.nim;
       }
+    }
+    if (!isUb) {
+      isUb = isUbEmail(customerEmail);
     }
 
     for (const item of input.items) {
@@ -2290,16 +2313,18 @@ export const createSale = async (req: Request, res: Response) => {
     // 1. Create order
     const [orderResult] = await connection.execute(
       `INSERT INTO orders (
-        order_id, channel, fulfillment_type, fulfillment_status, cashier_id, customer_name,
-        customer_email, customer_phone, subtotal, discount_amount, tax_amount, gross_amount,
+        order_id, channel, fulfillment_type, fulfillment_status, user_id, cashier_id, customer_name,
+        customer_email, customer_phone, customer_nim, subtotal, discount_amount, tax_amount, gross_amount,
         payment_status, order_status, notes, transaction_status
-      ) VALUES (?, 'pos', 'walk_in', 'completed', ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'completed', ?, 'settlement')`,
+      ) VALUES (?, 'pos', 'walk_in', 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'completed', ?, 'settlement')`,
       [
         saleId,
+        targetUserId,
         input.admin_id || null,
         input.customer_name || "Pelanggan POS",
         customerEmail,
         input.customer_phone || "081234567890",
+        customerNim,
         calculatedSubtotal,
         discountAmount,
         taxAmount,

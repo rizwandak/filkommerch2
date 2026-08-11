@@ -379,6 +379,11 @@ export interface CreateSaleInput {
   total: number;
   notes?: string;
   customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string;
+  customer_nim?: string;
+  user_id?: number;
+  is_filkom_verified?: boolean;
   order_id?: string;
 }
 

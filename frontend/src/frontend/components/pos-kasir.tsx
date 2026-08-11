@@ -10,6 +10,10 @@ import {
   Banknote,
   QrCode,
   CreditCard,
+  UserCheck,
+  User,
+  UserPlus,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@frontend/components/ui/button";
@@ -29,6 +33,7 @@ import type {
   ProductVariant,
   Category,
   StoreSettings,
+  DbUser,
 } from "@backend/server-actions";
 import {
   createSale,
@@ -36,6 +41,7 @@ import {
   getCategories,
   getStoreSettings,
   createOrderAndPayment,
+  getUsersAdmin,
 } from "@backend/server-actions";
 import { bluetoothPrinter, type ReceiptData } from "@frontend/lib/bluetooth-printer";
 import logoFilkom from "@/assets/logo_filkom.png";
@@ -58,7 +64,7 @@ interface CartItem {
   }>;
 }
 
-type PaymentMethod = "cash" | "online";
+type PaymentMethod = "cash" | "qris";
 
 const formatPaymentType = (type: string, result: any): string => {
   if (!type) return "Online Payment";
@@ -116,6 +122,89 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
   const [printerConnected, setPrinterConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
+
+  // States for registered user selection in POS
+  const [registeredUsers, setRegisteredUsers] = useState<DbUser[]>([]);
+  const [selectedUser, setSelectedUser] = useState<DbUser | null>(null);
+  const [userSearchQuery, setUserSearchQuery] = useState("");
+  const [showUserModal, setShowUserModal] = useState(false);
+
+  const getItemUnitPrice = (
+    product: ProductWithVariants,
+    variant: ProductVariant,
+    isFilkom: boolean
+  ): number => {
+    let basePrice = product.price;
+    if (
+      product.promo_price !== undefined &&
+      product.promo_price !== null &&
+      Number(product.promo_price) > 0
+    ) {
+      basePrice = Number(product.promo_price);
+    } else if (isFilkom) {
+      if (
+        product.filkom_price !== undefined &&
+        product.filkom_price !== null &&
+        Number(product.filkom_price) > 0
+      ) {
+        basePrice = Number(product.filkom_price);
+      }
+    }
+
+    let addon = 0;
+    if (
+      variant.filkom_price !== undefined &&
+      variant.filkom_price !== null &&
+      Number(variant.filkom_price) > 0
+    ) {
+      addon = Number(variant.filkom_price);
+    } else if (
+      variant.price_override !== undefined &&
+      variant.price_override !== null &&
+      Number(variant.price_override) > 0
+    ) {
+      addon = Number(variant.price_override);
+    }
+
+    return basePrice + addon;
+  };
+
+  const handleSelectCustomer = (user: DbUser | null) => {
+    setSelectedUser(user);
+    if (user) {
+      setCustomerName(user.name);
+      const isFilkom = Boolean(user.is_filkom_verified);
+      setCart((prevCart) =>
+        prevCart.map((item) => {
+          const prod = products.find((p) => p.id === item.product_id);
+          const variant = prod?.variants.find((v) => v.id === item.variant_id);
+          if (prod && variant && prod.product_type !== "bundle") {
+            const newUnitPrice = getItemUnitPrice(prod, variant, isFilkom);
+            return { ...item, unit_price: newUnitPrice };
+          }
+          return item;
+        })
+      );
+      toast.success(`Pelanggan dipilih: ${user.name}`, {
+        description: isFilkom
+          ? "✓ Status: Civitas FILKOM (Harga Khusus FILKOM)"
+          : "Status: Pelanggan Umum (Harga Reguler)",
+      });
+    } else {
+      setCustomerName("");
+      setCart((prevCart) =>
+        prevCart.map((item) => {
+          const prod = products.find((p) => p.id === item.product_id);
+          const variant = prod?.variants.find((v) => v.id === item.variant_id);
+          if (prod && variant && prod.product_type !== "bundle") {
+            const newUnitPrice = getItemUnitPrice(prod, variant, false);
+            return { ...item, unit_price: newUnitPrice };
+          }
+          return item;
+        })
+      );
+    }
+  };
 
   // States for variant selection dialog
   const [activeProductForVariantSelection, setActiveProductForVariantSelection] =
@@ -288,6 +377,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     setCurrentReceiptData(null);
     setCart([]);
     setCustomerName("");
+    setSelectedUser(null);
     setDiscount(0);
     setNotes("");
     setSearchQuery("");
@@ -295,14 +385,16 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
 
   const loadData = useCallback(async () => {
     try {
-      const [productsResult, categoriesResult, settingsResult] = await Promise.all([
+      const [productsResult, categoriesResult, settingsResult, usersResult] = await Promise.all([
         getProducts(),
         getCategories(),
         getStoreSettings(),
+        getUsersAdmin().catch(() => ({ success: false, users: [] })),
       ]);
       if (productsResult?.products) setProducts(productsResult.products);
       if (categoriesResult?.categories) setCategories(categoriesResult.categories);
       if (settingsResult?.settings) setStoreSettings(settingsResult.settings);
+      if (usersResult?.success && usersResult.users) setRegisteredUsers(usersResult.users);
     } catch {
       toast.error("Gagal memuat data produk");
     } finally {
@@ -332,6 +424,8 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     product.variants.reduce((sum, v) => sum + v.stock, 0);
 
   const filteredProducts = products.filter((p) => {
+    // POS hanya melayani produk Ready Stock (bukan Pre-Order)
+    const isReadyStock = p.sale_type !== "preorder" && p.sale_type !== "pre_order";
     const matchCategory = categoryFilter === "all" || String(p.category_id) === categoryFilter;
     const q = searchQuery.trim().toLowerCase();
     const matchSearch =
@@ -340,7 +434,18 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       p.slug.toLowerCase().includes(q) ||
       String(p.id).includes(q) ||
       p.variants.some((v) => v.size.toLowerCase().includes(q));
-    return matchCategory && matchSearch && getTotalStock(p) > 0;
+    return isReadyStock && matchCategory && matchSearch && getTotalStock(p) > 0;
+  });
+
+  const filteredRegisteredUsers = registeredUsers.filter((u) => {
+    const q = userSearchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return (
+      u.name.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q) ||
+      (u.nim && u.nim.toLowerCase().includes(q)) ||
+      (u.phone && u.phone.includes(q))
+    );
   });
 
   const subtotal = cart.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
@@ -404,6 +509,13 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       const variantStr = [variant.color, variant.size]
         .filter((v) => v && v !== "One Size" && v !== "All Size")
         .join(" — ");
+
+      const unitPrice = getItemUnitPrice(
+        product,
+        variant,
+        Boolean(selectedUser?.is_filkom_verified)
+      );
+
       setCart([
         ...cart,
         {
@@ -414,7 +526,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
           size: variant.size,
           color: variant.color || undefined,
           quantity: customQty,
-          unit_price: product.price,
+          unit_price: unitPrice,
           discount: 0,
         },
       ]);
@@ -590,6 +702,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     if (window.confirm("Kosongkan keranjang?")) {
       setCart([]);
       setCustomerName("");
+      setSelectedUser(null);
       setDiscount(0);
       setNotes("");
     }
@@ -616,7 +729,12 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
           tax: 0,
           total,
           notes: notes || undefined,
-          customer_name: customerName || undefined,
+          customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
+          customer_email: selectedUser ? selectedUser.email : undefined,
+          customer_phone: selectedUser ? (selectedUser.phone || undefined) : undefined,
+          customer_nim: selectedUser ? (selectedUser.nim || undefined) : undefined,
+          user_id: selectedUser ? selectedUser.id : undefined,
+          is_filkom_verified: selectedUser ? Boolean(selectedUser.is_filkom_verified) : undefined,
           order_id: paymentMethod === "online" ? saleId : undefined,
         };
 
@@ -645,7 +763,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
           total,
           payment_method: paymentMethodLabel,
           cashier_name: admin_name,
-          customer_name: customerName || undefined,
+          customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
         };
 
         if (printerConnected) {
@@ -662,50 +780,8 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
         await loadData();
       };
 
-      if (paymentMethod === "online") {
-        const transactionDetails = {
-          orderId: saleId,
-          grossAmount: total,
-          customerName: customerName || "Pelanggan POS",
-          customerEmail: "pos.cashier@student.ub.ac.id",
-          customerPhone: "081234567890",
-          channel: "pos" as const,
-          items: cart.map((item) => ({
-            id: String(item.product_id || item.id),
-            variant_id: item.variant_id,
-            name: item.product_name,
-            price: item.unit_price,
-            quantity: item.quantity,
-            bundle_selections: item.bundle_selections,
-          })),
-        };
-
-        const result = await createOrderAndPayment({ data: transactionDetails });
-
-        if (!result.success || !result.token) {
-          throw new Error(result.error || "Gagal membuat pembayaran Midtrans");
-        }
-
-        if ((window as any).snap) {
-          (window as any).snap.pay(result.token, {
-            onSuccess: async (snapResult: any) => {
-              toast.success("Pembayaran Online Midtrans Berhasil!");
-              const finalPaymentMethod = formatPaymentType(snapResult.payment_type, snapResult);
-              await recordSaleInDatabase(finalPaymentMethod);
-            },
-            onPending: (snapResult: any) => {
-              toast.info("Pembayaran Online tertunda. Silakan selesaikan pembayaran Anda.");
-            },
-            onError: (snapResult: any) => {
-              toast.error("Pembayaran Online Midtrans Gagal!");
-            },
-            onClose: () => {
-              toast.warning("Popup pembayaran Online ditutup.");
-            },
-          });
-        } else {
-          throw new Error("SDK Midtrans Snap gagal dimuat di browser.");
-        }
+      if (paymentMethod === "qris") {
+        await recordSaleInDatabase("QRIS Statis");
         setIsProcessing(false);
       } else {
         await recordSaleInDatabase("Tunai");
@@ -1014,8 +1090,60 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
           </ScrollArea>
 
           <div className="shrink-0 space-y-3 border-t border-border p-3 sm:p-4 bg-cream/15">
-            {/* Customer form fields structured inside grids for better spacing */}
+            {/* Customer Selector & Details */}
             <div className="space-y-2">
+              {selectedUser ? (
+                <div className="p-2.5 bg-background border-2 border-ink rounded-lg shadow-sm space-y-1.5">
+                  <div className="flex items-center justify-between gap-1">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <span className="font-extrabold text-xs text-ink truncate">
+                        {selectedUser.name}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectCustomer(null)}
+                      className="text-[10px] font-bold text-red-600 hover:underline shrink-0"
+                    >
+                      [Ganti]
+                    </button>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-1 text-[10px]">
+                    {Boolean(selectedUser.is_filkom_verified) ? (
+                      <span className="font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded">
+                        ✓ Civitas FILKOM (Harga Khusus)
+                      </span>
+                    ) : (
+                      <span className="font-semibold bg-gray-100 text-gray-700 border border-gray-200 px-1.5 py-0.5 rounded">
+                        Pelanggan Umum (Harga Reguler)
+                      </span>
+                    )}
+                    {selectedUser.email && (
+                      <span className="text-muted-foreground truncate max-w-[150px]">
+                        • {selectedUser.email}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setShowUserModal(true)}
+                    className="w-full h-9 text-xs font-bold border-2 border-ink bg-white hover:bg-cream/40 text-ink flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                  >
+                    <UserCheck className="w-4 h-4 text-brand-orange" />
+                    Pilih Pelanggan Terdaftar
+                  </Button>
+                  <p className="text-[10px] text-muted-foreground bg-amber-50/80 border border-amber-200 p-2 rounded-md leading-tight">
+                    💡 Pelanggan baru? Arahkan mendaftar/login di web <strong>filkommerch.com</strong> via Google Login (1-click) agar transaksi masuk ke akun mereka &amp; dapat Harga FILKOM.
+                  </p>
+                </div>
+              )}
+
               <div className="relative flex items-center">
                 <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">
                   Pelanggan
@@ -1023,7 +1151,12 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 <Input
                   placeholder="Nama Pembeli (opsional)"
                   value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
+                  onChange={(e) => {
+                    setCustomerName(e.target.value);
+                    if (selectedUser && e.target.value !== selectedUser.name) {
+                      setSelectedUser(null);
+                    }
+                  }}
                   className="border-input bg-background text-xs sm:text-sm text-ink pl-24 focus-visible:ring-brand-blue h-9 rounded-md"
                 />
               </div>
@@ -1062,17 +1195,18 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 {(
                   [
                     { key: "cash" as const, label: "TUNAI", icon: Banknote },
-                    { key: "online" as const, label: "ONLINE / QRIS", icon: CreditCard },
+                    { key: "qris" as const, label: "QRIS STATIS", icon: QrCode },
                   ] as const
                 ).map(({ key, label, icon: Icon }) => (
                   <button
                     key={key}
+                    type="button"
                     onClick={() => setPaymentMethod(key)}
-                    className={`flex flex-col items-center justify-center gap-1 rounded-lg py-2.5 text-[9px] font-bold tracking-wider transition-all duration-300 border ${
+                    className={`flex flex-col items-center justify-center gap-1 rounded-lg py-2.5 text-[9px] font-bold tracking-wider transition-all duration-300 border cursor-pointer ${
                       paymentMethod === key
                         ? key === "cash"
                           ? "bg-emerald-50 text-emerald-800 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm font-extrabold scale-95"
-                          : "bg-blue-50 text-brand-blue border-brand-blue ring-2 ring-brand-blue/20 shadow-sm font-extrabold scale-95"
+                          : "bg-amber-50 text-amber-900 border-amber-500 ring-2 ring-amber-500/20 shadow-sm font-extrabold scale-95"
                         : "bg-background text-muted-foreground border-border hover:bg-cream/40"
                     }`}
                   >
@@ -1081,6 +1215,21 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   </button>
                 ))}
               </div>
+              {paymentMethod === "qris" && (
+                <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-900 flex items-center justify-between gap-1.5">
+                  <span className="font-semibold">📷 Scan Barcode QRIS Statis Toko</span>
+                  {storeSettings?.qris_static_url && (
+                    <a
+                      href={storeSettings.qris_static_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-bold text-amber-900 underline shrink-0"
+                    >
+                      Lihat QRIS
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="space-y-1 rounded-xl bg-background border border-border p-3">
@@ -1105,8 +1254,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
             </div>
 
             <button
+              type="button"
               onClick={() => void handleConnectPrinter()}
-              className={`flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs transition duration-200 border ${
+              className={`flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs transition duration-200 border cursor-pointer ${
                 printerConnected
                   ? "bg-secondary text-brand-blue border-brand-blue/30 font-medium"
                   : "border-border text-muted-foreground hover:bg-cream/50 bg-background"
@@ -1127,8 +1277,6 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   MEMPROSES...
                 </span>
-              ) : paymentMethod === "online" ? (
-                "BAYAR SEKARANG"
               ) : (
                 "BAYAR & CETAK STRUK"
               )}
@@ -1590,6 +1738,108 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Modal Dialog for Customer Selection */}
+      <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
+        <DialogContent className="sm:max-w-md bg-card text-ink border-2 border-ink shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-extrabold uppercase flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-brand-orange" />
+              Pilih Pelanggan Terdaftar
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Cari berdasarkan Nama, Email, atau NIM..."
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                className="pl-9 text-xs sm:text-sm border-2 border-ink rounded-lg focus-visible:ring-brand-orange"
+              />
+            </div>
+
+            <ScrollArea className="h-[280px] rounded-md border border-border p-2">
+              {filteredRegisteredUsers.length === 0 ? (
+                <div className="text-center py-8 text-xs text-muted-foreground space-y-2">
+                  <p className="font-semibold">Pelanggan tidak ditemukan.</p>
+                  <p className="text-[11px] bg-amber-50 text-amber-900 border border-amber-200 p-2.5 rounded-lg inline-block text-left leading-relaxed">
+                    💡 <strong>Pelanggan Belum Terdaftar?</strong><br />
+                    Minta pelanggan mendaftar/login di web <strong>filkommerch.com</strong> via Google Login (1-click) terlebih dahulu agar transaksi ini tercatat di akun mereka &amp; otomatis mendapat Harga Civitas FILKOM.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {filteredRegisteredUsers.map((u) => {
+                    const isFilkom = Boolean(u.is_filkom_verified);
+                    const isSelected = selectedUser?.id === u.id;
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => {
+                          handleSelectCustomer(u);
+                          setShowUserModal(false);
+                        }}
+                        className={`w-full text-left p-2.5 rounded-lg border transition-all flex items-center justify-between gap-2 hover:bg-cream/40 cursor-pointer ${
+                          isSelected
+                            ? "border-brand-orange bg-brand-orange/10 ring-1 ring-brand-orange"
+                            : "border-border/80 bg-background"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-xs sm:text-sm text-ink truncate">
+                              {u.name}
+                            </span>
+                            {isFilkom ? (
+                              <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded shrink-0">
+                                ✓ FILKOM
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-semibold bg-gray-100 text-gray-700 border border-gray-200 px-1.5 py-0.2 rounded shrink-0">
+                                Umum
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground truncate">{u.email}</p>
+                          {u.nim && (
+                            <p className="text-[10px] text-muted-foreground/80 font-mono">
+                              NIM: {u.nim}
+                            </p>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant={isSelected ? "default" : "ghost"}
+                          className={`h-7 text-xs shrink-0 ${
+                            isSelected ? "bg-brand-orange text-white" : ""
+                          }`}
+                        >
+                          {isSelected ? "Terpilih" : "Pilih"}
+                        </Button>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </ScrollArea>
+          </div>
+          <DialogFooter className="flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-border pt-3">
+            <p className="text-[10px] text-muted-foreground">
+              * Transaksi akan otomatis terhubung ke akun pelanggan.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowUserModal(false)}
+              className="text-xs font-bold border-ink"
+            >
+              Tutup
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
