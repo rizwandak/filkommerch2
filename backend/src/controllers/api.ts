@@ -376,15 +376,106 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
 // Get all users
 export const getAllUsersAdmin = async (req: Request, res: Response) => {
   try {
-    const users = await query<any>(
-      "SELECT id, name, nim, email, phone, address, role, is_filkom_verified, created_at FROM users ORDER BY role, name"
-    );
+    const users = await query<any>(`
+      SELECT 
+        u.id, 
+        u.name, 
+        u.nim, 
+        u.email, 
+        u.phone, 
+        u.address, 
+        u.role, 
+        u.is_filkom_verified, 
+        u.created_at,
+        COALESCE(COUNT(DISTINCT o.id), 0) AS total_orders,
+        COALESCE(SUM(
+          CASE 
+            WHEN (o.payment_status IN ('paid', 'settlement') OR o.order_status IN ('completed', 'settlement', 'capture')) 
+                 AND o.order_status NOT IN ('cancelled', 'cancel') 
+            THEN o.gross_amount 
+            ELSE 0 
+          END
+        ), 0) AS total_spent
+      FROM users u
+      LEFT JOIN orders o ON (
+        o.user_id = u.id 
+        OR (u.email IS NOT NULL AND u.email != '' AND LOWER(o.customer_email) = LOWER(u.email))
+        OR (u.nim IS NOT NULL AND u.nim != '' AND (o.customer_nim = u.nim OR o.notes LIKE CONCAT('%', u.nim, '%')))
+        OR (u.name IS NOT NULL AND u.name != '' AND LOWER(TRIM(o.customer_name)) = LOWER(TRIM(u.name)))
+      )
+      GROUP BY u.id
+      ORDER BY u.role, u.name
+    `);
     return res.json({ success: true, users });
   } catch (error: any) {
     console.error("Error fetching users:", error);
     return res.status(500).json({ success: false, error: "Gagal memuat daftar pengguna" });
   }
 };
+
+// Get user transaction history (admin)
+export const getUserTransactionsAdmin = async (req: Request, res: Response) => {
+  try {
+    const userId = parseInt(req.params.id);
+    if (!userId) {
+      return res.status(400).json({ success: false, error: "ID pengguna tidak valid" });
+    }
+
+    const targetUser = await queryOne<any>(
+      "SELECT id, name, email, phone, nim FROM users WHERE id = ?",
+      [userId]
+    );
+    if (!targetUser) {
+      return res.status(404).json({ success: false, error: "Pengguna tidak ditemukan" });
+    }
+
+    const email = (targetUser.email || "").trim().toLowerCase();
+    const name = (targetUser.name || "").trim().toLowerCase();
+    const nim = (targetUser.nim || "").trim();
+
+    const orders = await query<any>(
+      `SELECT id, order_id, user_id, customer_name, customer_email, customer_phone, 
+              channel, fulfillment_type, fulfillment_status, payment_type, payment_status, 
+              order_status, gross_amount, created_at, notes
+       FROM orders 
+       WHERE user_id = ? 
+          OR (? != '' AND LOWER(customer_email) = ?)
+          OR (? != '' AND (customer_nim = ? OR notes LIKE CONCAT('%', ?, '%')))
+          OR (? != '' AND LOWER(TRIM(customer_name)) = ?)
+       ORDER BY created_at DESC`,
+      [userId, email, email, nim, nim, nim, name, name]
+    );
+
+    if (!orders || orders.length === 0) {
+      return res.json({ success: true, orders: [] });
+    }
+
+    const orderIds = orders.map((o) => o.order_id);
+    const placeholders = orderIds.map(() => "?").join(",");
+    const items = await query<any>(
+      `SELECT oi.*, p.image_url, p.name as catalog_product_name
+       FROM order_items oi 
+       LEFT JOIN products p ON p.id = oi.product_id 
+       WHERE oi.order_id IN (${placeholders})`,
+      orderIds
+    );
+
+    const ordersWithItems = orders.map((order) => {
+      const orderItems = items.filter((item) => item.order_id === order.order_id);
+      return {
+        ...order,
+        items: orderItems,
+      };
+    });
+
+    return res.json({ success: true, orders: ordersWithItems });
+  } catch (error: any) {
+    console.error("Error fetching user transactions:", error);
+    return res.status(500).json({ success: false, error: "Gagal memuat riwayat transaksi pengguna" });
+  }
+};
+
+
 
 
 
@@ -5146,21 +5237,38 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
   try {
     const batchFilter = (req.query.batch as string) || "all";
 
-    let orderWhere = "WHERE o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed')";
+    let orderWhere = "WHERE o.order_status NOT IN ('cancelled', 'cancel') AND (o.payment_status IN ('paid', 'settlement') OR o.order_status IN ('completed', 'settlement', 'capture'))";
     const orderParams: any[] = [];
+    
     if (batchFilter !== "all") {
-      orderWhere += " AND o.pre_order_campaign_id = ?";
-      orderParams.push(batchFilter);
+      const campaigns = await query<any>("SELECT id, start_date, end_date FROM pre_order_campaigns WHERE id = ?", [batchFilter]);
+      const matchedCamp = campaigns[0];
+      if (matchedCamp && matchedCamp.start_date && matchedCamp.end_date) {
+        const startD = new Date(matchedCamp.start_date).toISOString().split("T")[0];
+        const endD = new Date(matchedCamp.end_date).toISOString().split("T")[0] + " 23:59:59";
+        orderWhere += " AND (o.pre_order_campaign_id = ? OR (o.pre_order_campaign_id IS NULL AND o.created_at >= ? AND o.created_at <= ?))";
+        orderParams.push(batchFilter, startD, endD);
+      } else {
+        orderWhere += " AND o.pre_order_campaign_id = ?";
+        orderParams.push(batchFilter);
+      }
     }
 
     const revRows = await query<any>(
-      `SELECT COALESCE(SUM(o.grand_total), 0) as total_rev FROM orders o ${orderWhere}`,
+      `SELECT COALESCE(SUM(COALESCE(o.gross_amount, o.subtotal, 0)), 0) as total_rev FROM orders o ${orderWhere}`,
       orderParams
     );
     const totalRevenue = Number(revRows[0]?.total_rev || 0);
 
+    let cogsWhere = "WHERE status != 'cancelled'";
+    const cogsParams: any[] = [];
+    if (batchFilter !== "all") {
+      // Option to filter POs by batch if PO vendor orders have batch/campaign or campaign_id reference
+    }
+
     const cogsRows = await query<any>(
-      "SELECT COALESCE(SUM(total_cost), 0) as total_cogs FROM vendor_orders WHERE status != 'cancelled'"
+      `SELECT COALESCE(SUM(total_cost), 0) as total_cogs FROM vendor_orders ${cogsWhere}`,
+      cogsParams
     );
     const totalCogs = Number(cogsRows[0]?.total_cogs || 0);
 
@@ -5174,12 +5282,12 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
         COALESCE(p.name, oi.product_name) as product_name,
         SUM(oi.quantity) as qty_sold,
         SUM(oi.subtotal) as revenue,
-        COALESCE(p.vendor_cost, 0) as unit_cogs
+        COALESCE(p.vendor_cost, p.cost_price, 0) as unit_cogs
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
        LEFT JOIN products p ON oi.product_id = p.id
        ${orderWhere}
-       GROUP BY oi.product_id, product_name, p.vendor_cost`,
+       GROUP BY oi.product_id, product_name, p.vendor_cost, p.cost_price`,
       orderParams
     );
 

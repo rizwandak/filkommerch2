@@ -372,6 +372,7 @@ app.get("/api/admin/vouchers/:id/history", checkRole(["admin", "cashier"]), apiC
 
 // Admin User CRUD API Routes
 app.get("/api/admin/users", checkRole(["admin", "cashier"]), apiControllers.getAllUsersAdmin);
+app.get("/api/admin/users/:id/orders", checkRole(["admin", "cashier"]), apiControllers.getUserTransactionsAdmin);
 app.post("/api/admin/users", checkRole(["admin"]), apiControllers.createUser);
 app.put("/api/admin/users", checkRole(["admin"]), apiControllers.updateUser);
 app.delete("/api/admin/users/:id", checkRole(["admin"]), apiControllers.deleteUser);

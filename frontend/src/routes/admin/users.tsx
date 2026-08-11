@@ -1,9 +1,29 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState, useMemo } from "react";
-import { Plus, Pencil, Trash2, Search, User, Users, ShieldCheck, MonitorSmartphone, GraduationCap, BadgeCheck } from "lucide-react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState, useMemo, Fragment } from "react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Search,
+  User,
+  Users,
+  ShieldCheck,
+  MonitorSmartphone,
+  GraduationCap,
+  BadgeCheck,
+  ChevronDown,
+  ChevronUp,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  ShoppingBag,
+  ExternalLink,
+  Loader2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { getApiBaseUrl } from "@/lib/api-config";
+import { resolveImageUrl } from "@/lib/image-resolver";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
 import { Input } from "@frontend/components/ui/input";
@@ -55,6 +75,26 @@ const emptyForm = (): UserForm => ({
   is_filkom_verified: false,
 });
 
+const getPaymentBadge = (order: any) => {
+  const pStatus = order.payment_status;
+  const oStatus = order.order_status;
+  if (oStatus === "cancelled" || oStatus === "cancel") {
+    return { text: "Dibatalkan", color: "bg-red-100 text-red-800 border-red-200" };
+  }
+  if (
+    pStatus === "paid" ||
+    pStatus === "settlement" ||
+    oStatus === "completed" ||
+    oStatus === "capture"
+  ) {
+    return { text: "Lunas", color: "bg-emerald-100 text-emerald-800 border-emerald-200" };
+  }
+  if (pStatus === "pending" || pStatus === "unpaid") {
+    return { text: "Pending", color: "bg-amber-100 text-amber-800 border-amber-200" };
+  }
+  return { text: pStatus || oStatus || "-", color: "bg-slate-100 text-slate-800 border-slate-200" };
+};
+
 function AdminUsersPage() {
   const { user, loading: authLoading } = useAuth();
   const isCashier = user?.type === "admin" && user.role === "cashier";
@@ -69,6 +109,15 @@ function AdminUsersPage() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<number | null>(null);
   const [userNameToDelete, setUserNameToDelete] = useState("");
+
+  // Expandable Rows State & Orders Map
+  const [expandedRows, setExpandedRows] = useState<Record<number, boolean>>({});
+  const [userOrdersMap, setUserOrdersMap] = useState<Record<number, any[]>>({});
+  const [loadingOrdersMap, setLoadingOrdersMap] = useState<Record<number, boolean>>({});
+
+  // Sorting State
+  const [sortField, setSortField] = useState<"total_spent" | "total_orders" | "name" | null>(null);
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const API_BASE_URL = getApiBaseUrl();
 
@@ -189,6 +238,30 @@ function AdminUsersPage() {
     void loadUsers();
   }, [authLoading]);
 
+  const toggleUserExpand = async (userId: number) => {
+    const isCurrentlyExpanded = !!expandedRows[userId];
+    setExpandedRows((prev) => ({ ...prev, [userId]: !isCurrentlyExpanded }));
+
+    if (!isCurrentlyExpanded && !userOrdersMap[userId] && !loadingOrdersMap[userId]) {
+      setLoadingOrdersMap((prev) => ({ ...prev, [userId]: true }));
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/admin/users/${userId}/orders`, {
+          headers: getAdminRequestHeaders(),
+        });
+        const data = await res.json().catch(() => null);
+        if (res.ok && data?.success) {
+          setUserOrdersMap((prev) => ({ ...prev, [userId]: data.orders || [] }));
+        } else {
+          toast.error(data?.error || "Gagal memuat riwayat transaksi");
+        }
+      } catch {
+        toast.error("Gagal terhubung ke server untuk memuat transaksi");
+      } finally {
+        setLoadingOrdersMap((prev) => ({ ...prev, [userId]: false }));
+      }
+    }
+  };
+
   const openCreate = () => {
     setForm(emptyForm());
     setDialogOpen(true);
@@ -301,6 +374,20 @@ function AdminUsersPage() {
     );
   };
 
+  const handleSort = (field: "total_spent" | "total_orders" | "name") => {
+    if (sortField === field) {
+      if (sortDirection === "desc") {
+        setSortDirection("asc");
+      } else {
+        setSortField(null);
+        setSortDirection("desc");
+      }
+    } else {
+      setSortField(field);
+      setSortDirection("desc");
+    }
+  };
+
   const filteredUsers = users.filter((u) => {
     const matchRole = roleFilters.length === 0 || roleFilters.includes(u.role);
     const matchVerified = !verifiedOnly || Number(u.is_filkom_verified) === 1;
@@ -314,6 +401,30 @@ function AdminUsersPage() {
 
     return matchRole && matchVerified && matchSearch;
   });
+
+  const sortedAndFilteredUsers = useMemo(() => {
+    const list = [...filteredUsers];
+    if (!sortField) return list;
+
+    return list.sort((a, b) => {
+      let valA: any = 0;
+      let valB: any = 0;
+      if (sortField === "total_spent") {
+        valA = Number(a.total_spent || 0);
+        valB = Number(b.total_spent || 0);
+      } else if (sortField === "total_orders") {
+        valA = Number(a.total_orders || 0);
+        valB = Number(b.total_orders || 0);
+      } else if (sortField === "name") {
+        valA = (a.name || "").toLowerCase();
+        valB = (b.name || "").toLowerCase();
+      }
+
+      if (valA < valB) return sortDirection === "asc" ? -1 : 1;
+      if (valA > valB) return sortDirection === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [filteredUsers, sortField, sortDirection]);
 
   if (loading && users.length === 0) {
     return (
@@ -537,94 +648,311 @@ function AdminUsersPage() {
         <CardContent>
           <div className="border rounded-lg overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-cream">
+              <thead className="bg-cream border-b border-border">
                 <tr>
-                  <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                    Nama / NIM
+                  <th className="p-3 text-center text-xs font-bold tracking-wider text-ink uppercase w-12">
+                    No
                   </th>
-                  <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                    Username
+                  <th
+                    className="p-3 text-left text-xs font-bold tracking-wider text-ink uppercase cursor-pointer hover:bg-black/5 select-none"
+                    onClick={() => handleSort("name")}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span>Nama</span>
+                      {sortField === "name" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="w-3.5 h-3.5 text-brand-orange" />
+                        ) : (
+                          <ArrowDown className="w-3.5 h-3.5 text-brand-orange" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />
+                      )}
+                    </div>
                   </th>
-                  <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
+                  <th className="p-3 text-left text-xs font-bold tracking-wider text-ink uppercase">
+                    Email
+                  </th>
+                  <th className="p-3 text-left text-xs font-bold tracking-wider text-ink uppercase">
                     Telepon
                   </th>
-                  <th className="p-3 text-center text-xs font-semibold tracking-wider text-ink uppercase">
+                  <th className="p-3 text-center text-xs font-bold tracking-wider text-ink uppercase">
                     Peran
                   </th>
-                  {!isCashier && (
-                    <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
-                      Aksi
-                    </th>
-                  )}
+                  <th
+                    className="p-3 text-center text-xs font-bold tracking-wider text-ink uppercase cursor-pointer hover:bg-black/5 select-none"
+                    onClick={() => handleSort("total_orders")}
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>Jumlah Transaksi</span>
+                      {sortField === "total_orders" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="w-3.5 h-3.5 text-brand-orange" />
+                        ) : (
+                          <ArrowDown className="w-3.5 h-3.5 text-brand-orange" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />
+                      )}
+                    </div>
+                  </th>
+                  <th
+                    className="p-3 text-right text-xs font-bold tracking-wider text-ink uppercase cursor-pointer hover:bg-black/5 select-none"
+                    onClick={() => handleSort("total_spent")}
+                  >
+                    <div className="flex items-center justify-end gap-1">
+                      <span>Total Pembelian</span>
+                      {sortField === "total_spent" ? (
+                        sortDirection === "asc" ? (
+                          <ArrowUp className="w-3.5 h-3.5 text-brand-orange" />
+                        ) : (
+                          <ArrowDown className="w-3.5 h-3.5 text-brand-orange" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />
+                      )}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.length === 0 ? (
+                {sortedAndFilteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-6 text-center text-muted-foreground">
+                    <td colSpan={7} className="p-6 text-center text-muted-foreground">
                       Pengguna tidak ditemukan.
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((user) => (
-                    <tr key={user.id} className="border-t border-border">
-                      <td className="p-3">
-                        <div>
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <p className="font-semibold text-ink uppercase text-xs tracking-wide">
-                              {user.name}
-                            </p>
-                            {Number(user.is_filkom_verified) === 1 && (
-                              <span className="bg-green-100 text-green-800 text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider uppercase">
-                                VERIFIED
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-[10px] text-muted-foreground font-mono">
-                            {user.nim || "Non-Mahasiswa"}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="p-3 text-muted-foreground text-xs">{user.email}</td>
-                      <td className="p-3 text-muted-foreground text-xs">{user.phone || "-"}</td>
-                      <td className="p-3 text-center">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                            user.role === "admin"
-                              ? "bg-red-50 text-red-700 border border-red-200"
-                              : user.role === "cashier"
-                                ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                : "bg-blue-50 text-blue-700 border border-blue-200"
-                          }`}
-                        >
-                          {user.role}
-                        </span>
-                      </td>
-                      {!isCashier && (
-                        <td className="p-3 text-right">
-                          <div className="flex justify-end gap-1">
+                  sortedAndFilteredUsers.map((userItem, idx) => {
+                    const isExpanded = !!expandedRows[userItem.id];
+                    const userOrders = userOrdersMap[userItem.id] || [];
+                    const isLoadingUserOrders = !!loadingOrdersMap[userItem.id];
+
+                    return (
+                      <Fragment key={userItem.id}>
+                        <tr className="border-t border-border hover:bg-cream/30 transition-colors">
+                          <td className="p-3 text-center">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => openEdit(user)}
-                              className="hover:bg-muted text-ink"
+                              className="h-7 w-7 hover:bg-muted font-bold"
+                              onClick={() => void toggleUserExpand(userItem.id)}
+                              title={isExpanded ? "Tutup rincian" : "Lihat transaksi"}
                             >
-                              <Pencil className="h-4 w-4" />
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4 text-brand-orange" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 text-ink" />
+                              )}
                             </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              disabled={user.id === 1}
-                              className="text-destructive hover:bg-red-50 disabled:opacity-30"
-                              onClick={() => openDeleteConfirm(user)}
+                          </td>
+                          <td className="p-3">
+                            <div>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <p className="font-bold text-ink uppercase text-xs tracking-wide">
+                                  {userItem.name}
+                                </p>
+                                {Number(userItem.is_filkom_verified) === 1 && (
+                                  <span className="bg-emerald-100 text-emerald-800 text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider uppercase border border-emerald-300">
+                                    VERIFIED
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[10px] text-muted-foreground font-mono">
+                                {userItem.nim || "Non-Mahasiswa"}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="p-3 text-muted-foreground text-xs">{userItem.email}</td>
+                          <td className="p-3 text-muted-foreground text-xs">{userItem.phone || "-"}</td>
+                          <td className="p-3 text-center">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                userItem.role === "admin"
+                                  ? "bg-red-50 text-red-700 border border-red-200"
+                                  : userItem.role === "cashier"
+                                    ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                    : "bg-blue-50 text-blue-700 border border-blue-200"
+                              }`}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      )}
-                    </tr>
-                  ))
+                              {userItem.role}
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <button
+                              type="button"
+                              onClick={() => void toggleUserExpand(userItem.id)}
+                              className="inline-flex items-center gap-1 font-mono font-bold text-xs bg-slate-100 hover:bg-slate-200 text-slate-800 px-2.5 py-1 rounded-full transition-colors cursor-pointer"
+                            >
+                              <ShoppingBag className="w-3 h-3 text-slate-500" />
+                              {Number(userItem.total_orders || 0)} Transaksi
+                            </button>
+                          </td>
+                          <td className="p-3 text-right">
+                            <span className="font-mono font-black text-xs text-ink">
+                              Rp {Number(userItem.total_spent || 0).toLocaleString("id-ID")}
+                            </span>
+                          </td>
+                        </tr>
+
+                        {/* Expanded Row Content Dropdown */}
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={7} className="p-4 bg-amber-50/40 border-t border-b border-border">
+                              <div className="space-y-4">
+                                {/* Sub-Table for User Transactions */}
+                                <div className="bg-white border-2 border-ink/20 rounded-xl overflow-hidden shadow-xs">
+                                  <div className="p-3 bg-cream/70 border-b border-ink/10 flex items-center justify-between">
+                                    <span className="text-xs font-black uppercase text-ink tracking-wider flex items-center gap-2">
+                                      <ShoppingBag className="w-4 h-4 text-brand-orange" />
+                                      Daftar Transaksi Pengguna
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground font-mono font-bold">
+                                      {userOrders.length} Transaksi Ditemukan
+                                    </span>
+                                  </div>
+
+                                  {isLoadingUserOrders ? (
+                                    <div className="p-6 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                                      <Loader2 className="w-4 h-4 animate-spin text-brand-orange" />
+                                      Memuat riwayat transaksi...
+                                    </div>
+                                  ) : userOrders.length === 0 ? (
+                                    <div className="p-6 text-center text-xs text-muted-foreground">
+                                      Pengguna ini belum pernah melakukan transaksi.
+                                    </div>
+                                  ) : (
+                                    <div className="overflow-x-auto">
+                                      <table className="w-full text-xs">
+                                        <thead className="bg-slate-50 border-b border-slate-200 text-muted-foreground font-bold uppercase tracking-wider text-[10px]">
+                                          <tr>
+                                            <th className="p-2.5 text-center w-10">No</th>
+                                            <th className="p-2.5 text-left">ID Transaksi</th>
+                                            <th className="p-2.5 text-left">Produk yang Dibeli</th>
+                                            <th className="p-2.5 text-right">Nominal Pembelian</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                          {userOrders.map((order, orderIdx) => {
+                                            const pBadge = getPaymentBadge(order);
+                                            return (
+                                              <tr
+                                                key={order.order_id || order.id}
+                                                className="hover:bg-slate-50/80 transition-colors"
+                                              >
+                                                <td className="p-2.5 text-center font-mono text-muted-foreground font-bold">
+                                                  {orderIdx + 1}
+                                                </td>
+                                                <td className="p-2.5">
+                                                  <div className="space-y-1">
+                                                    <div className="font-mono font-bold text-ink flex items-center gap-2">
+                                                      <span>{order.order_id}</span>
+                                                      <span
+                                                        className={`px-2 py-0.5 rounded text-[9px] font-extrabold uppercase border ${pBadge.color}`}
+                                                      >
+                                                        {pBadge.text}
+                                                      </span>
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground font-mono">
+                                                      {new Date(order.created_at).toLocaleString("id-ID")} •{" "}
+                                                      <span className="uppercase">{order.channel || "online"}</span>
+                                                    </div>
+                                                  </div>
+                                                </td>
+                                                <td className="p-2.5">
+                                                  {order.items && order.items.length > 0 ? (
+                                                    <div className="space-y-1.5">
+                                                      {order.items.map((item: any, itemIdx: number) => (
+                                                        <div key={itemIdx} className="flex items-center gap-2 text-[11px]">
+                                                          <div className="w-8 h-8 rounded border border-slate-200 overflow-hidden bg-slate-100 flex-shrink-0">
+                                                            {item.image_url || item.catalog_product_name ? (
+                                                              <img
+                                                                src={resolveImageUrl(item.image_url)}
+                                                                alt={item.product_name}
+                                                                className="w-full h-full object-cover"
+                                                              />
+                                                            ) : (
+                                                              <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                                                <ShoppingBag className="w-4 h-4" />
+                                                              </div>
+                                                            )}
+                                                          </div>
+                                                          <div>
+                                                            <p className="font-bold text-ink line-clamp-1">
+                                                              {item.product_name}
+                                                            </p>
+                                                            <p className="text-[10px] text-muted-foreground font-mono">
+                                                              {item.variant_name ? `${item.variant_name} • ` : ""}
+                                                              {item.quantity}x @ Rp{" "}
+                                                              {Number(item.price || item.unit_price || 0).toLocaleString(
+                                                                "id-ID",
+                                                              )}
+                                                            </p>
+                                                          </div>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  ) : (
+                                                    <span className="text-muted-foreground italic text-[10px]">
+                                                      Detail produk tidak tersedia
+                                                    </span>
+                                                  )}
+                                                </td>
+                                                <td className="p-2.5 text-right align-top">
+                                                  <div className="space-y-1">
+                                                    <span className="font-mono font-black text-ink text-xs block">
+                                                      Rp{" "}
+                                                      {Number(
+                                                        order.grand_total || order.gross_amount || 0,
+                                                      ).toLocaleString("id-ID")}
+                                                    </span>
+                                                    <Link
+                                                      to="/admin/transactions"
+                                                      search={{ search: order.order_id }}
+                                                      className="inline-flex items-center gap-1 text-[10px] font-bold text-brand-blue hover:underline"
+                                                    >
+                                                      Lihat di Transaksi <ExternalLink className="w-3 h-3" />
+                                                    </Link>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Actions Edit & Hapus (Below Table) */}
+                                {!isCashier && (
+                                  <div className="grid grid-cols-2 gap-3 mt-4">
+                                    <Button
+                                      variant="outline"
+                                      onClick={() => openEdit(userItem)}
+                                      className="w-full text-xs font-bold border-ink/30 hover:bg-slate-50 bg-white text-ink h-10"
+                                    >
+                                      <Pencil className="h-4 w-4 mr-2 text-slate-600" />
+                                      Edit Pengguna
+                                    </Button>
+                                    <Button
+                                      variant="destructive"
+                                      disabled={userItem.id === 1}
+                                      onClick={() => openDeleteConfirm(userItem)}
+                                      className="w-full text-xs font-bold h-10"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Hapus
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })
                 )}
               </tbody>
             </table>

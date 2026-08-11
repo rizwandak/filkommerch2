@@ -223,6 +223,8 @@ export interface DbUser {
   role: "admin" | "cashier" | "customer";
   is_filkom_verified?: number;
   created_at?: string;
+  total_orders?: number;
+  total_spent?: number;
 }
 
 export interface DatabaseStatus {

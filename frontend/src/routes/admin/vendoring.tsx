@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -21,6 +22,7 @@ import {
   X,
   TrendingUp,
   Printer,
+  Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -73,12 +75,32 @@ function AdminVendoringPage() {
   const [isSpkModalOpen, setIsSpkModalOpen] = useState(false);
   const [paymentScheme, setPaymentScheme] = useState<string>("50_50");
   const [customPaymentNotes, setCustomPaymentNotes] = useState<string>("");
-
-
+  const [spkSignerName, setSpkSignerName] = useState<string>("Manajemen FILKOM Merch UB");
+  const [spkSignatureImg, setSpkSignatureImg] = useState<string | null>(null);
 
   const openSpkModal = (po: VendorOrder) => {
     setSelectedSpkPo(po);
+    setPaymentScheme("50_50");
+    setCustomPaymentNotes("");
+    setSpkSignerName("Manajemen FILKOM Merch UB");
+    setSpkSignatureImg(null);
     setIsSpkModalOpen(true);
+  };
+
+  const handleSignatureUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Ukuran file gambar TTD terlalu besar (Maksimal 5MB)");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setSpkSignatureImg(event.target?.result as string);
+        toast.success("Gambar Tanda Tangan berhasil diupload!");
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const closeSpkModal = () => {
@@ -87,6 +109,10 @@ function AdminVendoringPage() {
   };
 
   const handlePrintSpk = () => {
+    const docBody = document.getElementById("spk-doc-body");
+    if (docBody) docBody.scrollTop = 0;
+    const modalRoot = document.getElementById("spk-modal-root");
+    if (modalRoot) modalRoot.scrollTop = 0;
     window.print();
   };
 
@@ -179,7 +205,7 @@ function AdminVendoringPage() {
         <meta charset='utf-8'>
         <title>SPK ${selectedSpkPo.po_number}</title>
         <style>
-          body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; color: #1b1b1b; margin: 20px; }
+          body { font-family: 'Calibri', 'Arial', sans-serif; font-size: 11pt; color: #1b1b1b; margin: 35px 25px 25px 25px; }
           h1 { font-size: 16pt; font-weight: bold; color: #1b1b1b; margin: 0; }
           h2 { font-size: 13pt; font-weight: bold; text-decoration: underline; text-align: center; margin-top: 15px; margin-bottom: 5px; }
           h3 { font-size: 11pt; font-weight: bold; margin-top: 15px; margin-bottom: 5px; text-transform: uppercase; color: #1b1b1b; }
@@ -190,7 +216,7 @@ function AdminVendoringPage() {
       </head>
       <body>
         <!-- KOP SURAT HEADER -->
-        <table style="width: 100%; border-bottom: 3px solid #1b1b1b; padding-bottom: 10px; border-collapse: collapse;">
+        <table style="width: 100%; border-bottom: 3px solid #1b1b1b; padding-top: 10px; padding-bottom: 12px; border-collapse: collapse;">
           <tr>
             <td style="vertical-align: middle; border: none;">
               <h1>FILKOM MERCH UB</h1>
@@ -292,9 +318,11 @@ function AdminVendoringPage() {
             <td style="width: 50%; text-align: center; border: none;">
               <div style="font-size: 9pt; color: #666; font-weight: bold;">PIHAK PERTAMA</div>
               <div style="font-weight: bold; margin-top: 2px;">FILKOM MERCH UB</div>
-              <div style="height: 60px;"></div>
+              <div style="height: 85px; text-align: center; vertical-align: middle;">
+                ${spkSignatureImg ? `<img src="${spkSignatureImg}" style="max-height: 80px; max-width: 230px; object-fit: contain;" />` : ""}
+              </div>
               <div style="border-top: 2px solid #1b1b1b; width: 180px; margin: 0 auto; padding-top: 4px; font-weight: bold;">
-                Manajemen FILKOM Merch UB
+                ${spkSignerName || "Manajemen FILKOM Merch UB"}
               </div>
             </td>
             <td style="width: 50%; text-align: center; border: none;">
@@ -583,8 +611,10 @@ function AdminVendoringPage() {
   };
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 bg-background min-h-screen">
-      {/* Header */}
+    <div className="p-6 lg:p-8 space-y-6 bg-background min-h-screen print:p-0 print:bg-white print:min-h-0 print:space-y-0">
+      {/* Outer wrapper hidden during print to isolate SPK document modal */}
+      <div className="space-y-6 print:hidden">
+        {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-ink pb-4">
         <div>
           <div className="flex items-center gap-2">
@@ -1073,6 +1103,7 @@ function AdminVendoringPage() {
           )}
         </div>
       )}
+      </div>
 
       {/* VENDOR MODAL */}
       {isVendorModalOpen && (
@@ -1326,7 +1357,7 @@ function AdminVendoringPage() {
       )}
 
       {/* SPK VENDOR PRINTABLE MODAL */}
-      {isSpkModalOpen && selectedSpkPo && (
+      {isSpkModalOpen && selectedSpkPo && createPortal(
         <div id="spk-modal-root" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/70 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:static print:overflow-visible">
           <style>{`
             @media print {
@@ -1339,25 +1370,32 @@ function AdminVendoringPage() {
                 print-color-adjust: exact !important;
                 color-adjust: exact !important;
               }
-              body * {
-                visibility: hidden !important;
+              body > *:not(#spk-modal-root) {
+                display: none !important;
               }
-              #spk-modal-root, #spk-modal-root * {
-                visibility: visible !important;
+              html, body {
+                margin: 0 !important;
+                padding: 0 !important;
+                height: auto !important;
+                min-height: 0 !important;
+                overflow: visible !important;
+                background: white !important;
               }
               #spk-modal-root {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
+                position: static !important;
+                display: block !important;
                 width: 100% !important;
+                height: auto !important;
                 margin: 0 !important;
                 padding: 0 !important;
                 background: white !important;
+                overflow: visible !important;
               }
               #spk-printable-area {
                 position: static !important;
                 display: block !important;
                 width: 100% !important;
+                height: auto !important;
                 max-height: none !important;
                 box-shadow: none !important;
                 border: none !important;
@@ -1367,6 +1405,7 @@ function AdminVendoringPage() {
                 background: white !important;
               }
               #spk-doc-body {
+                position: static !important;
                 display: block !important;
                 overflow: visible !important;
                 max-height: none !important;
@@ -1374,7 +1413,7 @@ function AdminVendoringPage() {
                 margin: 0 !important;
                 height: auto !important;
               }
-              .print\\:hidden {
+              .print\:hidden {
                 display: none !important;
               }
               tr, table, .grid {
@@ -1421,35 +1460,81 @@ function AdminVendoringPage() {
               </div>
             </div>
 
-            {/* PAYMENT SCHEME SELECTOR CONTROLS (Hidden during printing) */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 border-b-2 border-ink/20 py-3 px-4 sm:px-6 bg-cream/40 shrink-0 print:hidden">
-              <label className="text-xs font-bold text-ink uppercase shrink-0">Skema Pembayaran Vendor:</label>
-              <select
-                value={paymentScheme}
-                onChange={(e) => setPaymentScheme(e.target.value)}
-                className="px-3 py-1.5 border-2 border-ink rounded-xl text-xs font-bold bg-white text-ink cursor-pointer shadow-2xs"
-              >
-                <option value="50_50">50% - 50% (DP 50% &amp; Pelunasan 50%)</option>
-                <option value="30_20_50">30% - 20% - 50% (DP 30%, Progress 20%, Pelunasan 50%)</option>
-                <option value="100_0">100% Lunas di Awal</option>
-                <option value="custom">Custom / Catatan Khusus</option>
-              </select>
+            {/* PAYMENT SCHEME, SIGNER NAME & SIGNATURE IMAGE CONTROLS (Hidden during printing) */}
+            <div className="flex flex-col gap-2.5 border-b-2 border-ink/20 py-3 px-4 sm:px-6 bg-cream/40 shrink-0 print:hidden text-xs">
+              {/* Baris 1: Skema Pembayaran */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-bold text-ink uppercase shrink-0 sm:w-48">Skema Pembayaran:</label>
+                <select
+                  value={paymentScheme}
+                  onChange={(e) => setPaymentScheme(e.target.value)}
+                  className="px-3 py-1.5 border-2 border-ink rounded-xl font-bold bg-white text-ink cursor-pointer shadow-2xs flex-1 max-w-md"
+                >
+                  <option value="50_50">50% - 50% (DP 50% &amp; Pelunasan 50%)</option>
+                  <option value="30_20_50">30% - 20% - 50% (DP 30%, Progress 20%, Pelunasan 50%)</option>
+                  <option value="100_0">100% Lunas di Awal</option>
+                  <option value="custom">Custom / Catatan Khusus</option>
+                </select>
 
-              {paymentScheme === "custom" && (
+                {paymentScheme === "custom" && (
+                  <input
+                    type="text"
+                    value={customPaymentNotes}
+                    onChange={(e) => setCustomPaymentNotes(e.target.value)}
+                    placeholder="Misal: DP 40% awal & Pelunasan 60%..."
+                    className="px-3 py-1.5 border-2 border-ink rounded-xl bg-white font-medium flex-1 max-w-md focus:outline-none"
+                  />
+                )}
+              </div>
+
+              {/* Baris 2: Penandatangan Pihak 1 */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-bold text-ink uppercase shrink-0 sm:w-48">Nama Penandatangan:</label>
                 <input
                   type="text"
-                  value={customPaymentNotes}
-                  onChange={(e) => setCustomPaymentNotes(e.target.value)}
-                  placeholder="Misal: DP 40% awal & Pelunasan 60%..."
-                  className="px-3 py-1.5 border-2 border-ink rounded-xl text-xs bg-white font-medium flex-1 focus:outline-none"
+                  value={spkSignerName}
+                  onChange={(e) => setSpkSignerName(e.target.value)}
+                  placeholder="Nama Penandatangan Pihak 1..."
+                  className="px-3 py-1.5 border-2 border-ink rounded-xl font-bold text-ink focus:outline-none flex-1 max-w-md shadow-2xs"
                 />
-              )}
+              </div>
+
+              {/* Baris 3: Upload Gambar TTD (PNG) */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <label className="font-bold text-ink uppercase shrink-0 sm:w-48">Upload TTD (PNG / Stempel):</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <label className="px-3 py-1.5 bg-white border-2 border-ink rounded-xl font-bold text-ink cursor-pointer hover:bg-cream/80 transition-all flex items-center gap-1.5 shadow-2xs">
+                    <Upload className="w-3.5 h-3.5 text-brand-orange" />
+                    <span>{spkSignatureImg ? "Ganti Gambar TTD" : "Pilih File Gambar TTD (PNG)"}</span>
+                    <input
+                      type="file"
+                      accept="image/png, image/jpeg, image/webp"
+                      onChange={handleSignatureUpload}
+                      className="hidden"
+                    />
+                  </label>
+
+                  {spkSignatureImg && (
+                    <button
+                      type="button"
+                      onClick={() => setSpkSignatureImg(null)}
+                      className="px-2.5 py-1.5 bg-rose-100 text-rose-800 border-2 border-rose-400 rounded-xl font-bold hover:bg-rose-200 transition-all text-[11px] flex items-center gap-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" /> Hapus TTD
+                    </button>
+                  )}
+
+                  <span className="text-[10px] text-muted-foreground font-medium">
+                    (Opsional, disarankan format PNG transparan)
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* PRINTABLE SPK DOCUMENT BODY (Scrollable inside modal) */}
-            <div id="spk-doc-body" className="p-4 sm:p-6 space-y-6 text-ink font-sans text-xs overflow-y-auto flex-1 print:overflow-visible print:p-0 print:text-black">
+            <div id="spk-doc-body" className="p-4 sm:p-6 space-y-6 text-ink font-sans text-xs overflow-y-auto flex-1 print:overflow-visible print:pt-4 print:px-0 print:text-black">
               {/* KOP SURAT & DOKUMEN TITLE */}
-              <div className="space-y-3 pb-3 border-b-2 border-ink print:break-after-avoid">
+              <div className="space-y-3 pb-3 border-b-2 border-ink">
                 {/* KOP SURAT / OFFICIAL HEADER */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1667,24 +1752,37 @@ function AdminVendoringPage() {
 
               {/* TANDA TANGAN 2 PIHAK */}
               <div className="grid grid-cols-2 gap-8 pt-4 border-t-2 border-ink text-center print:break-inside-avoid">
-                <div className="flex flex-col items-center justify-between h-44">
+                <div className="flex flex-col items-center justify-between h-52">
                   <div>
                     <span className="font-bold text-[10px] uppercase text-neutral-700">PIHAK PERTAMA (PEMBERI KERJA)</span>
                     <div className="font-black text-xs text-ink uppercase mt-0.5">FILKOM MERCH UB</div>
                   </div>
+
+                  {/* Gambar TTD (PNG) atau Space Kosong */}
+                  <div className="my-auto flex items-center justify-center h-28 w-full relative">
+                    {spkSignatureImg ? (
+                      <img src={spkSignatureImg} alt="Tanda Tangan Pihak 1" className="max-h-28 max-w-[240px] object-contain mx-auto -mb-2" />
+                    ) : null}
+                  </div>
+
                   <div className="w-56 text-center">
                     <div className="font-extrabold text-xs text-ink border-b-2 border-ink pb-1 uppercase">
-                      Manajemen FILKOM Merch UB
+                      {spkSignerName || "Manajemen FILKOM Merch UB"}
                     </div>
                     <div className="text-[10px] text-neutral-600 font-bold mt-1">Tanda Tangan &amp; Stempel Resmi</div>
                   </div>
                 </div>
 
-                <div className="flex flex-col items-center justify-between h-44">
+                <div className="flex flex-col items-center justify-between h-52">
                   <div>
                     <span className="font-bold text-[10px] uppercase text-neutral-700">PIHAK KEDUA (PELAKSANA VENDOR)</span>
                     <div className="font-black text-xs text-ink uppercase mt-0.5">{selectedSpkPo.vendor_name || "Vendor Mitra"}</div>
                   </div>
+
+                  <div className="my-auto flex items-center justify-center h-28 w-full">
+                    {/* Space Kosong TTD Fisik Vendor */}
+                  </div>
+
                   <div className="w-56 text-center">
                     <div className="font-extrabold text-xs text-ink border-b-2 border-ink pb-1 uppercase">
                       {selectedSpkPo.contact_person || "Pimpinan / Rep. Vendor"}
@@ -1697,7 +1795,8 @@ function AdminVendoringPage() {
             </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
     </div>
