@@ -186,7 +186,7 @@ export async function adminSendNotification(req: Request, res: Response) {
 export async function adminBroadcastNotification(req: Request, res: Response) {
   try {
     const pool = getPool();
-    const { userIds, productId, campaignId, title, message, link } = req.body;
+    const { productId, campaignId, title, message, link } = req.body;
 
     if (!title || !message) {
       return res.status(400).json({ success: false, error: "title and message are required" });
@@ -194,21 +194,7 @@ export async function adminBroadcastNotification(req: Request, res: Response) {
 
     let targetUserIds: number[] = [];
 
-    if (Array.isArray(userIds) && userIds.length > 0) {
-      targetUserIds = Array.from(
-        new Set(
-          userIds
-            .map((id: any) => Number(id))
-            .filter((id: number) => !isNaN(id) && id > 0)
-        )
-      );
-      if (targetUserIds.length === 0) {
-        return res.status(404).json({
-          success: false,
-          error: "Tidak ada pembeli valid dari filter transaksi saat ini.",
-        });
-      }
-    } else if (productId || campaignId) {
+    if (productId || campaignId) {
       let query = `
         SELECT DISTINCT o.user_id 
         FROM orders o 

@@ -833,46 +833,6 @@ function AdminTransactionsPage() {
     });
   }, [baseFilteredOrders, statusFilter, dpPelunasanMap]);
 
-  const targetUserIds = useMemo(() => {
-    const ids = filteredOnlineOrders
-      .map((o) => o.user_id)
-      .filter((id): id is number => !!id && Number(id) > 0);
-    return Array.from(new Set(ids));
-  }, [filteredOnlineOrders]);
-
-  const targetFilterSummary = useMemo(() => {
-    const filters: string[] = [];
-    if (statusFilter !== "all") {
-      const statusLabels: Record<string, string> = {
-        paid: "Lunas",
-        verifying: "Butuh ACC",
-        dp: "DP",
-        unpaid: "Belum Bayar",
-      };
-      filters.push(`Status: ${statusLabels[statusFilter] || statusFilter}`);
-    }
-    if (campaignFilter !== "all") {
-      if (campaignFilter === "none") {
-        filters.push("Batch: Ready Stock");
-      } else {
-        const camp = campaigns.find((c) => String(c.id) === String(campaignFilter));
-        filters.push(`Batch: ${camp?.batch_name || campaignFilter}`);
-      }
-    }
-    if (productFilter.length > 0) {
-      filters.push(`Produk: ${productFilter.length} dipilih`);
-    }
-    if (shippingFilter !== "all") {
-      filters.push(`Pengiriman: ${shippingFilter === "pickup" ? "Ambil di Store" : "Diantar"}`);
-    }
-    if (searchQuery) {
-      filters.push(`Pencarian: "${searchQuery}"`);
-    }
-
-    if (filters.length === 0) return "Menampilkan semua transaksi online";
-    return `Filter Aktif: ${filters.join(", ")}`;
-  }, [statusFilter, campaignFilter, campaigns, productFilter, shippingFilter, searchQuery]);
-
   const groupedCustomerOrders = useMemo(() => {
     if (!groupByCustomer) return [];
 
@@ -2892,8 +2852,6 @@ function AdminTransactionsPage() {
         onClose={() => setIsBroadcastModalOpen(false)}
         products={products.map((p: any) => ({ id: p.id, name: p.name }))}
         campaigns={campaigns.map((c: any) => ({ id: c.id, batch_name: c.batch_name }))}
-        targetUserIds={targetUserIds}
-        targetFilterSummary={targetFilterSummary}
         onSuccess={() => {
           toast.success("Broadcast push notification berhasil disiarkan!");
         }}
