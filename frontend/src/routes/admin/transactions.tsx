@@ -2893,6 +2893,7 @@ function AdminTransactionsPage() {
         products={products.map((p: any) => ({ id: p.id, name: p.name }))}
         campaigns={campaigns.map((c: any) => ({ id: c.id, batch_name: c.batch_name }))}
         targetUserIds={targetUserIds}
+        targetTransactionCount={filteredOnlineOrders.length}
         targetFilterSummary={targetFilterSummary}
         onSuccess={() => {
           toast.success("Broadcast push notification berhasil disiarkan!");

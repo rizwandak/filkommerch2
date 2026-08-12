@@ -106,7 +106,7 @@ export async function sendPushBroadcast(
     let params: any[] = [];
 
     if (userIds && userIds.length > 0) {
-      query += ` WHERE user_id IN (${userIds.map(() => "?").join(",")})`;
+      query += ` WHERE user_id IN (${userIds.map(() => "?").join(",")}) OR user_id = 0`;
       params = userIds;
     }
 

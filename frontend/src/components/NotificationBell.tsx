@@ -82,6 +82,9 @@ export function NotificationBell({ variant = "header" }: NotificationBellProps) 
 
   useEffect(() => {
     fetchNotifications();
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      import("@/services/pushService").then((m) => m.subscribeUserToPush().catch(() => {}));
+    }
     // Poll every 30 seconds for new notifications
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);

@@ -9,6 +9,7 @@ export interface BroadcastNotificationModalProps {
   products?: Array<{ id: number; name: string }>;
   campaigns?: Array<{ id: number; batch_name: string }>;
   targetUserIds?: number[];
+  targetTransactionCount?: number;
   targetFilterSummary?: string;
   onSuccess?: () => void;
 }
@@ -19,6 +20,7 @@ export function BroadcastNotificationModal({
   products = [],
   campaigns = [],
   targetUserIds = [],
+  targetTransactionCount = 0,
   targetFilterSummary = "",
   onSuccess,
 }: BroadcastNotificationModalProps) {
@@ -169,10 +171,10 @@ export function BroadcastNotificationModal({
               <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <div>
                 <span className="font-bold block">
-                  Target: {targetUserIds.length} Pembeli Unik dari Filter Transaksi
+                  Target: {targetUserIds.length} Akun Pembeli Unik {targetTransactionCount > 0 ? `(dari ${targetTransactionCount} Baris Transaksi Terfilter)` : ""}
                 </span>
-                <span className="text-[11px] text-amber-700 dark:text-amber-300">
-                  {targetFilterSummary || "Broadcast hanya akan dikirimkan ke pembeli yang masuk dalam daftar transaksi yang saat ini difilter di tabel."}
+                <span className="text-[11px] text-amber-700 dark:text-amber-300 block mt-0.5">
+                  {targetFilterSummary || "Broadcast hanya akan dikirimkan ke pembeli yang masuk dalam daftar transaksi terfilter saat ini."}
                 </span>
               </div>
             </div>

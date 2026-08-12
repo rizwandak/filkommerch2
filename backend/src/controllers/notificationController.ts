@@ -193,11 +193,12 @@ export async function adminBroadcastNotification(req: Request, res: Response) {
     }
 
     let targetUserIds: number[] = [];
+    const isFilteredTarget = Array.isArray(userIds);
 
-    if (Array.isArray(userIds) && userIds.length > 0) {
+    if (isFilteredTarget) {
       targetUserIds = Array.from(
         new Set(
-          userIds
+          (userIds as any[])
             .map((id: any) => Number(id))
             .filter((id: number) => !isNaN(id) && id > 0)
         )
@@ -205,7 +206,7 @@ export async function adminBroadcastNotification(req: Request, res: Response) {
       if (targetUserIds.length === 0) {
         return res.status(404).json({
           success: false,
-          error: "Tidak ada pembeli valid dari filter transaksi saat ini.",
+          error: "Tidak ada akun pembeli terdaftar dari hasil filter transaksi saat ini.",
         });
       }
     } else if (productId || campaignId) {
@@ -232,9 +233,13 @@ export async function adminBroadcastNotification(req: Request, res: Response) {
       if (targetUserIds.length === 0) {
         return res.status(404).json({
           success: false,
-          error: "No buyers found for the selected product/campaign filter",
+          error: "Tidak ada pembeli ditemukan untuk filter produk/campaign yang dipilih.",
         });
       }
+    } else {
+      // Broadcast to ALL users in users table only if no specific target mode specified
+      const [allUsers] = await pool.query<any[]>("SELECT id FROM users");
+      targetUserIds = allUsers.map((u: any) => u.id);
     }
 
     // 1. Insert in-app notifications
@@ -250,35 +255,23 @@ export async function adminBroadcastNotification(req: Request, res: Response) {
         "INSERT INTO notifications (user_id, title, message, type, link) VALUES ?",
         [values]
       );
-    } else {
-      // Broadcast to ALL users in users table
-      const [allUsers] = await pool.query<any[]>("SELECT id FROM users");
-      targetUserIds = allUsers.map((u: any) => u.id);
-      if (targetUserIds.length > 0) {
-        const values = targetUserIds.map((uId: number) => [
-          uId,
-          title,
-          message,
-          "BROADCAST",
-          link || "/products",
-        ]);
-        await pool.query(
-          "INSERT INTO notifications (user_id, title, message, type, link) VALUES ?",
-          [values]
-        );
-      }
     }
 
-    // 2. Send Push Broadcast
-    const pushResult = await sendPushBroadcast(pool, targetUserIds.length > 0 ? targetUserIds : null, {
-      title,
-      body: message,
-      url: link || "/products",
-    });
+    // 2. Send Push Broadcast to target users
+    const pushResult = await sendPushBroadcast(
+      pool,
+      targetUserIds,
+      {
+        title,
+        body: message,
+        url: link || "/products",
+      }
+    );
 
     return res.json({
       success: true,
-      message: `Broadcast sent to ${targetUserIds.length} users`,
+      message: `Broadcast berhasil dikirim ke ${targetUserIds.length} pembeli`,
+      targetUserCount: targetUserIds.length,
       pushSentCount: pushResult.sentCount,
     });
   } catch (err: any) {
