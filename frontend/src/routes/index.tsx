@@ -1419,8 +1419,6 @@ function Index() {
                           )}
                         </div>
                       </section>
-                        </div>
-                      </section>
                     )
                   );
                 }
