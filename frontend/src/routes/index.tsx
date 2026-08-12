@@ -189,81 +189,7 @@ type ProductCard = {
   promo_price?: number | null;
 };
 
-const FALLBACK_PRODUCTS: ProductCard[] = [
-  {
-    id: "varsity-jacket",
-    img: pVarsity,
-    name: "Varsity Jacket — Filkom '25",
-    price: "Rp 450.000",
-    was: "Rp 525.000",
-    tag: "BEST SELLER",
-    cat: "JACKET",
-    is_best_seller: true,
-    variants: [
-      { id: 101, size: "S", stock: 12 },
-      { id: 102, size: "M", stock: 25 },
-      { id: 103, size: "L", stock: 18 },
-      { id: 104, size: "XL", stock: 8 },
-    ],
-  },
-  {
-    id: "heavyweight-hoodie-navy",
-    img: pHoodie,
-    name: "Heavyweight Hoodie Navy",
-    price: "Rp 285.000",
-    was: "Rp 320.000",
-    tag: "LIMITED",
-    cat: "HOODIE",
-    is_limited: true,
-    variants: [
-      { id: 201, size: "S", stock: 5 },
-      { id: 202, size: "M", stock: 12 },
-      { id: 203, size: "L", stock: 3 },
-      { id: 204, size: "XL", stock: 0 },
-    ],
-  },
-  {
-    id: "essential-tee-navy",
-    img: pTshirt,
-    name: "Essential Tee — Navy",
-    price: "Rp 125.000",
-    tag: "NEW",
-    cat: "TEE",
-    variants: [
-      { id: 301, size: "S", stock: 10 },
-      { id: 302, size: "M", stock: 20 },
-      { id: 303, size: "L", stock: 15 },
-    ],
-  },
-  {
-    id: "graphic-tee-forpt",
-    img: pTee2,
-    name: "Graphic Tee — Forpt Cantcont",
-    price: "Rp 145.000",
-    tag: "NEW",
-    cat: "TEE",
-    variants: [
-      { id: 401, size: "M", stock: 8 },
-      { id: 402, size: "L", stock: 12 },
-    ],
-  },
-  {
-    id: "f-logo-snapback",
-    img: pCap,
-    name: "F Logo Snapback",
-    price: "Rp 95.000",
-    cat: "ACCESSORIES",
-    variants: [{ id: 501, size: "One Size", stock: 30 }],
-  },
-  {
-    id: "canvas-tote-logo",
-    img: pTote,
-    name: "Canvas Tote — Logo Stamp",
-    price: "Rp 65.000",
-    cat: "ACCESSORIES",
-    variants: [{ id: 601, size: "One Size", stock: 50 }],
-  },
-];
+const FALLBACK_PRODUCTS: ProductCard[] = [];
 
 const CATEGORIES: { name: string; img: string; filter: Filter }[] = [
   { name: "Varsity Jacket", img: pVarsity, filter: "JACKET" },
@@ -799,7 +725,7 @@ function Index() {
     return { ...defaults, ...extracted };
   }, [segments]);
 
-  const products = dbProducts.length > 0 ? dbProducts : FALLBACK_PRODUCTS;
+  const products = dbProducts || [];
 
   const cartCount = cart.reduce((s, i) => s + i.qty, 0);
   const cartTotal = cart.reduce((s, i) => s + parsePrice(i.price) * i.qty, 0);
