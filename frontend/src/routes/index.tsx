@@ -28,6 +28,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ZoomIn,
+  PackageX,
+  Package,
 } from "lucide-react";
 import { HackerModeToggle } from "@/components/HackerModeToggle";
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
@@ -1754,47 +1756,42 @@ function Index() {
                     (p) =>
                       p.category_slug === "bundle" ||
                       p.category_slug === "bundles" ||
-                      p.product_type === "bundle"
+                      p.product_type === "bundle" ||
+                      p.cat?.toUpperCase() === "BUNDLE"
                   );
                   const bundlesToRender =
                     dbBundles.length > 0
                       ? dbBundles.map((p: any) => {
                           const activePriceStr = getActivePriceForCard(p, user);
-                        const activePriceNum = parsePrice(activePriceStr);
+                          const activePriceNum = parsePrice(activePriceStr);
 
-                        const originalPriceVal = p.rawOriginalPrice !== null && p.rawOriginalPrice > activePriceNum
-                          ? formatRp(p.rawOriginalPrice)
-                          : p.rawPrice > activePriceNum
-                            ? formatRp(p.rawPrice)
-                            : p.was;
+                          const originalPriceVal = p.rawOriginalPrice !== null && p.rawOriginalPrice > activePriceNum
+                            ? formatRp(p.rawOriginalPrice)
+                            : p.rawPrice > activePriceNum
+                              ? formatRp(p.rawPrice)
+                              : p.was;
 
-                        let saveText = "Save up to 15%";
-                        const comparePrice = p.rawOriginalPrice || p.rawPrice;
-                        if (comparePrice && comparePrice > activePriceNum) {
-                          const pct = Math.round(((comparePrice - activePriceNum) / comparePrice) * 100);
-                          saveText = `Save ${pct}%`;
-                        }
+                          let saveText = "Save up to 15%";
+                          const comparePrice = p.rawOriginalPrice || p.rawPrice;
+                          if (comparePrice && comparePrice > activePriceNum) {
+                            const pct = Math.round(((comparePrice - activePriceNum) / comparePrice) * 100);
+                            saveText = `Save ${pct}%`;
+                          }
 
-                        return {
-                          id: p.id,
-                          name: p.name,
-                          price: activePriceStr,
-                          originalPrice: originalPriceVal,
-                          description: p.description || "",
-                          img: p.img,
-                          bundleComponents: p.bundle_components || [],
-                          saveText,
-                          isReal: true,
-                          rawProduct: p,
-                        };
-                      })
-                      : (el.config.items || []).map((bundle: any) => ({
-                        ...bundle,
-                        img: bundle.image || pTote,
-                        bundleComponents: [],
-                        saveText: bundle.saveText || "Save 20%",
-                        isReal: false,
-                      }));
+                          return {
+                            id: p.id,
+                            name: p.name,
+                            price: activePriceStr,
+                            originalPrice: originalPriceVal,
+                            description: p.description || "",
+                            img: p.img,
+                            bundleComponents: p.bundle_components || [],
+                            saveText,
+                            isReal: true,
+                            rawProduct: p,
+                          };
+                        })
+                      : [];
 
                   return (
                     <div key={el.id}>
@@ -1810,130 +1807,147 @@ function Index() {
                               {el.config.title || "Exclusive Bundles"}
                             </h2>
                           </div>
+
+                          {bundlesToRender.length > 0 ? (
                             <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                               {bundlesToRender.map((bundle: any, bIdx: number) => (
-                              <div
-                                key={bIdx}
-                                className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[200px] md:w-[230px] shrink-0"
-                              >
-                                {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
-                                <div className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden group">
-                                  <img
-                                    src={resolveImageUrl(bundle.img || pTote)}
-                                    alt={bundle.name}
-                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                  />
-                                  {bundle.saveText && (
-                                    <div className="absolute top-2 left-2 bg-brand-orange text-ink font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
-                                      🔥 {bundle.saveText}
-                                    </div>
-                                  )}
-                                </div>
+                                <div
+                                  key={bIdx}
+                                  className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[200px] md:w-[230px] shrink-0"
+                                >
+                                  {/* Top Full-Width Rigid 1:1 Aspect-Square Cover Photo */}
+                                  <div className="relative w-full aspect-square border-b-2 border-ink bg-secondary overflow-hidden group">
+                                    <img
+                                      src={resolveImageUrl(bundle.img || pTote)}
+                                      alt={bundle.name}
+                                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                    />
+                                    {bundle.saveText && (
+                                      <div className="absolute top-2 left-2 bg-brand-orange text-ink font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
+                                        🔥 {bundle.saveText}
+                                      </div>
+                                    )}
+                                  </div>
 
                                   {/* Details Content Body Below Image */}
-                                <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
-                                  <div>
-                                    {/* Header: Title Only */}
-                                    <div className="pb-1.5 border-b border-border">
-                                      <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight">
-                                        {bundle.name}
-                                      </h3>
-                                    </div>
-
-                                    {/* Included Components Grid */}
-                                    <div className="mt-2 space-y-1">
-                                      <div className="text-[8.5px] font-black text-ink uppercase tracking-widest flex items-center gap-1">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse" />
-                                        PAKET BUNDLE:
+                                  <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
+                                    <div>
+                                      {/* Header: Title Only */}
+                                      <div className="pb-1.5 border-b border-border">
+                                        <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight">
+                                          {bundle.name}
+                                        </h3>
                                       </div>
 
-                                      {bundle.bundleComponents && bundle.bundleComponents.length > 0 ? (
-                                        <div className="grid grid-cols-1 gap-1">
-                                          {bundle.bundleComponents.map((comp: any, compIdx: number) => (
-                                            <div
-                                              key={comp.id || compIdx}
-                                              className="flex items-center gap-1.5 p-1 bg-secondary/60 border border-ink/15 rounded-md shadow-2xs"
-                                            >
-                                              <img
-                                                src={resolveImageUrl(comp.image_url || comp.img || pTee2)}
-                                                alt={comp.name}
-                                                className="w-6 h-6 object-cover rounded border border-ink/20 shrink-0"
-                                              />
-                                              <div className="min-w-0 flex-1 leading-tight">
-                                                <p className="font-extrabold text-ink text-[9px] uppercase truncate">
-                                                  {comp.name}
-                                                </p>
-                                              </div>
-                                            </div>
-                                          ))}
+                                      {/* Included Components Grid */}
+                                      <div className="mt-2 space-y-1">
+                                        <div className="text-[8.5px] font-black text-ink uppercase tracking-widest flex items-center gap-1">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-brand-orange animate-pulse" />
+                                          PAKET BUNDLE:
                                         </div>
-                                      ) : bundle.itemsList ? (
-                                        <div className="grid grid-cols-1 gap-1">
-                                          {bundle.itemsList.split(",").map((it: string, itIdx: number) => {
-                                            const trimmedName = it.trim();
-                                            const matchProd = products.find(
-                                              (p) => p.name.toLowerCase().includes(trimmedName.toLowerCase())
-                                            );
-                                            const compImg = matchProd?.img || (itIdx % 2 === 0 ? pTshirt : pHoodie);
 
-                                            return (
+                                        {bundle.bundleComponents && bundle.bundleComponents.length > 0 ? (
+                                          <div className="grid grid-cols-1 gap-1">
+                                            {bundle.bundleComponents.map((comp: any, compIdx: number) => (
                                               <div
-                                                key={itIdx}
+                                                key={comp.id || compIdx}
                                                 className="flex items-center gap-1.5 p-1 bg-secondary/60 border border-ink/15 rounded-md shadow-2xs"
                                               >
                                                 <img
-                                                  src={resolveImageUrl(compImg)}
-                                                  alt={trimmedName}
+                                                  src={resolveImageUrl(comp.image_url || comp.img || pTee2)}
+                                                  alt={comp.name}
                                                   className="w-6 h-6 object-cover rounded border border-ink/20 shrink-0"
                                                 />
                                                 <div className="min-w-0 flex-1 leading-tight">
                                                   <p className="font-extrabold text-ink text-[9px] uppercase truncate">
-                                                    {trimmedName}
+                                                    {comp.name}
                                                   </p>
                                                 </div>
                                               </div>
-                                            );
-                                          })}
-                                        </div>
-                                      ) : null}
-                                    </div>
+                                            ))}
+                                          </div>
+                                        ) : bundle.itemsList ? (
+                                          <div className="grid grid-cols-1 gap-1">
+                                            {bundle.itemsList.split(",").map((it: string, itIdx: number) => {
+                                              const trimmedName = it.trim();
+                                              const matchProd = products.find(
+                                                (p) => p.name.toLowerCase().includes(trimmedName.toLowerCase())
+                                              );
+                                              const compImg = matchProd?.img || (itIdx % 2 === 0 ? pTshirt : pHoodie);
 
-                                    {/* Price Below Bundle List */}
-                                    <div className="mt-2.5 pt-2 border-t border-border flex items-baseline justify-between">
-                                      {bundle.originalPrice && (
-                                        <span className="text-[10px] font-extrabold text-red-500 line-through leading-none">
-                                          {bundle.originalPrice}
+                                              return (
+                                                <div
+                                                  key={itIdx}
+                                                  className="flex items-center gap-1.5 p-1 bg-secondary/60 border border-ink/15 rounded-md shadow-2xs"
+                                                >
+                                                  <img
+                                                    src={resolveImageUrl(compImg)}
+                                                    alt={trimmedName}
+                                                    className="w-6 h-6 object-cover rounded border border-ink/20 shrink-0"
+                                                  />
+                                                  <div className="min-w-0 flex-1 leading-tight">
+                                                    <p className="font-extrabold text-ink text-[9px] uppercase truncate">
+                                                      {trimmedName}
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : null}
+                                      </div>
+
+                                      {/* Price Below Bundle List */}
+                                      <div className="mt-2.5 pt-2 border-t border-border flex items-baseline justify-between">
+                                        {bundle.originalPrice && (
+                                          <span className="text-[10px] font-extrabold text-red-500 line-through leading-none">
+                                            {bundle.originalPrice}
+                                          </span>
+                                        )}
+                                        <span className="text-base sm:text-lg font-black text-brand-orange leading-tight ml-auto">
+                                          {bundle.price}
                                         </span>
-                                      )}
-                                      <span className="text-base sm:text-lg font-black text-brand-orange leading-tight ml-auto">
-                                        {bundle.price}
-                                      </span>
+                                      </div>
                                     </div>
-                                  </div>
 
-                                  {/* Action Button - Redirect to Product Detail */}
-                                  <div className="pt-2 border-t border-border w-full">
-                                    <button
-                                      onClick={() => {
-                                        if (bundle.isReal && bundle.rawProduct) {
-                                          navigate({ to: "/product/$slug", params: { slug: bundle.rawProduct.id } });
-                                        } else if (bundle.link) {
-                                          navigate({ to: bundle.link });
-                                        } else {
-                                          scrollToId("shop");
-                                        }
-                                      }}
-                                      title="Pesan Sekarang"
-                                      className="w-full h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center gap-1.5 text-xs font-black uppercase"
-                                    >
-                                      <span>Detail Produk</span>
-                                      <ArrowRight className="w-3.5 h-3.5" />
-                                    </button>
+                                    {/* Action Button - Redirect to Product Detail */}
+                                    <div className="pt-2 border-t border-border w-full">
+                                      <button
+                                        onClick={() => {
+                                          if (bundle.isReal && bundle.rawProduct) {
+                                            navigate({ to: "/product/$slug", params: { slug: bundle.rawProduct.id } });
+                                          } else if (bundle.link) {
+                                            navigate({ to: bundle.link });
+                                          } else {
+                                            scrollToId("shop");
+                                          }
+                                        }}
+                                        title="Pesan Sekarang"
+                                        className="w-full h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center justify-center gap-1.5 text-xs font-black uppercase"
+                                      >
+                                        <span>Detail Produk</span>
+                                        <ArrowRight className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </div>
                                 </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="bg-background border-2 border-ink rounded-2xl p-8 sm:p-12 text-center max-w-md mx-auto shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-3">
+                              <div className="w-14 h-14 rounded-2xl bg-cream border-2 border-ink flex items-center justify-center mx-auto shadow-2xs">
+                                <PackageX className="w-7 h-7 text-muted-foreground" />
                               </div>
-                            ))}
-                          </div>
+                              <div>
+                                <h3 className="font-extrabold text-sm sm:text-base text-ink uppercase tracking-wide">
+                                  Produk Belum Tersedia
+                                </h3>
+                                <p className="text-xs text-muted-foreground font-medium mt-1 leading-relaxed">
+                                  Tunggu pengumuman selanjutnya.
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </section>
 

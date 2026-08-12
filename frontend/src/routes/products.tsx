@@ -610,16 +610,22 @@ function ProductsCatalogPage() {
             ) : (
               <div className="bg-card rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-12 text-center text-ink">
                 <X className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-bold text-lg text-ink">Tidak ada produk yang cocok</h3>
+                <h3 className="font-bold text-lg text-ink">
+                  {products.length === 0 ? "Produk Belum Tersedia" : "Tidak ada produk yang cocok"}
+                </h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Coba sesuaikan kata kunci pencarian atau bersihkan filter Anda.
+                  {products.length === 0
+                    ? "Tunggu pengumuman selanjutnya."
+                    : "Coba sesuaikan kata kunci pencarian atau bersihkan filter Anda."}
                 </p>
-                <Button
-                  onClick={clearFilters}
-                  className="mt-6 bg-ink text-cream border-2 border-ink font-bold hover:bg-brand-orange hover:text-cream cursor-pointer transition shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none"
-                >
-                  Reset Semua Filter
-                </Button>
+                {products.length > 0 && (
+                  <Button
+                    onClick={clearFilters}
+                    className="mt-6 bg-ink text-cream border-2 border-ink font-bold hover:bg-brand-orange hover:text-cream cursor-pointer transition shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none"
+                  >
+                    Reset Semua Filter
+                  </Button>
+                )}
               </div>
             )}
           </div>
