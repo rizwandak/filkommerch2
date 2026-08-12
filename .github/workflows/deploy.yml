@@ -23,22 +23,36 @@ jobs:
       # ---- BUILD FRONTEND ----
       - name: 🔨 Install & Build Frontend
         env:
-          VITE_API_URL: https://filkommerch.com/api
+          NITRO_PRESET: node-server
+          VITE_API_URL: https://filkommerch.com
         run: |
           cd frontend
           npm install
           npm run build
 
-      # ---- DEPLOY FRONTEND TO PUBLIC_HTML VIA FTP ----
+      # ---- CREATE RESTART TRIGGER ----
+      - name: ⏱️ Create Restart File
+        run: |
+          mkdir -p frontend/tmp
+          echo $(date) > frontend/tmp/restart.txt
+
+      # ---- DEPLOY TO CPANEL VIA FTP ----
       - name: 📂 Deploy Frontend via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./frontend/dist/
-          server-dir: /public_html/
-          git-ignore: false
+          local-dir: ./frontend/
+          server-dir: /frontend_app/
+          exclude: |
+            **/node_modules/**
+            **/.git/**
+            **/src/**
+            **/.env*
+            **/tsconfig.json
+            **/vite.config.ts
+            **/eslint.config.js
 
   deploy-backend:
     name: ⚙️ Deploy Backend
@@ -67,7 +81,7 @@ jobs:
           mkdir -p backend/tmp
           echo $(date) > backend/tmp/restart.txt
 
-      # ---- DEPLOY BACKEND VIA FTP ----
+      # ---- DEPLOY TO CPANEL VIA FTP ----
       - name: 📂 Deploy Backend via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
@@ -76,7 +90,6 @@ jobs:
           password: ${{ secrets.FTP_PASSWORD }}
           local-dir: ./backend/
           server-dir: /backend_app/
-          git-ignore: false
           exclude: |
             **/node_modules/**
             **/.git/**
