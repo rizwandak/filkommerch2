@@ -1158,6 +1158,7 @@ function Index() {
                               {el.config.title}
                             </h2>
                           </div>
+                          {heroProductsToRender.length > 0 ? (
                             <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                               {heroProductsToRender.map((p) => {
                                 let discountText = null;
@@ -1266,6 +1267,21 @@ function Index() {
                                 );
                               })}
                             </div>
+                          ) : (
+                            <div className="bg-neutral-900 border-2 border-brand-orange/40 rounded-2xl p-8 sm:p-12 text-center max-w-md mx-auto shadow-[4px_4px_0px_0px_rgba(255,107,0,0.5)] space-y-3">
+                              <div className="w-14 h-14 rounded-2xl bg-neutral-800 border-2 border-brand-orange flex items-center justify-center mx-auto shadow-2xs">
+                                <PackageX className="w-7 h-7 text-brand-orange" />
+                              </div>
+                              <div>
+                                <h3 className="font-extrabold text-sm sm:text-base text-white uppercase tracking-wide">
+                                  Produk Belum Tersedia
+                                </h3>
+                                <p className="text-xs text-neutral-400 font-medium mt-1 leading-relaxed">
+                                  Tunggu pengumuman selanjutnya.
+                                </p>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </section>
                     ) : (
@@ -1282,6 +1298,7 @@ function Index() {
                             </h2>
                           </div>
 
+                          {gridProducts.length > 0 ? (
                             <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
                               {gridProducts.map((p) => {
                                 let discountText = null;
@@ -1385,6 +1402,23 @@ function Index() {
                                 );
                               })}
                             </div>
+                          ) : (
+                            <div className="bg-cream border-2 border-ink rounded-2xl p-8 sm:p-12 text-center max-w-md mx-auto shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-3">
+                              <div className="w-14 h-14 rounded-2xl bg-white border-2 border-ink flex items-center justify-center mx-auto shadow-2xs">
+                                <PackageX className="w-7 h-7 text-muted-foreground" />
+                              </div>
+                              <div>
+                                <h3 className="font-extrabold text-sm sm:text-base text-ink uppercase tracking-wide">
+                                  Produk Belum Tersedia
+                                </h3>
+                                <p className="text-xs text-muted-foreground font-medium mt-1 leading-relaxed">
+                                  Tunggu pengumuman selanjutnya.
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </section>
                         </div>
                       </section>
                     )
@@ -1961,8 +1995,6 @@ function Index() {
                           return !isHero && !isBundle;
                         });
 
-                        if (allOthers.length === 0) return null;
-
                         return (
                           <section id="all-products-homepage" className="bg-cream py-10 sm:py-16 border-b-2 border-ink animate-slide-up scroll-mt-32 w-full">
                             <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-10">
@@ -1975,61 +2007,77 @@ function Index() {
                                 </h2>
                               </div>
 
-                              <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
-                                {allOthers.map((p) => (
-                                  <div
-                                    key={p.id}
-                                    className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[200px] md:w-[230px] shrink-0"
-                                  >
-                                    <Link
-                                      to="/product/$slug"
-                                      params={{ slug: p.id }}
-                                      className="relative aspect-square overflow-hidden block border-b-2 border-ink bg-secondary"
+                              {allOthers.length > 0 ? (
+                                <div className="flex flex-wrap justify-center gap-3.5 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
+                                  {allOthers.map((p) => (
+                                    <div
+                                      key={p.id}
+                                      className="group flex flex-col border-2 border-ink bg-background rounded-xl overflow-hidden shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all duration-200 w-[calc(50%-0.5rem)] sm:w-[200px] md:w-[230px] shrink-0"
                                     >
-                                      <img
-                                        src={resolveImageUrl(p.img)}
-                                        alt={p.name}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                      />
-                                      <span className="absolute top-2 left-2 bg-brand-orange text-ink font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
-                                        PO
-                                      </span>
-                                    </Link>
+                                      <Link
+                                        to="/product/$slug"
+                                        params={{ slug: p.id }}
+                                        className="relative aspect-square overflow-hidden block border-b-2 border-ink bg-secondary"
+                                      >
+                                        <img
+                                          src={resolveImageUrl(p.img)}
+                                          alt={p.name}
+                                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                        />
+                                        <span className="absolute top-2 left-2 bg-brand-orange text-ink font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
+                                          PO
+                                        </span>
+                                      </Link>
 
-                                    <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
-                                      <div>
-                                        <div className="pb-1.5 border-b border-border">
-                                          <div className="text-[9px] font-extrabold tracking-widest text-brand-orange uppercase mb-1">
-                                            {p.cat}
-                                          </div>
-                                          <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight">
-                                            {p.name}
-                                          </h3>
-                                        </div>
-                                      </div>
-
-                                      <div className="mt-auto pt-2 border-t border-ink/10 flex items-center justify-between">
+                                      <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
                                         <div>
-                                          <span className="text-xs font-black text-ink">{p.price}</span>
-                                          {p.was && (
-                                            <span className="block text-[9px] text-muted-foreground line-through font-bold">
-                                              {p.was}
-                                            </span>
-                                          )}
+                                          <div className="pb-1.5 border-b border-border">
+                                            <div className="text-[9px] font-extrabold tracking-widest text-brand-orange uppercase mb-1">
+                                              {p.cat}
+                                            </div>
+                                            <h3 className="font-extrabold text-xs sm:text-sm text-ink uppercase tracking-wide leading-tight">
+                                              {p.name}
+                                            </h3>
+                                          </div>
                                         </div>
 
-                                        <button
-                                          onClick={() => addToCart(p)}
-                                          className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
-                                          title="Tambah ke bag"
-                                        >
-                                          <ShoppingBag className="w-3 h-3" />
-                                        </button>
+                                        <div className="mt-auto pt-2 border-t border-ink/10 flex items-center justify-between">
+                                          <div>
+                                            <span className="text-xs font-black text-ink">{p.price}</span>
+                                            {p.was && (
+                                              <span className="block text-[9px] text-muted-foreground line-through font-bold">
+                                                {p.was}
+                                              </span>
+                                            )}
+                                          </div>
+
+                                          <button
+                                            onClick={() => addToCart(p)}
+                                            className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
+                                            title="Tambah ke bag"
+                                          >
+                                            <ShoppingBag className="w-3 h-3" />
+                                          </button>
+                                        </div>
                                       </div>
                                     </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="bg-background border-2 border-ink rounded-2xl p-8 sm:p-12 text-center max-w-md mx-auto shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-3">
+                                  <div className="w-14 h-14 rounded-2xl bg-cream border-2 border-ink flex items-center justify-center mx-auto shadow-2xs">
+                                    <PackageX className="w-7 h-7 text-muted-foreground" />
                                   </div>
-                                ))}
-                              </div>
+                                  <div>
+                                    <h3 className="font-extrabold text-sm sm:text-base text-ink uppercase tracking-wide">
+                                      Produk Belum Tersedia
+                                    </h3>
+                                    <p className="text-xs text-muted-foreground font-medium mt-1 leading-relaxed">
+                                      Tunggu pengumuman selanjutnya.
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </section>
                         );
