@@ -44,6 +44,8 @@ import {
   confirmOrderCompletionServerAction,
   createProductReviewServerAction,
   submitOrderComplaintServerAction,
+  claimSearchServerAction,
+  submitClaimServerAction,
 } from "@backend/server-actions";
 import { Navbar } from "@/components/Navbar";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -97,6 +99,13 @@ function UserOrdersPage() {
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
+  
+  // Claim state
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [claimSearchKeyword, setClaimSearchKeyword] = useState("");
+  const [claimSearchResults, setClaimSearchResults] = useState<any[]>([]);
+  const [isSearchingClaim, setIsSearchingClaim] = useState(false);
+  const [submittingClaimOrderId, setSubmittingClaimOrderId] = useState<string | null>(null);
 
   const [storeSettings, setStoreSettings] = useState<any>(null);
 
@@ -496,6 +505,7 @@ function UserOrdersPage() {
     return "Pengiriman Kurir";
   };
 
+
   return (
     <div className="min-h-screen bg-[#FCFAF7] text-ink font-sans">
       <Navbar />
@@ -512,27 +522,36 @@ function UserOrdersPage() {
               {user?.email} • Peran: {user?.type === "buyer" ? "Pembeli" : "Admin"}
             </p>
           </div>
-          <div className="flex gap-3 text-xs">
-            <div className="bg-cream border border-ink px-4 py-2 rounded text-center">
-              <span className="block font-bold text-lg">{mainOrders.length}</span>
-              <span className="text-[10px] text-muted-foreground uppercase font-semibold">
-                Total Transaksi
-              </span>
-            </div>
-            <div className="bg-amber-50 border border-amber-200 px-4 py-2 rounded text-center">
-              <span className="block font-bold text-lg text-amber-700">
-                {
-                  mainOrders.filter(
-                    (o) =>
-                      o.payment_status === "unpaid" ||
-                      o.payment_status === "pending" ||
-                      (isDpOrder(o) && getLinkedPelunasan(o.order_id)?.payment_status !== "paid"),
-                  ).length
-                }
-              </span>
-              <span className="text-[10px] text-amber-800 uppercase font-semibold">
-                Belum Bayar
-              </span>
+          <div className="flex flex-col sm:flex-row gap-3 items-center">
+            <Link
+              to="/claimbatch1"
+              className="bg-brand-orange hover:bg-brand-orange/90 text-white px-4 py-2 rounded font-bold text-xs uppercase tracking-wide border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:translate-y-0.5 active:shadow-none transition-all flex items-center gap-2"
+            >
+              <Search className="w-4 h-4" />
+              Klaim Pesanan
+            </Link>
+            <div className="flex gap-3 text-xs">
+              <div className="bg-cream border border-ink px-4 py-2 rounded text-center">
+                <span className="block font-bold text-lg">{mainOrders.length}</span>
+                <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+                  Total Transaksi
+                </span>
+              </div>
+              <div className="bg-amber-50 border border-amber-200 px-4 py-2 rounded text-center">
+                <span className="block font-bold text-lg text-amber-700">
+                  {
+                    mainOrders.filter(
+                      (o) =>
+                        o.payment_status === "unpaid" ||
+                        o.payment_status === "pending" ||
+                        (isDpOrder(o) && getLinkedPelunasan(o.order_id)?.payment_status !== "paid"),
+                    ).length
+                  }
+                </span>
+                <span className="text-[10px] text-amber-800 uppercase font-semibold">
+                  Belum Bayar
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -571,6 +590,8 @@ function UserOrdersPage() {
             </div>
           </div>
         )}
+
+
 
         {/* Search Bar */}
         <div className="relative">

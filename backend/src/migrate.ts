@@ -249,6 +249,21 @@ export async function runMigration() {
       {
         name: "fix_pre_order_campaign_batch_name_two_zero",
         sql: "UPDATE pre_order_campaigns SET batch_name = 'Batch #2' WHERE batch_name = 'Batch #20'"
+      },
+      {
+        name: "order_claims",
+        sql: `CREATE TABLE IF NOT EXISTS order_claims (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          order_id VARCHAR(50) NOT NULL,
+          status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+          claim_reason VARCHAR(255) DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
+          UNIQUE KEY unique_user_order_claim (user_id, order_id)
+        )`
       }
     ];
 

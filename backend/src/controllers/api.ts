@@ -5561,3 +5561,250 @@ export const importOrders = async (req: Request, res: Response) => {
     connection.release();
   }
 };
+
+// ============ ORDER CLAIMS (BATCH 1) ============
+
+/**
+ * Endpoint for users to search their unassigned orders by NIM or Phone
+ */
+export const claimSearch = async (req: Request, res: Response) => {
+  try {
+    const { nim, phone } = req.body;
+    if (!nim && !phone) {
+      return res.status(400).json({ success: false, error: "Masukkan NIM atau No HP" });
+    }
+
+    // Search for orders where user_id IS NULL and batch_source = 'manual' or 'csv_import'
+    // Matching either customer_nim or customer_phone
+    const params: any[] = [];
+    let queryStr = `SELECT order_id, customer_name, customer_nim, customer_phone, gross_amount, created_at 
+       FROM orders 
+       WHERE user_id IS NULL 
+         AND (batch_source = 'manual' OR batch_source = 'csv_import')`;
+         
+    if (nim && phone) {
+      queryStr += ` AND (customer_nim = ? OR customer_phone = ? OR customer_phone = CONCAT('0', ?))`;
+      params.push(nim, phone, phone.startsWith('62') ? phone.substring(2) : phone);
+    } else if (nim) {
+      queryStr += ` AND customer_nim = ?`;
+      params.push(nim);
+    } else if (phone) {
+      queryStr += ` AND (customer_phone = ? OR customer_phone = CONCAT('0', ?))`;
+      params.push(phone, phone.startsWith('62') ? phone.substring(2) : phone);
+    }
+
+    queryStr += ` ORDER BY created_at DESC`;
+
+    const orders = await query<any>(queryStr, params);
+
+    // Get order items for these orders
+    let finalOrders = [];
+    for (const order of orders) {
+      const items = await query<any>(
+        `SELECT oi.product_name, oi.size, oi.color, oi.quantity, oi.unit_price, oi.subtotal, p.image_url,
+                p.price as p_price, p.promo_price as p_promo_price, p.filkom_price as p_filkom_price,
+                (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = 1 LIMIT 1) as primary_image_url
+         FROM order_items oi
+         LEFT JOIN products p ON p.id = oi.product_id
+         WHERE oi.order_id = ?`,
+        [order.order_id]
+      );
+      
+      // Masking the name for privacy
+      let maskedName = order.customer_name;
+      if (maskedName) {
+        const parts = maskedName.split(' ');
+        maskedName = parts.map((part: string) => {
+          if (part.length > 2) {
+            return part.substring(0, 2) + '*'.repeat(part.length - 2);
+          }
+          return part;
+        }).join(' ');
+      }
+
+      finalOrders.push({
+        ...order,
+        customer_name: maskedName,
+        items: items
+      });
+    }
+
+    return res.json({ success: true, orders: finalOrders });
+  } catch (error: any) {
+    console.error("Error in claimSearch:", error);
+    return res.status(500).json({ success: false, error: "Terjadi kesalahan sistem saat mencari pesanan" });
+  }
+};
+
+/**
+ * Endpoint for users to submit a claim for a specific order
+ */
+export const submitClaim = async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.body;
+    const userId = req.header("x-user-id");
+
+    if (!orderId || !userId) {
+      return res.status(400).json({ success: false, error: "Parameter tidak lengkap" });
+    }
+
+    // Check if order exists and is still unassigned
+    const order = await queryOne<any>(
+      "SELECT * FROM orders WHERE order_id = ? AND user_id IS NULL",
+      [orderId]
+    );
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan atau sudah terhubung dengan akun lain" });
+    }
+
+    // Check if already requested
+    const existing = await queryOne<any>(
+      "SELECT * FROM order_claims WHERE user_id = ? AND order_id = ?",
+      [userId, orderId]
+    );
+
+    if (existing) {
+      return res.status(400).json({ success: false, error: "Kamu sudah mengajukan klaim untuk pesanan ini, silakan tunggu admin mengeceknya." });
+    }
+
+    // Insert claim
+    await execute(
+      "INSERT INTO order_claims (user_id, order_id, status) VALUES (?, ?, 'pending')",
+      [userId, orderId]
+    );
+
+    return res.json({ success: true, message: "Klaim berhasil diajukan! Admin akan memverifikasi dalam waktu 1x24 jam." });
+  } catch (error: any) {
+    console.error("Error in submitClaim:", error);
+    return res.status(500).json({ success: false, error: "Gagal mengajukan klaim" });
+  }
+};
+
+/**
+ * Admin: Get all claims
+ */
+export const getAllClaims = async (req: Request, res: Response) => {
+  try {
+    const claims = await query<any>(
+      `SELECT c.id, c.user_id, c.order_id, c.status, c.created_at,
+              u.name as web_user_name, u.nim as web_user_nim, u.email as web_user_email, u.phone as web_user_phone,
+              o.customer_name as csv_name, o.customer_nim as csv_nim, o.customer_phone as csv_phone, o.customer_email as csv_email, o.gross_amount
+       FROM order_claims c
+       JOIN users u ON c.user_id = u.id
+       JOIN orders o ON c.order_id = o.order_id
+       ORDER BY c.created_at DESC`
+    );
+    return res.json({ success: true, claims });
+  } catch (error: any) {
+    console.error("Error in getAllClaims:", error);
+    return res.status(500).json({ success: false, error: "Gagal mengambil data klaim" });
+  }
+};
+
+/**
+ * Admin: Approve claim
+ */
+import { sendPushToUser } from "../services/pushService";
+
+export const approveClaim = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const claimId = req.params.id;
+    const adminName = req.header("x-user-name") || "Admin";
+
+    await connection.beginTransaction();
+
+    const [claims] = await connection.execute(
+      "SELECT * FROM order_claims WHERE id = ? FOR UPDATE",
+      [claimId]
+    );
+    const claim = (claims as any[])[0];
+
+    if (!claim) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, error: "Klaim tidak ditemukan" });
+    }
+
+    if (claim.status !== 'pending') {
+      await connection.rollback();
+      return res.status(400).json({ success: false, error: "Klaim ini sudah diproses sebelumnya" });
+    }
+
+    // Check if order is still unassigned
+    const [orders] = await connection.execute(
+      "SELECT * FROM orders WHERE order_id = ? FOR UPDATE",
+      [claim.order_id]
+    );
+    const order = (orders as any[])[0];
+
+    if (order.user_id) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, error: "Pesanan ini sudah dihubungkan ke akun lain" });
+    }
+
+    // 1. Update order
+    await connection.execute(
+      "UPDATE orders SET user_id = ? WHERE order_id = ?",
+      [claim.user_id, claim.order_id]
+    );
+
+    // 2. Update claim status
+    await connection.execute(
+      "UPDATE order_claims SET status = 'approved' WHERE id = ?",
+      [claimId]
+    );
+
+    // 3. Reject other pending claims for this same order
+    await connection.execute(
+      "UPDATE order_claims SET status = 'rejected' WHERE order_id = ? AND id != ?",
+      [claim.order_id, claimId]
+    );
+
+    await connection.commit();
+
+    // 4. Send Push Notification to User
+    try {
+      await sendPushToUser(
+        connection,
+        claim.user_id,
+        {
+          title: "🎉 Klaim Pesanan Berhasil!",
+          body: `Pesanan dengan ID ${claim.order_id} berhasil dihubungkan ke akunmu. Kamu sekarang bisa melacaknya!`,
+          url: `/orders`,
+        }
+      );
+    } catch (pushErr) {
+      console.error("Failed to send push on claim approve:", pushErr);
+      // Don't fail the request if push fails
+    }
+
+    return res.json({ success: true, message: "Klaim berhasil disetujui" });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error in approveClaim:", error);
+    return res.status(500).json({ success: false, error: "Gagal menyetujui klaim" });
+  } finally {
+    connection.release();
+  }
+};
+
+/**
+ * Admin: Reject claim
+ */
+export const rejectClaim = async (req: Request, res: Response) => {
+  try {
+    const claimId = req.params.id;
+    
+    await execute(
+      "UPDATE order_claims SET status = 'rejected' WHERE id = ?",
+      [claimId]
+    );
+    
+    return res.json({ success: true, message: "Klaim berhasil ditolak" });
+  } catch (error: any) {
+    console.error("Error in rejectClaim:", error);
+    return res.status(500).json({ success: false, error: "Gagal menolak klaim" });
+  }
+};
+

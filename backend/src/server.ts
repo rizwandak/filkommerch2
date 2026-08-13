@@ -370,6 +370,13 @@ app.put("/api/admin/vouchers/:id", checkRole(["admin"]), apiControllers.updateVo
 app.delete("/api/admin/vouchers/:id", checkRole(["admin"]), apiControllers.deleteVoucher);
 app.get("/api/admin/vouchers/:id/history", checkRole(["admin", "cashier"]), apiControllers.getVoucherHistory);
 
+// Order Claims API Routes
+app.post("/api/orders/claim-search", apiControllers.claimSearch);
+app.post("/api/orders/claim-submit", apiControllers.submitClaim);
+app.get("/api/admin/order-claims", checkRole(["admin"]), apiControllers.getAllClaims);
+app.post("/api/admin/order-claims/:id/approve", checkRole(["admin"]), apiControllers.approveClaim);
+app.post("/api/admin/order-claims/:id/reject", checkRole(["admin"]), apiControllers.rejectClaim);
+
 // Admin User CRUD API Routes
 app.get("/api/admin/users", checkRole(["admin", "cashier"]), apiControllers.getAllUsersAdmin);
 app.get("/api/admin/users/:id/orders", checkRole(["admin", "cashier"]), apiControllers.getUserTransactionsAdmin);

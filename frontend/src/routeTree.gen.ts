@@ -16,6 +16,7 @@ import { Route as OrderConfirmationRouteImport } from './routes/order-confirmati
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as DbTestRouteImport } from './routes/db-test'
+import { Route as Claimbatch1RouteImport } from './routes/claimbatch1'
 import { Route as CheckoutRouteImport } from './routes/checkout'
 import { Route as PosRouteRouteImport } from './routes/pos/route'
 import { Route as AdminRouteRouteImport } from './routes/admin/route'
@@ -70,6 +71,11 @@ const FaqRoute = FaqRouteImport.update({
 const DbTestRoute = DbTestRouteImport.update({
   id: '/db-test',
   path: '/db-test',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Claimbatch1Route = Claimbatch1RouteImport.update({
+  id: '/claimbatch1',
+  path: '/claimbatch1',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CheckoutRoute = CheckoutRouteImport.update({
@@ -178,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteRouteWithChildren
   '/pos': typeof PosRouteRouteWithChildren
   '/checkout': typeof CheckoutRoute
+  '/claimbatch1': typeof Claimbatch1Route
   '/db-test': typeof DbTestRoute
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/checkout': typeof CheckoutRoute
+  '/claimbatch1': typeof Claimbatch1Route
   '/db-test': typeof DbTestRoute
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
@@ -235,6 +243,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteRouteWithChildren
   '/pos': typeof PosRouteRouteWithChildren
   '/checkout': typeof CheckoutRoute
+  '/claimbatch1': typeof Claimbatch1Route
   '/db-test': typeof DbTestRoute
   '/faq': typeof FaqRoute
   '/login': typeof LoginRoute
@@ -266,6 +275,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/pos'
     | '/checkout'
+    | '/claimbatch1'
     | '/db-test'
     | '/faq'
     | '/login'
@@ -293,6 +303,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/checkout'
+    | '/claimbatch1'
     | '/db-test'
     | '/faq'
     | '/login'
@@ -322,6 +333,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/pos'
     | '/checkout'
+    | '/claimbatch1'
     | '/db-test'
     | '/faq'
     | '/login'
@@ -352,6 +364,7 @@ export interface RootRouteChildren {
   AdminRouteRoute: typeof AdminRouteRouteWithChildren
   PosRouteRoute: typeof PosRouteRouteWithChildren
   CheckoutRoute: typeof CheckoutRoute
+  Claimbatch1Route: typeof Claimbatch1Route
   DbTestRoute: typeof DbTestRoute
   FaqRoute: typeof FaqRoute
   LoginRoute: typeof LoginRoute
@@ -413,6 +426,13 @@ declare module '@tanstack/react-router' {
       path: '/db-test'
       fullPath: '/db-test'
       preLoaderRoute: typeof DbTestRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/claimbatch1': {
+      id: '/claimbatch1'
+      path: '/claimbatch1'
+      fullPath: '/claimbatch1'
+      preLoaderRoute: typeof Claimbatch1RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/checkout': {
@@ -609,6 +629,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRouteRoute: AdminRouteRouteWithChildren,
   PosRouteRoute: PosRouteRouteWithChildren,
   CheckoutRoute: CheckoutRoute,
+  Claimbatch1Route: Claimbatch1Route,
   DbTestRoute: DbTestRoute,
   FaqRoute: FaqRoute,
   LoginRoute: LoginRoute,

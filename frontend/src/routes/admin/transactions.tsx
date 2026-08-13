@@ -64,6 +64,9 @@ import {
   deleteOrder,
   deleteOfflineSale,
   verifyPaymentProof,
+  getAllClaimsServerAction,
+  approveClaimServerAction,
+  rejectClaimServerAction,
   type Order,
   type OfflineSale,
 } from "@backend/server-actions";
@@ -210,6 +213,7 @@ function AdminTransactionsPage() {
   const [offlineSales, setOfflineSales] = useState<OfflineSale[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [orderClaims, setOrderClaims] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Search & Filter state
@@ -339,6 +343,15 @@ function AdminTransactionsPage() {
       console.error("Error fetching offline sales:", error);
       toast.error("Gagal memuat penjualan POS");
       setOfflineSales([]);
+    }
+
+    try {
+      const claimsRes = await getAllClaimsServerAction();
+      if (claimsRes && claimsRes.success && claimsRes.claims) {
+        setOrderClaims(claimsRes.claims);
+      }
+    } catch (error) {
+      console.error("Error fetching claims:", error);
     } finally {
       setLoading(false);
     }
@@ -583,6 +596,36 @@ function AdminTransactionsPage() {
       }
     } catch {
       toast.error("Aksi gagal");
+    }
+  };
+
+  const handleApproveClaim = async (id: number) => {
+    if (!window.confirm("Setujui klaim ini dan hubungkan pesanan ke akun pembeli?")) return;
+    try {
+      const res = await approveClaimServerAction({ data: { id } });
+      if (res.success) {
+        toast.success(res.message);
+        await loadTransactions();
+      } else {
+        toast.error(res.error || "Gagal menyetujui klaim");
+      }
+    } catch (e: any) {
+      toast.error("Terjadi kesalahan sistem");
+    }
+  };
+
+  const handleRejectClaim = async (id: number) => {
+    if (!window.confirm("Tolak klaim ini?")) return;
+    try {
+      const res = await rejectClaimServerAction({ data: { id } });
+      if (res.success) {
+        toast.success(res.message);
+        await loadTransactions();
+      } else {
+        toast.error(res.error || "Gagal menolak klaim");
+      }
+    } catch (e: any) {
+      toast.error("Terjadi kesalahan sistem");
     }
   };
 
@@ -1352,6 +1395,14 @@ function AdminTransactionsPage() {
         <TabsList>
           <TabsTrigger value="online">Pesanan Online</TabsTrigger>
           <TabsTrigger value="offline">Penjualan Offline / POS</TabsTrigger>
+          <TabsTrigger value="claims">
+            Klaim Pesanan
+            {orderClaims.filter(c => c.status === 'pending').length > 0 && (
+              <span className="ml-2 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                {orderClaims.filter(c => c.status === 'pending').length}
+              </span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="online">
@@ -2028,6 +2079,92 @@ function AdminTransactionsPage() {
                             </tr>
                           )}
                         </>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="claims">
+          <Card>
+            <CardHeader>
+              <CardTitle className="display text-sm tracking-wider text-ink">
+                Klaim Pesanan Batch 1 ({orderClaims.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto rounded-lg border-2 border-ink">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead className="bg-cream border-b-2 border-ink font-bold">
+                    <tr>
+                      <th className="p-3 text-ink text-xs tracking-wider uppercase">Waktu Pengajuan</th>
+                      <th className="p-3 text-ink text-xs tracking-wider uppercase">Data Akun Web (User)</th>
+                      <th className="p-3 text-ink text-xs tracking-wider uppercase">Data Pesanan CSV</th>
+                      <th className="p-3 text-ink text-xs tracking-wider uppercase">Status</th>
+                      <th className="p-3 text-ink text-xs tracking-wider uppercase">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y-2 divide-ink/10 bg-white">
+                    {orderClaims.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-muted-foreground font-bold">
+                          Tidak ada data klaim.
+                        </td>
+                      </tr>
+                    ) : (
+                      orderClaims.map((claim) => (
+                        <tr key={claim.id} className="hover:bg-amber-50 transition-colors">
+                          <td className="p-3 text-xs">
+                            {new Date(claim.created_at).toLocaleString("id-ID")}
+                          </td>
+                          <td className="p-3 text-xs">
+                            <div className="font-bold text-ink">{claim.web_user_name}</div>
+                            <div className="text-muted-foreground">{claim.web_user_nim}</div>
+                            <div className="text-muted-foreground">{claim.web_user_email}</div>
+                          </td>
+                          <td className="p-3 text-xs">
+                            <div className="font-bold text-ink">{claim.csv_name} (ID: {claim.order_id})</div>
+                            <div className="text-muted-foreground">{claim.csv_nim}</div>
+                            <div className="text-muted-foreground">{claim.csv_phone}</div>
+                          </td>
+                          <td className="p-3 text-xs">
+                            <Badge
+                              className={
+                                claim.status === "pending"
+                                  ? "bg-amber-100 text-amber-800"
+                                  : claim.status === "approved"
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-red-100 text-red-800"
+                              }
+                            >
+                              {claim.status.toUpperCase()}
+                            </Badge>
+                          </td>
+                          <td className="p-3 text-xs flex gap-2">
+                            {claim.status === "pending" && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-none text-[10px]"
+                                  onClick={() => handleApproveClaim(claim.id)}
+                                >
+                                  Terima
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  className="shadow-none text-[10px]"
+                                  onClick={() => handleRejectClaim(claim.id)}
+                                >
+                                  Tolak
+                                </Button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
                       ))
                     )}
                   </tbody>

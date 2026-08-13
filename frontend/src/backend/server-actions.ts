@@ -2022,5 +2022,80 @@ export const deleteImportedOrdersServerAction = createServerFn({ method: "POST" 
     }
   });
 
+// ============ ORDER CLAIMS (BATCH 1) ============
 
+export const claimSearchServerAction = createServerFn({ method: "POST" })
+  .validator((data: { nim?: string; phone?: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/orders/claim-search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("claimSearchServerAction error:", e);
+      return { success: false, error: e.message || "Gagal mencari pesanan" };
+    }
+  });
 
+export const submitClaimServerAction = createServerFn({ method: "POST" })
+  .validator((data: { orderId: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/orders/claim-submit`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("submitClaimServerAction error:", e);
+      return { success: false, error: e.message || "Gagal mengajukan klaim" };
+    }
+  });
+
+export const getAllClaimsServerAction = createServerFn({ method: "POST" })
+  .handler(async () => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/order-claims`);
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getAllClaimsServerAction error:", e);
+      return { success: false, error: e.message || "Gagal memuat daftar klaim" };
+    }
+  });
+
+export const approveClaimServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/order-claims/${data.id}/approve`, {
+        method: "POST",
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("approveClaimServerAction error:", e);
+      return { success: false, error: e.message || "Gagal menyetujui klaim" };
+    }
+  });
+
+export const rejectClaimServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/order-claims/${data.id}/reject`, {
+        method: "POST",
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("rejectClaimServerAction error:", e);
+      return { success: false, error: e.message || "Gagal menolak klaim" };
+    }
+  });
