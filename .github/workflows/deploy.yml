@@ -24,20 +24,27 @@ jobs:
       - name: 🔨 Install & Build Frontend
         env:
           VITE_API_URL: https://filkommerch.com/api
+          NITRO_PRESET: node-server
         run: |
           cd frontend
           npm install
           npm run build
 
-      # ---- DEPLOY FRONTEND TO PUBLIC_HTML VIA FTP ----
+      # ---- CREATE RESTART TRIGGER ----
+      - name: ⏱️ Create Restart File
+        run: |
+          mkdir -p frontend/.output/tmp
+          echo $(date) > frontend/.output/tmp/restart.txt
+
+      # ---- DEPLOY FRONTEND VIA FTP ----
       - name: 📂 Deploy Frontend via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./frontend/.output/public/
-          server-dir: /public_html/
+          local-dir: ./frontend/.output/
+          server-dir: /frontend_app/
           git-ignore: false
 
   deploy-backend:
