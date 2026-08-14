@@ -377,6 +377,7 @@ app.get("/api/orders/claims/me", apiControllers.getUserClaims);
 app.get("/api/admin/order-claims", checkRole(["admin"]), apiControllers.getAllClaims);
 app.post("/api/admin/order-claims/:id/approve", checkRole(["admin"]), apiControllers.approveClaim);
 app.post("/api/admin/order-claims/:id/reject", checkRole(["admin"]), apiControllers.rejectClaim);
+app.post("/api/admin/order-claims/:id/annul", checkRole(["admin"]), apiControllers.annulClaim);
 
 // Admin User CRUD API Routes
 app.get("/api/admin/users", checkRole(["admin", "cashier"]), apiControllers.getAllUsersAdmin);

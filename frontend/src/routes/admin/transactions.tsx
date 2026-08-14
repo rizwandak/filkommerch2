@@ -67,6 +67,7 @@ import {
   getAllClaimsServerAction,
   approveClaimServerAction,
   rejectClaimServerAction,
+  annulClaimServerAction,
   type Order,
   type OfflineSale,
 } from "@backend/server-actions";
@@ -227,6 +228,12 @@ function AdminTransactionsPage() {
 
   // Filter Modal state
   const [filterModalOpen, setFilterModalOpen] = useState(false);
+
+  // Claim Detail Modal state
+  const [detailClaimModalOpen, setDetailClaimModalOpen] = useState(false);
+  const [selectedClaim, setSelectedClaim] = useState<any>(null);
+  const [claimOrderDetails, setClaimOrderDetails] = useState<any>(null);
+  const [loadingClaimOrder, setLoadingClaimOrder] = useState(false);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -599,6 +606,34 @@ function AdminTransactionsPage() {
     }
   };
 
+  const handleOpenDetailClaim = async (claim: any) => {
+    setSelectedClaim(claim);
+    setDetailClaimModalOpen(true);
+    setLoadingClaimOrder(true);
+    try {
+      const res = await getOrderById({ data: claim.order_id });
+      if (res.success) {
+        setClaimOrderDetails(res);
+      } else {
+        toast.error("Gagal memuat detail pesanan terkait");
+        setClaimOrderDetails(null);
+      }
+    } catch (e) {
+      toast.error("Terjadi kesalahan memuat pesanan");
+      setClaimOrderDetails(null);
+    } finally {
+      setLoadingClaimOrder(false);
+    }
+  };
+
+  const handleCloseDetailClaim = () => {
+    setDetailClaimModalOpen(false);
+    setTimeout(() => {
+      setSelectedClaim(null);
+      setClaimOrderDetails(null);
+    }, 300);
+  };
+
   const handleApproveClaim = async (id: number) => {
     if (!window.confirm("Setujui klaim ini dan hubungkan pesanan ke akun pembeli?")) return;
     const adminNote = window.prompt("Catatan untuk pengguna (opsional):");
@@ -606,6 +641,7 @@ function AdminTransactionsPage() {
       const res = await approveClaimServerAction({ data: { id, adminNote: adminNote || undefined } });
       if (res.success) {
         toast.success(res.message);
+        if (detailClaimModalOpen) handleCloseDetailClaim();
         await loadTransactions();
       } else {
         toast.error(res.error || "Gagal menyetujui klaim");
@@ -622,9 +658,26 @@ function AdminTransactionsPage() {
       const res = await rejectClaimServerAction({ data: { id, adminNote: adminNote || undefined } });
       if (res.success) {
         toast.success(res.message);
+        if (detailClaimModalOpen) handleCloseDetailClaim();
         await loadTransactions();
       } else {
         toast.error(res.error || "Gagal menolak klaim");
+      }
+    } catch (e: any) {
+      toast.error("Terjadi kesalahan sistem");
+    }
+  };
+
+  const handleAnnulClaim = async (id: number) => {
+    if (!window.confirm("Anulir keputusan ini dan kembalikan klaim menjadi status Pending? (Data pesanan akan dikembalikan seperti semula)")) return;
+    try {
+      const res = await annulClaimServerAction({ data: { id } });
+      if (res.success) {
+        toast.success(res.message);
+        if (detailClaimModalOpen) handleCloseDetailClaim();
+        await loadTransactions();
+      } else {
+        toast.error(res.error || "Gagal menganulir klaim");
       }
     } catch (e: any) {
       toast.error("Terjadi kesalahan sistem");
@@ -2151,25 +2204,14 @@ function AdminTransactionsPage() {
                             )}
                           </td>
                           <td className="p-3 text-xs flex gap-2">
-                            {claim.status === "pending" && (
-                              <>
-                                <Button
-                                  size="sm"
-                                  className="bg-emerald-500 hover:bg-emerald-600 text-white shadow-none text-[10px]"
-                                  onClick={() => handleApproveClaim(claim.id)}
-                                >
-                                  Terima
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  className="shadow-none text-[10px]"
-                                  onClick={() => handleRejectClaim(claim.id)}
-                                >
-                                  Tolak
-                                </Button>
-                              </>
-                            )}
+                            <Button
+                              size="sm"
+                              className="bg-brand-blue hover:bg-brand-blue/90 text-white shadow-none text-[10px]"
+                              onClick={() => handleOpenDetailClaim(claim)}
+                            >
+                              <Eye className="w-3 h-3 mr-1" />
+                              Detail
+                            </Button>
                           </td>
                         </tr>
                       ))
@@ -3043,6 +3085,184 @@ function AdminTransactionsPage() {
           toast.success("Broadcast push notification berhasil disiarkan!");
         }}
       />
+
+      {/* Detail Klaim Modal */}
+      <Dialog open={detailClaimModalOpen} onOpenChange={setDetailClaimModalOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-[#FCFAF7] border-2 border-ink shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] p-0 rounded-xl gap-0">
+          <DialogHeader className="p-6 pb-4 border-b-2 border-ink bg-white sticky top-0 z-10 flex flex-row items-center justify-between">
+            <div>
+              <DialogTitle className="font-black text-2xl uppercase tracking-tight text-ink flex items-center gap-2">
+                <FileText className="w-6 h-6 text-brand-orange" />
+                Detail Klaim Pesanan
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground mt-1 font-medium">ID Pesanan: {selectedClaim?.order_id}</p>
+            </div>
+          </DialogHeader>
+
+          <div className="p-6 space-y-6">
+            {selectedClaim && (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Akun Web */}
+                  <div className="bg-white border-2 border-ink rounded-xl p-5 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+                    <h3 className="font-black text-sm uppercase text-brand-blue mb-4 flex items-center gap-2">
+                      <Users className="w-4 h-4" /> Data Akun Web (Pengklaim)
+                    </h3>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs font-bold uppercase mb-0.5">Nama</p>
+                        <p className="font-bold text-ink">{selectedClaim.web_user_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs font-bold uppercase mb-0.5">NIM</p>
+                        <p className="font-medium text-ink">{selectedClaim.web_user_nim}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs font-bold uppercase mb-0.5">No HP</p>
+                        <p className="font-medium text-ink">{selectedClaim.web_user_phone}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs font-bold uppercase mb-0.5">Email</p>
+                        <p className="font-medium text-ink">{selectedClaim.web_user_email}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Data CSV */}
+                  <div className="bg-cream/40 border-2 border-ink border-dashed rounded-xl p-5">
+                    <h3 className="font-black text-sm uppercase text-brand-orange mb-4 flex items-center gap-2">
+                      <FileText className="w-4 h-4" /> Data CSV Asli (Batch 1)
+                    </h3>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <p className="text-muted-foreground text-xs font-bold uppercase mb-0.5">Nama di Form</p>
+                        <p className="font-bold text-ink">{selectedClaim.csv_name}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs font-bold uppercase mb-0.5">NIM di Form</p>
+                        <p className="font-medium text-ink">{selectedClaim.csv_nim}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs font-bold uppercase mb-0.5">No HP di Form</p>
+                        <p className="font-medium text-ink">{selectedClaim.csv_phone}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground text-xs font-bold uppercase mb-0.5">Email di Form</p>
+                        <p className="font-medium text-ink">{selectedClaim.csv_email}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Items */}
+                <div className="mt-6 border-t-2 border-ink border-dashed pt-6">
+                  <h3 className="font-black text-sm uppercase text-ink mb-4 flex items-center gap-2">
+                    <ShoppingBag className="w-4 h-4 text-brand-orange" />
+                    Item yang Dipesan
+                  </h3>
+                  
+                  {loadingClaimOrder ? (
+                    <div className="py-8 text-center text-muted-foreground font-medium animate-pulse">
+                      Memuat rincian pesanan...
+                    </div>
+                  ) : claimOrderDetails?.items && claimOrderDetails.items.length > 0 ? (
+                    <div className="overflow-x-auto rounded border-2 border-ink/20">
+                      <table className="w-full text-left text-sm whitespace-nowrap">
+                        <thead className="bg-cream border-b-2 border-ink/20">
+                          <tr>
+                            <th className="p-3 font-bold text-ink">Item</th>
+                            <th className="p-3 font-bold text-ink text-center">Harga</th>
+                            <th className="p-3 font-bold text-ink text-center">Qty</th>
+                            <th className="p-3 font-bold text-ink text-right">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y border-ink/10">
+                          {claimOrderDetails.items.map((item: any, idx: number) => {
+                            const variantParts = [];
+                            if (item.size && item.size !== "Standard" && item.size !== "One Size" && item.size !== "") variantParts.push(item.size);
+                            if (item.color && item.color !== "") variantParts.push(item.color);
+                            const variantText = variantParts.length > 0 ? variantParts.join(" / ") : "-";
+                            const price = Number(item.unit_price) || 0;
+                            const subtotal = Number(item.subtotal) || (price * item.quantity);
+                            
+                            return (
+                              <tr key={idx} className="bg-white">
+                                <td className="p-3">
+                                  <div className="font-bold text-ink">{item.product_name}</div>
+                                  <div className="text-xs text-muted-foreground">{variantText}</div>
+                                </td>
+                                <td className="p-3 text-center">Rp {price.toLocaleString("id-ID")}</td>
+                                <td className="p-3 text-center font-bold text-ink">{item.quantity}</td>
+                                <td className="p-3 text-right font-black text-brand-blue">
+                                  Rp {subtotal.toLocaleString("id-ID")}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="py-4 text-center text-muted-foreground italic border-2 border-ink/10 border-dashed rounded bg-white">
+                      Rincian item tidak tersedia.
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex justify-between items-center bg-brand-orange/10 border-2 border-brand-orange/30 rounded p-4">
+                    <p className="font-bold text-ink uppercase text-xs">Total Transaksi</p>
+                    <p className="font-black text-brand-orange text-lg">
+                      Rp {Number(selectedClaim.gross_amount).toLocaleString("id-ID")}
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          <DialogFooter className="p-6 bg-cream/30 border-t-2 border-ink sticky bottom-0 z-10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCloseDetailClaim}
+              className="border-2 border-ink font-bold"
+            >
+              Tutup
+            </Button>
+            
+            {selectedClaim?.status === "pending" ? (
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={() => handleRejectClaim(selectedClaim.id)}
+                  className="bg-red-500 hover:bg-red-600 text-white font-bold border-2 border-transparent"
+                >
+                  Tolak Klaim
+                </Button>
+                <Button
+                  onClick={() => handleApproveClaim(selectedClaim.id)}
+                  className="bg-emerald-500 hover:bg-emerald-600 text-white font-black border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none transition-all"
+                >
+                  Setujui & Hubungkan
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border-2 ${
+                  selectedClaim?.status === "approved" ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
+                  "bg-red-100 text-red-800 border-red-200"
+                }`}>
+                  Status: {selectedClaim?.status === "approved" ? "Disetujui" : "Ditolak"}
+                </span>
+                <Button
+                  onClick={() => handleAnnulClaim(selectedClaim?.id)}
+                  className="bg-amber-500 hover:bg-amber-600 text-white font-bold border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" /> Anulir Keputusan
+                </Button>
+              </div>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Sent Notifications History & Unsend Modal */}
       <SentNotificationsHistoryModal

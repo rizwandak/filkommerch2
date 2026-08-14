@@ -5757,16 +5757,36 @@ export const approveClaim = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: "Pesanan ini sudah dihubungkan ke akun lain" });
     }
 
-    // 1. Update order
+    // Get the user data
+    const [users] = await connection.execute(
+      "SELECT name, email, phone, nim FROM users WHERE id = ?",
+      [claim.user_id]
+    );
+    const user = (users as any[])[0];
+
+    if (!user) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, error: "Pengguna tidak ditemukan" });
+    }
+
+    // 1. Backup original order data into order_claims.original_csv_data
+    const originalCsvData = JSON.stringify({
+      customer_name: order.customer_name,
+      customer_email: order.customer_email,
+      customer_phone: order.customer_phone,
+      customer_nim: order.customer_nim
+    });
+
+    // 2. Update claim status, admin_note, and original_csv_data
     await connection.execute(
-      "UPDATE orders SET user_id = ? WHERE order_id = ?",
-      [claim.user_id, claim.order_id]
+      "UPDATE order_claims SET status = 'approved', admin_note = ?, original_csv_data = ? WHERE id = ?",
+      [adminNote || null, originalCsvData, claimId]
     );
 
-    // 2. Update claim status and admin_note
+    // 3. Update order: set user_id and overwrite buyer details
     await connection.execute(
-      "UPDATE order_claims SET status = 'approved', admin_note = ? WHERE id = ?",
-      [adminNote || null, claimId]
+      "UPDATE orders SET user_id = ?, customer_name = ?, customer_email = ?, customer_phone = ?, customer_nim = ? WHERE order_id = ?",
+      [claim.user_id, user.name, user.email, user.phone, user.nim, claim.order_id]
     );
 
     // 3. Reject other pending claims for this same order
@@ -5820,6 +5840,75 @@ export const rejectClaim = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error in rejectClaim:", error);
     return res.status(500).json({ success: false, error: "Gagal menolak klaim" });
+  }
+};
+
+/**
+ * Admin: Annul claim (Revert decision to pending)
+ */
+export const annulClaim = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const claimId = req.params.id;
+
+    await connection.beginTransaction();
+
+    const [claims] = await connection.execute(
+      "SELECT * FROM order_claims WHERE id = ? FOR UPDATE",
+      [claimId]
+    );
+    const claim = (claims as any[])[0];
+
+    if (!claim) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, error: "Klaim tidak ditemukan" });
+    }
+
+    if (claim.status === 'pending') {
+      await connection.rollback();
+      return res.status(400).json({ success: false, error: "Klaim masih berstatus pending" });
+    }
+
+    // If it was approved, we need to revert the order changes
+    if (claim.status === 'approved') {
+      let csvData: any = {};
+      try {
+        if (claim.original_csv_data) {
+          csvData = JSON.parse(claim.original_csv_data);
+        }
+      } catch (e) {
+        console.error("Failed to parse original_csv_data", e);
+      }
+
+      const c_name = csvData.customer_name || null;
+      const c_email = csvData.customer_email || null;
+      const c_phone = csvData.customer_phone || null;
+      const c_nim = csvData.customer_nim || null;
+
+      // Unassign user_id from order and restore CSV data if available
+      await connection.execute(
+        "UPDATE orders SET user_id = NULL, customer_name = COALESCE(?, customer_name), customer_email = COALESCE(?, customer_email), customer_phone = COALESCE(?, customer_phone), customer_nim = COALESCE(?, customer_nim) WHERE order_id = ?",
+        [c_name, c_email, c_phone, c_nim, claim.order_id]
+      );
+    }
+
+    // Set claim back to pending
+    await connection.execute(
+      "UPDATE order_claims SET status = 'pending', admin_note = NULL WHERE id = ?",
+      [claimId]
+    );
+
+    // If we are annulling an approved claim, what about the other claims for the same order that were rejected?
+    // Let's leave them rejected for now, or the admin can annul them individually.
+
+    await connection.commit();
+    return res.json({ success: true, message: "Klaim berhasil dianulir dan dikembalikan ke status Pending" });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error in annulClaim:", error);
+    return res.status(500).json({ success: false, error: "Gagal menganulir klaim" });
+  } finally {
+    connection.release();
   }
 };
 

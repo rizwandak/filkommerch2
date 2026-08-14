@@ -2088,19 +2088,35 @@ export const approveClaimServerAction = createServerFn({ method: "POST" })
   });
 
 export const rejectClaimServerAction = createServerFn({ method: "POST" })
-  .validator((data: { id: number, adminNote?: string }) => data)
+  .validator((d: { id: number, adminNote?: string }) => d)
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();
       const res = await serverFetch(`${baseUrl}/api/admin/order-claims/${data.id}/reject`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({ adminNote: data.adminNote })
       });
-      return await res.json();
+      const resJson = await res.json();
+      return { success: true, message: resJson.message || "Klaim berhasil ditolak" };
     } catch (e: any) {
       console.warn("rejectClaimServerAction error:", e);
       return { success: false, error: e.message || "Gagal menolak klaim" };
+    }
+  });
+
+export const annulClaimServerAction = createServerFn({ method: "POST" })
+  .validator((d: { id: number }) => d)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/order-claims/${data.id}/annul`, {
+        method: "POST"
+      });
+      const resJson = await res.json();
+      return { success: true, message: resJson.message || "Klaim berhasil dianulir" };
+    } catch (e: any) {
+      console.warn("annulClaimServerAction error:", e);
+      return { success: false, error: e.message || "Gagal menganulir klaim" };
     }
   });
 
