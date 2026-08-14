@@ -131,6 +131,11 @@ interface OrdersSummaryResponse {
   products: ProductSummary[];
   buyers: BuyerSummary[];
   sales_trend: SalesTrendPoint[];
+  visitors?: {
+    total: number;
+    unique_total: number;
+    unique_today: number;
+  };
 }
 
 function AdminDashboardPage() {
@@ -145,6 +150,7 @@ function AdminDashboardPage() {
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [buyers, setBuyers] = useState<BuyerSummary[]>([]);
   const [salesTrend, setSalesTrend] = useState<SalesTrendPoint[]>([]);
+  const [visitors, setVisitors] = useState<{total: number, unique_total: number, unique_today: number} | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -199,6 +205,9 @@ function AdminDashboardPage() {
         setProducts(summaryResult.products || []);
         setBuyers(summaryResult.buyers || []);
         setSalesTrend(summaryResult.sales_trend || []);
+        if (summaryResult.visitors) {
+          setVisitors(summaryResult.visitors);
+        }
       }
 
       // Fetch inventory status
@@ -418,7 +427,7 @@ function AdminDashboardPage() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* KPI 1: Revenue */}
         <Card className="shadow-sm border-border bg-card overflow-hidden relative">
           <div className="absolute top-0 left-0 w-1.5 h-full bg-[var(--brand-blue)]" />
@@ -527,6 +536,33 @@ function AdminDashboardPage() {
               <div className="flex items-center justify-between">
                 <span>Subtotal Kotor:</span>
                 <span className="font-semibold">Rp {(summary?.total_subtotal || 0).toLocaleString("id-ID")}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* KPI 5: Website Visitors */}
+        <Card className="shadow-sm border-border bg-card overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-1.5 h-full bg-cyan-500" />
+          <CardHeader className="pb-2">
+            <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center justify-between">
+              Pengunjung Web
+              <Users className="h-4 w-4 text-cyan-500" />
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-extrabold text-cyan-600 flex items-center gap-1">
+              <span>{visitors?.unique_today || 0}</span>
+              <span className="text-xs font-bold text-ink uppercase tracking-normal">Hari Ini</span>
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-2 space-y-1">
+              <div className="flex items-center justify-between">
+                <span>Total Unique IP:</span>
+                <span className="font-semibold text-ink">{visitors?.unique_total || 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span>Total Pageviews:</span>
+                <span className="font-semibold">{visitors?.total || 0}</span>
               </div>
             </div>
           </CardContent>

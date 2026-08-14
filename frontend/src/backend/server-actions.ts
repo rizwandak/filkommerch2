@@ -2099,3 +2099,19 @@ export const rejectClaimServerAction = createServerFn({ method: "POST" })
       return { success: false, error: e.message || "Gagal menolak klaim" };
     }
   });
+
+export const trackVisitServerAction = createServerFn({ method: "POST" })
+  .validator((data: { path: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/analytics/track-visit`, {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("trackVisitServerAction error:", e);
+      return { success: false }; // Fail silently
+    }
+  });

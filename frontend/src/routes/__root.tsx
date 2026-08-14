@@ -18,6 +18,7 @@ import { AuthProvider } from "../lib/auth";
 import { Toaster } from "@frontend/components/ui/sonner";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { SplashScreen } from "../components/SplashScreen";
+import { trackVisitServerAction } from "../backend/server-actions";
 
 function NotFoundComponent() {
   return (
@@ -190,6 +191,14 @@ function RootComponent() {
   useEffect(() => {
     if (localStorage.getItem("theme") === "dark") {
       document.documentElement.classList.add("dark");
+    }
+    
+    // Track visit once per session
+    const hasTracked = sessionStorage.getItem("visit_tracked");
+    if (!hasTracked) {
+      trackVisitServerAction({ data: { path: window.location.pathname } }).then(() => {
+        sessionStorage.setItem("visit_tracked", "true");
+      }).catch(e => console.error("Tracking failed", e));
     }
   }, []);
 

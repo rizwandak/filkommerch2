@@ -22,6 +22,19 @@ export async function runMigration() {
 
     const queries = [
       {
+        name: "page_views",
+        sql: `CREATE TABLE IF NOT EXISTS page_views (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          ip_address VARCHAR(45) DEFAULT NULL,
+          user_agent TEXT DEFAULT NULL,
+          path VARCHAR(255) DEFAULT NULL,
+          user_id INT DEFAULT NULL,
+          user_name VARCHAR(100) DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_ip_path (ip_address, path)
+        )`
+      },
+      {
         name: "product_reviews",
         sql: `CREATE TABLE IF NOT EXISTS product_reviews (
           id INT AUTO_INCREMENT PRIMARY KEY,

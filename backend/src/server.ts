@@ -402,6 +402,7 @@ app.get("/api/analytics/daily", checkRole(["admin", "cashier"]), apiControllers.
 app.get("/api/analytics/top-products", checkRole(["admin", "cashier"]), apiControllers.getTopProducts);
 app.get("/api/analytics/inventory", checkRole(["admin", "cashier"]), apiControllers.getInventory);
 app.get("/api/analytics/orders-summary", checkRole(["admin", "cashier"]), apiControllers.getOrdersSummary);
+app.post("/api/analytics/track-visit", apiControllers.trackVisit);
 
 // Vendoring & Vendor Mitra API Routes
 app.get("/api/admin/vendors", checkRole(["admin"]), apiControllers.getVendors);

@@ -3018,7 +3018,7 @@ export const togglePreOrderCampaignActive = async (req: Request, res: Response) 
     await execute("UPDATE pre_order_campaigns SET is_active = ? WHERE id = ?", [is_active ? 1 : 0, id]);
     return res.json({ success: true, message: "Status batch berhasil diubah" });
   } catch (error: any) {
-    console.error("Error toggling pre-order campaign active status:", error);
+    console.error("Error toggling pre-order campaign status:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
@@ -4020,6 +4020,12 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
     const campaignsBreakdown = Object.values(batchBreakdownMap);
     const civitasCount = buyerRows.filter((b: any) => b.customer_nim && String(b.customer_nim).trim() !== "").length;
 
+    // Fetch Visitor Analytics
+    const todayStr = new Date().toISOString().split('T')[0];
+    const totalVisitorsRow = await queryOne<any>("SELECT COUNT(*) as count FROM page_views", []);
+    const uniqueVisitorsTotalRow = await queryOne<any>("SELECT COUNT(DISTINCT ip_address) as count FROM page_views", []);
+    const uniqueVisitorsTodayRow = await queryOne<any>("SELECT COUNT(DISTINCT ip_address) as count FROM page_views WHERE DATE(created_at) = ?", [todayStr]);
+
     return res.json({
       success: true,
       summary: {
@@ -4033,6 +4039,11 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         total_tax: Number(summary?.total_tax || 0),
         total_subtotal: Number(summary?.total_subtotal || 0),
         civitas_count: civitasCount
+      },
+      visitors: {
+        total: totalVisitorsRow?.count || 0,
+        unique_total: uniqueVisitorsTotalRow?.count || 0,
+        unique_today: uniqueVisitorsTodayRow?.count || 0,
       },
       campaigns_list: campaigns.map((c: any) => ({ id: c.id, batch_name: c.batch_name })),
       campaigns_breakdown: campaignsBreakdown,
@@ -5808,3 +5819,32 @@ export const rejectClaim = async (req: Request, res: Response) => {
   }
 };
 
+// Track Visitor (Analytics)
+export const trackVisit = async (req: Request, res: Response) => {
+  try {
+    const { path } = req.body;
+    // Get IP Address safely, falling back to general request IP
+    const ip_address = req.headers["x-forwarded-for"] || req.connection?.remoteAddress || req.socket?.remoteAddress || req.ip || "unknown";
+    const user_agent = req.headers["user-agent"] || "unknown";
+    const user_id = req.headers["x-user-id"] ? parseInt(req.headers["x-user-id"] as string) : null;
+    const user_name = req.headers["x-user-name"] ? String(req.headers["x-user-name"]) : null;
+
+    // Simple anti-spam check (Optional: Limit to 1 insert per IP per day for the same path? For now just insert every visit)
+    await execute(
+      "INSERT INTO page_views (ip_address, user_agent, path, user_id, user_name) VALUES (?, ?, ?, ?, ?)",
+      [
+        Array.isArray(ip_address) ? ip_address[0] : ip_address,
+        user_agent,
+        path || "/",
+        user_id,
+        user_name
+      ]
+    );
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    // Fail silently to not disrupt the frontend
+    console.error("Error tracking visit:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
