@@ -5783,10 +5783,17 @@ export const approveClaim = async (req: Request, res: Response) => {
       [adminNote || null, originalCsvData, claimId]
     );
 
-    // 3. Update order: set user_id and overwrite buyer details
+    // 3. Update order: set user_id and overwrite buyer details, fallback to order's original data if user's data is null
     await connection.execute(
       "UPDATE orders SET user_id = ?, customer_name = ?, customer_email = ?, customer_phone = ?, customer_nim = ? WHERE order_id = ?",
-      [claim.user_id, user.name, user.email, user.phone, user.nim, claim.order_id]
+      [
+        claim.user_id, 
+        user.name || order.customer_name, 
+        user.email || order.customer_email, 
+        user.phone || order.customer_phone, 
+        user.nim || order.customer_nim, 
+        claim.order_id
+      ]
     );
 
     // 3. Reject other pending claims for this same order
