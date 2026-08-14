@@ -49,6 +49,7 @@ import {
   SlidersHorizontal,
   RotateCcw,
   Megaphone,
+  FileText,
 } from "lucide-react";
 import { BroadcastNotificationModal } from "@/components/BroadcastNotificationModal";
 import { SentNotificationsHistoryModal } from "@/components/SentNotificationsHistoryModal";
