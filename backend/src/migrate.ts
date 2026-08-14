@@ -268,7 +268,7 @@ export async function runMigration() {
         sql: `CREATE TABLE IF NOT EXISTS order_claims (
           id INT AUTO_INCREMENT PRIMARY KEY,
           user_id INT NOT NULL,
-          order_id VARCHAR(50) NOT NULL,
+          order_id VARCHAR(50) COLLATE utf8mb4_general_ci NOT NULL,
           status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
           claim_reason VARCHAR(255) DEFAULT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

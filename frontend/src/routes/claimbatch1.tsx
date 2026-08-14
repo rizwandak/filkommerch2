@@ -37,10 +37,16 @@ function ClaimBatch1Page() {
     setHasSearched(false);
     
     try {
+      // Hilangkan awalan 0 dari nomor HP jika ada (untuk akurasi)
+      let cleanedPhone = phone.trim();
+      if (cleanedPhone.startsWith('0')) {
+        cleanedPhone = cleanedPhone.substring(1);
+      }
+
       const res = await claimSearchServerAction({ 
         data: { 
           nim: nim.trim() || undefined, 
-          phone: phone.trim() || undefined 
+          phone: cleanedPhone || undefined 
         } 
       });
       
