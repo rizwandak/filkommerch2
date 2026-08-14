@@ -4025,6 +4025,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
     const totalVisitorsRow = await queryOne<any>("SELECT COUNT(*) as count FROM page_views", []);
     const uniqueVisitorsTotalRow = await queryOne<any>("SELECT COUNT(DISTINCT ip_address) as count FROM page_views", []);
     const uniqueVisitorsTodayRow = await queryOne<any>("SELECT COUNT(DISTINCT ip_address) as count FROM page_views WHERE DATE(created_at) = ?", [todayStr]);
+    const recentVisitors = await query<any>("SELECT * FROM page_views ORDER BY created_at DESC LIMIT 100", []);
 
     return res.json({
       success: true,
@@ -4044,6 +4045,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         total: totalVisitorsRow?.count || 0,
         unique_total: uniqueVisitorsTotalRow?.count || 0,
         unique_today: uniqueVisitorsTodayRow?.count || 0,
+        list: recentVisitors,
       },
       campaigns_list: campaigns.map((c: any) => ({ id: c.id, batch_name: c.batch_name })),
       campaigns_breakdown: campaignsBreakdown,

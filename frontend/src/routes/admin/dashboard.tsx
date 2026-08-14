@@ -135,6 +135,7 @@ interface OrdersSummaryResponse {
     total: number;
     unique_total: number;
     unique_today: number;
+    list?: any[];
   };
 }
 
@@ -588,6 +589,9 @@ function AdminDashboardPage() {
                 {lowStockCount}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger value="visitors" className="data-[state=active]:bg-card py-2 text-xs">
+            <Activity className="h-3.5 w-3.5 mr-2" /> Daftar Pengunjung
           </TabsTrigger>
         </TabsList>
 
@@ -1172,6 +1176,66 @@ function AdminDashboardPage() {
                   </table>
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+        {/* TAB 5: VISITORS */}
+        <TabsContent value="visitors" className="space-y-6">
+          <Card className="border-border shadow-sm bg-card">
+            <CardHeader className="pb-3 border-b border-border">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="display tracking-wider text-lg text-ink">Daftar Pengunjung Terkini</CardTitle>
+                  <CardDescription className="text-xs uppercase tracking-widest mt-1">100 Pengunjung Terakhir</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-muted-foreground">
+                  <thead className="bg-muted text-xs uppercase text-muted-foreground border-b border-border">
+                    <tr>
+                      <th className="px-4 py-3 font-semibold">Waktu Kunjungan</th>
+                      <th className="px-4 py-3 font-semibold">User</th>
+                      <th className="px-4 py-3 font-semibold">IP Address</th>
+                      <th className="px-4 py-3 font-semibold">Path</th>
+                      <th className="px-4 py-3 font-semibold">User Agent / Perangkat</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {visitors?.list && visitors.list.length > 0 ? (
+                      visitors.list.map((v, i) => (
+                        <tr key={i} className="hover:bg-muted/50 transition-colors">
+                          <td className="px-4 py-3 whitespace-nowrap text-ink">
+                            {new Date(v.created_at).toLocaleString("id-ID", {
+                              day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+                            })}
+                          </td>
+                          <td className="px-4 py-3 text-ink">
+                            {v.user_name ? (
+                              <div className="flex flex-col">
+                                <span className="font-semibold text-[var(--brand-blue)]">{v.user_name}</span>
+                                <span className="text-xs opacity-70">ID: {v.user_id}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs italic opacity-70">Guest (Belum Login)</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-xs text-orange-600">{v.ip_address || "unknown"}</td>
+                          <td className="px-4 py-3 font-mono text-xs">{v.path}</td>
+                          <td className="px-4 py-3 text-xs max-w-xs truncate" title={v.user_agent}>{v.user_agent}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-12 text-center text-muted-foreground">
+                          Belum ada data pengunjung.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
