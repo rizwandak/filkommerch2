@@ -47,6 +47,8 @@ jobs:
           local-dir: ./frontend/.output/
           server-dir: /frontend_app/
           git-ignore: false
+          exclude: |
+            **/node_modules/**
 
   deploy-backend:
     name: ⚙️ Deploy Backend
