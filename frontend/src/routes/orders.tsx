@@ -499,7 +499,8 @@ function UserOrdersPage() {
     );
   };
 
-  const getFulfillmentLabel = (type: string) => {
+  const getFulfillmentLabel = (type: string, batchSource?: string) => {
+    if (batchSource === "manual" || batchSource === "csv_import") return "Ambil di Toko FILKOM Merch";
     if (type === "pickup") return "Ambil di Toko FILKOM Merch";
     if (type === "walk_in") return "Beli Langsung (POS)";
     return "Pengiriman Kurir";
@@ -904,7 +905,7 @@ function UserOrdersPage() {
                       <div>
                         <span className="text-muted-foreground">Metode Pengiriman: </span>
                         <span className="font-bold text-ink">
-                          {getFulfillmentLabel(order.fulfillment_type)}
+                          {getFulfillmentLabel(order.fulfillment_type, order.batch_source)}
                         </span>
                       </div>
                       {order.fulfillment_type === "shipping" && order.shipping_address && (

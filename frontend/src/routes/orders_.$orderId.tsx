@@ -246,7 +246,8 @@ function getStatusBadge(order: any, linkedLns?: any) {
   );
 }
 
-function getFulfillmentLabel(type: string) {
+function getFulfillmentLabel(type: string, batchSource?: string) {
+  if (batchSource === "manual" || batchSource === "csv_import") return "Ambil di Toko FILKOM Merch";
   if (type === "pickup") return "Ambil di Toko FILKOM Merch";
   if (type === "shipping") return "Pengiriman (JNE/J&T/dll)";
   if (type === "cod") return "Cash on Delivery";
@@ -1040,15 +1041,14 @@ function OrderDetailComponent() {
                 <p className="text-xs text-muted-foreground mt-0.5">{order.customer_phone}</p>
               </div>
               
-              <div className="border-t sm:border-t-0 sm:border-l border-ink/15 pt-4 sm:pt-0 sm:pl-6">
-                <h3 className="font-black text-xs text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <Truck className="w-3.5 h-3.5 text-brand-orange" /> Informasi Pengiriman
-                </h3>
-                <p className="font-extrabold text-ink text-sm">{getFulfillmentLabel(order.fulfillment_type)}</p>
-                {order.fulfillment_type === "shipping" && order.shipping_address && (
-                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{order.shipping_address}</p>
-                )}
-              </div>
+              {order.fulfillment_type === "shipping" && order.batch_source !== "csv_import" && order.batch_source !== "manual" && (
+                <div className="border-t sm:border-t-0 sm:border-l border-ink/15 pt-4 sm:pt-0 sm:pl-6">
+                  <h3 className="font-black text-xs text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5 text-brand-orange" /> Informasi Pengiriman
+                  </h3>
+                  <p className="font-extrabold text-ink text-sm leading-relaxed">Informasi pengiriman akan diberitahukan lewat WhatsApp</p>
+                </div>
+              )}
             </div>
 
             {/* Items List (Cards) */}
@@ -1333,7 +1333,7 @@ function OrderDetailComponent() {
 
                 <div className="flex justify-between text-muted-foreground">
                   <span>Metode Pengiriman:</span>
-                  <span className="font-bold text-ink">{getFulfillmentLabel(order.fulfillment_type)}</span>
+                  <span className="font-bold text-ink">{getFulfillmentLabel(order.fulfillment_type, order.batch_source)}</span>
                 </div>
 
                 {order.fulfillment_type === "shipping" && order.shipping_address && (
