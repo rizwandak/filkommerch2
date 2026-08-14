@@ -5724,6 +5724,7 @@ export const approveClaim = async (req: Request, res: Response) => {
   const connection = await getConnection();
   try {
     const claimId = req.params.id;
+    const { adminNote } = req.body;
     const adminName = req.header("x-user-name") || "Admin";
 
     await connection.beginTransaction();
@@ -5762,10 +5763,10 @@ export const approveClaim = async (req: Request, res: Response) => {
       [claim.user_id, claim.order_id]
     );
 
-    // 2. Update claim status
+    // 2. Update claim status and admin_note
     await connection.execute(
-      "UPDATE order_claims SET status = 'approved' WHERE id = ?",
-      [claimId]
+      "UPDATE order_claims SET status = 'approved', admin_note = ? WHERE id = ?",
+      [adminNote || null, claimId]
     );
 
     // 3. Reject other pending claims for this same order
@@ -5808,16 +5809,39 @@ export const approveClaim = async (req: Request, res: Response) => {
 export const rejectClaim = async (req: Request, res: Response) => {
   try {
     const claimId = req.params.id;
+    const { adminNote } = req.body;
     
     await execute(
-      "UPDATE order_claims SET status = 'rejected' WHERE id = ?",
-      [claimId]
+      "UPDATE order_claims SET status = 'rejected', admin_note = ? WHERE id = ?",
+      [adminNote || null, claimId]
     );
     
     return res.json({ success: true, message: "Klaim berhasil ditolak" });
   } catch (error: any) {
     console.error("Error in rejectClaim:", error);
     return res.status(500).json({ success: false, error: "Gagal menolak klaim" });
+  }
+};
+
+/**
+ * Get user claims
+ */
+export const getUserClaims = async (req: Request, res: Response) => {
+  try {
+    const userId = req.header("x-user-id");
+    if (!userId) {
+      return res.status(401).json({ success: false, error: "Unauthorized" });
+    }
+
+    const claims = await query(
+      "SELECT c.*, o.gross_amount, o.customer_name FROM order_claims c JOIN orders o ON c.order_id = o.order_id WHERE c.user_id = ? ORDER BY c.created_at DESC",
+      [userId]
+    );
+
+    return res.json({ success: true, claims });
+  } catch (error: any) {
+    console.error("Error in getUserClaims:", error);
+    return res.status(500).json({ success: false, error: "Gagal mengambil riwayat klaim" });
   }
 };
 

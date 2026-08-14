@@ -601,8 +601,9 @@ function AdminTransactionsPage() {
 
   const handleApproveClaim = async (id: number) => {
     if (!window.confirm("Setujui klaim ini dan hubungkan pesanan ke akun pembeli?")) return;
+    const adminNote = window.prompt("Catatan untuk pengguna (opsional):");
     try {
-      const res = await approveClaimServerAction({ data: { id } });
+      const res = await approveClaimServerAction({ data: { id, adminNote: adminNote || undefined } });
       if (res.success) {
         toast.success(res.message);
         await loadTransactions();
@@ -616,8 +617,9 @@ function AdminTransactionsPage() {
 
   const handleRejectClaim = async (id: number) => {
     if (!window.confirm("Tolak klaim ini?")) return;
+    const adminNote = window.prompt("Catatan untuk pengguna (wajib jika ditolak, opsional):");
     try {
-      const res = await rejectClaimServerAction({ data: { id } });
+      const res = await rejectClaimServerAction({ data: { id, adminNote: adminNote || undefined } });
       if (res.success) {
         toast.success(res.message);
         await loadTransactions();
@@ -2142,6 +2144,11 @@ function AdminTransactionsPage() {
                             >
                               {claim.status.toUpperCase()}
                             </Badge>
+                            {claim.admin_note && (
+                              <div className="mt-1 text-[10px] text-muted-foreground whitespace-normal max-w-[200px]">
+                                <span className="font-bold">Catatan:</span> {claim.admin_note}
+                              </div>
+                            )}
                           </td>
                           <td className="p-3 text-xs flex gap-2">
                             {claim.status === "pending" && (

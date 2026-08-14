@@ -271,6 +271,7 @@ export async function runMigration() {
           order_id VARCHAR(50) COLLATE utf8mb4_general_ci NOT NULL,
           status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
           claim_reason VARCHAR(255) DEFAULT NULL,
+          admin_note TEXT DEFAULT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

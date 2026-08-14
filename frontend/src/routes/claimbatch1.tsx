@@ -1,8 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/Navbar";
 import { Search, Loader2, CheckCircle2 } from "lucide-react";
-import { claimSearchServerAction, submitClaimServerAction } from "@backend/server-actions";
+import { claimSearchServerAction, submitClaimServerAction, getUserClaimsServerAction } from "@backend/server-actions";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -25,6 +25,32 @@ function ClaimBatch1Page() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [submittingOrderId, setSubmittingOrderId] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<"search" | "history">("search");
+  const [claims, setClaims] = useState<any[]>([]);
+  const [loadingClaims, setLoadingClaims] = useState(false);
+
+  useEffect(() => {
+    if (user && activeTab === "history") {
+      fetchClaims();
+    }
+  }, [user, activeTab]);
+
+  const fetchClaims = async () => {
+    setLoadingClaims(true);
+    try {
+      const res = await getUserClaimsServerAction();
+      if (res.success) {
+        setClaims(res.claims || []);
+      } else {
+        toast.error(res.error || "Gagal memuat riwayat klaim");
+      }
+    } catch (e) {
+      toast.error("Terjadi kesalahan saat memuat riwayat klaim");
+    } finally {
+      setLoadingClaims(false);
+    }
+  };
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,54 +127,83 @@ function ClaimBatch1Page() {
           </p>
         </div>
 
-        <div className="bg-white border-4 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
-          <div className="p-6 border-b-4 border-ink bg-cream/40">
-            <h2 className="font-bold text-lg uppercase flex items-center gap-2">
-              <Search className="w-5 h-5 text-brand-orange" />
-              Cari Data Pesananmu
-            </h2>
-            <p className="text-sm text-muted-foreground mt-1">Masukkan NIM dan/atau No HP yang kamu gunakan saat mengisi form pemesanan.</p>
+        {user && (
+          <div className="flex gap-2 mb-6 border-b-2 border-ink pb-[-2px]">
+            <button
+              onClick={() => setActiveTab("search")}
+              className={`px-6 py-3 font-bold uppercase tracking-wider text-sm rounded-t-lg border-2 border-b-0 transition-colors ${
+                activeTab === "search" 
+                  ? "bg-white border-ink text-brand-orange shadow-[0_2px_0_0_#FFF] z-10 relative" 
+                  : "bg-cream/40 border-transparent text-muted-foreground hover:bg-cream/80"
+              }`}
+            >
+              Cari Pesanan
+            </button>
+            <button
+              onClick={() => setActiveTab("history")}
+              className={`px-6 py-3 font-bold uppercase tracking-wider text-sm rounded-t-lg border-2 border-b-0 transition-colors ${
+                activeTab === "history" 
+                  ? "bg-white border-ink text-brand-orange shadow-[0_2px_0_0_#FFF] z-10 relative" 
+                  : "bg-cream/40 border-transparent text-muted-foreground hover:bg-cream/80"
+              }`}
+            >
+              Riwayat Klaim
+            </button>
           </div>
-          
-          <div className="p-6">
-            <form onSubmit={handleSearch} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="font-bold text-sm uppercase">NIM Pembeli</label>
-                  <input
-                    type="text"
-                    value={nim}
-                    onChange={(e) => setNim(e.target.value)}
-                    placeholder="Contoh: 215150xxx"
-                    className="w-full px-4 py-3 border-2 border-ink rounded-lg font-medium outline-none focus:border-brand-orange transition-colors"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="font-bold text-sm uppercase">Nomor HP</label>
-                  <input
-                    type="text"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="Contoh: 0812345xxx"
-                    className="w-full px-4 py-3 border-2 border-ink rounded-lg font-medium outline-none focus:border-brand-orange transition-colors"
-                  />
-                </div>
+        )}
+
+        {activeTab === "search" ? (
+          <>
+            <div className="bg-white border-4 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
+              <div className="p-6 border-b-4 border-ink bg-cream/40">
+                <h2 className="font-bold text-lg uppercase flex items-center gap-2">
+                  <Search className="w-5 h-5 text-brand-orange" />
+                  Cari Data Pesananmu
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">Masukkan NIM dan/atau No HP yang kamu gunakan saat mengisi form pemesanan.</p>
               </div>
               
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isSearching || (!nim.trim() && !phone.trim())}
-                  className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 rounded-lg font-black uppercase tracking-wider border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] active:translate-y-1 active:shadow-none hover:bg-brand-orange/90 transition-all disabled:opacity-50 disabled:active:translate-y-0 flex items-center justify-center gap-2"
-                >
-                  {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : "Cari Pesanan"}
-                </button>
+              <div className="p-6">
+                <form onSubmit={handleSearch} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="font-bold text-sm uppercase">NIM Pembeli</label>
+                      <input
+                        type="text"
+                        value={nim}
+                        onChange={(e) => setNim(e.target.value)}
+                        placeholder="Contoh: 215150xxx"
+                        className="w-full px-4 py-3 border-2 border-ink rounded-lg font-medium outline-none focus:border-brand-orange transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="font-bold text-sm uppercase">Nomor HP</label>
+                      <input
+                        type="text"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        placeholder="Contoh: 0812345xxx"
+                        className="w-full px-4 py-3 border-2 border-ink rounded-lg font-medium outline-none focus:border-brand-orange transition-colors"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="pt-2">
+                    <button
+                      type="submit"
+                      disabled={isSearching || (!nim.trim() && !phone.trim())}
+                      className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 rounded-lg font-black uppercase tracking-wider border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] active:translate-y-1 active:shadow-none hover:bg-brand-orange/90 transition-all disabled:opacity-50 disabled:active:translate-y-0 flex items-center justify-center gap-2"
+                    >
+                      {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : "Cari Pesanan"}
+                    </button>
+                  </div>
+                </form>
               </div>
-            </form>
-          </div>
-        </div>
+            </div>
+          </>
+        ) : null}
 
-        {hasSearched && (
+        {activeTab === "search" && hasSearched && (
           <div className="mt-10 animate-fade-in">
             <h3 className="font-black text-xl uppercase mb-6 flex items-center gap-2">
               Hasil Pencarian 
@@ -263,6 +318,64 @@ function ClaimBatch1Page() {
                         )}
                       </button>
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === "history" && (
+          <div className="animate-fade-in space-y-6">
+            <h3 className="font-black text-xl uppercase mb-6 flex items-center gap-2">
+              Riwayat Klaim 
+              <span className="bg-ink text-white text-xs px-3 py-1 rounded-full">{claims.length}</span>
+            </h3>
+            
+            {loadingClaims ? (
+              <div className="flex flex-col items-center justify-center py-20">
+                <Loader2 className="w-10 h-10 animate-spin text-brand-orange mb-4" />
+                <p className="text-sm font-semibold text-muted-foreground">Memuat riwayat klaim...</p>
+              </div>
+            ) : claims.length === 0 ? (
+              <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-12 text-center">
+                <Search className="w-16 h-16 text-muted-foreground/40 mx-auto mb-4" />
+                <h3 className="display text-xl tracking-wide uppercase text-ink">Tidak Ada Riwayat Klaim</h3>
+                <p className="text-xs text-muted-foreground mt-2 max-w-sm mx-auto">
+                  Anda belum pernah mengajukan klaim pesanan.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {claims.map((claim) => (
+                  <div key={claim.id} className="bg-white border-2 border-ink rounded-xl p-5 shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]">
+                    <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-3">
+                      <div>
+                        <h4 className="font-black text-lg uppercase text-ink tracking-wide">ID Pesanan: {claim.order_id}</h4>
+                        <p className="text-xs text-muted-foreground mt-0.5">Diajukan pada: {new Date(claim.created_at).toLocaleString("id-ID")}</p>
+                      </div>
+                      <div className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border-2 ${
+                        claim.status === "pending" ? "bg-amber-100 text-amber-800 border-amber-200" :
+                        claim.status === "approved" ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
+                        "bg-red-100 text-red-800 border-red-200"
+                      }`}>
+                        {claim.status === "approved" ? "Diterima" : claim.status === "rejected" ? "Ditolak" : "Pending"}
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-center bg-cream/30 border border-ink/20 rounded p-3 text-sm">
+                      <span className="font-bold uppercase text-xs text-muted-foreground tracking-wider">Total Pesanan:</span>
+                      <span className="font-black text-brand-orange">Rp {Number(claim.gross_amount).toLocaleString("id-ID")}</span>
+                    </div>
+
+                    {claim.admin_note && (
+                      <div className="mt-4 bg-red-50 border-2 border-red-200 rounded p-4 text-sm relative">
+                        <div className="absolute top-0 left-4 -translate-y-1/2 bg-red-50 px-2 font-bold text-[10px] text-red-800 uppercase tracking-widest">
+                          Catatan Admin
+                        </div>
+                        <p className="text-red-900 mt-1 font-medium">{claim.admin_note}</p>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
