@@ -500,7 +500,7 @@ function UserOrdersPage() {
   };
 
   const getFulfillmentLabel = (type: string) => {
-    if (type === "pickup") return "Ambil di Toko (Pickup)";
+    if (type === "pickup") return "Ambil di Toko FILKOM Merch";
     if (type === "walk_in") return "Beli Langsung (POS)";
     return "Pengiriman Kurir";
   };
@@ -901,36 +901,22 @@ function UserOrdersPage() {
                   {/* Card Footer */}
                   <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-cream/10 border-t border-ink/20">
                     <div className="text-xs space-y-1">
-                      {(order.batch_source === "manual" || order.batch_source === "csv_import") ? (
-                        <>
-                          <div>
-                            <span className="text-muted-foreground">Metode Pengiriman: </span>
-                            <span className="font-bold text-ink">Ambil di Toko FILKOM Merch</span>
-                          </div>
-                          <div className="text-[10px] text-brand-orange font-semibold mt-1">
-                            * Pengambilan pesanan dilakukan di toko FILKOM Merch (samping Gedung A belakang tulisan FILKOM parkiran FTP).
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div>
-                            <span className="text-muted-foreground">Metode Pengiriman: </span>
-                            <span className="font-bold text-ink">
-                              {getFulfillmentLabel(order.fulfillment_type)}
-                            </span>
-                          </div>
-                          {order.fulfillment_type === "shipping" && order.shipping_address && (
-                            <div>
-                              <span className="text-muted-foreground">Alamat Pengiriman: </span>
-                              <span className="font-bold text-ink">{order.shipping_address}</span>
-                            </div>
-                          )}
-                          {order.fulfillment_type === "shipping" && (
-                            <div className="text-[10px] text-brand-orange font-semibold mt-1">
-                              * Ada ongkir menyesuaikan jarak, info lengkap akan diberitahu melalui WhatsApp
-                            </div>
-                          )}
-                        </>
+                      <div>
+                        <span className="text-muted-foreground">Metode Pengiriman: </span>
+                        <span className="font-bold text-ink">
+                          {getFulfillmentLabel(order.fulfillment_type)}
+                        </span>
+                      </div>
+                      {order.fulfillment_type === "shipping" && order.shipping_address && (
+                        <div>
+                          <span className="text-muted-foreground">Alamat Pengiriman: </span>
+                          <span className="font-bold text-ink">{order.shipping_address}</span>
+                        </div>
+                      )}
+                      {order.fulfillment_type === "shipping" && (
+                        <div className="text-[10px] text-brand-orange font-semibold mt-1">
+                          * Ada ongkir menyesuaikan jarak, info lengkap akan diberitahu melalui WhatsApp
+                        </div>
                       )}
                       {order.pickup_code && (
                         <div>
