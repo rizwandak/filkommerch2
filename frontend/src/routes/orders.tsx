@@ -901,23 +901,36 @@ function UserOrdersPage() {
                   {/* Card Footer */}
                   <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-cream/10 border-t border-ink/20">
                     <div className="text-xs space-y-1">
-                      <div>
-                        <span className="text-muted-foreground">Metode Pengiriman: </span>
-                        <span className="font-bold text-ink">
-                          {getFulfillmentLabel(order.fulfillment_type)}
-                        </span>
-                      </div>
-                      {order.fulfillment_type === "shipping" && order.shipping_address && (
-                        <div>
-                          <span className="text-muted-foreground">Alamat Pengiriman: </span>
-                          <span className="font-bold text-ink">{order.shipping_address}</span>
-                        </div>
-                      )}
-                      {order.fulfillment_type === "shipping" && (
-                        <div className="text-[10px] text-brand-orange font-semibold">
-                          * Ada ongkir menyesuaikan jarak, info lengkap akan diberitahu melalui
-                          WhatsApp
-                        </div>
+                      {(order.batch_source === "manual" || order.batch_source === "csv_import") ? (
+                        <>
+                          <div>
+                            <span className="text-muted-foreground">Metode Pengiriman: </span>
+                            <span className="font-bold text-ink">Ambil di Toko FILKOM Merch</span>
+                          </div>
+                          <div className="text-[10px] text-brand-orange font-semibold mt-1">
+                            * Pesanan Batch 1 diambil secara langsung di secretariat BEM FILKOM.
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div>
+                            <span className="text-muted-foreground">Metode Pengiriman: </span>
+                            <span className="font-bold text-ink">
+                              {getFulfillmentLabel(order.fulfillment_type)}
+                            </span>
+                          </div>
+                          {order.fulfillment_type === "shipping" && order.shipping_address && (
+                            <div>
+                              <span className="text-muted-foreground">Alamat Pengiriman: </span>
+                              <span className="font-bold text-ink">{order.shipping_address}</span>
+                            </div>
+                          )}
+                          {order.fulfillment_type === "shipping" && (
+                            <div className="text-[10px] text-brand-orange font-semibold mt-1">
+                              * Ada ongkir menyesuaikan jarak, info lengkap akan diberitahu melalui WhatsApp
+                            </div>
+                          )}
+                        </>
                       )}
                       {order.pickup_code && (
                         <div>

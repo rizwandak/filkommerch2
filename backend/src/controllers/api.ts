@@ -5833,12 +5833,27 @@ export const getUserClaims = async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, error: "Unauthorized" });
     }
 
-    const claims = await query(
+    const claims = await query<any>(
       "SELECT c.*, o.gross_amount, o.customer_name FROM order_claims c JOIN orders o ON c.order_id = o.order_id WHERE c.user_id = ? ORDER BY c.created_at DESC",
       [userId]
     );
 
-    return res.json({ success: true, claims });
+    const enrichedClaims = await Promise.all(
+      claims.map(async (claim: any) => {
+        const items = await query<any>(
+          `SELECT oi.product_name, oi.size, oi.color, oi.quantity, oi.unit_price, oi.subtotal, p.image_url,
+                  p.price as p_price, p.promo_price as p_promo_price, p.filkom_price as p_filkom_price,
+                  (SELECT image_url FROM product_images pi WHERE pi.product_id = p.id AND pi.is_primary = 1 LIMIT 1) as primary_image_url
+           FROM order_items oi
+           LEFT JOIN products p ON p.id = oi.product_id
+           WHERE oi.order_id = ?`,
+          [claim.order_id]
+        );
+        return { ...claim, items };
+      })
+    );
+
+    return res.json({ success: true, claims: enrichedClaims });
   } catch (error: any) {
     console.error("Error in getUserClaims:", error);
     return res.status(500).json({ success: false, error: "Gagal mengambil riwayat klaim" });

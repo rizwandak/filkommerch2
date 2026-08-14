@@ -18,7 +18,7 @@ export const Route = createFileRoute("/claimbatch1")({
 
 function ClaimBatch1Page() {
   const { user } = useAuth();
-  
+
   const [nim, setNim] = useState("");
   const [phone, setPhone] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -58,10 +58,10 @@ function ClaimBatch1Page() {
       toast.error("Silakan isi NIM atau No HP (salah satu atau keduanya).");
       return;
     }
-    
+
     setIsSearching(true);
     setHasSearched(false);
-    
+
     try {
       // Hilangkan awalan 0 dari nomor HP jika ada (untuk akurasi)
       let cleanedPhone = phone.trim();
@@ -69,13 +69,13 @@ function ClaimBatch1Page() {
         cleanedPhone = cleanedPhone.substring(1);
       }
 
-      const res = await claimSearchServerAction({ 
-        data: { 
-          nim: nim.trim() || undefined, 
-          phone: cleanedPhone || undefined 
-        } 
+      const res = await claimSearchServerAction({
+        data: {
+          nim: nim.trim() || undefined,
+          phone: cleanedPhone || undefined
+        }
       });
-      
+
       if (res.success) {
         setSearchResults(res.orders || []);
         setHasSearched(true);
@@ -118,7 +118,7 @@ function ClaimBatch1Page() {
   return (
     <div className="min-h-screen bg-[#FCFAF7] text-ink font-sans flex flex-col">
       <Navbar />
-      
+
       <main className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12">
         <div className="mb-8 text-center sm:text-left">
           <h1 className="text-3xl font-black uppercase tracking-tight text-ink">Klaim Pesanan <span className="text-brand-orange">Batch 1</span></h1>
@@ -131,21 +131,19 @@ function ClaimBatch1Page() {
           <div className="flex gap-2 mb-6 border-b-2 border-ink pb-[-2px]">
             <button
               onClick={() => setActiveTab("search")}
-              className={`px-6 py-3 font-bold uppercase tracking-wider text-sm rounded-t-lg border-2 border-b-0 transition-colors ${
-                activeTab === "search" 
-                  ? "bg-white border-ink text-brand-orange shadow-[0_2px_0_0_#FFF] z-10 relative" 
-                  : "bg-cream/40 border-transparent text-muted-foreground hover:bg-cream/80"
-              }`}
+              className={`px-6 py-3 font-bold uppercase tracking-wider text-sm rounded-t-lg border-2 border-b-0 transition-colors ${activeTab === "search"
+                ? "bg-white border-ink text-brand-orange shadow-[0_2px_0_0_#FFF] z-10 relative"
+                : "bg-cream/40 border-transparent text-muted-foreground hover:bg-cream/80"
+                }`}
             >
               Cari Pesanan
             </button>
             <button
               onClick={() => setActiveTab("history")}
-              className={`px-6 py-3 font-bold uppercase tracking-wider text-sm rounded-t-lg border-2 border-b-0 transition-colors ${
-                activeTab === "history" 
-                  ? "bg-white border-ink text-brand-orange shadow-[0_2px_0_0_#FFF] z-10 relative" 
-                  : "bg-cream/40 border-transparent text-muted-foreground hover:bg-cream/80"
-              }`}
+              className={`px-6 py-3 font-bold uppercase tracking-wider text-sm rounded-t-lg border-2 border-b-0 transition-colors ${activeTab === "history"
+                ? "bg-white border-ink text-brand-orange shadow-[0_2px_0_0_#FFF] z-10 relative"
+                : "bg-cream/40 border-transparent text-muted-foreground hover:bg-cream/80"
+                }`}
             >
               Riwayat Klaim
             </button>
@@ -162,7 +160,7 @@ function ClaimBatch1Page() {
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">Masukkan NIM dan/atau No HP yang kamu gunakan saat mengisi form pemesanan.</p>
               </div>
-              
+
               <div className="p-6">
                 <form onSubmit={handleSearch} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -187,7 +185,7 @@ function ClaimBatch1Page() {
                       />
                     </div>
                   </div>
-                  
+
                   <div className="pt-2">
                     <button
                       type="submit"
@@ -206,10 +204,10 @@ function ClaimBatch1Page() {
         {activeTab === "search" && hasSearched && (
           <div className="mt-10 animate-fade-in">
             <h3 className="font-black text-xl uppercase mb-6 flex items-center gap-2">
-              Hasil Pencarian 
+              Hasil Pencarian
               <span className="bg-ink text-white text-xs px-3 py-1 rounded-full">{searchResults.length}</span>
             </h3>
-            
+
             {searchResults.length === 0 ? (
               <div className="bg-cream/30 border-2 border-ink border-dashed rounded-xl p-8 text-center">
                 <p className="font-bold text-lg text-ink">Tidak Ada Pesanan Ditemukan</p>
@@ -221,7 +219,7 @@ function ClaimBatch1Page() {
               <div className="space-y-6">
                 {searchResults.map((order) => (
                   <div key={order.order_id} className="bg-[#FCFAF7] border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
-                    
+
                     {/* Header Info */}
                     <div className="p-4 sm:p-5 border-b-2 border-ink flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center bg-cream/50">
                       <div>
@@ -250,17 +248,18 @@ function ClaimBatch1Page() {
                             <tr className="border-b-2 border-ink/10 text-muted-foreground">
                               <th className="pb-3 font-semibold min-w-[200px]">Nama Produk</th>
                               <th className="pb-3 font-semibold text-center min-w-[150px]">Varian</th>
-                              <th className="pb-3 font-semibold text-center min-w-[100px]">Harga Qty</th>
+                              <th className="pb-3 font-semibold text-center min-w-[120px]">Harga</th>
+                              <th className="pb-3 font-semibold text-center min-w-[60px]">Qty</th>
                               <th className="pb-3 font-semibold text-right min-w-[100px]">Subtotal</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y-2 divide-ink/5 border-b-2 border-ink/10 border-dashed">
                             {order.items && order.items.map((item: any, idx: number) => {
                               const variantParts = [];
-                              if (item.size && item.size !== "Standard" && item.size !== "") variantParts.push(item.size);
+                              if (item.size && item.size !== "Standard" && item.size !== "One Size" && item.size !== "") variantParts.push(item.size);
                               if (item.color && item.color !== "") variantParts.push(item.color);
                               const variantText = variantParts.length > 0 ? variantParts.join(" / ") : "-";
-                              
+
                               const imageUrl = item.primary_image_url || item.image_url;
                               let displayPrice = Number(item.unit_price || 0);
                               if (displayPrice === 0) {
@@ -273,7 +272,7 @@ function ClaimBatch1Page() {
                                   <td className="py-4">
                                     <div className="flex items-center gap-3">
                                       <div className="w-12 h-12 bg-[#F5F5F5] rounded border border-ink/20 shrink-0 overflow-hidden flex items-center justify-center p-1">
-                                        <img 
+                                        <img
                                           src={imageUrl ? (imageUrl.startsWith('http') ? imageUrl : resolveImageUrl(imageUrl)) : (item.product_name.toLowerCase().includes("kaos") || item.product_name.toLowerCase().includes("t-shirt") ? "/mockup-kaos.png" : item.product_name.toLowerCase().includes("jaket") || item.product_name.toLowerCase().includes("jacket") ? "/mockup-jaket.png" : item.product_name.toLowerCase().includes("lanyard") ? "/mockup-lanyard.png" : item.product_name.toLowerCase().includes("totebag") || item.product_name.toLowerCase().includes("tote") ? "/mockup-totebag.png" : item.product_name.toLowerCase().includes("keychain") || item.product_name.toLowerCase().includes("ganci") ? "/mockup-keychain.png" : item.product_name.toLowerCase().includes("sticker") || item.product_name.toLowerCase().includes("stiker") ? "/mockup-sticker.png" : "/logo-fm.png")}
                                           alt={item.product_name}
                                           className="w-full h-full object-contain mix-blend-multiply"
@@ -284,7 +283,10 @@ function ClaimBatch1Page() {
                                   </td>
                                   <td className="py-4 text-center text-muted-foreground">{variantText}</td>
                                   <td className="py-4 text-center whitespace-nowrap">
-                                    Rp {displayPrice.toLocaleString("id-ID")} <span className="font-black text-ink ml-1">{item.quantity}</span>
+                                    Rp {displayPrice.toLocaleString("id-ID")}
+                                  </td>
+                                  <td className="py-4 text-center font-black text-ink">
+                                    {item.quantity}
                                   </td>
                                   <td className="py-4 text-right font-black text-brand-blue whitespace-nowrap">
                                     Rp {displaySubtotal.toLocaleString("id-ID")}
@@ -295,13 +297,16 @@ function ClaimBatch1Page() {
                           </tbody>
                         </table>
                       </div>
-                      
-                      <div className="mt-5 flex justify-between items-center">
+
+                      <div className="mt-5 flex justify-between items-center border-t-2 border-ink/10 pt-4">
                         <p className="text-muted-foreground font-bold uppercase text-xs">Total Pembayaran:</p>
                         <p className="font-black text-brand-orange text-xl">Rp {Number(order.gross_amount).toLocaleString("id-ID")}</p>
                       </div>
+                      <div className="mt-4 flex flex-col gap-1">
+                        <p className="text-sm"><span className="text-muted-foreground font-semibold">Metode Pengiriman:</span> <span className="font-bold text-ink">Ambil di Toko FILKOM Merch</span></p>
+                      </div>
                     </div>
-                    
+
                     <div className="p-4 bg-cream/30 border-t-2 border-ink flex justify-end">
                       <button
                         onClick={() => handleSubmitClaim(order.order_id)}
@@ -328,10 +333,10 @@ function ClaimBatch1Page() {
         {activeTab === "history" && (
           <div className="animate-fade-in space-y-6">
             <h3 className="font-black text-xl uppercase mb-6 flex items-center gap-2">
-              Riwayat Klaim 
+              Riwayat Klaim
               <span className="bg-ink text-white text-xs px-3 py-1 rounded-full">{claims.length}</span>
             </h3>
-            
+
             {loadingClaims ? (
               <div className="flex flex-col items-center justify-center py-20">
                 <Loader2 className="w-10 h-10 animate-spin text-brand-orange mb-4" />
@@ -354,18 +359,80 @@ function ClaimBatch1Page() {
                         <h4 className="font-black text-lg uppercase text-ink tracking-wide">ID Pesanan: {claim.order_id}</h4>
                         <p className="text-xs text-muted-foreground mt-0.5">Diajukan pada: {new Date(claim.created_at).toLocaleString("id-ID")}</p>
                       </div>
-                      <div className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border-2 ${
-                        claim.status === "pending" ? "bg-amber-100 text-amber-800 border-amber-200" :
+                      <div className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border-2 ${claim.status === "pending" ? "bg-amber-100 text-amber-800 border-amber-200" :
                         claim.status === "approved" ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
-                        "bg-red-100 text-red-800 border-red-200"
-                      }`}>
+                          "bg-red-100 text-red-800 border-red-200"
+                        }`}>
                         {claim.status === "approved" ? "Diterima" : claim.status === "rejected" ? "Ditolak" : "Pending"}
                       </div>
                     </div>
-                    
-                    <div className="flex justify-between items-center bg-cream/30 border border-ink/20 rounded p-3 text-sm">
-                      <span className="font-bold uppercase text-xs text-muted-foreground tracking-wider">Total Pesanan:</span>
-                      <span className="font-black text-brand-orange">Rp {Number(claim.gross_amount).toLocaleString("id-ID")}</span>
+
+                    {/* Table Items */}
+                    <div className="bg-cream/30 border border-ink/20 rounded p-3 sm:p-5 mt-4">
+                      <h5 className="font-black text-sm uppercase text-ink mb-4">ITEM YANG DIBELI</h5>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead>
+                            <tr className="border-b-2 border-ink/10 text-muted-foreground">
+                              <th className="pb-3 font-semibold min-w-[200px]">Nama Produk</th>
+                              <th className="pb-3 font-semibold text-center min-w-[150px]">Varian</th>
+                              <th className="pb-3 font-semibold text-center min-w-[120px]">Harga</th>
+                              <th className="pb-3 font-semibold text-center min-w-[60px]">Qty</th>
+                              <th className="pb-3 font-semibold text-right min-w-[100px]">Subtotal</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y-2 divide-ink/5 border-b-2 border-ink/10 border-dashed">
+                            {claim.items && claim.items.map((item: any, idx: number) => {
+                              const variantParts = [];
+                              if (item.size && item.size !== "Standard" && item.size !== "One Size" && item.size !== "") variantParts.push(item.size);
+                              if (item.color && item.color !== "") variantParts.push(item.color);
+                              const variantText = variantParts.length > 0 ? variantParts.join(" / ") : "-";
+
+                              const imageUrl = item.primary_image_url || item.image_url;
+                              let displayPrice = Number(item.unit_price || 0);
+                              if (displayPrice === 0) {
+                                displayPrice = Number(item.p_filkom_price) > 0 ? Number(item.p_filkom_price) : (Number(item.p_promo_price) > 0 ? Number(item.p_promo_price) : Number(item.p_price || 0));
+                              }
+                              const displaySubtotal = Number(item.subtotal) > 0 ? Number(item.subtotal) : displayPrice * (item.quantity || 1);
+
+                              return (
+                                <tr key={idx} className="hover:bg-cream/10 transition-colors">
+                                  <td className="py-4">
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-10 h-10 bg-[#F5F5F5] rounded border border-ink/20 shrink-0 overflow-hidden flex items-center justify-center p-1">
+                                        <img
+                                          src={imageUrl ? (imageUrl.startsWith('http') ? imageUrl : resolveImageUrl(imageUrl)) : (item.product_name.toLowerCase().includes("kaos") || item.product_name.toLowerCase().includes("t-shirt") ? "/mockup-kaos.png" : item.product_name.toLowerCase().includes("jaket") || item.product_name.toLowerCase().includes("jacket") ? "/mockup-jaket.png" : item.product_name.toLowerCase().includes("lanyard") ? "/mockup-lanyard.png" : item.product_name.toLowerCase().includes("totebag") || item.product_name.toLowerCase().includes("tote") ? "/mockup-totebag.png" : item.product_name.toLowerCase().includes("keychain") || item.product_name.toLowerCase().includes("ganci") ? "/mockup-keychain.png" : item.product_name.toLowerCase().includes("sticker") || item.product_name.toLowerCase().includes("stiker") ? "/mockup-sticker.png" : "/logo-fm.png")}
+                                          alt={item.product_name}
+                                          className="w-full h-full object-contain mix-blend-multiply"
+                                        />
+                                      </div>
+                                      <span className="font-bold text-ink uppercase text-xs">{item.product_name}</span>
+                                    </div>
+                                  </td>
+                                  <td className="py-4 text-center text-muted-foreground text-xs">{variantText}</td>
+                                  <td className="py-4 text-center whitespace-nowrap text-xs">
+                                    Rp {displayPrice.toLocaleString("id-ID")}
+                                  </td>
+                                  <td className="py-4 text-center font-black text-ink text-xs">
+                                    {item.quantity}
+                                  </td>
+                                  <td className="py-4 text-right font-black text-brand-blue whitespace-nowrap text-xs">
+                                    Rp {displaySubtotal.toLocaleString("id-ID")}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="mt-5 flex justify-between items-center border-t-2 border-ink/10 pt-4">
+                        <p className="text-muted-foreground font-bold uppercase text-xs tracking-wider">Total Pesanan:</p>
+                        <p className="font-black text-brand-orange text-lg">Rp {Number(claim.gross_amount).toLocaleString("id-ID")}</p>
+                      </div>
+                      <div className="mt-4 flex flex-col gap-1">
+                        <p className="text-sm"><span className="text-muted-foreground font-semibold">Metode Pengiriman:</span> <span className="font-bold text-ink">Ambil di Toko FILKOM Merch</span></p>
+                      </div>
                     </div>
 
                     {claim.admin_note && (
