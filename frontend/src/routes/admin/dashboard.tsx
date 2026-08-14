@@ -41,7 +41,8 @@ import {
   Layers,
   ShieldCheck,
   ExternalLink,
-  Factory
+  Factory,
+  Activity
 } from "lucide-react";
 import { type InventoryItem } from "@backend/server-actions";
 
