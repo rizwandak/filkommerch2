@@ -18,7 +18,7 @@ import {
   Bar,
   Line
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@frontend/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@frontend/components/ui/tabs";
 import { toast } from "sonner";
 import { 
