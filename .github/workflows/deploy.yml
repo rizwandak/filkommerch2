@@ -48,6 +48,7 @@ jobs:
           server-dir: /frontend_app/
           git-ignore: false
           exclude: |
+            **/node_modules
             **/node_modules/**
 
   deploy-backend:
@@ -88,6 +89,7 @@ jobs:
           server-dir: /backend_app/
           git-ignore: false
           exclude: |
+            **/node_modules
             **/node_modules/**
             **/.git/**
             **/src/**
