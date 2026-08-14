@@ -908,7 +908,7 @@ function UserOrdersPage() {
                             <span className="font-bold text-ink">Ambil di Toko FILKOM Merch</span>
                           </div>
                           <div className="text-[10px] text-brand-orange font-semibold mt-1">
-                            * Pesanan Batch 1 diambil secara langsung di secretariat BEM FILKOM.
+                            * Pengambilan pesanan dilakukan di toko FILKOM Merch (samping Gedung A belakang tulisan FILKOM parkiran FTP).
                           </div>
                         </>
                       ) : (

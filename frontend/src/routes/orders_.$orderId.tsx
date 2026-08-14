@@ -247,7 +247,7 @@ function getStatusBadge(order: any, linkedLns?: any) {
 }
 
 function getFulfillmentLabel(type: string) {
-  if (type === "pickup") return "Ambil di BEM FILKOM";
+  if (type === "pickup") return "Ambil di Toko FILKOM Merch";
   if (type === "shipping") return "Pengiriman (JNE/J&T/dll)";
   if (type === "cod") return "Cash on Delivery";
   return type;
@@ -1242,7 +1242,7 @@ function OrderDetailComponent() {
                 ) : (
                   <div className="space-y-4">
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Silakan bayar atau transfer via QRIS BEM FILKOM, lalu unggah foto/screenshot bukti transfer di bawah ini:
+                      Silakan bayar atau transfer via QRIS FILKOM Merch, lalu unggah foto/screenshot bukti transfer di bawah ini:
                     </p>
                     <div className="flex flex-col sm:flex-row items-center gap-3">
                       <input
