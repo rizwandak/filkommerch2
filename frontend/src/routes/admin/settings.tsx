@@ -16,6 +16,7 @@ import {
 } from "@frontend/components/ui/select";
 import { getStoreSettings, updateStoreSettings, type StoreSettings } from "@backend/server-actions";
 import { uploadImageHelper } from "@/lib/upload-helper";
+import { resolveImageUrl } from "@/lib/image-resolver";
 
 export const Route = createFileRoute("/admin/settings")({
   component: AdminSettingsPage,
@@ -43,13 +44,14 @@ function AdminSettingsPage() {
       toast.dismiss();
 
       if (data.success && data.url) {
+        const qrisUrl: string = data.url;
         setSettings((prev) =>
           prev
             ? {
-              ...prev,
-              qris_static_url: data.url,
-            }
-            : null,
+                ...prev,
+                qris_static_url: qrisUrl,
+              }
+            : null
         );
         toast.success("Foto QRIS berhasil diunggah");
       } else {
@@ -183,7 +185,7 @@ function AdminSettingsPage() {
               {settings.qris_static_url ? (
                 <div className="relative border-2 border-dashed border-ink/30 rounded-lg p-4 bg-muted/30 flex flex-col items-center gap-3">
                   <img
-                    src={settings.qris_static_url}
+                    src={resolveImageUrl(settings.qris_static_url)}
                     alt="QRIS Statis"
                     className="max-h-48 rounded object-contain border border-ink/20 bg-white"
                   />
@@ -191,7 +193,7 @@ function AdminSettingsPage() {
                     type="button"
                     variant="destructive"
                     size="sm"
-                    onClick={() => setSettings({ ...settings, qris_static_url: "" })}
+                    onClick={() => setSettings((prev) => (prev ? { ...prev, qris_static_url: null } : null))}
                     className="text-xs uppercase tracking-wider font-bold animate-fade-in"
                   >
                     Hapus QRIS

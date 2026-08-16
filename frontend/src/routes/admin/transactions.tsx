@@ -2869,7 +2869,7 @@ function AdminTransactionsPage() {
 
       {/* Filter Modal Dialog */}
       <Dialog open={filterModalOpen} onOpenChange={setFilterModalOpen}>
-        <DialogContent className="max-w-md bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5">
+        <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto overflow-x-hidden bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5">
           <DialogHeader>
             <DialogTitle className="display text-lg tracking-wide text-ink flex items-center gap-2 uppercase">
               <SlidersHorizontal className="w-5 h-5 text-brand-orange" />
@@ -2900,7 +2900,7 @@ function AdminTransactionsPage() {
             </div>
 
             {/* 2. Product Filter (Multi-Select Checkboxes) */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 w-full">
               <div className="flex items-center justify-between">
                 <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
                   <Package className="w-3.5 h-3.5 text-brand-orange" />
@@ -2918,7 +2918,7 @@ function AdminTransactionsPage() {
               </div>
 
               {/* Include / Exclude Mode Toggle */}
-              <div className="flex items-center gap-1 bg-cream/40 border-2 border-ink rounded-lg p-1.5">
+              <div className="flex items-center gap-1 bg-cream/40 border-2 border-ink rounded-lg p-1.5 w-full">
                 <button
                   type="button"
                   onClick={() => setProductFilterMode("include")}
@@ -2948,18 +2948,19 @@ function AdminTransactionsPage() {
                 </div>
               )}
 
-              <div className="bg-cream/40 border-2 border-ink rounded-lg p-2.5 max-h-48 overflow-y-auto space-y-1">
+              <div className="w-full bg-cream/30 border-2 border-ink rounded-lg p-2 max-h-52 overflow-y-auto overflow-x-hidden space-y-1 box-border">
                 <label
-                  className={`flex items-center gap-2.5 p-1.5 rounded-md cursor-pointer text-xs font-bold transition-colors select-none ${productFilter.length === 0 ? "bg-brand-orange/10 text-brand-orange" : "hover:bg-black/5 text-ink"
-                    }`}
+                  className={`w-full flex items-center gap-2.5 p-2 rounded-md cursor-pointer text-xs font-bold transition-colors select-none ${
+                    productFilter.length === 0 ? "bg-brand-orange/15 text-brand-orange border border-brand-orange/40" : "hover:bg-black/5 text-ink"
+                  }`}
                 >
                   <input
                     type="checkbox"
                     checked={productFilter.length === 0}
                     onChange={() => setProductFilter([])}
-                    className="w-4 h-4 accent-brand-orange cursor-pointer rounded"
+                    className="w-4 h-4 accent-brand-orange cursor-pointer rounded shrink-0"
                   />
-                  <span>Semua Produk (Tanpa Filter)</span>
+                  <span className="truncate">Semua Produk (Tanpa Filter)</span>
                 </label>
 
                 <div className="border-t border-dashed border-ink/20 my-1"></div>
@@ -2970,10 +2971,12 @@ function AdminTransactionsPage() {
                   return (
                     <label
                       key={p.id}
-                      className={`flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${isChecked ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300" : "hover:bg-black/5 text-ink font-semibold"
-                        }`}
+                      className={`w-full flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${
+                        isChecked ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300" : "hover:bg-black/5 text-ink font-semibold"
+                      }`}
+                      title={p.name}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
                         <input
                           type="checkbox"
                           checked={isChecked}
@@ -2986,10 +2989,10 @@ function AdminTransactionsPage() {
                           }}
                           className="w-4 h-4 accent-brand-orange cursor-pointer rounded shrink-0"
                         />
-                        <span className="truncate">{p.name}</span>
+                        <span className="truncate text-xs">{p.name}</span>
                       </div>
                       {!p.is_active && (
-                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded uppercase tracking-wider shrink-0">
+                        <span className="text-[9px] font-black px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded uppercase tracking-wider shrink-0 ml-1">
                           Nonaktif
                         </span>
                       )}
