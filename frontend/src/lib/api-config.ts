@@ -27,26 +27,39 @@ export const getApiBaseUrl = (): string => {
     return LIVE_BACKEND_URL;
   }
 
-  // If VITE_API_URL is specified in env, use it (strip trailing /api or /)
+  // 1. If explicit env variable is set (VITE_API_URL or API_URL or BACKEND_URL)
+  if (typeof process !== "undefined") {
+    const envApi = process.env.VITE_API_URL || process.env.API_URL || process.env.BACKEND_URL;
+    if (envApi) {
+      return envApi.replace(/\/api\/?$/, "").replace(/\/$/, "");
+    }
+  }
+
   if (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) {
     return import.meta.env.VITE_API_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
   }
 
-  // AUTO Mode: Detect local development vs server environment
-  const isLocalEnv =
-    (typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1" ||
-        window.location.hostname.startsWith("192.168.") ||
-        window.location.hostname.startsWith("10.") ||
-        window.location.hostname.endsWith(".local"))) ||
-    (typeof process !== "undefined" &&
-      (process.env.NODE_ENV === "development" || !process.env.NODE_ENV));
+  // 2. In Browser: Detect localhost/127.0.0.1
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("10.") ||
+      hostname.endsWith(".local")
+    ) {
+      return LOCAL_BACKEND_URL;
+    }
+    return LIVE_BACKEND_URL;
+  }
 
-  if (isLocalEnv) {
+  // 3. In Server (SSR): Only treat as local if explicitly running in development mode
+  if (typeof process !== "undefined" && process.env.NODE_ENV === "development") {
     return LOCAL_BACKEND_URL;
   }
 
+  // Production SSR fallback (cPanel Node.js server)
   return LIVE_BACKEND_URL;
 };
 

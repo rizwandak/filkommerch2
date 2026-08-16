@@ -24,6 +24,7 @@ jobs:
       - name: 🔨 Install & Build Frontend
         env:
           VITE_API_URL: https://filkommerch.com/api
+          NODE_ENV: production
           NITRO_PRESET: node-server
         run: |
           cd frontend
@@ -56,6 +57,7 @@ jobs:
 
   deploy-backend:
     name: ⚙️ Deploy Backend
+    needs: deploy-frontend
     runs-on: ubuntu-latest
     steps:
       - name: ✅ Checkout Code
