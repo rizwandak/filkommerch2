@@ -336,7 +336,12 @@ function AdminTransactionsPage() {
     }
 
     try {
-      const prodRes = await fetchJson<{ products: any[] }>(`${API_BASE_URL}/api/products`);
+      let prodRes: any = null;
+      try {
+        prodRes = await fetchJson<{ products: any[] }>(`${API_BASE_URL}/api/admin/products`);
+      } catch {
+        prodRes = await fetchJson<{ products: any[] }>(`${API_BASE_URL}/api/products`);
+      }
       if (prodRes?.products) {
         setProducts(prodRes.products);
       }
@@ -731,12 +736,21 @@ function AdminTransactionsPage() {
     return map;
   }, [onlineOrders]);
 
-  // Extract unique product names from products table for the filter dropdown
+  // Extract unique product names from products table for the filter dropdown (including inactive products)
   const uniqueProductNames = useMemo(() => {
     return products
       .filter((p) => p.name)
-      .map((p) => ({ id: p.id, name: String(p.name).trim() }))
-      .sort((a, b) => a.name.localeCompare(b.name, "id"));
+      .map((p) => ({
+        id: p.id,
+        name: String(p.name).trim(),
+        is_active: p.is_active !== undefined ? Boolean(Number(p.is_active) === 1 || p.is_active === true) : true,
+      }))
+      .sort((a, b) => {
+        if (a.is_active !== b.is_active) {
+          return a.is_active ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name, "id");
+      });
   }, [products]);
 
   // 1. Base filtered list (respects campaign batch filter and search query)
@@ -2956,22 +2970,29 @@ function AdminTransactionsPage() {
                   return (
                     <label
                       key={p.id}
-                      className={`flex items-center gap-2.5 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${isChecked ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300" : "hover:bg-black/5 text-ink font-semibold"
+                      className={`flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${isChecked ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300" : "hover:bg-black/5 text-ink font-semibold"
                         }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setProductFilter((prev) => [...prev, pIdStr]);
-                          } else {
-                            setProductFilter((prev) => prev.filter((id) => id !== pIdStr));
-                          }
-                        }}
-                        className="w-4 h-4 accent-brand-orange cursor-pointer rounded"
-                      />
-                      <span className="truncate">{p.name}</span>
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setProductFilter((prev) => [...prev, pIdStr]);
+                            } else {
+                              setProductFilter((prev) => prev.filter((id) => id !== pIdStr));
+                            }
+                          }}
+                          className="w-4 h-4 accent-brand-orange cursor-pointer rounded shrink-0"
+                        />
+                        <span className="truncate">{p.name}</span>
+                      </div>
+                      {!p.is_active && (
+                        <span className="text-[9px] font-extrabold px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded uppercase tracking-wider shrink-0">
+                          Nonaktif
+                        </span>
+                      )}
                     </label>
                   );
                 })}

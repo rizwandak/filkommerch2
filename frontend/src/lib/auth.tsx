@@ -96,15 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginAsGoogle = async (userInfo: Omit<BuyerUser, "type">) => {
     const result = await authGoogleLogin({ data: { email: userInfo.email, name: userInfo.name } });
     if (!result || !result.success || !result.user) {
-      // Fallback
-      const fallbackUser: BuyerUser = {
-        type: "buyer",
-        ...userInfo,
-        is_google: true,
-      };
-      setUser(fallbackUser);
-      localStorage.setItem("user", JSON.stringify(fallbackUser));
-      return;
+      throw new Error(result?.error || "Gagal login dengan akun Google.");
     }
 
     const updatedUser = {

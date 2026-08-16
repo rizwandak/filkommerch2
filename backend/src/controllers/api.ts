@@ -5657,40 +5657,110 @@ export const submitClaim = async (req: Request, res: Response) => {
     const { orderId } = req.body;
     const userId = req.header("x-user-id");
 
-    if (!orderId || !userId) {
-      return res.status(400).json({ success: false, error: "Parameter tidak lengkap" });
+    if (!orderId) {
+      return res.status(400).json({ success: false, error: "ID pesanan tidak valid atau kosong." });
     }
 
-    // Check if order exists and is still unassigned
+    if (!userId || isNaN(Number(userId)) || Number(userId) <= 0) {
+      return res.status(401).json({
+        success: false,
+        error: "Sesi login Anda tidak valid atau telah kedaluwarsa. Silakan logout lalu login kembali ke akun Anda.",
+      });
+    }
+
+    // Check if user exists in database
+    const user = await queryOne<any>("SELECT id, name, email FROM users WHERE id = ?", [Number(userId)]);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        error: "Akun pengguna tidak ditemukan di database. Mohon logout dan login kembali.",
+      });
+    }
+
+    // Check if order exists
     const order = await queryOne<any>(
-      "SELECT * FROM orders WHERE order_id = ? AND user_id IS NULL",
+      "SELECT * FROM orders WHERE order_id = ?",
       [orderId]
     );
 
     if (!order) {
-      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan atau sudah terhubung dengan akun lain" });
+      return res.status(404).json({
+        success: false,
+        error: `Pesanan #${orderId} tidak ditemukan dalam database sistem.`,
+      });
     }
 
-    // Check if already requested
-    const existing = await queryOne<any>(
+    // Check if order is already assigned to a user
+    if (order.user_id) {
+      if (Number(order.user_id) === Number(userId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Pesanan ini sudah berhasil terhubung dengan akun Anda saat ini. Cek di halaman 'Pesanan Saya'.",
+        });
+      } else {
+        return res.status(400).json({
+          success: false,
+          error: "Pesanan ini sudah terhubung dan diklaim oleh akun pengguna lain. Silakan hubungi admin jika ini pesanan Anda.",
+        });
+      }
+    }
+
+    // Check existing claims for this user and order
+    const existingThisUser = await queryOne<any>(
       "SELECT * FROM order_claims WHERE user_id = ? AND order_id = ?",
-      [userId, orderId]
+      [Number(userId), orderId]
     );
 
-    if (existing) {
-      return res.status(400).json({ success: false, error: "Kamu sudah mengajukan klaim untuk pesanan ini, silakan tunggu admin mengeceknya." });
+    if (existingThisUser) {
+      if (existingThisUser.status === "pending") {
+        return res.status(400).json({
+          success: false,
+          error: "Anda sudah mengajukan klaim untuk pesanan ini dan saat ini sedang menunggu verifikasi admin. Silakan pantau di tab 'Riwayat Klaim'.",
+        });
+      } else if (existingThisUser.status === "approved") {
+        return res.status(400).json({
+          success: false,
+          error: "Klaim pesanan ini sudah disetujui admin sebelumnya untuk akun Anda.",
+        });
+      } else if (existingThisUser.status === "rejected") {
+        return res.status(400).json({
+          success: false,
+          error: `Pengajuan klaim pesanan ini sebelumnya ditolak oleh admin${
+            existingThisUser.admin_note ? `: "${existingThisUser.admin_note}"` : ""
+          }. Silakan hubungi admin FILKOM Merch jika terdapat kekeliruan.`,
+        });
+      }
     }
 
-    // Insert claim
+    // Check if another user currently has a pending claim for this order
+    const existingOtherUser = await queryOne<any>(
+      "SELECT * FROM order_claims WHERE order_id = ? AND status = 'pending'",
+      [orderId]
+    );
+
+    if (existingOtherUser) {
+      return res.status(400).json({
+        success: false,
+        error: "Pesanan ini sedang dalam proses peninjauan klaim oleh pengguna lain. Silakan hubungi admin untuk verifikasi manual.",
+      });
+    }
+
+    // Insert new claim
     await execute(
       "INSERT INTO order_claims (user_id, order_id, status) VALUES (?, ?, 'pending')",
-      [userId, orderId]
+      [Number(userId), orderId]
     );
 
-    return res.json({ success: true, message: "Klaim berhasil diajukan! Admin akan memverifikasi dalam waktu 1x24 jam." });
+    return res.json({
+      success: true,
+      message: "Klaim berhasil diajukan! Admin akan memverifikasi data Anda dalam waktu 1x24 jam.",
+    });
   } catch (error: any) {
     console.error("Error in submitClaim:", error);
-    return res.status(500).json({ success: false, error: "Gagal mengajukan klaim" });
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Terjadi kesalahan pada server saat memproses pengajuan klaim.",
+    });
   }
 };
 

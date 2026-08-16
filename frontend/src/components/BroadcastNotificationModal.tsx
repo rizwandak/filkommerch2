@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { Megaphone, X, Send, Sparkles, Smartphone, Check, Filter } from "lucide-react";
+import { getApiBaseUrl } from "@/lib/api-config";
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080/api";
+const getAPI_URL = () => `${getApiBaseUrl()}/api`;
 
 export interface BroadcastNotificationModalProps {
   isOpen: boolean;
@@ -63,7 +64,7 @@ export function BroadcastNotificationModal({
 
     try {
       setLoading(true);
-      const res = await fetch(`${API_URL}/admin/notifications/broadcast`, {
+      const res = await fetch(`${getAPI_URL()}/admin/notifications/broadcast`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

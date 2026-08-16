@@ -12,8 +12,8 @@ import {
   ShoppingBag,
   GraduationCap,
 } from "lucide-react";
-import { useAuth, type BuyerUser } from "@/lib/auth";
-import { authLogin, authGoogleLogin } from "@backend/server-actions";
+import { useAuth } from "@/lib/auth";
+import { authLogin, authGoogleLogin, authRegister } from "@backend/server-actions";
 import { Button } from "@frontend/components/ui/button";
 import { Input } from "@frontend/components/ui/input";
 import {
@@ -43,14 +43,6 @@ export const Route = createFileRoute("/login")({
   }),
 });
 
-interface LocalAccount {
-  id: string;
-  name: string;
-  username: string;
-  email: string;
-  password?: string;
-}
-
 interface GoogleJwtPayload {
   sub: string;
   email: string;
@@ -60,7 +52,7 @@ interface GoogleJwtPayload {
 }
 
 function LoginPage() {
-  const { setUser, loginAsGoogle, upsertBuyer } = useAuth();
+  const { setUser } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
 
   // Form fields
@@ -70,33 +62,7 @@ function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Local accounts state
-  const [accounts, setAccounts] = useState<LocalAccount[]>([]);
-
-  // Load registered buyers from localStorage on mount
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("registeredBuyers");
-      if (saved) {
-        setAccounts(JSON.parse(saved));
-      } else {
-        // Seed a demo buyer account
-        const demoAccount: LocalAccount = {
-          id: "buyer_demo",
-          name: "Brawijaya Buyer",
-          username: "buyer",
-          email: "buyer@student.ub.ac.id",
-          password: "password123",
-        };
-        localStorage.setItem("registeredBuyers", JSON.stringify([demoAccount]));
-        setAccounts([demoAccount]);
-      }
-    } catch (e) {
-      console.error("Failed to load local accounts", e);
-    }
-  }, []);
-
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
@@ -112,30 +78,28 @@ function LoginPage() {
       return;
     }
 
-    // Check if username or email already exists
-    const exists = accounts.find((acc) => acc.username === username || acc.email === email);
-    if (exists) {
-      toast.error("Username atau Email sudah terdaftar!");
+    try {
+      const res = await authRegister({
+        data: {
+          name,
+          email,
+          password,
+          nim: username,
+        },
+      });
+
+      if (res && res.success) {
+        toast.success("Registrasi berhasil! Silakan login dengan akun Anda.");
+        setMode("login");
+        setPassword("");
+      } else {
+        toast.error(res?.error || "Gagal registrasi akun. Silakan coba lagi.");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat registrasi.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const newAccount: LocalAccount = {
-      id: "buyer_" + Math.random().toString(36).substr(2, 9),
-      name,
-      username,
-      email,
-      password,
-    };
-
-    const updatedAccounts = [...accounts, newAccount];
-    localStorage.setItem("registeredBuyers", JSON.stringify(updatedAccounts));
-    setAccounts(updatedAccounts);
-
-    toast.success("Registrasi berhasil! Silakan login.");
-    setMode("login");
-    setPassword("");
-    setLoading(false);
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -154,50 +118,15 @@ function LoginPage() {
       if (result && result.success && result.user) {
         setUser(result.user);
         localStorage.setItem("user", JSON.stringify(result.user));
-        
-        // Redirect to homepage for all users. Users with admin/cashier role can navigate to admin dashboard via navbar avatar dropdown.
+        toast.success(`Selamat datang, ${result.user.username || result.user.name}!`);
         window.location.href = "/";
-        setLoading(false);
         return;
       }
 
-      // 2. Fallback to local accounts if backend returned fail or offline
-      const account = accounts.find(
-        (acc) => (acc.username === username || acc.email === username) && acc.password === password
-      );
-      if (account) {
-        const fallbackUser: BuyerUser = {
-          type: "buyer",
-          id: account.id,
-          email: account.email,
-          name: account.name,
-          picture: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(account.name)}`,
-        };
-        setUser(fallbackUser);
-        localStorage.setItem("user", JSON.stringify(fallbackUser));
-        window.location.href = "/";
-      } else {
-        toast.error(result?.error || "Username atau password salah!");
-      }
+      toast.error(result?.error || "Email/NIM atau password salah!");
     } catch (error: any) {
-      // 3. Fallback on network/fetch error
-      const account = accounts.find(
-        (acc) => (acc.username === username || acc.email === username) && acc.password === password
-      );
-      if (account) {
-        const fallbackUser: BuyerUser = {
-          type: "buyer",
-          id: account.id,
-          email: account.email,
-          name: account.name,
-          picture: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(account.name)}`,
-        };
-        setUser(fallbackUser);
-        localStorage.setItem("user", JSON.stringify(fallbackUser));
-        window.location.href = "/";
-      } else {
-        toast.error(error.message || "Gagal login.");
-      }
+      console.error("Login error:", error);
+      toast.error(error.message || "Gagal terhubung ke server login.");
     } finally {
       setLoading(false);
     }
@@ -221,25 +150,15 @@ function LoginPage() {
         };
         setUser(updatedUser);
         localStorage.setItem("user", JSON.stringify(updatedUser));
+        toast.success(`Selamat datang, ${updatedUser.username || updatedUser.name}!`);
         window.location.href = "/";
-      } else {
-        // Fallback for buyer
-        const fallbackUser: BuyerUser = {
-          type: "buyer",
-          id: profile.sub,
-          email: profile.email,
-          name: profile.name,
-          picture: profile.picture,
-          is_google: true,
-        };
-        setUser(fallbackUser);
-        localStorage.setItem("user", JSON.stringify(fallbackUser));
-        upsertBuyer(fallbackUser);
-        window.location.href = "/";
+        return;
       }
-    } catch (error) {
+
+      toast.error(result?.error || "Gagal login dengan akun Google.");
+    } catch (error: any) {
       console.error("Google login failed", error);
-      toast.error("Google login failed");
+      toast.error(error.message || "Gagal login dengan Google.");
     } finally {
       setLoading(false);
     }
