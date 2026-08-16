@@ -1165,7 +1165,7 @@ export const deleteUserAdmin = createServerFn({ method: "POST" })
 
 // Update order status
 export const updateOrderStatus = createServerFn({ method: "POST" })
-  .validator((d: { id: string; status: string; shipping_address?: string; notes?: string; fulfillment_proof_url?: string }) => d)
+  .validator((d: { id: string; status: string; shipping_address?: string; fulfillment_type?: string; notes?: string; fulfillment_proof_url?: string }) => d)
   .handler(async ({ data: input }) => {
     try {
       const res = await serverFetch(`${API_URL}/api/admin/orders/${input.id}/status`, {
@@ -1174,6 +1174,7 @@ export const updateOrderStatus = createServerFn({ method: "POST" })
         body: JSON.stringify({
           status: input.status,
           shipping_address: input.shipping_address,
+          fulfillment_type: input.fulfillment_type,
           notes: input.notes,
           fulfillment_proof_url: input.fulfillment_proof_url,
         }),

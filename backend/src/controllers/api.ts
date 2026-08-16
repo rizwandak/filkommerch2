@@ -1874,6 +1874,10 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       updateFields.push("shipping_address = ?");
       updateParams.push(shipping_address);
     }
+    if (req.body.fulfillment_type !== undefined) {
+      updateFields.push("fulfillment_type = ?");
+      updateParams.push(req.body.fulfillment_type);
+    }
     if (notes !== undefined) {
       updateFields.push("notes = ?");
       updateParams.push(notes);

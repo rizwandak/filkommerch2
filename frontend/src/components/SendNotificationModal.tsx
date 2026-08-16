@@ -101,6 +101,8 @@ export function SendNotificationModal({
         },
         body: JSON.stringify({
           userId: targetUserId,
+          orderId: targetTrxId,
+          targetTrxId: targetTrxId,
           title,
           message,
           type,

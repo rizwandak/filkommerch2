@@ -80,6 +80,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof document === "undefined" || loading) return;
     syncAuthCookies(user);
+
+    // Auto-sync push subscription token to user account if permission is already granted
+    if (user?.id && typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+      import("@/services/pushService")
+        .then((m) => m.subscribeUserToPush(user.id))
+        .catch(() => {});
+    }
   }, [user, loading]);
 
   const loginAsAdmin = async (username: string, password: string) => {

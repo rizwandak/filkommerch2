@@ -267,6 +267,31 @@ function AdminTransactionsPage() {
 
   const [managedStatus, setManagedStatus] = useState<string>("");
   const [managedShippingAddress, setManagedShippingAddress] = useState<string>("");
+  const [managedFulfillmentType, setManagedFulfillmentType] = useState<"pickup" | "shipping">("pickup");
+  const [managedStreetAddress, setManagedStreetAddress] = useState<string>("");
+  const [managedRtRw, setManagedRtRw] = useState<string>("");
+  const [managedKelurahan, setManagedKelurahan] = useState<string>("");
+  const [managedKecamatan, setManagedKecamatan] = useState<string>("");
+  const [managedCity, setManagedCity] = useState<string>("");
+  const [managedProvince, setManagedProvince] = useState<string>("");
+  const [managedPostalCode, setManagedPostalCode] = useState<string>("");
+
+  const [provinces, setProvinces] = useState<{ id: string; name: string }[]>([]);
+  const [cities, setCities] = useState<{ id: string; name: string }[]>([]);
+  const [districts, setDistricts] = useState<{ id: string; name: string }[]>([]);
+  const [villages, setVillages] = useState<{ id: string; name: string }[]>([]);
+
+  const [provId, setProvId] = useState("");
+  const [cityId, setCityId] = useState("");
+  const [distId, setDistId] = useState("");
+  const [villId, setVillId] = useState("");
+
+  const [loadingProv, setLoadingProv] = useState(false);
+  const [loadingCity, setLoadingCity] = useState(false);
+  const [loadingDist, setLoadingDist] = useState(false);
+  const [loadingVill, setLoadingVill] = useState(false);
+  const [apiFailed, setApiFailed] = useState(false);
+
   const [managedNotes, setManagedNotes] = useState<string>("");
   const [managedFulfillmentProof, setManagedFulfillmentProof] = useState<string>("");
   const [uploadingFulfillmentProof, setUploadingFulfillmentProof] = useState(false);
@@ -401,6 +426,94 @@ function AdminTransactionsPage() {
     }
   };
 
+  const toTitleCase = (str: string) => {
+    if (!str) return "";
+    return str
+      .toLowerCase()
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  // Load provinces on modal open / shipping selection
+  useEffect(() => {
+    if (managementOpen && managedFulfillmentType === "shipping" && provinces.length === 0) {
+      setLoadingProv(true);
+      fetch("https://cdn.jsdelivr.net/gh/emsifa/api-wilayah-indonesia@gh-pages/api/provinces.json")
+        .then((res) => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
+        .then((data) => {
+          setProvinces(data);
+          setApiFailed(false);
+        })
+        .catch(() => {
+          setApiFailed(true);
+        })
+        .finally(() => {
+          setLoadingProv(false);
+        });
+    }
+  }, [managementOpen, managedFulfillmentType, provinces.length]);
+
+  // Fetch cities when provId changes
+  useEffect(() => {
+    if (provId) {
+      setLoadingCity(true);
+      setCities([]);
+      setDistricts([]);
+      setVillages([]);
+      setCityId("");
+      setDistId("");
+      setVillId("");
+      fetch(`https://cdn.jsdelivr.net/gh/emsifa/api-wilayah-indonesia@gh-pages/api/regencies/${provId}.json`)
+        .then((res) => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
+        .then((data) => setCities(data))
+        .catch(() => setApiFailed(true))
+        .finally(() => setLoadingCity(false));
+    }
+  }, [provId]);
+
+  // Fetch districts when cityId changes
+  useEffect(() => {
+    if (cityId) {
+      setLoadingDist(true);
+      setDistricts([]);
+      setVillages([]);
+      setDistId("");
+      setVillId("");
+      fetch(`https://cdn.jsdelivr.net/gh/emsifa/api-wilayah-indonesia@gh-pages/api/districts/${cityId}.json`)
+        .then((res) => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
+        .then((data) => setDistricts(data))
+        .catch(() => setApiFailed(true))
+        .finally(() => setLoadingDist(false));
+    }
+  }, [cityId]);
+
+  // Fetch villages when distId changes
+  useEffect(() => {
+    if (distId) {
+      setLoadingVill(true);
+      setVillages([]);
+      setVillId("");
+      fetch(`https://cdn.jsdelivr.net/gh/emsifa/api-wilayah-indonesia@gh-pages/api/villages/${distId}.json`)
+        .then((res) => {
+          if (!res.ok) throw new Error();
+          return res.json();
+        })
+        .then((data) => setVillages(data))
+        .catch(() => setApiFailed(true))
+        .finally(() => setLoadingVill(false));
+    }
+  }, [distId]);
+
   const handleOpenManagement = async (id: string, type: "online" | "offline") => {
     setFetchingManagedDetail(true);
     setManagedType(type);
@@ -415,7 +528,43 @@ function AdminTransactionsPage() {
           setManagedTransaction(result.order);
           setManagedItems(result.items || []);
           setManagedStatus(result.order.transaction_status);
-          setManagedShippingAddress(result.order.shipping_address || "");
+          
+          const rawAddr = result.order.shipping_address || "";
+          const isPickup =
+            result.order.fulfillment_type === "pickup" ||
+            rawAddr.toLowerCase().includes("ambil di filkom merch") ||
+            rawAddr.toLowerCase().startsWith("ambil di");
+
+          if (isPickup) {
+            setManagedFulfillmentType("pickup");
+            setManagedShippingAddress("Ambil di FILKOM Merch (gratis)");
+            setManagedStreetAddress("");
+            setManagedRtRw("");
+            setManagedKelurahan("");
+            setManagedKecamatan("");
+            setManagedCity("");
+            setManagedProvince("");
+            setManagedPostalCode("");
+            setProvId("");
+            setCityId("");
+            setDistId("");
+            setVillId("");
+          } else {
+            setManagedFulfillmentType("shipping");
+            setManagedShippingAddress(rawAddr);
+            setManagedStreetAddress(rawAddr);
+            setManagedRtRw("");
+            setManagedKelurahan("");
+            setManagedKecamatan("");
+            setManagedCity("");
+            setManagedProvince("");
+            setManagedPostalCode("");
+            setProvId("");
+            setCityId("");
+            setDistId("");
+            setVillId("");
+          }
+
           setManagedNotes(result.order.notes || "");
           setManagedFulfillmentProof(result.order.fulfillment_proof_url || "");
         } else {
@@ -448,17 +597,33 @@ function AdminTransactionsPage() {
     if (!managedTransaction || !managedStatus) return;
     setSavingManaged(true);
     try {
+      const finalAddress =
+        managedFulfillmentType === "pickup"
+          ? "Ambil di FILKOM Merch (gratis)"
+          : [
+              managedStreetAddress.trim(),
+              managedRtRw.trim() ? `RT/RW ${managedRtRw.trim()}` : "",
+              managedKelurahan.trim() ? `Kel. ${managedKelurahan.trim()}` : "",
+              managedKecamatan.trim() ? `Kec. ${managedKecamatan.trim()}` : "",
+              managedCity.trim(),
+              managedProvince.trim(),
+              managedPostalCode.trim() ? `Kode Pos ${managedPostalCode.trim()}` : "",
+            ]
+              .filter(Boolean)
+              .join(", ") || managedStreetAddress.trim() || "Diantar";
+
       const result = await updateOrderStatus({
         data: {
           id: managedTransaction.order_id,
           status: managedStatus,
-          shipping_address: managedShippingAddress || undefined,
+          shipping_address: finalAddress,
+          fulfillment_type: managedFulfillmentType,
           notes: managedNotes || undefined,
           fulfillment_proof_url: managedFulfillmentProof || undefined,
         },
       });
       if (result.success) {
-        toast.success("Status transaksi berhasil diperbarui!");
+        toast.success("Status transaksi & pengiriman berhasil diperbarui!");
         await loadTransactions();
         // Re-fetch details to sync state
         const detailRes = await getOrderById({ data: managedTransaction.order_id });
@@ -2801,15 +2966,303 @@ function AdminTransactionsPage() {
                           </div>
                         )}
 
-                        <div className="space-y-1">
-                          <Label className="text-xs font-semibold text-ink">Alamat Pengiriman</Label>
-                          <Input
-                            value={managedShippingAddress}
-                            onChange={(e) => setManagedShippingAddress(e.target.value)}
-                            placeholder="Alamat lengkap pengiriman"
-                            className="h-9 text-xs"
-                          />
+                        {/* Pilihan Metode Pengambilan / Pengiriman */}
+                        <div className="space-y-2 pt-1 border-t border-ink/10">
+                          <Label className="text-xs font-bold text-ink uppercase tracking-wide flex items-center gap-1.5">
+                            <Truck className="w-3.5 h-3.5 text-brand-orange" />
+                            Metode Pengambilan / Pengiriman
+                          </Label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setManagedFulfillmentType("pickup");
+                                setManagedShippingAddress("Ambil di FILKOM Merch (gratis)");
+                              }}
+                              className={`flex flex-col text-left p-2.5 rounded-xl border-2 transition cursor-pointer ${
+                                managedFulfillmentType === "pickup"
+                                  ? "border-ink bg-cream/50 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
+                                  : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-xs text-ink flex items-center gap-1.5">
+                                  <Store className="w-3.5 h-3.5 text-emerald-600" /> Ambil di Store
+                                </span>
+                                <span className="text-[9px] text-emerald-700 bg-emerald-100 font-black px-1.5 py-0.5 rounded border border-emerald-300 uppercase">
+                                  Gratis
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground mt-1 leading-snug">
+                                Ambil langsung di toko fisik FILKOM Merch UB.
+                              </span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setManagedFulfillmentType("shipping");
+                              }}
+                              className={`flex flex-col text-left p-2.5 rounded-xl border-2 transition cursor-pointer ${
+                                managedFulfillmentType === "shipping"
+                                  ? "border-ink bg-cream/50 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
+                                  : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-xs text-ink flex items-center gap-1.5">
+                                  <Truck className="w-3.5 h-3.5 text-brand-orange" /> Diantar (Kurir)
+                                </span>
+                                <span className="text-[9px] text-brand-orange bg-brand-orange/10 font-black px-1.5 py-0.5 rounded border border-brand-orange/30 uppercase">
+                                  Ada Ongkir
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-muted-foreground mt-1 leading-snug">
+                                Kirim ke alamat tujuan pembeli.
+                              </span>
+                            </button>
+                          </div>
                         </div>
+
+                        {/* Ambil di Store Notice */}
+                        {managedFulfillmentType === "pickup" && (
+                          <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-lg text-[11px] text-emerald-900 flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                            <span>
+                              <strong>Lokasi Pengambilan:</strong> Toko FILKOM Merch (Belakang Tulisan FILKOM dekat FTP UB).
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Form Alamat Lengkap untuk Diantar */}
+                        {managedFulfillmentType === "shipping" && (
+                          <div className="space-y-3 border-2 border-ink bg-[#FCFAF7] p-3 rounded-xl shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] animate-fade-in">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-extrabold text-[11px] uppercase tracking-wider text-brand-orange flex items-center gap-1">
+                                📍 Form Alamat Pengiriman Lengkap
+                              </h4>
+                              {apiFailed && (
+                                <span className="text-[9px] text-red-500 font-bold bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
+                                  Mode Manual
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Nama Jalan & No Rumah */}
+                            <div className="space-y-1">
+                              <Label htmlFor="manage_streetAddress" className="font-bold text-[10px] uppercase text-ink">
+                                Nama Jalan / No Rumah / Detail Lokasi *
+                              </Label>
+                              <Input
+                                id="manage_streetAddress"
+                                placeholder="Contoh: Jl. Veteran No. 8, Kos Pondok Indah Kamar A3"
+                                value={managedStreetAddress}
+                                onChange={(e) => setManagedStreetAddress(e.target.value)}
+                                className="border-2 border-ink bg-white font-medium text-xs h-8"
+                              />
+                            </div>
+
+                            {/* RT / RW & Kode Pos */}
+                            <div className="grid grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <Label htmlFor="manage_rtRw" className="font-bold text-[10px] uppercase text-ink">
+                                  RT / RW (Opsional)
+                                </Label>
+                                <Input
+                                  id="manage_rtRw"
+                                  placeholder="Contoh: 02/04"
+                                  value={managedRtRw}
+                                  onChange={(e) => setManagedRtRw(e.target.value)}
+                                  className="border-2 border-ink bg-white font-medium text-xs h-8"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label htmlFor="manage_postalCode" className="font-bold text-[10px] uppercase text-ink">
+                                  Kode Pos *
+                                </Label>
+                                <Input
+                                  id="manage_postalCode"
+                                  placeholder="Contoh: 65145"
+                                  value={managedPostalCode}
+                                  onChange={(e) => setManagedPostalCode(e.target.value)}
+                                  className="border-2 border-ink bg-white font-medium text-xs h-8"
+                                />
+                              </div>
+                            </div>
+
+                            {/* Provinsi & Kota/Kabupaten */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <Label htmlFor="manage_province" className="font-bold text-[10px] uppercase text-ink">
+                                  Provinsi *
+                                </Label>
+                                {apiFailed ? (
+                                  <Input
+                                    id="manage_province"
+                                    placeholder="Contoh: Jawa Timur"
+                                    value={managedProvince}
+                                    onChange={(e) => setManagedProvince(e.target.value)}
+                                    className="border-2 border-ink bg-white font-medium text-xs h-8"
+                                  />
+                                ) : (
+                                  <select
+                                    id="manage_province"
+                                    value={provId}
+                                    onChange={(e) => {
+                                      const id = e.target.value;
+                                      setProvId(id);
+                                      const matched = provinces.find((p) => p.id === id);
+                                      setManagedProvince(matched ? toTitleCase(matched.name) : "");
+                                      setManagedCity("");
+                                      setManagedKecamatan("");
+                                      setManagedKelurahan("");
+                                    }}
+                                    className="w-full border-2 border-ink bg-white font-bold text-xs p-1.5 rounded-lg focus:outline-none cursor-pointer h-8"
+                                    disabled={loadingProv}
+                                  >
+                                    <option value="">{loadingProv ? "Memuat..." : "-- Pilih Provinsi --"}</option>
+                                    {provinces.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        {toTitleCase(p.name)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              </div>
+
+                              <div className="space-y-1">
+                                <Label htmlFor="manage_city" className="font-bold text-[10px] uppercase text-ink">
+                                  Kota / Kabupaten *
+                                </Label>
+                                {apiFailed ? (
+                                  <Input
+                                    id="manage_city"
+                                    placeholder="Contoh: Malang"
+                                    value={managedCity}
+                                    onChange={(e) => setManagedCity(e.target.value)}
+                                    className="border-2 border-ink bg-white font-medium text-xs h-8"
+                                  />
+                                ) : (
+                                  <select
+                                    id="manage_city"
+                                    value={cityId}
+                                    onChange={(e) => {
+                                      const id = e.target.value;
+                                      setCityId(id);
+                                      const matched = cities.find((c) => c.id === id);
+                                      setManagedCity(matched ? toTitleCase(matched.name) : "");
+                                      setManagedKecamatan("");
+                                      setManagedKelurahan("");
+                                    }}
+                                    className="w-full border-2 border-ink bg-white font-bold text-xs p-1.5 rounded-lg focus:outline-none cursor-pointer h-8"
+                                    disabled={!provId || loadingCity}
+                                  >
+                                    <option value="">{loadingCity ? "Memuat..." : provId ? "-- Pilih Kota/Kabupaten --" : "-- Pilih Provinsi Dulu --"}</option>
+                                    {cities.map((c) => (
+                                      <option key={c.id} value={c.id}>
+                                        {toTitleCase(c.name)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Kecamatan & Kelurahan */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div className="space-y-1">
+                                <Label htmlFor="manage_kecamatan" className="font-bold text-[10px] uppercase text-ink">
+                                  Kecamatan *
+                                </Label>
+                                {apiFailed ? (
+                                  <Input
+                                    id="manage_kecamatan"
+                                    placeholder="Kecamatan"
+                                    value={managedKecamatan}
+                                    onChange={(e) => setManagedKecamatan(e.target.value)}
+                                    className="border-2 border-ink bg-white font-medium text-xs h-8"
+                                  />
+                                ) : (
+                                  <select
+                                    id="manage_kecamatan"
+                                    value={distId}
+                                    onChange={(e) => {
+                                      const id = e.target.value;
+                                      setDistId(id);
+                                      const matched = districts.find((d) => d.id === id);
+                                      setManagedKecamatan(matched ? toTitleCase(matched.name) : "");
+                                      setManagedKelurahan("");
+                                    }}
+                                    className="w-full border-2 border-ink bg-white font-bold text-xs p-1.5 rounded-lg focus:outline-none cursor-pointer h-8"
+                                    disabled={!cityId || loadingDist}
+                                  >
+                                    <option value="">{loadingDist ? "Memuat..." : cityId ? "-- Pilih Kecamatan --" : "-- Pilih Kota Dulu --"}</option>
+                                    {districts.map((d) => (
+                                      <option key={d.id} value={d.id}>
+                                        {toTitleCase(d.name)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              </div>
+
+                              <div className="space-y-1">
+                                <Label htmlFor="manage_kelurahan" className="font-bold text-[10px] uppercase text-ink">
+                                  Desa / Kelurahan *
+                                </Label>
+                                {apiFailed ? (
+                                  <Input
+                                    id="manage_kelurahan"
+                                    placeholder="Kelurahan"
+                                    value={managedKelurahan}
+                                    onChange={(e) => setManagedKelurahan(e.target.value)}
+                                    className="border-2 border-ink bg-white font-medium text-xs h-8"
+                                  />
+                                ) : (
+                                  <select
+                                    id="manage_kelurahan"
+                                    value={villId}
+                                    onChange={(e) => {
+                                      const id = e.target.value;
+                                      setVillId(id);
+                                      const matched = villages.find((v) => v.id === id);
+                                      setManagedKelurahan(matched ? toTitleCase(matched.name) : "");
+                                    }}
+                                    className="w-full border-2 border-ink bg-white font-bold text-xs p-1.5 rounded-lg focus:outline-none cursor-pointer h-8"
+                                    disabled={!distId || loadingVill}
+                                  >
+                                    <option value="">{loadingVill ? "Memuat..." : distId ? "-- Pilih Kelurahan/Desa --" : "-- Pilih Kecamatan Dulu --"}</option>
+                                    {villages.map((v) => (
+                                      <option key={v.id} value={v.id}>
+                                        {toTitleCase(v.name)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Preview Hasil Rangkaian Alamat */}
+                            {(managedStreetAddress || managedCity || managedProvince) && (
+                              <div className="bg-white border border-ink/20 rounded p-2 text-[10px] text-ink leading-relaxed">
+                                <span className="font-bold text-muted-foreground block uppercase text-[9px]">
+                                  Preview Alamat Tersimpan:
+                                </span>
+                                {[
+                                  managedStreetAddress.trim(),
+                                  managedRtRw.trim() ? `RT/RW ${managedRtRw.trim()}` : "",
+                                  managedKelurahan.trim() ? `Kel. ${managedKelurahan.trim()}` : "",
+                                  managedKecamatan.trim() ? `Kec. ${managedKecamatan.trim()}` : "",
+                                  managedCity.trim(),
+                                  managedProvince.trim(),
+                                  managedPostalCode.trim() ? `Kode Pos ${managedPostalCode.trim()}` : "",
+                                ]
+                                  .filter(Boolean)
+                                  .join(", ") || managedStreetAddress.trim()}
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         <div className="space-y-1">
                           <Label className="text-xs font-semibold text-ink">Catatan untuk Pembeli</Label>

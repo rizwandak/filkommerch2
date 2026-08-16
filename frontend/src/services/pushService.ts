@@ -29,7 +29,7 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 }
 
-export async function subscribeUserToPush(): Promise<{ success: boolean; error?: string }> {
+export async function subscribeUserToPush(customUserId?: string | number): Promise<{ success: boolean; error?: string }> {
   try {
     if (!(await isPushNotificationSupported())) {
       return { success: false, error: "Notifikasi Push tidak didukung oleh browser ini." };
@@ -46,6 +46,11 @@ export async function subscribeUserToPush(): Promise<{ success: boolean; error?:
     const reg = await registerServiceWorker();
     if (!reg) {
       return { success: false, error: "Gagal mendaftarkan Service Worker." };
+    }
+
+    // Ensure service worker is fully active and ready before push subscription
+    if ("serviceWorker" in navigator) {
+      await navigator.serviceWorker.ready;
     }
 
     // Fetch VAPID key from backend
@@ -78,9 +83,9 @@ export async function subscribeUserToPush(): Promise<{ success: boolean; error?:
       }
     }
 
-    const userJson = localStorage.getItem("user");
+    const userJson = typeof localStorage !== "undefined" ? localStorage.getItem("user") : null;
     const user = userJson ? JSON.parse(userJson) : null;
-    const userId = user?.id || "";
+    const userId = customUserId !== undefined ? String(customUserId) : (user?.id ? String(user.id) : "");
 
     // Send subscription object to backend
     const res = await fetch(`${getAPI_URL()}/notifications/subscribe`, {

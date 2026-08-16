@@ -29,14 +29,18 @@ export interface PushNotificationPayload {
  */
 export async function sendPushToUser(
   connection: mysql.Connection | mysql.Pool,
-  userId: number,
+  userId: number | null,
   payload: PushNotificationPayload
 ) {
   try {
-    const [subs] = await connection.query<any[]>(
-      "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ? OR user_id = 0",
-      [userId]
-    );
+    let subs: any[] = [];
+    if (userId && Number(userId) > 0) {
+      const [res] = await connection.query<any[]>(
+        "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE user_id = ?",
+        [Number(userId)]
+      );
+      subs = res || [];
+    }
 
     if (!subs || subs.length === 0) {
       console.log(`[PushService] User ID ${userId} has no active push subscriptions.`);
