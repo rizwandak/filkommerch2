@@ -36,6 +36,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import { getApiBaseUrl } from "@/lib/api-config";
+import { uploadImageHelper } from "@/lib/upload-helper";
 import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/orders_/$orderId")({
@@ -330,20 +332,15 @@ function OrderDetailComponent() {
     if (!pelunasanProofFile || !linkedPelunasan) return;
     setUploadingPelunasanProof(true);
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || "https://filkommerch.com";
-      const formData = new FormData();
-      formData.append("file", pelunasanProofFile);
-
-      const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, { method: "POST", body: formData });
-      const uploadData = await uploadRes.json();
-      if (!uploadRes.ok || !uploadData.success || !uploadData.url) {
-        throw new Error(uploadData.error || "Gagal mengunggah gambar ke server");
+      const uploadRes = await uploadImageHelper(pelunasanProofFile);
+      if (!uploadRes.success || !uploadRes.url) {
+        throw new Error(uploadRes.error || "Gagal mengunggah gambar bukti pelunasan");
       }
 
       const res = await submitPaymentProof({
         data: {
           orderId: linkedPelunasan.order_id,
-          paymentProofUrl: uploadData.url,
+          paymentProofUrl: uploadRes.url,
         },
       });
 
@@ -355,7 +352,8 @@ function OrderDetailComponent() {
         toast.error(res.error || "Gagal menyimpan bukti pelunasan");
       }
     } catch (err: any) {
-      toast.error(err.message || "Terjadi kesalahan sistem");
+      console.error("Pelunasan upload error:", err);
+      toast.error(err.message || "Terjadi kesalahan sistem saat unggah pelunasan");
     } finally {
       setUploadingPelunasanProof(false);
     }
@@ -386,47 +384,32 @@ function OrderDetailComponent() {
 
     setUploadingPaymentProof(true);
     try {
-      const API_BASE_URL = import.meta.env.VITE_API_URL || "https://filkommerch.com";
-      const formData = new FormData();
-      formData.append("file", paymentProofFile);
-
-      const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!uploadRes.ok) {
-        throw new Error("Gagal mengunggah gambar ke server");
+      const uploadRes = await uploadImageHelper(paymentProofFile);
+      if (!uploadRes.success || !uploadRes.url) {
+        throw new Error(uploadRes.error || "Gagal mengunggah gambar bukti pembayaran");
       }
 
-      const uploadData = await uploadRes.json();
-      if (!uploadData.success || !uploadData.url) {
-        throw new Error(uploadData.error || "Gagal mendapatkan URL gambar");
-      }
-
-      const proofUrl = uploadData.url;
       const res = await submitPaymentProof({
         data: {
           orderId: order.order_id,
-          paymentProofUrl: proofUrl,
+          paymentProofUrl: uploadRes.url,
         },
       });
 
       if (res.success) {
-        toast.success("Bukti pembayaran berhasil dikirim. Menunggu verifikasi admin.");
-        setOrder({
-          ...order,
-          payment_proof_url: proofUrl,
-          payment_proof_note: null,
-          order_status: "pending_payment",
-          payment_status: "pending",
-        });
+        toast.success("Bukti pembayaran berhasil dikirim! Menunggu verifikasi admin.");
         setPaymentProofFile(null);
+        // Refresh local order data
+        const updated = await getOrderById({ data: order.order_id });
+        if (updated.success && updated.order) {
+          setOrder(updated.order);
+        }
       } else {
-        toast.error(res.error || "Gagal menyimpan bukti pembayaran");
+        toast.error(res.error || "Gagal menyimpan bukti transfer");
       }
-    } catch (e: any) {
-      toast.error(e.message || "Terjadi kesalahan sistem saat unggah bukti");
+    } catch (err: any) {
+      console.error("Payment proof upload error:", err);
+      toast.error(err.message || "Terjadi kesalahan sistem saat unggah bukti");
     } finally {
       setUploadingPaymentProof(false);
     }
@@ -625,19 +608,10 @@ function OrderDetailComponent() {
     try {
       let uploadedUrls: string[] = [];
       if (reviewMediaFiles.length > 0) {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || "https://filkommerch.com";
         for (const file of reviewMediaFiles) {
-          const formData = new FormData();
-          formData.append("file", file);
-          const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
-            method: "POST",
-            body: formData,
-          });
-          if (uploadRes.ok) {
-            const uploadData = await uploadRes.json();
-            if (uploadData.success && uploadData.url) {
-              uploadedUrls.push(uploadData.url);
-            }
+          const uploadRes = await uploadImageHelper(file);
+          if (uploadRes.success && uploadRes.url) {
+            uploadedUrls.push(uploadRes.url);
           }
         }
       }
@@ -681,19 +655,10 @@ function OrderDetailComponent() {
     try {
       let uploadedUrls: string[] = [];
       if (complaintMediaFiles.length > 0) {
-        const API_BASE_URL = import.meta.env.VITE_API_URL || "https://filkommerch.com";
         for (const file of complaintMediaFiles) {
-          const formData = new FormData();
-          formData.append("file", file);
-          const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
-            method: "POST",
-            body: formData,
-          });
-          if (uploadRes.ok) {
-            const uploadData = await uploadRes.json();
-            if (uploadData.success && uploadData.url) {
-              uploadedUrls.push(uploadData.url);
-            }
+          const uploadRes = await uploadImageHelper(file);
+          if (uploadRes.success && uploadRes.url) {
+            uploadedUrls.push(uploadRes.url);
           }
         }
       }

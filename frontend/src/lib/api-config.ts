@@ -27,11 +27,18 @@ export const getApiBaseUrl = (): string => {
     return LIVE_BACKEND_URL;
   }
 
+  // If VITE_API_URL is specified in env, use it (strip trailing /api or /)
+  if (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
+  }
+
   // AUTO Mode: Detect local development vs server environment
   const isLocalEnv =
     (typeof window !== "undefined" &&
       (window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1" ||
+        window.location.hostname.startsWith("192.168.") ||
+        window.location.hostname.startsWith("10.") ||
         window.location.hostname.endsWith(".local"))) ||
     (typeof process !== "undefined" &&
       (process.env.NODE_ENV === "development" || !process.env.NODE_ENV));

@@ -26,6 +26,7 @@ import {
 } from "@backend/server-actions";
 import { toast } from "sonner";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import { uploadImageHelper } from "@/lib/upload-helper";
 
 interface OrderConfirmationSearch {
   orderId?: string;
@@ -181,34 +182,23 @@ function OrderConfirmationPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append("file", file);
-
-    const API_BASE_URL = import.meta.env.VITE_API_URL || "https://filkommerch.com";
-
     try {
       setUploadingProof(true);
       toast.loading("Mengunggah bukti transfer...");
-      const res = await fetch(`${API_BASE_URL}/api/upload`, {
-        method: "POST",
-        body: formData,
-        headers: {
-          "ngrok-skip-browser-warning": "true"
-        }
-      });
-      const data = await res.json();
+      
+      const res = await uploadImageHelper(file);
       toast.dismiss();
 
-      if (data.success && data.url) {
-        setProofUrlTemp(data.url);
+      if (res.success && res.url) {
+        setProofUrlTemp(res.url);
         toast.success("Foto bukti transfer berhasil diunggah");
       } else {
-        toast.error(data.error || "Gagal mengunggah foto");
+        toast.error(res.error || "Gagal mengunggah foto bukti transfer");
       }
-    } catch (err) {
+    } catch (err: any) {
       toast.dismiss();
-      console.error(err);
-      toast.error("Gagal mengunggah bukti transfer");
+      console.error("Upload proof error:", err);
+      toast.error(err.message || "Gagal mengunggah bukti transfer");
     } finally {
       setUploadingProof(false);
     }
@@ -343,7 +333,7 @@ function OrderConfirmationPage() {
   if (isManualQrisMode && (pStatus === "unpaid" || pStatus === "pending")) {
     if (proofUrl || order?.payment_proof_url) {
       statusIcon = <Clock className="mx-auto mb-3 h-10 w-10 sm:h-12 sm:w-12 text-blue-500" />;
-      statusTitle = "Pesanan Sedang Direview Admin";
+      statusTitle = "Pembayaran Sedang Direview Admin";
       statusDescription =
         "Bukti pembayaran Anda telah diterima. Sembari menunggu, anda bisa melihat-lihat produk lain dengan klik \"Lanjut Belanja\".";
       statusBg = "bg-blue-50 border-blue-200 text-blue-900";

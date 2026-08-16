@@ -41,6 +41,7 @@ import {
 } from "@backend/server-actions";
 import { useQuery } from "@tanstack/react-query";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import { getApiBaseUrl } from "@/lib/api-config";
 import { ImageCropperModal } from "@frontend/components/admin/ImageCropperModal";
 
 export const Route = createFileRoute("/admin/products")({
@@ -330,11 +331,6 @@ function AdminProductsPage() {
     }
   };
 
-  const getApiBaseUrl = () => {
-    let url = import.meta.env.VITE_API_URL || "https://filkommerch.com";
-    url = url.replace(/\/api\/?$/, "").replace(/\/$/, "");
-    return url;
-  };
   const API_BASE_URL = getApiBaseUrl();
 
   const getAdminRequestHeaders = () => {

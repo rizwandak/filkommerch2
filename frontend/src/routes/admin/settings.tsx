@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@frontend/components/ui/select";
 import { getStoreSettings, updateStoreSettings, type StoreSettings } from "@backend/server-actions";
+import { uploadImageHelper } from "@/lib/upload-helper";
 
 export const Route = createFileRoute("/admin/settings")({
   component: AdminSettingsPage,
@@ -28,12 +29,6 @@ function AdminSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const getApiBaseUrl = () => {
-    let url = import.meta.env.VITE_API_URL || "https://filkommerch.com";
-    return url.replace(/\/api\/?$/, "").replace(/\/$/, "");
-  };
-  const API_BASE_URL = getApiBaseUrl();
-
   const handleUploadQris = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (isCashier) {
       toast.error("Akses ditolak: Kasir tidak diizinkan mengubah QRIS.");
@@ -42,19 +37,9 @@ function AdminSettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
       toast.loading("Mengunggah QRIS statis...");
-      const res = await fetch(`${API_BASE_URL}/api/upload`, {
-        method: "POST",
-        body: formData,
-        headers: {
-          "ngrok-skip-browser-warning": "true"
-        }
-      });
-      const data = await res.json();
+      const data = await uploadImageHelper(file);
       toast.dismiss();
 
       if (data.success && data.url) {

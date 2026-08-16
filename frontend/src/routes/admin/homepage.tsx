@@ -37,6 +37,7 @@ import {
 } from "@/lib/homepage-types";
 import { ImageCropperModal } from "@frontend/components/admin/ImageCropperModal";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import { getApiBaseUrl } from "@/lib/api-config";
 import hero from "@/assets/hero.jpg";
 import pVarsity from "@/assets/p-varsity.jpg";
 import pHoodie from "@/assets/p-hoodie.jpg";
@@ -314,10 +315,6 @@ function AdminHomepageEditorPage() {
     elementType: string;
   } | null>(null);
 
-  const getApiBaseUrl = () => {
-    let url = import.meta.env.VITE_API_URL || "https://filkommerch.com";
-    return url.replace(/\/api\/?$/, "").replace(/\/$/, "");
-  };
   const API_BASE_URL = getApiBaseUrl();
 
   // Sensors for DnD kit
