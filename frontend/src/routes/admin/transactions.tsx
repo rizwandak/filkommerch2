@@ -2869,15 +2869,15 @@ function AdminTransactionsPage() {
 
       {/* Filter Modal Dialog */}
       <Dialog open={filterModalOpen} onOpenChange={setFilterModalOpen}>
-        <DialogContent className="sm:max-w-md w-full bg-white border-4 border-ink rounded-2xl shadow-[6px_6px_0px_0px_rgba(27,27,27,1)] p-5 sm:p-6 overflow-hidden">
-          <DialogHeader className="pb-2 border-b-2 border-ink/10">
+        <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] overflow-y-auto overflow-x-hidden bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5">
+          <DialogHeader>
             <DialogTitle className="display text-lg tracking-wide text-ink flex items-center gap-2 uppercase">
               <SlidersHorizontal className="w-5 h-5 text-brand-orange" />
               Filter &amp; Penyaringan Transaksi
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2 text-xs max-h-[60vh] overflow-y-auto pr-1">
+          <div className="space-y-4 py-2 text-xs">
             {/* 1. Batch PO Filter */}
             <div className="space-y-1.5">
               <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
@@ -2948,7 +2948,7 @@ function AdminTransactionsPage() {
                 </div>
               )}
 
-              <div className="w-full bg-cream/30 border-2 border-ink rounded-lg p-2 max-h-44 overflow-y-auto overflow-x-hidden space-y-1 box-border">
+              <div className="w-full bg-cream/30 border-2 border-ink rounded-lg p-2 max-h-52 overflow-y-auto overflow-x-hidden space-y-1 box-border">
                 <label
                   className={`w-full flex items-center gap-2.5 p-2 rounded-md cursor-pointer text-xs font-bold transition-colors select-none ${
                     productFilter.length === 0 ? "bg-brand-orange/15 text-brand-orange border border-brand-orange/40" : "hover:bg-black/5 text-ink"
