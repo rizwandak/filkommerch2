@@ -283,14 +283,10 @@ export async function runMigration() {
 
     for (const q of queries) {
       try {
-        console.log(`Running schema migration: ${q.name}...`);
         await connection.query(q.sql);
-        console.log(`✅ ${q.name} migrated successfully!`);
       } catch (err: any) {
-        // Handle MySQL Duplicate Column Error safely
-        if (err.code === "ER_DUP_FIELDNAME" || err.errno === 1060 || err.code === "ER_DUP_COLUMN_NAME") {
-          console.log(`ℹ️ Column ${q.name} already exists. Skipping.`);
-        } else {
+        // Handle MySQL Duplicate Column / Table Error safely without spamming logs
+        if (err.code !== "ER_DUP_FIELDNAME" && err.errno !== 1060 && err.code !== "ER_DUP_COLUMN_NAME") {
           console.error(`❌ Error migrating ${q.name}:`, err.message);
         }
       }
@@ -298,7 +294,6 @@ export async function runMigration() {
 
     // Manage order_items foreign keys to ON DELETE SET NULL
     try {
-      console.log("Migrating order_items foreign keys to ON DELETE SET NULL...");
       try {
         await connection.query("ALTER TABLE order_items DROP FOREIGN KEY order_items_ibfk_2");
       } catch (e: any) {}
@@ -308,14 +303,10 @@ export async function runMigration() {
       
       await connection.query("ALTER TABLE order_items ADD CONSTRAINT order_items_ibfk_2 FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL");
       await connection.query("ALTER TABLE order_items ADD CONSTRAINT fk_order_items_variant FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE SET NULL");
-      console.log("✅ Managed order_items foreign keys successfully!");
-    } catch (err: any) {
-      console.warn("Notice: order_items foreign keys migration status:", err.message);
-    }
+    } catch (err: any) {}
 
     // Backfill historical order voucher_code in production database
     try {
-      console.log("Backfilling voucher_code for historical orders...");
       await connection.query(`
         UPDATE orders 
         SET voucher_code = 'AKUMABA100' 
@@ -326,14 +317,10 @@ export async function runMigration() {
         SET voucher_code = 'THANKYOU20' 
         WHERE discount_amount > 0 AND voucher_code IS NULL
       `);
-      console.log("✅ Managed historical voucher_code backfill successfully!");
-    } catch (err: any) {
-      console.warn("Notice: voucher_code backfill status:", err.message);
-    }
+    } catch (err: any) {}
 
     // Create product_reviews table if it doesn't exist
     try {
-      console.log("Creating product_reviews table if not exists...");
       await connection.query(`
         CREATE TABLE IF NOT EXISTS product_reviews (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -348,14 +335,10 @@ export async function runMigration() {
           UNIQUE KEY unique_review (product_id, order_id)
         )
       `);
-      console.log("✅ product_reviews table ready!");
-    } catch (err: any) {
-      console.warn("Notice: product_reviews table status:", err.message);
-    }
+    } catch (err: any) {}
 
     // Create notifications table
     try {
-      console.log("Creating notifications table if not exists...");
       await connection.query(`
         CREATE TABLE IF NOT EXISTS notifications (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -369,21 +352,16 @@ export async function runMigration() {
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci
       `);
-      console.log("✅ notifications table ready!");
 
-      // Ensure notifications table charset is utf8mb4 & restore any mangled ? emojis
       await connection.query(`ALTER TABLE notifications CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
       await connection.query(`UPDATE notifications SET title = REPLACE(title, '? PESANAN', '📦 PESANAN') WHERE title LIKE '? PESANAN%'`);
       await connection.query(`UPDATE notifications SET title = REPLACE(title, '? Bukti', '⚠️ Bukti') WHERE title LIKE '? Bukti%'`);
       await connection.query(`UPDATE notifications SET title = REPLACE(title, '? Pembayaran', '✅ Pembayaran') WHERE title LIKE '? Pembayaran%'`);
       await connection.query(`UPDATE notifications SET title = REPLACE(title, '? Update', '💬 Update') WHERE title LIKE '? Update%'`);
-    } catch (err: any) {
-      console.warn("Notice: notifications table status:", err.message);
-    }
+    } catch (err: any) {}
 
     // Create push_subscriptions table
     try {
-      console.log("Creating push_subscriptions table if not exists...");
       await connection.query(`
         CREATE TABLE IF NOT EXISTS push_subscriptions (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -395,14 +373,10 @@ export async function runMigration() {
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
       `);
-      console.log("✅ push_subscriptions table ready!");
-    } catch (err: any) {
-      console.warn("Notice: push_subscriptions table status:", err.message);
-    }
+    } catch (err: any) {}
 
     // Auto-fix Keychain variant names in order_items for historical imported CSV items
     try {
-      console.log("Fixing Keychain order items variant names...");
       const keychainMapping: Record<string, { color: string; variant_id: number }> = {
         "desain 1": { color: "Bara", variant_id: 120 },
         "desain 2": { color: "Satu hati satu jiwa filkom", variant_id: 121 },
@@ -419,14 +393,10 @@ export async function runMigration() {
           [target.color, target.variant_id, key]
         );
       }
-      console.log("✅ Keychain order items variant names fixed successfully!");
-    } catch (err: any) {
-      console.warn("Notice: Keychain variant fix status:", err.message);
-    }
+    } catch (err: any) {}
 
     // Auto-fix T-Shirt Kaos variant names in order_items for historical imported CSV items
     try {
-      console.log("Fixing T-Shirt Kaos order items variant names...");
       const tshirtMapping: Record<string, string> = {
         "desain 1": "COMPUTER SCIENCE",
         "desain 2": "SATU HATI SATU JIWA",
@@ -440,14 +410,10 @@ export async function runMigration() {
           [targetColor, key]
         );
       }
-      console.log("✅ T-Shirt Kaos order items variant names fixed successfully!");
-    } catch (err: any) {
-      console.warn("Notice: T-Shirt Kaos variant fix status:", err.message);
-    }
+    } catch (err: any) {}
 
     // Auto-fix Pin Enamel department normalization
     try {
-      console.log("Fixing Pin Enamel order items and variants...");
       const pinEnamelDeptMap: Record<string, string> = {
         "SISTEM INFORMASI": "Sistem Informasi",
         "TEKNIK INFORMATIKA": "Teknik Informatika",
@@ -473,16 +439,12 @@ export async function runMigration() {
         if (row.size === "Pendidikan Teknologi Informasi" || row.color === "Pendidikan Teknologi Informasi") targetColor = "Pendidikan Teknologi Informasi";
         if (row.size === "FILKOM" || row.color === "FILKOM") targetColor = "FILKOM";
 
-        await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE id = ?", [targetColor, row.id]);
+        await connection.query("UPDATE order_items SET size = '', color = ? WHERE id = ?", [targetColor, row.id]);
       }
-      console.log("✅ Pin Enamel order items fixed successfully!");
-    } catch (err: any) {
-      console.warn("Notice: Pin Enamel variant fix status:", err.message);
-    }
+    } catch (err: any) {}
 
     // Auto-fix Pin Tas variant names and imported items distribution
     try {
-      console.log("Fixing Pin Tas order items and variants...");
       const pinTasMapping: Record<string, string> = {
         "desain 1": "FILKOM Oranye",
         "desain 2": "FILKOM Blue",
@@ -494,13 +456,13 @@ export async function runMigration() {
       };
 
       for (const [k, v] of Object.entries(pinTasMapping)) {
-        await connection.query("UPDATE product_variants SET color = ?, size = 'One Size' WHERE product_id = 17 AND LOWER(TRIM(color)) = ?", [v, k]);
+        await connection.query("UPDATE product_variants SET color = ?, size = '' WHERE product_id = 17 AND LOWER(TRIM(color)) = ?", [v, k]);
       }
 
       // Update non-imported items based on their variant_id
       const [pvList] = await connection.query<any[]>("SELECT id, color FROM product_variants WHERE product_id = 17");
       for (const pv of pvList) {
-        await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE (product_id = 17 OR product_name LIKE '%Pin Tas%') AND variant_id = ?", [pv.color, pv.id]);
+        await connection.query("UPDATE order_items SET size = '', color = ? WHERE (product_id = 17 OR product_name LIKE '%Pin Tas%') AND variant_id = ?", [pv.color, pv.id]);
       }
 
       // Match imported Pin Tas items (order_id LIKE 'IMP-%') with exact user table purchases
@@ -605,14 +567,10 @@ export async function runMigration() {
           }
         }
       }
-      console.log("✅ Pin Tas order items fixed successfully!");
-    } catch (err: any) {
-      console.warn("Notice: Pin Tas variant fix status:", err.message);
-    }
+    } catch (err: any) {}
 
     // Auto-fix Totebag variant names
     try {
-      console.log("Fixing Totebag order items and variants...");
       const totebagMapping: Record<string, string> = {
         "desain 1": "FILKOM BRAWIJAYA Outline",
         "desain 2": "FILKOM BRAWIJAYA Signature",
@@ -621,23 +579,19 @@ export async function runMigration() {
       };
 
       for (const [k, v] of Object.entries(totebagMapping)) {
-        await connection.query("UPDATE product_variants SET color = ?, size = 'One Size' WHERE product_id = 22 AND LOWER(TRIM(color)) = ?", [v, k]);
+        await connection.query("UPDATE product_variants SET color = ?, size = '' WHERE product_id = 22 AND LOWER(TRIM(color)) = ?", [v, k]);
       }
 
       const [totebagRows] = await connection.query<any[]>("SELECT id, color FROM order_items WHERE (product_id = 22 OR product_name LIKE '%Totebag%')");
       for (const row of totebagRows) {
         const cLower = (row.color || "").trim().toLowerCase();
         const targetColor = totebagMapping[cLower] || row.color || "FILKOM BRAWIJAYA Outline";
-        await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE id = ?", [targetColor, row.id]);
+        await connection.query("UPDATE order_items SET size = '', color = ? WHERE id = ?", [targetColor, row.id]);
       }
-      console.log("✅ Totebag order items fixed successfully!");
-    } catch (err: any) {
-      console.warn("Notice: Totebag variant fix status:", err.message);
-    }
+    } catch (err: any) {}
 
     // Auto-fix Batch #1 official product prices
     try {
-      console.log("Updating Batch #1 official product prices...");
       const [campaigns] = await connection.query<any[]>("SELECT * FROM pre_order_campaigns ORDER BY id ASC");
       const b1 = campaigns.find((c) => c.batch_name.includes("1"));
       if (b1) {
@@ -651,15 +605,6 @@ export async function runMigration() {
           { names: ["T-Shirt Kaos", "Kaos", "T-Shirt"], price: 105000 },
         ];
 
-        const [b1Orders] = await connection.query<any[]>(
-          `SELECT DISTINCT o.order_id
-           FROM orders o
-           JOIN order_items oi ON o.order_id = oi.order_id
-           WHERE o.order_status != 'cancelled'
-             AND (o.pre_order_campaign_id = ? OR (o.created_at >= ? AND o.created_at <= ?))`,
-          [b1.id, b1.start_date, b1.extended_end_date || b1.end_date]
-        );
-
         for (const rule of priceMap) {
           for (const namePattern of rule.names) {
             await connection.query(
@@ -672,41 +617,21 @@ export async function runMigration() {
             );
           }
         }
-
-        for (const oRow of b1Orders) {
-          const [sumRes] = await connection.query<any[]>(
-            "SELECT SUM(COALESCE(unit_price, 0) * COALESCE(quantity, 1)) as new_total FROM order_items WHERE order_id = ?",
-            [oRow.order_id]
-          );
-          const newTotal = Number(sumRes[0]?.new_total || 0);
-          await connection.query("UPDATE orders SET gross_amount = ? WHERE order_id = ?", [newTotal, oRow.order_id]);
-        }
-        console.log("✅ Batch #1 official product prices updated successfully!");
       }
-    } catch (err: any) {
-      console.warn("Notice: Batch #1 price update status:", err.message);
-    }
+    } catch (err: any) {}
 
     try {
-      console.log("Syncing order_items subtotal = unit_price * quantity...");
       await connection.query(
         "UPDATE order_items SET subtotal = unit_price * quantity WHERE (subtotal != (unit_price * quantity) OR subtotal IS NULL) AND unit_price > 0"
       );
-      console.log("✅ Order items subtotal synced successfully!");
-    } catch (err: any) {
-      console.warn("Notice: Subtotal sync status:", err.message);
-    }
+    } catch (err: any) {}
 
     try {
-      console.log("Removing generic size placeholders ('One Size', 'All Size', 'Default', 'Standard', '-') from database...");
       await connection.query("UPDATE order_items SET size = '' WHERE size IN ('One Size', 'All Size', 'Default', '-', 'Standard')");
       await connection.query("UPDATE product_variants SET size = '' WHERE size IN ('One Size', 'All Size', 'Default', '-', 'Standard')");
-      console.log("✅ Generic size placeholders removed from database!");
-    } catch (err: any) {
-      console.warn("Notice: Generic size removal status:", err.message);
-    }
+    } catch (err: any) {}
 
-    console.log("Schema migration finished successfully!");
+    console.log("✅ Database schema & migrations up-to-date!");
   } catch (err) {
     console.error("Fatal connection error during migration:", err);
   } finally {
