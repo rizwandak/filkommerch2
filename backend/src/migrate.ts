@@ -503,27 +503,91 @@ export async function runMigration() {
         await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE (product_id = 17 OR product_name LIKE '%Pin Tas%') AND variant_id = ?", [pv.color, pv.id]);
       }
 
-      // Distribute imported items (where order_id LIKE 'IMP-%') according to exact target counts
-      const [importedItems] = await connection.query<any[]>(
-        "SELECT id FROM order_items WHERE (product_id = 17 OR product_name LIKE '%Pin Tas%') AND order_id LIKE 'IMP-%' ORDER BY id ASC"
-      );
+      // Match imported Pin Tas items (order_id LIKE 'IMP-%') with exact original CSV customer purchases
+      const csvCustomerOrders = [
+        { name: "Crisnanta Ciello Purnama Junior", designs: ["2", "4"] },
+        { name: "ARMAN SYAH MAULANA", designs: ["3", "7"] },
+        { name: "Nadya Rosaliadevi", designs: ["6"] },
+        { name: "Athilla Faveurdi Bhimas Suwandoko", designs: ["2"] },
+        { name: "Shifa Kayana Pradiptasari Jatmiko", designs: ["6"] },
+        { name: "Huriyah Aqilah Nur Mahdiyyah", designs: ["6"] },
+        { name: "Keyla Raissa Sasikirana", designs: ["6"] },
+        { name: "Ariel Rizky Nayoan", designs: ["3", "4"] },
+        { name: "Mufidah Samlawi", designs: ["6"] },
+        { name: "Risma Aullia Zairull Ikhrom", designs: ["6"] },
+        { name: "Nadiya Aisyah Istiqomah", designs: ["6"] },
+        { name: "Nasywa Azalia", designs: ["2", "6"] },
+        { name: "Nadya Alya Athaillah", designs: ["2", "1"] },
+        { name: "Ahsanul Maarif Aresty", designs: ["2"] },
+        { name: "Raisya Ramadhani", designs: ["6"] },
+        { name: "Fahri Ahmad", designs: ["7", "5", "6"] },
+        { name: "Rahmadhina Andalas Putri Seventri", designs: ["1"] },
+        { name: "Reinmarsha Cathleya Khalbi", designs: ["4", "1"] },
+        { name: "Luqman Faaza Dzurroyyan", designs: ["7"] },
+        { name: "Muhammad Dzakwan Ikram", designs: ["7"] },
+        { name: "DWI FITRIYATI", designs: ["4", "5", "6"] },
+        { name: "Cinta Syahda Nur Tsany", designs: ["6"] },
+        { name: "Sherlyta Safira Zulianta", designs: ["2", "6"] },
+        { name: "Chelsea Yulianty Gurning", designs: ["2"] },
+        { name: "Keitaro Dior Purnomo", designs: ["2"] },
+        { name: "ADRIAN ALFARO", designs: ["2"] },
+        { name: "Khobala Firdaus", designs: ["7"] },
+        { name: "Cristian Ruben Saputra", designs: ["7"] },
+        { name: "Rahmat Dhani", designs: ["2"] },
+        { name: "Moch Hisyam Farrel Irsyad", designs: ["1"] },
+        { name: "Awang Bintang M Lazuardi", designs: ["7"] },
+        { name: "M. Daffa Riyadlussalam", designs: ["2"] },
+        { name: "Muhammad Iqbal Fahmi", designs: ["4"] },
+        { name: "Rajendra Kaysan Satriya Setyantoro", designs: ["7"] },
+        { name: "Shafiyyah Najah Wijaya", designs: ["6", "1"] },
+        { name: "Muhammad Taufiqul Hafizh", designs: ["4", "5"] },
+        { name: "Carrisa Galih Gefiana", designs: ["4"] },
+        { name: "Valen Pratama Sahedi", designs: ["1", "4"] }
+      ];
 
-      if (importedItems.length > 0) {
-        const targets = [
-          { color: "FILKOM Oranye", vId: 36, count: 8 },
-          { color: "FILKOM Blue", vId: 37, count: 16 },
-          { color: "Let's Stay Connected", vId: 38, count: 2 },
-          { color: "It's My First Time Ngoding", vId: 39, count: 11 },
-          { color: "I ❤️ Coding", vId: 40, count: 6 },
-          { color: "FILKOM Girls", vId: 41, count: 15 },
-          { color: "FILKOM Boys", vId: 42, count: 10 },
-        ];
+      const variantMap: Record<string, { name: string; vId: number }> = {
+        '1': { name: 'FILKOM Oranye', vId: 36 },
+        '2': { name: 'FILKOM Blue', vId: 37 },
+        '3': { name: "Let's Stay Connected", vId: 38 },
+        '4': { name: "It's My First Time Ngoding", vId: 39 },
+        '5': { name: 'I ❤️ Coding', vId: 40 },
+        '6': { name: 'FILKOM Girls', vId: 41 },
+        '7': { name: 'FILKOM Boys', vId: 42 },
+      };
 
-        let idx = 0;
-        for (const t of targets) {
-          for (let i = 0; i < t.count && idx < importedItems.length; i++) {
-            await connection.query("UPDATE order_items SET size = 'One Size', color = ?, variant_id = ? WHERE id = ?", [t.color, t.vId, importedItems[idx].id]);
-            idx++;
+      const [dbItems] = await connection.query<any[]>(`
+        SELECT oi.id, oi.order_id, o.customer_name
+        FROM order_items oi
+        JOIN orders o ON oi.order_id = o.order_id
+        WHERE (oi.product_id = 17 OR oi.product_name LIKE '%Pin Tas%')
+          AND oi.order_id LIKE 'IMP-%'
+        ORDER BY oi.id ASC
+      `);
+
+      const cleanStr = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const customerDbMap: Record<string, any[]> = {};
+      dbItems.forEach(item => {
+        const cKey = cleanStr(item.customer_name);
+        if (!customerDbMap[cKey]) customerDbMap[cKey] = [];
+        customerDbMap[cKey].push(item);
+      });
+
+      for (const csvCust of csvCustomerOrders) {
+        const key = cleanStr(csvCust.name);
+        const matchedDbItems = customerDbMap[key] || [];
+
+        if (matchedDbItems.length > 0) {
+          for (let i = 0; i < csvCust.designs.length && i < matchedDbItems.length; i++) {
+            const dNum = csvCust.designs[i];
+            const vInfo = variantMap[dNum];
+            const dbItem = matchedDbItems[i];
+
+            if (vInfo) {
+              await connection.query(
+                "UPDATE order_items SET size = 'One Size', color = ?, variant_id = ? WHERE id = ?",
+                [vInfo.name, vInfo.vId, dbItem.id]
+              );
+            }
           }
         }
       }
