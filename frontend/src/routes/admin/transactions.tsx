@@ -2103,7 +2103,7 @@ function AdminTransactionsPage() {
                                             <tr key={idx_item} className="border-b border-dashed border-border/40 last:border-0">
                                               <td className="py-2 font-bold text-ink uppercase">{item.product_name}</td>
                                               <td className="py-2 text-center text-muted-foreground">
-                                                {item.size || "One Size"}{item.color ? ` / ${item.color}` : ""}
+                                                {[item.size, item.color].filter((s: string) => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(' / ') || '-'}
                                               </td>
                                               <td className="py-2 text-right">
                                                 Rp {Number(item.price || item.unit_price).toLocaleString("id-ID")}
@@ -2288,7 +2288,7 @@ function AdminTransactionsPage() {
                                             <tr key={idx_item} className="border-b border-dashed border-border/40 last:border-0">
                                               <td className="py-2 font-bold text-ink uppercase">{item.product_name}</td>
                                               <td className="py-2 text-center text-muted-foreground">
-                                                {item.size || "One Size"}{item.color ? ` / ${item.color}` : ""}
+                                                {[item.size, item.color].filter((s: string) => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(' / ') || '-'}
                                               </td>
                                               <td className="py-2 text-right">
                                                 Rp {Number(item.price || item.unit_price).toLocaleString("id-ID")}
@@ -2800,7 +2800,7 @@ function AdminTransactionsPage() {
                             <tr key={idx} className="border-t border-border">
                               <td className="p-2 font-bold text-ink uppercase">{item.product_name}</td>
                               <td className="p-2 text-center text-muted-foreground">
-                                {item.size || "One Size"}{item.color ? ` / ${item.color}` : ""}
+                                {[item.size, item.color].filter((s: string) => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(' / ') || '-'}
                               </td>
                               <td className="p-2 text-right">
                                 Rp {Number(item.price || item.unit_price).toLocaleString("id-ID")}

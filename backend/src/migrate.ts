@@ -683,6 +683,15 @@ export async function runMigration() {
       console.warn("Notice: Subtotal sync status:", err.message);
     }
 
+    try {
+      console.log("Removing generic size placeholders ('One Size', 'All Size', 'Default', 'Standard', '-') from database...");
+      await connection.query("UPDATE order_items SET size = '' WHERE size IN ('One Size', 'All Size', 'Default', '-', 'Standard')");
+      await connection.query("UPDATE product_variants SET size = '' WHERE size IN ('One Size', 'All Size', 'Default', '-', 'Standard')");
+      console.log("✅ Generic size placeholders removed from database!");
+    } catch (err: any) {
+      console.warn("Notice: Generic size removal status:", err.message);
+    }
+
     console.log("Schema migration finished successfully!");
   } catch (err) {
     console.error("Fatal connection error during migration:", err);

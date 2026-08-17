@@ -623,7 +623,7 @@ function OrderDetailComponent() {
           userId: user?.id ? Number(user.id) : (order.user_id ? Number(order.user_id) : undefined),
           rating: reviewRating,
           comment: reviewComment,
-          variant: [selectedItemForReview.item.size, selectedItemForReview.item.color].filter(Boolean).join(" / "),
+          variant: [selectedItemForReview.item.size, selectedItemForReview.item.color].filter(s => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(" / "),
           userName: (user as any)?.name || (user as any)?.username || order.customer_name,
           mediaUrl: uploadedUrls.length > 0 ? JSON.stringify(uploadedUrls) : undefined
         }
@@ -1037,7 +1037,7 @@ function OrderDetailComponent() {
                         <div>
                           <p className="font-bold text-ink text-sm leading-snug">{item.product_name}</p>
                           <div className="flex gap-2 text-[10px] text-muted-foreground mt-0.5">
-                            {item.size && <span>Ukuran: {item.size}</span>}
+                            {item.size && item.size !== 'One Size' && item.size !== 'All Size' && item.size !== 'Standard' && item.size !== 'Default' && item.size !== '-' && <span>Ukuran: {item.size}</span>}
                             {item.color && item.color !== "Default" && <span>Warna: {item.color}</span>}
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
@@ -1389,7 +1389,7 @@ function OrderDetailComponent() {
                 {selectedItemForReview.item.product_name}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Varian: {[selectedItemForReview.item.size, selectedItemForReview.item.color].filter(Boolean).join(" / ") || "Standard"}
+                Varian: {[selectedItemForReview.item.size, selectedItemForReview.item.color].filter(s => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(" / ") || "Standard"}
               </p>
             </div>
 

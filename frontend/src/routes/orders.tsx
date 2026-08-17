@@ -740,7 +740,7 @@ function UserOrdersPage() {
                               {item.product_name}
                             </h4>
                             <div className="flex flex-wrap gap-1.5 mt-1.5">
-                              {item.size && (
+                              {item.size && item.size !== 'One Size' && item.size !== 'All Size' && item.size !== 'Standard' && item.size !== 'Default' && item.size !== '-' && (
                                 <span className="text-[10px] font-bold bg-cream border border-ink/20 text-ink px-2 py-0.5 rounded">
                                   Ukuran: {item.size}
                                 </span>

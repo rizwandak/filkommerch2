@@ -184,7 +184,7 @@ function AdminVendoringPage() {
 
     const itemsRows = items.map((item: any, idx: number) => {
       const sub = (item.quantity || 0) * (item.unit_cost || 0);
-      const spec = [item.size, item.color].filter(Boolean).join(" / ") || "Standard";
+      const spec = [item.size, item.color].filter(s => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(" / ") || "Standard";
       return `
         <tr>
           <td style="text-align: center; border: 1px solid #1b1b1b; padding: 6px;">${idx + 1}</td>
@@ -1639,7 +1639,7 @@ function AdminVendoringPage() {
                             <td className="p-2.5 text-center font-mono font-bold">{idx + 1}</td>
                             <td className="p-2.5 font-bold text-ink">{item.catalog_product_name || `Produk #${item.product_id}`}</td>
                             <td className="p-2.5 font-mono">
-                              {[item.size, item.color].filter(Boolean).join(" / ") || "Standard"}
+                              {[item.size, item.color].filter(s => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(" / ") || "Standard"}
                             </td>
                             <td className="p-2.5 text-center font-bold text-brand-orange">{item.quantity} pcs</td>
                             <td className="p-2.5 text-right font-mono">Rp {Number(item.unit_cost || 0).toLocaleString("id-ID")}</td>
