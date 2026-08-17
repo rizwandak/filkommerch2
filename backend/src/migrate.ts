@@ -503,56 +503,62 @@ export async function runMigration() {
         await connection.query("UPDATE order_items SET size = 'One Size', color = ? WHERE (product_id = 17 OR product_name LIKE '%Pin Tas%') AND variant_id = ?", [pv.color, pv.id]);
       }
 
-      // Match imported Pin Tas items (order_id LIKE 'IMP-%') with exact original CSV customer purchases
-      const csvCustomerOrders = [
-        { name: "Crisnanta Ciello Purnama Junior", designs: ["2", "4"] },
-        { name: "ARMAN SYAH MAULANA", designs: ["3", "7"] },
-        { name: "Nadya Rosaliadevi", designs: ["6"] },
-        { name: "Athilla Faveurdi Bhimas Suwandoko", designs: ["2"] },
-        { name: "Shifa Kayana Pradiptasari Jatmiko", designs: ["6"] },
-        { name: "Huriyah Aqilah Nur Mahdiyyah", designs: ["6"] },
-        { name: "Keyla Raissa Sasikirana", designs: ["6"] },
-        { name: "Ariel Rizky Nayoan", designs: ["3", "4"] },
-        { name: "Mufidah Samlawi", designs: ["6"] },
-        { name: "Risma Aullia Zairull Ikhrom", designs: ["6"] },
-        { name: "Nadiya Aisyah Istiqomah", designs: ["6"] },
-        { name: "Nasywa Azalia", designs: ["2", "6"] },
-        { name: "Nadya Alya Athaillah", designs: ["2", "1"] },
-        { name: "Ahsanul Maarif Aresty", designs: ["2"] },
-        { name: "Raisya Ramadhani", designs: ["6"] },
-        { name: "Fahri Ahmad", designs: ["7", "5", "6"] },
-        { name: "Rahmadhina Andalas Putri Seventri", designs: ["1"] },
-        { name: "Reinmarsha Cathleya Khalbi", designs: ["4", "1"] },
-        { name: "Luqman Faaza Dzurroyyan", designs: ["7"] },
-        { name: "Muhammad Dzakwan Ikram", designs: ["7"] },
-        { name: "DWI FITRIYATI", designs: ["4", "5", "6"] },
-        { name: "Cinta Syahda Nur Tsany", designs: ["6"] },
-        { name: "Sherlyta Safira Zulianta", designs: ["2", "6"] },
-        { name: "Chelsea Yulianty Gurning", designs: ["2"] },
-        { name: "Keitaro Dior Purnomo", designs: ["2"] },
-        { name: "ADRIAN ALFARO", designs: ["2"] },
-        { name: "Khobala Firdaus", designs: ["7"] },
-        { name: "Cristian Ruben Saputra", designs: ["7"] },
-        { name: "Rahmat Dhani", designs: ["2"] },
-        { name: "Moch Hisyam Farrel Irsyad", designs: ["1"] },
-        { name: "Awang Bintang M Lazuardi", designs: ["7"] },
-        { name: "M. Daffa Riyadlussalam", designs: ["2"] },
-        { name: "Muhammad Iqbal Fahmi", designs: ["4"] },
-        { name: "Rajendra Kaysan Satriya Setyantoro", designs: ["7"] },
-        { name: "Shafiyyah Najah Wijaya", designs: ["6", "1"] },
-        { name: "Muhammad Taufiqul Hafizh", designs: ["4", "5"] },
-        { name: "Carrisa Galih Gefiana", designs: ["4"] },
-        { name: "Valen Pratama Sahedi", designs: ["1", "4"] }
+      // Match imported Pin Tas items (order_id LIKE 'IMP-%') with exact user table purchases
+      const userTableData = [
+        { name: "Crisnanta Ciello Purnama Junior", variants: ["FILKOM Blue", "It's My First Time Ngoding"] },
+        { name: "ARMAN SYAH MAULANA", variants: ["Let's Stay Connected", "FILKOM Boys"] },
+        { name: "Nadya Rosaliadevi", variants: ["FILKOM Girls"] },
+        { name: "Athilla Faveurdi Bhimas Suwandoko", variants: ["FILKOM Blue"] },
+        { name: "Shifa Kayana Pradiptasari Jatmiko", variants: ["FILKOM Girls"] },
+        { name: "Huriyah Aqilah Nur Mahdiyyah", variants: ["FILKOM Girls"] },
+        { name: "Keyla Raissa Sasikirana", variants: ["FILKOM Girls"] },
+        { name: "Ariel Rizky Nayoan", variants: ["Let's Stay Connected", "It's My First Time Ngoding"] },
+        { name: "Mufidah Samlawi", variants: ["FILKOM Girls"] },
+        { name: "Risma Aullia Zairull Ikhrom", variants: ["FILKOM Girls"] },
+        { name: "Nadiya Aisyah Istiqomah", variants: ["FILKOM Girls"] },
+        { name: "Nasywa Azalia", variants: ["FILKOM Blue", "FILKOM Girls"] },
+        { name: "Nadya Alya Athaillah", variants: ["FILKOM Blue", "FILKOM Oranye"] },
+        { name: "Ahsanul Maarif Aresty", variants: ["FILKOM Blue"] },
+        { name: "Raisya Ramadhani", variants: ["FILKOM Girls"] },
+        { name: "Fahri Ahmad", variants: ["FILKOM Boys", "I ❤️ Coding", "FILKOM Girls"] },
+        { name: "Rahmadhina Andalas Putri Seventri", variants: ["FILKOM Oranye"] },
+        { name: "Nisfil Laili Azzahra", variants: ["FILKOM Oranye", "FILKOM Blue", "I ❤️ Coding", "FILKOM Girls"] },
+        { name: "Reinmarsha Cathleya Khalbi", variants: ["It's My First Time Ngoding", "FILKOM Oranye"] },
+        { name: "Luqman Faaza Dzurroyyan", variants: ["FILKOM Boys"] },
+        { name: "Muhammad Dzakwan Ikram", variants: ["FILKOM Boys"] },
+        { name: "DWI FITRIYATI", variants: ["It's My First Time Ngoding", "I ❤️ Coding", "FILKOM Girls"] },
+        { name: "Cinta Syahda Nur Tsany", variants: ["FILKOM Girls"] },
+        { name: "Sherlyta Safira Zulianta", variants: ["FILKOM Blue", "FILKOM Girls"] },
+        { name: "Chelsea Yulianty Gurning", variants: ["FILKOM Blue"] },
+        { name: "queency alifia", variants: ["FILKOM Oranye", "FILKOM Blue", "I ❤️ Coding"] },
+        { name: "Keitaro Dior Purnomo", variants: ["FILKOM Blue"] },
+        { name: "Asyila Putri Fazira", variants: ["FILKOM Blue", "It's My First Time Ngoding", "I ❤️ Coding", "FILKOM Girls"] },
+        { name: "ADRIAN ALFARO", variants: ["FILKOM Blue"] },
+        { name: "Khobala Firdaus", variants: ["FILKOM Boys"] },
+        { name: "Cristian Ruben Saputra", variants: ["FILKOM Boys"] },
+        { name: "Rahmat Dhani", variants: ["FILKOM Blue"] },
+        { name: "Mukti Abdi Syukur", variants: ["FILKOM Blue", "It's My First Time Ngoding"] },
+        { name: "Moch Hisyam Farrel Irsyad", variants: ["FILKOM Oranye"] },
+        { name: "Awang Bintang M Lazuardi", variants: ["FILKOM Boys"] },
+        { name: "M. Daffa Riyadlussalam", variants: ["FILKOM Blue"] },
+        { name: "Dyandra Naresuan Vaisaka Passadhi", variants: ["FILKOM Blue"] },
+        { name: "Muhammad Iqbal Fahmi", variants: ["It's My First Time Ngoding"] },
+        { name: "Rajendra Kaysan Satriya Setyantoro", variants: ["FILKOM Boys"] },
+        { name: "Shafiyyah Najah Wijaya", variants: ["FILKOM Girls", "FILKOM Oranye"] },
+        { name: "Muhammad Taufiqul Hafizh", variants: ["It's My First Time Ngoding", "I ❤️ Coding"] },
+        { name: "Muhammad Dave Davin Noval Arrafai", variants: ["It's My First Time Ngoding", "FILKOM Boys"] },
+        { name: "Carrisa Galih Gefiana", variants: ["It's My First Time Ngoding"] },
+        { name: "Valen Pratama Sahedi", variants: ["FILKOM Oranye", "It's My First Time Ngoding"] }
       ];
 
-      const variantMap: Record<string, { name: string; vId: number }> = {
-        '1': { name: 'FILKOM Oranye', vId: 36 },
-        '2': { name: 'FILKOM Blue', vId: 37 },
-        '3': { name: "Let's Stay Connected", vId: 38 },
-        '4': { name: "It's My First Time Ngoding", vId: 39 },
-        '5': { name: 'I ❤️ Coding', vId: 40 },
-        '6': { name: 'FILKOM Girls', vId: 41 },
-        '7': { name: 'FILKOM Boys', vId: 42 },
+      const variantMap: Record<string, number> = {
+        'FILKOM Oranye': 36,
+        'FILKOM Blue': 37,
+        "Let's Stay Connected": 38,
+        "It's My First Time Ngoding": 39,
+        'I ❤️ Coding': 40,
+        'FILKOM Girls': 41,
+        'FILKOM Boys': 42,
       };
 
       const [dbItems] = await connection.query<any[]>(`
@@ -572,20 +578,28 @@ export async function runMigration() {
         customerDbMap[cKey].push(item);
       });
 
-      for (const csvCust of csvCustomerOrders) {
-        const key = cleanStr(csvCust.name);
-        const matchedDbItems = customerDbMap[key] || [];
+      for (const cust of userTableData) {
+        const key = cleanStr(cust.name);
+        let itemsToUpdate = customerDbMap[key];
 
-        if (matchedDbItems.length > 0) {
-          for (let i = 0; i < csvCust.designs.length && i < matchedDbItems.length; i++) {
-            const dNum = csvCust.designs[i];
-            const vInfo = variantMap[dNum];
-            const dbItem = matchedDbItems[i];
+        if (!itemsToUpdate || itemsToUpdate.length === 0) {
+          for (const dbKey of Object.keys(customerDbMap)) {
+            if (dbKey.includes(key) || key.includes(dbKey)) {
+              itemsToUpdate = customerDbMap[dbKey];
+              break;
+            }
+          }
+        }
 
-            if (vInfo) {
+        if (itemsToUpdate && itemsToUpdate.length > 0) {
+          for (let i = 0; i < cust.variants.length && i < itemsToUpdate.length; i++) {
+            const vName = cust.variants[i];
+            const vId = variantMap[vName];
+
+            if (vName && vId) {
               await connection.query(
-                "UPDATE order_items SET size = 'One Size', color = ?, variant_id = ? WHERE id = ?",
-                [vInfo.name, vInfo.vId, dbItem.id]
+                "UPDATE order_items SET size = '', color = ?, variant_id = ? WHERE id = ?",
+                [vName, vId, itemsToUpdate[i].id]
               );
             }
           }
