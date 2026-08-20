@@ -45,5 +45,6 @@ backend/node_modules/
 frontend/node_modules/
 backend/dist/
 frontend/dist/
+backend/uploads/
 .env
 backend/.env

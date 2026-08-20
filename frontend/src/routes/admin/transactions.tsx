@@ -528,7 +528,7 @@ function AdminTransactionsPage() {
           setManagedTransaction(result.order);
           setManagedItems(result.items || []);
           setManagedStatus(result.order.transaction_status);
-          
+
           const rawAddr = result.order.shipping_address || "";
           const isPickup =
             result.order.fulfillment_type === "pickup" ||
@@ -601,16 +601,16 @@ function AdminTransactionsPage() {
         managedFulfillmentType === "pickup"
           ? "Ambil di FILKOM Merch (gratis)"
           : [
-              managedStreetAddress.trim(),
-              managedRtRw.trim() ? `RT/RW ${managedRtRw.trim()}` : "",
-              managedKelurahan.trim() ? `Kel. ${managedKelurahan.trim()}` : "",
-              managedKecamatan.trim() ? `Kec. ${managedKecamatan.trim()}` : "",
-              managedCity.trim(),
-              managedProvince.trim(),
-              managedPostalCode.trim() ? `Kode Pos ${managedPostalCode.trim()}` : "",
-            ]
-              .filter(Boolean)
-              .join(", ") || managedStreetAddress.trim() || "Diantar";
+            managedStreetAddress.trim(),
+            managedRtRw.trim() ? `RT/RW ${managedRtRw.trim()}` : "",
+            managedKelurahan.trim() ? `Kel. ${managedKelurahan.trim()}` : "",
+            managedKecamatan.trim() ? `Kec. ${managedKecamatan.trim()}` : "",
+            managedCity.trim(),
+            managedProvince.trim(),
+            managedPostalCode.trim() ? `Kode Pos ${managedPostalCode.trim()}` : "",
+          ]
+            .filter(Boolean)
+            .join(", ") || managedStreetAddress.trim() || "Diantar";
 
       const result = await updateOrderStatus({
         data: {
@@ -2371,8 +2371,8 @@ function AdminTransactionsPage() {
                                 claim.status === "pending"
                                   ? "bg-amber-100 text-amber-800"
                                   : claim.status === "approved"
-                                  ? "bg-emerald-100 text-emerald-800"
-                                  : "bg-red-100 text-red-800"
+                                    ? "bg-emerald-100 text-emerald-800"
+                                    : "bg-red-100 text-red-800"
                               }
                             >
                               {claim.status.toUpperCase()}
@@ -2979,11 +2979,10 @@ function AdminTransactionsPage() {
                                 setManagedFulfillmentType("pickup");
                                 setManagedShippingAddress("Ambil di FILKOM Merch (gratis)");
                               }}
-                              className={`flex flex-col text-left p-2.5 rounded-xl border-2 transition cursor-pointer ${
-                                managedFulfillmentType === "pickup"
+                              className={`flex flex-col text-left p-2.5 rounded-xl border-2 transition cursor-pointer ${managedFulfillmentType === "pickup"
                                   ? "border-ink bg-cream/50 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
                                   : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
-                              }`}
+                                }`}
                             >
                               <div className="flex items-center justify-between">
                                 <span className="font-extrabold text-xs text-ink flex items-center gap-1.5">
@@ -3003,11 +3002,10 @@ function AdminTransactionsPage() {
                               onClick={() => {
                                 setManagedFulfillmentType("shipping");
                               }}
-                              className={`flex flex-col text-left p-2.5 rounded-xl border-2 transition cursor-pointer ${
-                                managedFulfillmentType === "shipping"
+                              className={`flex flex-col text-left p-2.5 rounded-xl border-2 transition cursor-pointer ${managedFulfillmentType === "shipping"
                                   ? "border-ink bg-cream/50 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] font-bold"
                                   : "border-border bg-white hover:border-ink/50 hover:bg-cream/10"
-                              }`}
+                                }`}
                             >
                               <div className="flex items-center justify-between">
                                 <span className="font-extrabold text-xs text-ink flex items-center gap-1.5">
@@ -3375,22 +3373,20 @@ function AdminTransactionsPage() {
                 <button
                   type="button"
                   onClick={() => setProductFilterMode("include")}
-                  className={`flex-1 text-[10px] font-black uppercase tracking-wider py-1.5 rounded-md transition-all cursor-pointer ${
-                    productFilterMode === "include"
+                  className={`flex-1 text-[10px] font-black uppercase tracking-wider py-1.5 rounded-md transition-all cursor-pointer ${productFilterMode === "include"
                       ? "bg-brand-orange text-white shadow-sm"
                       : "text-ink hover:bg-black/5"
-                  }`}
+                    }`}
                 >
                   ✅ Berisi (Include)
                 </button>
                 <button
                   type="button"
                   onClick={() => setProductFilterMode("exclude")}
-                  className={`flex-1 text-[10px] font-black uppercase tracking-wider py-1.5 rounded-md transition-all cursor-pointer ${
-                    productFilterMode === "exclude"
+                  className={`flex-1 text-[10px] font-black uppercase tracking-wider py-1.5 rounded-md transition-all cursor-pointer ${productFilterMode === "exclude"
                       ? "bg-red-600 text-white shadow-sm"
                       : "text-ink hover:bg-black/5"
-                  }`}
+                    }`}
                 >
                   🚫 Tanpa (Exclude)
                 </button>
@@ -3403,9 +3399,8 @@ function AdminTransactionsPage() {
 
               <div className="w-full bg-cream/30 border-2 border-ink rounded-lg p-2 max-h-52 overflow-y-auto overflow-x-hidden space-y-1 box-border">
                 <label
-                  className={`w-full flex items-center gap-2.5 p-2 rounded-md cursor-pointer text-xs font-bold transition-colors select-none ${
-                    productFilter.length === 0 ? "bg-brand-orange/15 text-brand-orange border border-brand-orange/40" : "hover:bg-black/5 text-ink"
-                  }`}
+                  className={`w-full flex items-center gap-2.5 p-2 rounded-md cursor-pointer text-xs font-bold transition-colors select-none ${productFilter.length === 0 ? "bg-brand-orange/15 text-brand-orange border border-brand-orange/40" : "hover:bg-black/5 text-ink"
+                    }`}
                 >
                   <input
                     type="checkbox"
@@ -3424,9 +3419,8 @@ function AdminTransactionsPage() {
                   return (
                     <label
                       key={p.id}
-                      className={`w-full flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${
-                        isChecked ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300" : "hover:bg-black/5 text-ink font-semibold"
-                      }`}
+                      className={`w-full flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${isChecked ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300" : "hover:bg-black/5 text-ink font-semibold"
+                        }`}
                       title={p.name}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
@@ -3638,7 +3632,7 @@ function AdminTransactionsPage() {
                     <ShoppingBag className="w-4 h-4 text-brand-orange" />
                     Item yang Dipesan
                   </h3>
-                  
+
                   {loadingClaimOrder ? (
                     <div className="py-8 text-center text-muted-foreground font-medium animate-pulse">
                       Memuat rincian pesanan...
@@ -3662,7 +3656,7 @@ function AdminTransactionsPage() {
                             const variantText = variantParts.length > 0 ? variantParts.join(" / ") : "-";
                             const price = Number(item.unit_price) || 0;
                             const subtotal = Number(item.subtotal) || (price * item.quantity);
-                            
+
                             return (
                               <tr key={idx} className="bg-white">
                                 <td className="p-3">
@@ -3706,7 +3700,7 @@ function AdminTransactionsPage() {
             >
               Tutup
             </Button>
-            
+
             {selectedClaim?.status === "pending" ? (
               <div className="flex items-center gap-3">
                 <Button
@@ -3724,10 +3718,9 @@ function AdminTransactionsPage() {
               </div>
             ) : (
               <div className="flex items-center gap-3">
-                <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border-2 ${
-                  selectedClaim?.status === "approved" ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
-                  "bg-red-100 text-red-800 border-red-200"
-                }`}>
+                <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-widest border-2 ${selectedClaim?.status === "approved" ? "bg-emerald-100 text-emerald-800 border-emerald-200" :
+                    "bg-red-100 text-red-800 border-red-200"
+                  }`}>
                   Status: {selectedClaim?.status === "approved" ? "Disetujui" : "Ditolak"}
                 </span>
                 <Button

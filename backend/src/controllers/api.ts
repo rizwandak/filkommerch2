@@ -104,7 +104,7 @@ export const logStockMovement = async (
   );
   const currentStock = (rows as any[])[0]?.stock || 0;
   const stockBefore = currentStock;
-  
+
   // Only actual stock changing movements change stock_after snapshot
   let stockAfter = currentStock;
   const isStockChanging = ['sale', 'restock', 'initial', 'adjustment_in', 'adjustment_out', 'return', 'refund'].includes(movementType);
@@ -861,7 +861,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
                 [compVar.product_id]
               );
               const allCompVars = allCompVarsRows as any[];
-              
+
               const hasLunas = allCompVars.some((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
               let refVariant = null;
               if (hasLunas) {
@@ -1119,7 +1119,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
     if (paymentMode === "manual_qris") {
       console.log("ℹ️ Manual QRIS mode active, skipping Midtrans transaction generation");
       qrUrl = storeSettings?.qris_static_url || "";
-      
+
       // Update order to set payment_type
       await connection.execute(
         "UPDATE orders SET payment_type = ? WHERE order_id = ?",
@@ -1391,7 +1391,7 @@ export const deleteCategory = async (req: Request, res: Response) => {
     const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
     const userName = req.header("x-user-name") || null;
     const userRole = req.header("x-user-role") || null;
-    
+
     // Soft delete by updating is_active to false
     await execute(
       "UPDATE categories SET is_active = FALSE WHERE id = ?",
@@ -1438,7 +1438,7 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
           [product.id]
         );
         const imageUrls = images.length > 0 ? images.map((img: any) => img.image_url) : [product.image_url].filter(Boolean);
-        
+
         let bundle_components: any[] = [];
         if (product.product_type === "bundle") {
           const comps = await query<any>(
@@ -1457,7 +1457,7 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
             })
           );
         }
-        
+
         return { ...product, variants, images: imageUrls, bundle_components };
       })
     );
@@ -1478,7 +1478,7 @@ export const createProduct = async (req: Request, res: Response) => {
     const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
     const userName = req.header("x-user-name") || null;
     const userRole = req.header("x-user-role") || null;
-    
+
     // Set the first image from images array as main image_url if provided
     const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
 
@@ -1574,7 +1574,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
     const userName = req.header("x-user-name") || null;
     const userRole = req.header("x-user-role") || null;
-    
+
     // Set the first image from images array as main image_url if provided
     const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
 
@@ -1623,7 +1623,7 @@ export const updateProduct = async (req: Request, res: Response) => {
 
     // Synchronize variants rather than DELETE + INSERT to avoid foreign key restrict failures on stock_movements
     await execute("UPDATE product_variants SET is_active = FALSE WHERE product_id = ?", [input.id]);
-    
+
     for (const variant of input.variants) {
       const existing = await queryOne<any>(
         "SELECT id FROM product_variants WHERE product_id = ? AND size = ? AND COALESCE(color, '') = COALESCE(?, '') LIMIT 1",
@@ -1647,7 +1647,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     if (input.images && Array.isArray(input.images)) {
       // Clear old images first
       await execute("DELETE FROM product_images WHERE product_id = ?", [input.id]);
-      
+
       // Insert new images
       for (let i = 0; i < input.images.length; i++) {
         await execute(
@@ -2140,7 +2140,7 @@ export const createSale = async (req: Request, res: Response) => {
     // CASE 1: If order already exists (meaning it was created via createOrderAndPayment for online POS payment)
     if (input.order_id) {
       console.log("ℹ️ Finalizing existing POS online order in database:", input.order_id);
-      
+
       const [orderRows] = await connection.execute(
         "SELECT id, order_id, payment_status FROM orders WHERE order_id = ? FOR UPDATE",
         [input.order_id]
@@ -2222,7 +2222,7 @@ export const createSale = async (req: Request, res: Response) => {
     const resolvedItems: any[] = [];
     let calculatedSubtotal = 0;
     const customerEmail = input.customer_email || "pos@filkommerch.com";
-    
+
     let targetUserId: number | null = input.user_id ? Number(input.user_id) : null;
     let customerNim: string | null = input.customer_nim || null;
     let isUb = false;
@@ -2307,7 +2307,7 @@ export const createSale = async (req: Request, res: Response) => {
                 [compVar.product_id]
               );
               const allCompVars = allCompVarsRows as any[];
-              
+
               const hasLunas = allCompVars.some((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
               let refVariant = null;
               if (hasLunas) {
@@ -2757,7 +2757,7 @@ export const getTopProducts = async (req: Request, res: Response) => {
   try {
     const limit = Number.isFinite(Number(req.query.limit)) ? Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10))) : 10;
     const days = Number.isFinite(Number(req.query.days)) ? Math.max(1, Math.min(365, parseInt(req.query.days as string, 10))) : 30;
-    
+
     const products = await query<any>(
       `SELECT p.id, p.name,
         COALESCE(SUM(oi.quantity), 0) AS total_quantity_sold,
@@ -2814,7 +2814,7 @@ export const getInventory = async (req: Request, res: Response) => {
 export const getUserOrders = async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    
+
     // Auto-complete orders that are shipped or ready_for_pickup and haven't been updated for 3 days
     try {
       await execute(`
@@ -3195,7 +3195,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
 
     for (const item of items) {
       const isPaid = item.payment_status === "paid" || item.payment_status === "settlement" || item.order_status === "completed";
-      
+
       const buyerId = item.customer_email || item.user_email || item.customer_phone || `order-${item.order_id}`;
       if (isPaid) {
         uniqueBuyersSet.add(buyerId);
@@ -3741,9 +3741,9 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
   try {
     const days = req.query.days as string || "30";
     const batch = (req.query.batch as string || "all").trim();
-    
+
     let dateConstraint = "o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
-    
+
     if (days === "today") {
       dateConstraint = "o.created_at >= CURDATE()";
     } else if (days === "7") {
@@ -3964,7 +3964,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
 
     // 5. Calculate Batch / Campaign Distribution breakdown across all paid orders
     const batchBreakdownMap: Record<string, { id: string | number; name: string; revenue: number; orders: number; items: number }> = {};
-    
+
     // Initialize entries for all campaigns
     for (const c of campaigns) {
       batchBreakdownMap[String(c.id)] = {
@@ -4140,17 +4140,17 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       // Check if it is the main Bundle product item
       if (product.product_type === "bundle") {
         let bundleSisa = 0;
-        
+
         // Find all component items of this bundle from the originalItems list
         const componentItems = originalItems.filter((oi: any) => oi.product_name && oi.product_name.includes("[KOMPONEN BUNDLE]"));
-        
+
         for (const comp of componentItems) {
           // We only calculate pelunasan for components that were paid via DP
           if (comp.color && comp.color.toUpperCase().includes("DP")) {
             const compProduct = await queryOne<any>("SELECT * FROM products WHERE id = ?", [comp.product_id]);
             if (compProduct) {
               const compLunasColor = comp.color.replace(/\bDP\b/i, "Lunas");
-              
+
               // Find matching Lunas variant
               let compLunasVar = await queryOne<any>(
                 "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
@@ -4663,9 +4663,9 @@ export const validateVoucher = async (req: Request, res: Response) => {
     }
 
     if (orderSubtotal < voucher.min_purchase) {
-      return res.status(400).json({ 
-        success: false, 
-        error: `Minimal pembelian untuk menggunakan voucher ini adalah Rp ${voucher.min_purchase.toLocaleString("id-ID")}` 
+      return res.status(400).json({
+        success: false,
+        error: `Minimal pembelian untuk menggunakan voucher ini adalah Rp ${voucher.min_purchase.toLocaleString("id-ID")}`
       });
     }
 
@@ -4683,9 +4683,9 @@ export const validateVoucher = async (req: Request, res: Response) => {
 
       const cleanNim = (user.nim || "").trim();
       if (!cleanNim.startsWith(voucher.target_nim_prefix)) {
-        return res.status(400).json({ 
-          success: false, 
-          error: `Voucher ini hanya berlaku untuk mahasiswa angkatan 20${voucher.target_nim_prefix}` 
+        return res.status(400).json({
+          success: false,
+          error: `Voucher ini hanya berlaku untuk mahasiswa angkatan 20${voucher.target_nim_prefix}`
         });
       }
     }
@@ -4700,9 +4700,9 @@ export const validateVoucher = async (req: Request, res: Response) => {
         );
         const usageCount = usageRow?.count || 0;
         if (usageCount >= voucher.usage_limit_per_user) {
-          return res.status(400).json({ 
-            success: false, 
-            error: `Anda sudah melebihi batas penggunaan voucher ini (Maks ${voucher.usage_limit_per_user} kali)` 
+          return res.status(400).json({
+            success: false,
+            error: `Anda sudah melebihi batas penggunaan voucher ini (Maks ${voucher.usage_limit_per_user} kali)`
           });
         }
       }
@@ -4755,22 +4755,22 @@ export const getVoucherHistory = async (req: Request, res: Response) => {
 const ensureOrderColumns = async () => {
   try {
     await execute("ALTER TABLE orders ADD COLUMN fulfillment_proof_url VARCHAR(500) NULL");
-  } catch {}
+  } catch { }
   try {
     await execute("ALTER TABLE product_reviews ADD COLUMN media_url VARCHAR(500) NULL");
-  } catch {}
+  } catch { }
   try {
     await execute("ALTER TABLE orders ADD COLUMN is_complained TINYINT(1) DEFAULT 0");
-  } catch {}
+  } catch { }
   try {
     await execute("ALTER TABLE orders ADD COLUMN complaint_notes TEXT NULL");
-  } catch {}
+  } catch { }
   try {
     await execute("ALTER TABLE orders ADD COLUMN complaint_media_urls TEXT NULL");
-  } catch {}
+  } catch { }
   try {
     await execute("ALTER TABLE orders ADD COLUMN completed_at TIMESTAMP NULL");
-  } catch {}
+  } catch { }
 };
 ensureOrderColumns();
 
@@ -4909,7 +4909,7 @@ export const getProductReviews = async (req: Request, res: Response) => {
        FROM order_items oi 
        JOIN orders o ON oi.order_id = o.order_id 
        WHERE oi.product_id = ? AND o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed')`,
-       [productId]
+      [productId]
     );
     const totalBuyers = Number(buyersQuery[0]?.total_buyers || 0);
 
@@ -4990,7 +4990,7 @@ export const deleteVendor = async (req: Request, res: Response) => {
 export const getProductionSummary = async (req: Request, res: Response) => {
   try {
     const batchFilter = (req.query.batch as string) || "all";
-    
+
     // Fetch all campaigns for smart date-range batch mapping
     const campaigns = await query<any>("SELECT * FROM pre_order_campaigns ORDER BY id ASC");
 
@@ -5106,8 +5106,8 @@ export const getProductionSummary = async (req: Request, res: Response) => {
           (i: any) =>
             i.order_id === r.order_id &&
             ((i.raw_product_name && i.raw_product_name.includes("[KOMPONEN BUNDLE]")) ||
-             (i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")) ||
-             Number(i.unit_price || i.price) === 0)
+              (i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")) ||
+              Number(i.unit_price || i.price) === 0)
         );
 
         if (!hasComponentRows) {
@@ -5256,7 +5256,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
 
     let orderWhere = "WHERE o.order_status NOT IN ('cancelled', 'cancel') AND (o.payment_status IN ('paid', 'settlement') OR o.order_status IN ('completed', 'settlement', 'capture'))";
     const orderParams: any[] = [];
-    
+
     if (batchFilter !== "all") {
       const campaigns = await query<any>("SELECT id, start_date, end_date FROM pre_order_campaigns WHERE id = ?", [batchFilter]);
       const matchedCamp = campaigns[0];
@@ -5354,14 +5354,14 @@ export const deleteImportedOrders = async (req: Request, res: Response) => {
       [campaignId]
     );
     const orders = rows as any[];
-    
+
     if (orders.length > 0) {
       const oldIds = orders.map((o) => o.order_id);
       const placeholders = oldIds.map(() => "?").join(",");
       await connection.query(`DELETE FROM order_items WHERE order_id IN (${placeholders})`, oldIds);
       await connection.query(`DELETE FROM orders WHERE order_id IN (${placeholders})`, oldIds);
     }
-    
+
     await connection.commit();
     return res.json({ success: true, message: `Berhasil menghapus ${orders.length} pesanan import.` });
   } catch (error: any) {
@@ -5413,7 +5413,7 @@ export const importOrders = async (req: Request, res: Response) => {
 
       const rawCreatedAt =
         row.created_at || row["Tanggal Order"] || row.tanggal_order || row["tanggal"] || new Date();
-      
+
       let formattedDate: string;
       try {
         const d = new Date(rawCreatedAt);
@@ -5458,21 +5458,21 @@ export const importOrders = async (req: Request, res: Response) => {
         rawPaymentStatus.includes("paid") || rawPaymentStatus.includes("settlement") || rawPaymentStatus.includes("lunas")
           ? "paid"
           : "unpaid";
-          
+
       const orderStatus =
-        rawOrderStatus.includes("completed") || rawOrderStatus.includes("selesai") 
+        rawOrderStatus.includes("completed") || rawOrderStatus.includes("selesai")
           ? "completed"
           : rawOrderStatus.includes("processing") || rawOrderStatus.includes("proses") || rawOrderStatus.includes("dikemas")
-          ? "processing"
-          : rawOrderStatus.includes("ready") || rawOrderStatus.includes("siap") || rawOrderStatus.includes("pickup")
-          ? "ready_for_pickup"
-          : rawOrderStatus.includes("shipped") || rawOrderStatus.includes("kirim")
-          ? "shipped"
-          : rawOrderStatus.includes("cancel") || rawOrderStatus.includes("batal")
-          ? "cancelled"
-          : rawOrderStatus.includes("paid") || rawOrderStatus.includes("lunas")
-          ? "paid"
-          : "pending_payment";
+            ? "processing"
+            : rawOrderStatus.includes("ready") || rawOrderStatus.includes("siap") || rawOrderStatus.includes("pickup")
+              ? "ready_for_pickup"
+              : rawOrderStatus.includes("shipped") || rawOrderStatus.includes("kirim")
+                ? "shipped"
+                : rawOrderStatus.includes("cancel") || rawOrderStatus.includes("batal")
+                  ? "cancelled"
+                  : rawOrderStatus.includes("paid") || rawOrderStatus.includes("lunas")
+                    ? "paid"
+                    : "pending_payment";
 
       await connection.query(
         `INSERT INTO orders (
@@ -5536,7 +5536,7 @@ export const importOrders = async (req: Request, res: Response) => {
               color = specParts[1] || "";
             }
 
-            let itemPrice = matchedProd 
+            let itemPrice = matchedProd
               ? Number(matchedProd.filkom_price && Number(matchedProd.filkom_price) > 0 ? matchedProd.filkom_price : (matchedProd.promo_price && Number(matchedProd.promo_price) > 0 ? matchedProd.promo_price : matchedProd.price))
               : Math.round(grandTotal / (itemTokens.length || 1));
 
@@ -5598,7 +5598,7 @@ export const claimSearch = async (req: Request, res: Response) => {
        FROM orders 
        WHERE user_id IS NULL 
          AND (batch_source = 'manual' OR batch_source = 'csv_import')`;
-         
+
     if (nim && phone) {
       queryStr += ` AND (customer_nim = ? OR customer_phone = ? OR customer_phone = CONCAT('0', ?))`;
       params.push(nim, phone, phone.startsWith('62') ? phone.substring(2) : phone);
@@ -5626,7 +5626,7 @@ export const claimSearch = async (req: Request, res: Response) => {
          WHERE oi.order_id = ?`,
         [order.order_id]
       );
-      
+
       // Masking the name for privacy
       let maskedName = order.customer_name;
       if (maskedName) {
@@ -5729,9 +5729,8 @@ export const submitClaim = async (req: Request, res: Response) => {
       } else if (existingThisUser.status === "rejected") {
         return res.status(400).json({
           success: false,
-          error: `Pengajuan klaim pesanan ini sebelumnya ditolak oleh admin${
-            existingThisUser.admin_note ? `: "${existingThisUser.admin_note}"` : ""
-          }. Silakan hubungi admin FILKOM Merch jika terdapat kekeliruan.`,
+          error: `Pengajuan klaim pesanan ini sebelumnya ditolak oleh admin${existingThisUser.admin_note ? `: "${existingThisUser.admin_note}"` : ""
+            }. Silakan hubungi admin FILKOM Merch jika terdapat kekeliruan.`,
         });
       }
     }
@@ -5861,11 +5860,11 @@ export const approveClaim = async (req: Request, res: Response) => {
     await connection.execute(
       "UPDATE orders SET user_id = ?, customer_name = ?, customer_email = ?, customer_phone = ?, customer_nim = ? WHERE order_id = ?",
       [
-        claim.user_id, 
-        user.name || order.customer_name, 
-        user.email || order.customer_email, 
-        user.phone || order.customer_phone, 
-        user.nim || order.customer_nim, 
+        claim.user_id,
+        user.name || order.customer_name,
+        user.email || order.customer_email,
+        user.phone || order.customer_phone,
+        user.nim || order.customer_nim,
         claim.order_id
       ]
     );
@@ -5911,12 +5910,12 @@ export const rejectClaim = async (req: Request, res: Response) => {
   try {
     const claimId = req.params.id;
     const { adminNote } = req.body;
-    
+
     await execute(
       "UPDATE order_claims SET status = 'rejected', admin_note = ? WHERE id = ?",
       [adminNote || null, claimId]
     );
-    
+
     return res.json({ success: true, message: "Klaim berhasil ditolak" });
   } catch (error: any) {
     console.error("Error in rejectClaim:", error);

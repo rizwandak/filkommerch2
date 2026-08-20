@@ -244,12 +244,12 @@ export interface Order {
   channel: "online" | "pos";
   fulfillment_type: "shipping" | "pickup" | "walk_in";
   fulfillment_status:
-    | "unfulfilled"
-    | "processing"
-    | "ready_for_pickup"
-    | "shipped"
-    | "completed"
-    | "cancelled";
+  | "unfulfilled"
+  | "processing"
+  | "ready_for_pickup"
+  | "shipped"
+  | "completed"
+  | "cancelled";
   user_id: number | null;
   cashier_id: number | null;
   customer_name: string;
@@ -264,22 +264,22 @@ export interface Order {
   tax_amount: number;
   gross_amount: number;
   payment_status:
-    | "unpaid"
-    | "pending"
-    | "paid"
-    | "expired"
-    | "failed"
-    | "refunded"
-    | "partial_refund";
+  | "unpaid"
+  | "pending"
+  | "paid"
+  | "expired"
+  | "failed"
+  | "refunded"
+  | "partial_refund";
   order_status:
-    | "pending_payment"
-    | "paid"
-    | "processing"
-    | "ready_for_pickup"
-    | "shipped"
-    | "completed"
-    | "cancelled"
-    | "refunded";
+  | "pending_payment"
+  | "paid"
+  | "processing"
+  | "ready_for_pickup"
+  | "shipped"
+  | "completed"
+  | "cancelled"
+  | "refunded";
   pickup_code: string | null;
   pickup_location: string | null;
   tracking_number: string | null;

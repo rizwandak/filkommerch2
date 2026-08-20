@@ -103,9 +103,9 @@ function CheckoutPage() {
   const discountAmount = appliedVoucher ? (
     appliedVoucher.discount_type === "percentage"
       ? Math.min(
-          Math.round((subtotalAmount * appliedVoucher.discount_amount) / 100),
-          appliedVoucher.max_discount && appliedVoucher.max_discount > 0 ? appliedVoucher.max_discount : Infinity
-        )
+        Math.round((subtotalAmount * appliedVoucher.discount_amount) / 100),
+        appliedVoucher.max_discount && appliedVoucher.max_discount > 0 ? appliedVoucher.max_discount : Infinity
+      )
       : appliedVoucher.discount_amount
   ) : 0;
   const totalAmount = Math.max(0, subtotalAmount - discountAmount);

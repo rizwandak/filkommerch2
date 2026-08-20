@@ -296,14 +296,14 @@ export async function runMigration() {
     try {
       try {
         await connection.query("ALTER TABLE order_items DROP FOREIGN KEY order_items_ibfk_2");
-      } catch (e: any) {}
+      } catch (e: any) { }
       try {
         await connection.query("ALTER TABLE order_items DROP FOREIGN KEY fk_order_items_variant");
-      } catch (e: any) {}
-      
+      } catch (e: any) { }
+
       await connection.query("ALTER TABLE order_items ADD CONSTRAINT order_items_ibfk_2 FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL");
       await connection.query("ALTER TABLE order_items ADD CONSTRAINT fk_order_items_variant FOREIGN KEY (variant_id) REFERENCES product_variants(id) ON DELETE SET NULL");
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     // Backfill historical order voucher_code in production database
     try {
@@ -317,7 +317,7 @@ export async function runMigration() {
         SET voucher_code = 'THANKYOU20' 
         WHERE discount_amount > 0 AND voucher_code IS NULL
       `);
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     // Create product_reviews table if it doesn't exist
     try {
@@ -335,7 +335,7 @@ export async function runMigration() {
           UNIQUE KEY unique_review (product_id, order_id)
         )
       `);
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     // Create notifications table
     try {
@@ -358,7 +358,7 @@ export async function runMigration() {
       await connection.query(`UPDATE notifications SET title = REPLACE(title, '? Bukti', '⚠️ Bukti') WHERE title LIKE '? Bukti%'`);
       await connection.query(`UPDATE notifications SET title = REPLACE(title, '? Pembayaran', '✅ Pembayaran') WHERE title LIKE '? Pembayaran%'`);
       await connection.query(`UPDATE notifications SET title = REPLACE(title, '? Update', '💬 Update') WHERE title LIKE '? Update%'`);
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     // Create push_subscriptions table
     try {
@@ -373,7 +373,7 @@ export async function runMigration() {
           FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
       `);
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     // Auto-fix Keychain variant names in order_items for historical imported CSV items
     try {
@@ -393,7 +393,7 @@ export async function runMigration() {
           [target.color, target.variant_id, key]
         );
       }
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     // Auto-fix T-Shirt Kaos variant names in order_items for historical imported CSV items
     try {
@@ -410,7 +410,7 @@ export async function runMigration() {
           [targetColor, key]
         );
       }
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     // Auto-fix Pin Enamel department normalization
     try {
@@ -441,7 +441,7 @@ export async function runMigration() {
 
         await connection.query("UPDATE order_items SET size = '', color = ? WHERE id = ?", [targetColor, row.id]);
       }
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     // Auto-fix Pin Tas variant names and imported items distribution
     try {
@@ -567,7 +567,7 @@ export async function runMigration() {
           }
         }
       }
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     // Auto-fix Totebag variant names
     try {
@@ -588,7 +588,7 @@ export async function runMigration() {
         const targetColor = totebagMapping[cLower] || row.color || "FILKOM BRAWIJAYA Outline";
         await connection.query("UPDATE order_items SET size = '', color = ? WHERE id = ?", [targetColor, row.id]);
       }
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     // Auto-fix Batch #1 official product prices
     try {
@@ -618,18 +618,64 @@ export async function runMigration() {
           }
         }
       }
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     try {
       await connection.query(
         "UPDATE order_items SET subtotal = unit_price * quantity WHERE (subtotal != (unit_price * quantity) OR subtotal IS NULL) AND unit_price > 0"
       );
-    } catch (err: any) {}
+    } catch (err: any) { }
 
     try {
       await connection.query("UPDATE order_items SET size = '' WHERE size IN ('One Size', 'All Size', 'Default', '-', 'Standard')");
       await connection.query("UPDATE product_variants SET size = '' WHERE size IN ('One Size', 'All Size', 'Default', '-', 'Standard')");
-    } catch (err: any) {}
+    } catch (err: any) { }
+
+    // Auto-fix specific imported order data corrections (e.g. Ni Putu Mega Cahya)
+    try {
+      const [megaOrders] = await connection.query<any[]>(
+        "SELECT id, order_id FROM orders WHERE customer_name LIKE '%Ni Putu Mega Cahya%' OR customer_phone = '87878065355' OR customer_nim = '255150407111108'"
+      );
+
+      for (const ord of megaOrders) {
+        const [existingItems] = await connection.query<any[]>(
+          "SELECT id, product_id, product_name, color FROM order_items WHERE order_id = ?",
+          [ord.order_id]
+        );
+
+        const hasWrongPin = existingItems.some(
+          (it) => it.product_id === 16 || (it.product_name || "").toLowerCase().includes("pin enamel")
+        );
+        const hasKeychain = existingItems.some(
+          (it) => it.product_id === 19 || (it.product_name || "").toLowerCase().includes("keychain")
+        );
+
+        if (hasWrongPin || !hasKeychain) {
+          // Remove incorrect items
+          await connection.query("DELETE FROM order_items WHERE order_id = ?", [ord.order_id]);
+
+          // Insert Keychain [Bara] (x1)
+          await connection.query(
+            `INSERT INTO order_items (order_id, product_id, variant_id, product_name, size, color, quantity, unit_price, discount_amount, subtotal, sku_snapshot)
+             VALUES (?, 19, 120, 'Keychain', '', 'Bara', 1, 10000, 0, 10000, 'VAR-120')`,
+            [ord.order_id]
+          );
+
+          // Insert Sticker Pack [Default] (x1)
+          await connection.query(
+            `INSERT INTO order_items (order_id, product_id, variant_id, product_name, size, color, quantity, unit_price, discount_amount, subtotal, sku_snapshot)
+             VALUES (?, 18, 43, 'Sticker Pack', '', 'Default', 1, 8000, 0, 8000, 'VAR-43')`,
+            [ord.order_id]
+          );
+
+          // Update order totals & customer info
+          await connection.query(
+            "UPDATE orders SET subtotal = 18000, gross_amount = 18000, customer_phone = '87878065355', customer_nim = '255150407111108', customer_name = 'Ni Putu Mega Cahya' WHERE order_id = ?",
+            [ord.order_id]
+          );
+        }
+      }
+    } catch (err: any) { }
 
     console.log("✅ Database schema & migrations up-to-date!");
   } catch (err) {

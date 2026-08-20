@@ -260,7 +260,7 @@ function OrderDetailComponent() {
   const { order: initialOrder, items, reviews: initialReviews } = Route.useLoaderData();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [order, setOrder] = useState<any>(initialOrder);
   const [reviews, setReviews] = useState(initialReviews);
 
@@ -414,13 +414,13 @@ function OrderDetailComponent() {
       setUploadingPaymentProof(false);
     }
   };
-  
+
   const [selectedItemForReview, setSelectedItemForReview] = useState<{ item: any } | null>(null);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewMediaFiles, setReviewMediaFiles] = useState<File[]>([]);
-  const [reviewMediaPreviews, setReviewMediaPreviews] = useState<{url: string, type: string}[]>([]);
+  const [reviewMediaPreviews, setReviewMediaPreviews] = useState<{ url: string, type: string }[]>([]);
 
   const isReviewAllowed = (orderObj: any) => {
     if (orderObj.order_status !== "completed") return false;
@@ -486,7 +486,7 @@ function OrderDetailComponent() {
     if (!files.length) return;
 
     let newFiles: File[] = [...reviewMediaFiles];
-    let newPreviews: {url: string, type: string}[] = [...reviewMediaPreviews];
+    let newPreviews: { url: string, type: string }[] = [...reviewMediaPreviews];
 
     for (const file of files) {
       if (file.size > 20 * 1024 * 1024) {
@@ -496,7 +496,7 @@ function OrderDetailComponent() {
 
       const isVideo = file.type.startsWith("video/");
       const isImage = file.type.startsWith("image/");
-      
+
       const currentVideos = newFiles.filter(f => f.type.startsWith("video/")).length;
       if (isVideo && currentVideos >= 1) {
         toast.error("Hanya diperbolehkan maksimal 1 video.");
@@ -530,14 +530,14 @@ function OrderDetailComponent() {
   const [complaintNotes, setComplaintNotes] = useState("");
   const [submittingComplaint, setSubmittingComplaint] = useState(false);
   const [complaintMediaFiles, setComplaintMediaFiles] = useState<File[]>([]);
-  const [complaintMediaPreviews, setComplaintMediaPreviews] = useState<{url: string, type: string}[]>([]);
+  const [complaintMediaPreviews, setComplaintMediaPreviews] = useState<{ url: string, type: string }[]>([]);
 
   const handleComplaintMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
     let newFiles: File[] = [...complaintMediaFiles];
-    let newPreviews: {url: string, type: string}[] = [...complaintMediaPreviews];
+    let newPreviews: { url: string, type: string }[] = [...complaintMediaPreviews];
 
     for (const file of files) {
       if (file.size > 20 * 1024 * 1024) {
@@ -547,7 +547,7 @@ function OrderDetailComponent() {
 
       const isVideo = file.type.startsWith("video/");
       const isImage = file.type.startsWith("image/");
-      
+
       const currentVideos = newFiles.filter(f => f.type.startsWith("video/")).length;
       const currentImages = newFiles.filter(f => f.type.startsWith("image/")).length;
 
@@ -689,7 +689,7 @@ function OrderDetailComponent() {
   const pelunasanAmount = linkedPelunasan
     ? Number(linkedPelunasan.gross_amount)
     : items
-    ? items
+      ? items
         .filter((item: any) => {
           const c = String(item.color || "").toUpperCase();
           const s = String(item.size || "").toUpperCase();
@@ -700,7 +700,7 @@ function OrderDetailComponent() {
           const sizeAddon = getSizeSurcharge(item.size) * Number(item.quantity || 1);
           return sum + baseSubtotal + sizeAddon;
         }, 0)
-    : Number(order.gross_amount);
+      : Number(order.gross_amount);
 
   const totalSizeSurcharge = items?.reduce((sum: number, i: any) => sum + getSizeSurcharge(i.size) * Number(i.quantity || 1), 0) || 0;
   const grandTotalProduct = Number(order.gross_amount) + (isDp ? pelunasanAmount : 0);
@@ -965,8 +965,8 @@ function OrderDetailComponent() {
                   {order.payment_status === "expired"
                     ? "Pesanan ini otomatis dibatalkan oleh sistem karena pembayaran tidak diselesaikan sesuai batas waktu."
                     : order.notes
-                    ? `Alasan Pembatalan / Catatan Admin: "${order.notes}"`
-                    : "Pesanan ini telah dibatalkan oleh Admin / Sistem. Jika Anda telah melakukan pembayaran, silakan hubungi tim Admin FILKOM Merch via WhatsApp."}
+                      ? `Alasan Pembatalan / Catatan Admin: "${order.notes}"`
+                      : "Pesanan ini telah dibatalkan oleh Admin / Sistem. Jika Anda telah melakukan pembayaran, silakan hubungi tim Admin FILKOM Merch via WhatsApp."}
                 </p>
               </div>
             </div>
@@ -990,7 +990,7 @@ function OrderDetailComponent() {
 
         {/* Main 2-Column Responsive Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-          
+
           {/* Left Column: Buyer & Shipping Info (Model Loss) + Items Cards */}
           <div className="lg:col-span-2 space-y-6">
 
@@ -1005,7 +1005,7 @@ function OrderDetailComponent() {
                 <p className="text-xs text-muted-foreground mt-0.5">{order.customer_email}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">{order.customer_phone}</p>
               </div>
-              
+
               {order.fulfillment_type === "shipping" && order.batch_source !== "csv_import" && order.batch_source !== "manual" && (
                 <div className="border-t sm:border-t-0 sm:border-l border-ink/15 pt-4 sm:pt-0 sm:pl-6">
                   <h3 className="font-black text-xs text-muted-foreground uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
@@ -1045,7 +1045,7 @@ function OrderDetailComponent() {
                           </p>
                         </div>
                       </div>
-                      
+
                       <div className="flex flex-row sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2">
                         <div className="font-extrabold text-ink">
                           Rp {item.subtotal.toLocaleString("id-ID")}
@@ -1057,7 +1057,7 @@ function OrderDetailComponent() {
                                 Ulasan Terkirim ✓
                               </span>
                             ) : isReviewAllowed(fullOrder) ? (
-                              <button 
+                              <button
                                 onClick={() => setSelectedItemForReview({ item })}
                                 className="text-[10px] px-3 py-1.5 bg-brand-orange text-white font-extrabold uppercase rounded shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer"
                               >
@@ -1263,7 +1263,7 @@ function OrderDetailComponent() {
 
           {/* Right Column: Rincian Pembayaran & Action Buttons */}
           <div className="space-y-4 lg:sticky lg:top-24">
-            
+
             {/* Rincian Pembayaran */}
             <div className="bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 space-y-3">
               <h3 className="font-extrabold text-ink uppercase tracking-wider text-xs border-b border-ink/20 pb-2">
@@ -1281,7 +1281,7 @@ function OrderDetailComponent() {
                     <span className="font-bold text-ink">+Rp {totalSizeSurcharge.toLocaleString("id-ID")}</span>
                   </div>
                 )}
-                
+
                 {order.voucher_code && (
                   <div className="flex justify-between text-brand-orange font-semibold">
                     <span>Voucher ({order.voucher_code}):</span>
@@ -1405,11 +1405,10 @@ function OrderDetailComponent() {
                     className="p-1 hover:scale-115 transition transform cursor-pointer"
                   >
                     <Star
-                      className={`w-8 h-8 ${
-                        star <= reviewRating
+                      className={`w-8 h-8 ${star <= reviewRating
                           ? "fill-amber-400 text-amber-500 drop-shadow-xs"
                           : "text-gray-300 fill-gray-100"
-                      }`}
+                        }`}
                     />
                   </button>
                 ))}
@@ -1435,7 +1434,7 @@ function OrderDetailComponent() {
                       {preview.type === "video" ? (
                         <video src={preview.url} className="w-full h-full object-cover" />
                       ) : (
-                        <img src={preview.url} alt={`Bukti ${idx+1}`} className="w-full h-full object-cover" />
+                        <img src={preview.url} alt={`Bukti ${idx + 1}`} className="w-full h-full object-cover" />
                       )}
                       <button
                         type="button"
@@ -1543,7 +1542,7 @@ function OrderDetailComponent() {
                                 <video src={resolveImageUrl(url)} className="w-full h-full object-cover" controls />
                               ) : (
                                 <a href={resolveImageUrl(url)} target="_blank" rel="noreferrer">
-                                  <img src={resolveImageUrl(url)} alt={`Bukti ${idx+1}`} className="w-full h-full object-cover hover:scale-105 transition" />
+                                  <img src={resolveImageUrl(url)} alt={`Bukti ${idx + 1}`} className="w-full h-full object-cover hover:scale-105 transition" />
                                 </a>
                               )}
                             </div>
@@ -1580,74 +1579,74 @@ function OrderDetailComponent() {
                   Silakan tuliskan kendala atau kecacatan barang yang Anda terima. Tim Admin FILKOM Merch akan segera menindaklanjuti laporan Anda.
                 </p>
 
-            <div className="mb-6">
-              <textarea
-                rows={4}
-                value={complaintNotes}
-                onChange={(e) => setComplaintNotes(e.target.value)}
-                placeholder="Jelaskan detail masalah (misal: barang robek, ukuran tidak sesuai nota, dll)..."
-                className="w-full p-3 border-2 border-ink rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-red-500 bg-red-50/30 mb-3"
-              />
+                <div className="mb-6">
+                  <textarea
+                    rows={4}
+                    value={complaintNotes}
+                    onChange={(e) => setComplaintNotes(e.target.value)}
+                    placeholder="Jelaskan detail masalah (misal: barang robek, ukuran tidak sesuai nota, dll)..."
+                    className="w-full p-3 border-2 border-ink rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-red-500 bg-red-50/30 mb-3"
+                  />
 
-              <label className="block text-xs font-extrabold uppercase text-ink mb-1.5">
-                Foto / Video Kendala (Opsional):
-              </label>
-              <div className="border-2 border-dashed border-ink/40 bg-red-50/30 hover:bg-red-50/60 rounded-xl p-3.5 text-center transition flex flex-col items-center justify-center gap-2">
-                <div className="flex flex-wrap gap-2 justify-center w-full">
-                  {complaintMediaPreviews.map((preview, idx) => (
-                    <div key={idx} className="relative w-16 h-16 rounded-lg border-2 border-ink overflow-hidden shadow-sm shrink-0">
-                      {preview.type === "video" ? (
-                        <video src={preview.url} className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={preview.url} alt={`Bukti ${idx+1}`} className="w-full h-full object-cover" />
+                  <label className="block text-xs font-extrabold uppercase text-ink mb-1.5">
+                    Foto / Video Kendala (Opsional):
+                  </label>
+                  <div className="border-2 border-dashed border-ink/40 bg-red-50/30 hover:bg-red-50/60 rounded-xl p-3.5 text-center transition flex flex-col items-center justify-center gap-2">
+                    <div className="flex flex-wrap gap-2 justify-center w-full">
+                      {complaintMediaPreviews.map((preview, idx) => (
+                        <div key={idx} className="relative w-16 h-16 rounded-lg border-2 border-ink overflow-hidden shadow-sm shrink-0">
+                          {preview.type === "video" ? (
+                            <video src={preview.url} className="w-full h-full object-cover" />
+                          ) : (
+                            <img src={preview.url} alt={`Bukti ${idx + 1}`} className="w-full h-full object-cover" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newFiles = [...complaintMediaFiles];
+                              const newPreviews = [...complaintMediaPreviews];
+                              newFiles.splice(idx, 1);
+                              newPreviews.splice(idx, 1);
+                              setComplaintMediaFiles(newFiles);
+                              setComplaintMediaPreviews(newPreviews);
+                            }}
+                            className="absolute top-1 right-1 bg-white border border-ink text-red-600 rounded-full p-0.5 hover:scale-110 transition z-10 cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                      {complaintMediaFiles.length < 6 && (
+                        <label className="w-16 h-16 flex flex-col items-center justify-center cursor-pointer border-2 border-dashed border-ink/40 rounded-lg bg-cream/30 hover:bg-cream/50 transition shrink-0">
+                          <Upload className="w-4 h-4 text-ink/60 mb-1" />
+                          <span className="text-[8px] font-bold text-ink/70 uppercase">Tambah</span>
+                          <input type="file" accept="image/*,video/mp4,video/quicktime" multiple onChange={handleComplaintMediaUpload} className="hidden" />
+                        </label>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newFiles = [...complaintMediaFiles];
-                          const newPreviews = [...complaintMediaPreviews];
-                          newFiles.splice(idx, 1);
-                          newPreviews.splice(idx, 1);
-                          setComplaintMediaFiles(newFiles);
-                          setComplaintMediaPreviews(newPreviews);
-                        }}
-                        className="absolute top-1 right-1 bg-white border border-ink text-red-600 rounded-full p-0.5 hover:scale-110 transition z-10 cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
                     </div>
-                  ))}
-                  {complaintMediaFiles.length < 6 && (
-                    <label className="w-16 h-16 flex flex-col items-center justify-center cursor-pointer border-2 border-dashed border-ink/40 rounded-lg bg-cream/30 hover:bg-cream/50 transition shrink-0">
-                      <Upload className="w-4 h-4 text-ink/60 mb-1" />
-                      <span className="text-[8px] font-bold text-ink/70 uppercase">Tambah</span>
-                      <input type="file" accept="image/*,video/mp4,video/quicktime" multiple onChange={handleComplaintMediaUpload} className="hidden" />
-                    </label>
-                  )}
+                    <span className="text-[10px] text-muted-foreground mt-1">
+                      Maksimal 5 foto & 1 video (20MB)
+                    </span>
+                  </div>
                 </div>
-                <span className="text-[10px] text-muted-foreground mt-1">
-                  Maksimal 5 foto & 1 video (20MB)
-                </span>
-              </div>
-            </div>
 
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setComplaintModalOpen(false)}
-                className="flex-1 py-2.5 border-2 border-ink text-xs font-bold uppercase bg-cream hover:bg-cream/80 text-ink rounded-xl shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition cursor-pointer"
-              >
-                Batal
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmitComplaint}
-                disabled={submittingComplaint}
-                className="flex-1 py-2.5 border-2 border-ink text-xs font-extrabold uppercase bg-red-600 text-white hover:bg-red-700 rounded-xl shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition cursor-pointer disabled:opacity-50"
-              >
-                {submittingComplaint ? "Mengirim..." : "Kirim Komplain"}
-              </button>
-            </div>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setComplaintModalOpen(false)}
+                    className="flex-1 py-2.5 border-2 border-ink text-xs font-bold uppercase bg-cream hover:bg-cream/80 text-ink rounded-xl shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSubmitComplaint}
+                    disabled={submittingComplaint}
+                    className="flex-1 py-2.5 border-2 border-ink text-xs font-extrabold uppercase bg-red-600 text-white hover:bg-red-700 rounded-xl shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition cursor-pointer disabled:opacity-50"
+                  >
+                    {submittingComplaint ? "Mengirim..." : "Kirim Komplain"}
+                  </button>
+                </div>
               </>
             )}
           </div>
