@@ -4217,6 +4217,22 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       }
 
       // Handling for regular single items
+      const itemColor = String(item.color || "").toUpperCase();
+      const itemSize = String(item.size || "").toUpperCase();
+      const isItemDp = itemColor.includes("DP") || itemSize.includes("DP");
+
+      // If item is NOT a DP product, sisa = 0 (already fully paid)
+      if (!isItemDp) {
+        resolvedItems.push({
+          item,
+          sisa: 0,
+          subtotal: 0,
+          lunasVariantId: item.variant_id,
+          lunasColor: item.color || "Default",
+        });
+        continue;
+      }
+
       const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
       let lunasVariant = await queryOne<any>(
         "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
@@ -4446,6 +4462,25 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
       }
 
       // Regular items
+      const itemColor = String(item.color || "").toUpperCase();
+      const itemSize = String(item.size || "").toUpperCase();
+      const isItemDp = itemColor.includes("DP") || itemSize.includes("DP");
+
+      // If item is NOT a DP product, sisa = 0 (already fully paid)
+      if (!isItemDp) {
+        previewItems.push({
+          id: item.id,
+          product_id: item.product_id,
+          product_name: `Pelunasan — ${item.product_name}`,
+          size: item.size,
+          color: item.color || "Default",
+          quantity: item.quantity,
+          unit_price: 0,
+          subtotal: 0
+        });
+        continue;
+      }
+
       const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
       let lunasVariant = await queryOne<any>(
         "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
