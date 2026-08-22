@@ -231,6 +231,21 @@ export async function runMigration() {
         )`
       },
       {
+        name: "vendor_order_payments",
+        sql: `CREATE TABLE IF NOT EXISTS vendor_order_payments (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          vendor_order_id INT NOT NULL,
+          term_name VARCHAR(100) NOT NULL,
+          amount INT NOT NULL DEFAULT 0,
+          payment_date DATE NOT NULL,
+          proof_image TEXT DEFAULT NULL,
+          notes TEXT DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          FOREIGN KEY (vendor_order_id) REFERENCES vendor_orders(id) ON DELETE CASCADE
+        )`
+      },
+      {
         name: "batch_product_prices",
         sql: `CREATE TABLE IF NOT EXISTS batch_product_prices (
           id INT AUTO_INCREMENT PRIMARY KEY,

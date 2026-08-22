@@ -26,6 +26,11 @@ import {
   ChevronDown,
   ChevronUp,
   Layers,
+  CreditCard,
+  Receipt,
+  Eye,
+  Image as ImageIcon,
+  Camera,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -39,11 +44,15 @@ import {
   updateVendorOrderServerAction,
   updateVendorOrderStatusServerAction,
   deleteVendorOrderServerAction,
+  getVendorOrderPaymentsServerAction,
+  createVendorOrderPaymentServerAction,
+  deleteVendorOrderPaymentServerAction,
   getFinancialOverviewServerAction,
   getPreOrderCampaignsServerAction,
   getAllProductsAdmin,
   type Vendor,
   type VendorOrder,
+  type VendorOrderPayment,
   type PreOrderCampaign,
 } from "@backend/server-actions";
 import logoFm from "../../assets/logo_fm_removebg.png";
@@ -74,6 +83,17 @@ function AdminVendoringPage() {
   const [poDeadline, setPoDeadline] = useState("");
   const [poNotes, setPoNotes] = useState("");
   const [poItems, setPoItems] = useState<Array<{ product_id: number; size: string; color: string; quantity: number; unit_cost: number }>>([]);
+
+  // Vendor PO Payment / Termin Modal State
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedPaymentPo, setSelectedPaymentPo] = useState<VendorOrder | null>(null);
+  const [paymentTermName, setPaymentTermName] = useState("DP 50%");
+  const [paymentAmount, setPaymentAmount] = useState<number | "">("");
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split("T")[0]);
+  const [paymentProofImg, setPaymentProofImg] = useState<string | null>(null);
+  const [paymentNotes, setPaymentNotes] = useState("");
+  const [isUploadingProof, setIsUploadingProof] = useState(false);
+  const [zoomProofImage, setZoomProofImage] = useState<string | null>(null);
 
   // SPK Vendor Modal State
   const [selectedSpkPo, setSelectedSpkPo] = useState<VendorOrder | null>(null);
@@ -491,6 +511,121 @@ function AdminVendoringPage() {
       }
     },
   });
+
+  // Vendor Payment Mutations
+  const createPaymentMutation = useMutation({
+    mutationFn: (data: { id: number; term_name: string; amount: number; payment_date: string; proof_image?: string | null; notes?: string | null }) =>
+      createVendorOrderPaymentServerAction({ data }),
+    onSuccess: (res: any) => {
+      if (res?.success) {
+        toast.success(res.message || "Pembayaran termin vendor berhasil dicatat!");
+        queryClient.invalidateQueries({ queryKey: ["adminVendorOrders"] });
+        queryClient.invalidateQueries({ queryKey: ["financialOverview"] });
+        setPaymentTermName("Pelunasan");
+        setPaymentAmount("");
+        setPaymentProofImg(null);
+        setPaymentNotes("");
+      } else {
+        toast.error("Gagal mencatat pembayaran: " + (res?.error || ""));
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Terjadi kesalahan saat menyimpan pembayaran");
+    },
+  });
+
+  const deletePaymentMutation = useMutation({
+    mutationFn: ({ id, paymentId }: { id: number; paymentId: number }) =>
+      deleteVendorOrderPaymentServerAction({ data: { id, paymentId } }),
+    onSuccess: (res: any) => {
+      if (res?.success) {
+        toast.success("Catatan pembayaran berhasil dihapus");
+        queryClient.invalidateQueries({ queryKey: ["adminVendorOrders"] });
+        queryClient.invalidateQueries({ queryKey: ["financialOverview"] });
+      } else {
+        toast.error("Gagal menghapus pembayaran: " + (res?.error || ""));
+      }
+    },
+  });
+
+  const openPaymentModal = (po: VendorOrder) => {
+    setSelectedPaymentPo(po);
+    const totalCost = Number(po.total_cost || 0);
+    const totalPaid = Number(po.total_paid || 0);
+    const remaining = Math.max(0, totalCost - totalPaid);
+
+    if (totalPaid === 0) {
+      setPaymentTermName("DP 50%");
+      setPaymentAmount(Math.round(totalCost / 2));
+    } else {
+      setPaymentTermName("Pelunasan");
+      setPaymentAmount(remaining);
+    }
+    setPaymentDate(new Date().toISOString().split("T")[0]);
+    setPaymentProofImg(null);
+    setPaymentNotes("");
+    setIsPaymentModalOpen(true);
+  };
+
+  const closePaymentModal = () => {
+    setIsPaymentModalOpen(false);
+    setSelectedPaymentPo(null);
+  };
+
+  const handleProofUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Ukuran file bukti transfer maksimal 10MB");
+      return;
+    }
+    setIsUploadingProof(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success && json.url) {
+        setPaymentProofImg(json.url);
+        toast.success("Foto bukti transfer berhasil diunggah!");
+      } else {
+        toast.error(json.error || "Gagal mengunggah foto bukti transfer");
+      }
+    } catch (err: any) {
+      toast.error("Gagal mengunggah foto: " + err.message);
+    } finally {
+      setIsUploadingProof(false);
+    }
+  };
+
+  const handlePaymentSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedPaymentPo) return;
+    if (!paymentTermName.trim()) {
+      toast.error("Nama termin/skema pembayaran wajib diisi");
+      return;
+    }
+    if (!paymentAmount || Number(paymentAmount) <= 0) {
+      toast.error("Nominal transfer harus lebih dari 0");
+      return;
+    }
+    if (!paymentDate) {
+      toast.error("Tanggal pembayaran wajib diisi");
+      return;
+    }
+
+    createPaymentMutation.mutate({
+      id: selectedPaymentPo.id,
+      term_name: paymentTermName.trim(),
+      amount: Number(paymentAmount),
+      payment_date: paymentDate,
+      proof_image: paymentProofImg,
+      notes: paymentNotes || null,
+    });
+  };
 
   // Modal Handlers
   const openCreateVendorModal = () => {
@@ -973,118 +1108,208 @@ function AdminVendoringPage() {
                 <p>Belum ada Purchase Order vendor yang dibuat.</p>
               </div>
             ) : (
-              vendorOrders.map((po) => (
-                <div
-                  key={po.id}
-                  className="bg-white border-2 border-ink rounded-2xl p-5 space-y-4 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-ink/10 pb-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-sm font-black text-ink">{po.po_number}</span>
-                        {statusBadge(po.status)}
+              vendorOrders.map((po) => {
+                const totalCost = Number(po.total_cost || 0);
+                const totalPaid = Number(po.total_paid || 0);
+                const remainingCost = Math.max(0, totalCost - totalPaid);
+                const progressPct = po.payment_progress_pct || 0;
+
+                return (
+                  <div
+                    key={po.id}
+                    className="bg-white border-2 border-ink rounded-2xl p-5 space-y-4 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]"
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-ink/10 pb-3">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-mono text-sm font-black text-ink">{po.po_number}</span>
+                          {statusBadge(po.status)}
+
+                          {/* Payment Status Badge */}
+                          {po.payment_status === "paid" ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Lunas (100%)
+                            </span>
+                          ) : po.payment_status === "partial" ? (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-amber-700" /> DP / Sebagian ({progressPct}%)
+                            </span>
+                          ) : (
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3 text-rose-600" /> Belum Bayar (0%)
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-extrabold text-brand-orange mt-0.5">
+                          Vendor: {po.vendor_name} {po.vendor_phone ? `(${po.vendor_phone})` : ""}
+                        </p>
                       </div>
-                      <p className="text-xs font-extrabold text-brand-orange mt-0.5">
-                        Vendor: {po.vendor_name} {po.vendor_phone ? `(${po.vendor_phone})` : ""}
-                      </p>
-                    </div>
 
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <select
-                        value={po.status}
-                        onChange={(e) =>
-                          updatePoStatusMutation.mutate({ id: po.id, status: e.target.value })
-                        }
-                        className="px-2.5 py-1.5 border border-ink rounded-lg text-xs font-bold bg-cream/50 cursor-pointer"
-                      >
-                        <option value="draft">Draft</option>
-                        <option value="sent">Sent to Vendor</option>
-                        <option value="in_production">In Production</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
-
-                      <button
-                        onClick={() => openEditPoModal(po)}
-                        className="px-3 py-1.5 bg-white text-ink border-2 border-ink rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-cream shadow-2xs cursor-pointer transition-all"
-                        title="Edit Rincian SPK / PO Vendor"
-                      >
-                        <Edit2 className="w-3.5 h-3.5 text-brand-blue" /> Edit SPK
-                      </button>
-
-                      <button
-                        onClick={() => openSpkModal(po)}
-                        className="px-3 py-1.5 bg-brand-orange text-cream border-2 border-ink rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-ink shadow-2xs cursor-pointer transition-all"
-                        title="Cetak Surat Perintah Kerja (SPK) Vendor"
-                      >
-                        <FileText className="w-3.5 h-3.5" /> Cetak SPK
-                      </button>
-
-                      <button
-                        onClick={() => handleExportPoCSV(po)}
-                        className="px-3 py-1.5 bg-secondary text-ink border border-ink rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-neutral-200 cursor-pointer"
-                        title="Export PO CSV"
-                      >
-                        <Download className="w-3.5 h-3.5" /> CSV
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          if (confirm(`Hapus PO "${po.po_number}"?`)) {
-                            deletePoMutation.mutate(po.id);
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <select
+                          value={po.status}
+                          onChange={(e) =>
+                            updatePoStatusMutation.mutate({ id: po.id, status: e.target.value })
                           }
-                        }}
-                        className="p-1.5 bg-rose-100 text-rose-800 border border-ink rounded-lg hover:bg-rose-600 hover:text-white cursor-pointer"
-                        title="Hapus PO"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                          className="px-2.5 py-1.5 border border-ink rounded-lg text-xs font-bold bg-cream/50 cursor-pointer"
+                        >
+                          <option value="draft">Draft</option>
+                          <option value="sent">Sent to Vendor</option>
+                          <option value="in_production">In Production</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+
+                        {/* Payment / Termin Button */}
+                        <button
+                          onClick={() => openPaymentModal(po)}
+                          className="px-3 py-1.5 bg-emerald-50 text-emerald-950 border-2 border-emerald-700 rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-emerald-100 shadow-2xs cursor-pointer transition-all"
+                          title="Kelola Skema Pembayaran & Bukti Transfer Vendor"
+                        >
+                          <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
+                          Termin &amp; Bukti Transfer {po.payments && po.payments.length > 0 ? `(${po.payments.length})` : ""}
+                        </button>
+
+                        <button
+                          onClick={() => openEditPoModal(po)}
+                          className="px-3 py-1.5 bg-white text-ink border-2 border-ink rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-cream shadow-2xs cursor-pointer transition-all"
+                          title="Edit Rincian SPK / PO Vendor"
+                        >
+                          <Edit2 className="w-3.5 h-3.5 text-brand-blue" /> Edit SPK
+                        </button>
+
+                        <button
+                          onClick={() => openSpkModal(po)}
+                          className="px-3 py-1.5 bg-brand-orange text-cream border-2 border-ink rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-ink shadow-2xs cursor-pointer transition-all"
+                          title="Cetak Surat Perintah Kerja (SPK) Vendor"
+                        >
+                          <FileText className="w-3.5 h-3.5" /> Cetak SPK
+                        </button>
+
+                        <button
+                          onClick={() => handleExportPoCSV(po)}
+                          className="px-3 py-1.5 bg-secondary text-ink border border-ink rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-neutral-200 cursor-pointer"
+                          title="Export PO CSV"
+                        >
+                          <Download className="w-3.5 h-3.5" /> CSV
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            if (confirm(`Hapus PO "${po.po_number}"?`)) {
+                              deletePoMutation.mutate(po.id);
+                            }
+                          }}
+                          className="p-1.5 bg-rose-100 text-rose-800 border border-ink rounded-lg hover:bg-rose-600 hover:text-white cursor-pointer"
+                          title="Hapus PO"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Items List Table */}
+                    <div className="overflow-x-auto border border-ink/20 rounded-xl">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="bg-cream/60 border-b border-ink/20 text-ink font-bold">
+                            <th className="p-2.5">Produk</th>
+                            <th className="p-2.5">Ukuran/Warna</th>
+                            <th className="p-2.5 text-center">Qty Dipesan</th>
+                            <th className="p-2.5 text-right">Harga Satuan Vendor</th>
+                            <th className="p-2.5 text-right font-black">Subtotal Cost</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-ink/10">
+                          {(po.items || []).map((item, idx) => (
+                            <tr key={idx}>
+                              <td className="p-2.5 font-bold text-ink">{item.catalog_product_name}</td>
+                              <td className="p-2.5 font-semibold text-muted-foreground">
+                                {[item.size, item.color].filter(Boolean).join(" / ") || "-"}
+                              </td>
+                              <td className="p-2.5 text-center font-black">{item.quantity} pcs</td>
+                              <td className="p-2.5 text-right font-mono">
+                                Rp {Number(item.unit_cost || 0).toLocaleString("id-ID")}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-black text-brand-orange">
+                                Rp {Number(item.subtotal_cost || (item.unit_cost * item.quantity)).toLocaleString("id-ID")}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Progress Pembayaran & Transfer Tracker */}
+                    <div className="bg-cream/30 border border-ink/20 p-3.5 rounded-xl space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-emerald-700" />
+                          <span className="font-extrabold uppercase text-ink">Progress Pembayaran Vendor:</span>
+                          <span className="font-bold font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded text-[11px]">
+                            {progressPct}% Ditransfer
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs font-mono">
+                          <span className="text-muted-foreground">
+                            Sudah Transfer: <b className="text-emerald-700">Rp {totalPaid.toLocaleString("id-ID")}</b>
+                          </span>
+                          <span className="text-muted-foreground">
+                            Sisa Tagihan: <b className="text-rose-600">Rp {remainingCost.toLocaleString("id-ID")}</b>
+                          </span>
+                          <span className="text-ink font-black">
+                            Total Kontrak: <b className="text-brand-orange">Rp {totalCost.toLocaleString("id-ID")}</b>
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Visual Progress Bar */}
+                      <div className="w-full bg-neutral-200 h-2.5 rounded-full overflow-hidden border border-ink/20">
+                        <div
+                          className="bg-emerald-600 h-full transition-all duration-500"
+                          style={{ width: `${progressPct}%` }}
+                        />
+                      </div>
+
+                      {/* Riwayat Termin Pills if any */}
+                      {po.payments && po.payments.length > 0 && (
+                        <div className="pt-1 flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[10px] font-black uppercase text-muted-foreground">Riwayat Transfer:</span>
+                          {po.payments.map((pmt, pIdx) => (
+                            <div
+                              key={pIdx}
+                              className="inline-flex items-center gap-1.5 bg-white border border-ink/30 px-2 py-1 rounded-lg text-[10px] font-bold shadow-2xs"
+                            >
+                              <span className="font-black text-ink">{pmt.term_name}:</span>
+                              <span className="font-mono text-emerald-700">Rp {Number(pmt.amount).toLocaleString("id-ID")}</span>
+                              <span className="text-muted-foreground text-[9px]">({new Date(pmt.payment_date).toLocaleDateString("id-ID")})</span>
+                              {pmt.proof_image && (
+                                <button
+                                  type="button"
+                                  onClick={() => setZoomProofImage(pmt.proof_image || null)}
+                                  className="text-brand-blue hover:text-brand-orange cursor-pointer ml-0.5"
+                                  title="Lihat Bukti Foto Transfer"
+                                >
+                                  <Eye className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 font-bold border-t border-ink/10">
+                      <span className="text-muted-foreground">
+                        Deadline: {po.deadline ? new Date(po.deadline).toLocaleDateString("id-ID") : "-"}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {po.notes ? `Catatan: "${po.notes}"` : ""}
+                      </span>
                     </div>
                   </div>
-
-                  {/* Items List Table */}
-                  <div className="overflow-x-auto border border-ink/20 rounded-xl">
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-cream/60 border-b border-ink/20 text-ink font-bold">
-                          <th className="p-2.5">Produk</th>
-                          <th className="p-2.5">Ukuran/Warna</th>
-                          <th className="p-2.5 text-center">Qty Dipesan</th>
-                          <th className="p-2.5 text-right">Harga Satuan Vendor</th>
-                          <th className="p-2.5 text-right font-black">Subtotal Cost</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-ink/10">
-                        {(po.items || []).map((item, idx) => (
-                          <tr key={idx}>
-                            <td className="p-2.5 font-bold text-ink">{item.catalog_product_name}</td>
-                            <td className="p-2.5 font-semibold text-muted-foreground">
-                              {[item.size, item.color].filter(Boolean).join(" / ") || "-"}
-                            </td>
-                            <td className="p-2.5 text-center font-black">{item.quantity} pcs</td>
-                            <td className="p-2.5 text-right font-mono">
-                              Rp {Number(item.unit_cost || 0).toLocaleString("id-ID")}
-                            </td>
-                            <td className="p-2.5 text-right font-mono font-black text-brand-orange">
-                              Rp {Number(item.subtotal_cost || (item.unit_cost * item.quantity)).toLocaleString("id-ID")}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div className="flex items-center justify-between text-xs pt-2 font-bold border-t border-ink/10">
-                    <span className="text-muted-foreground">
-                      Deadline: {po.deadline ? new Date(po.deadline).toLocaleDateString("id-ID") : "-"}
-                    </span>
-                    <span className="text-sm font-black text-ink">
-                      TOTAL BIAYA PRODUCTION COGS:{" "}
-                      <span className="text-brand-orange">Rp {Number(po.total_cost || 0).toLocaleString("id-ID")}</span>
-                    </span>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </div>
@@ -1096,7 +1321,7 @@ function AdminVendoringPage() {
           <div className="flex items-center justify-between border-b-2 border-ink pb-4">
             <div>
               <h3 className="font-extrabold text-base text-ink uppercase">Analisis Margin &amp; Laporan Keuangan</h3>
-              <p className="text-xs text-muted-foreground font-medium">Perbandingan Omset Penjualan vs Total HPP/COGS Vendor.</p>
+              <p className="text-xs text-muted-foreground font-medium">Perbandingan Omset Penjualan vs Realisasi Kas Keluar &amp; Komitmen Kontrak Vendor.</p>
             </div>
             <button
               onClick={() => refetchFinancials()}
@@ -1119,31 +1344,33 @@ function AdminVendoringPage() {
                   <div className="text-2xl font-black text-ink">
                     Rp {Number(financialData?.totalRevenue || 0).toLocaleString("id-ID")}
                   </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">Dari transaksi terbayar</p>
+                  <p className="text-[10px] text-muted-foreground font-medium">Dari transaksi pesanan terbayar</p>
                 </div>
 
                 <div className="bg-rose-50/70 border-2 border-rose-600 p-5 rounded-2xl space-y-1 shadow-[3px_3px_0px_0px_rgba(225,29,72,0.4)]">
-                  <span className="text-[10px] font-black uppercase text-rose-700">TOTAL COGS (BIAYA VENDOR)</span>
+                  <span className="text-[10px] font-black uppercase text-rose-700">REALIZED COGS (KAS KELUAR VENDOR)</span>
                   <div className="text-2xl font-black text-ink">
-                    Rp {Number(financialData?.totalCogs || 0).toLocaleString("id-ID")}
+                    Rp {Number(financialData?.totalPaidCogs || financialData?.totalCogs || 0).toLocaleString("id-ID")}
                   </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">Total biaya PO ke vendor</p>
+                  <p className="text-[10px] text-muted-foreground font-medium">Total uang yang sudah ditransfer ke vendor</p>
+                </div>
+
+                <div className="bg-purple-50/70 border-2 border-purple-600 p-5 rounded-2xl space-y-1 shadow-[3px_3px_0px_0px_rgba(147,51,234,0.4)]">
+                  <span className="text-[10px] font-black uppercase text-purple-800">TOTAL KONTRAK PO VENDOR</span>
+                  <div className="text-2xl font-black text-ink">
+                    Rp {Number(financialData?.totalCommittedCogs || 0).toLocaleString("id-ID")}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-medium">Total komitmen kontrak seluruh PO aktif</p>
                 </div>
 
                 <div className="bg-emerald-50/70 border-2 border-emerald-600 p-5 rounded-2xl space-y-1 shadow-[3px_3px_0px_0px_rgba(16,185,129,0.4)]">
-                  <span className="text-[10px] font-black uppercase text-emerald-800">GROSS MARGIN (LABA KOTOR)</span>
+                  <span className="text-[10px] font-black uppercase text-emerald-800">GROSS MARGIN (LABA RIIL)</span>
                   <div className="text-2xl font-black text-ink">
                     Rp {Number(financialData?.grossMargin || 0).toLocaleString("id-ID")}
                   </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">Revenue dikurangi Total COGS</p>
-                </div>
-
-                <div className="bg-blue-50/70 border-2 border-blue-600 p-5 rounded-2xl space-y-1 shadow-[3px_3px_0px_0px_rgba(37,99,235,0.4)]">
-                  <span className="text-[10px] font-black uppercase text-blue-800">MARGIN PERCENTAGE</span>
-                  <div className="text-2xl font-black text-ink">
-                    {financialData?.marginPercent || 0}%
-                  </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">Persentase keuntungan kotor</p>
+                  <p className="text-[10px] text-muted-foreground font-medium">
+                    Omset dikurangi Kas Keluar ({financialData?.marginPercent || 0}%)
+                  </p>
                 </div>
               </div>
 
@@ -1156,7 +1383,7 @@ function AdminVendoringPage() {
                       Rincian Revenue &amp; Margin Per Produk
                     </h4>
                     <p className="text-[11px] text-muted-foreground font-medium">
-                      Laporan terpadu penjualan produk, HPP kesepakatan Vendor Orders, dan rincian varian.
+                      Laporan terpadu penjualan produk, realisasi kas keluar vendor, dan komitmen kontrak PO.
                     </p>
                   </div>
                 </div>
@@ -1168,8 +1395,8 @@ function AdminVendoringPage() {
                         <th className="p-3">Nama Produk &amp; Detail Varian</th>
                         <th className="p-3 text-center">Qty Terjual / PO</th>
                         <th className="p-3 text-right">Revenue (Omset)</th>
-                        <th className="p-3 text-right">COGS Unit (HPP)</th>
-                        <th className="p-3 text-right">Total COGS (Vendor)</th>
+                        <th className="p-3 text-right">HPP PO Satuan</th>
+                        <th className="p-3 text-right">COGS Terbayar (Kas Keluar)</th>
                         <th className="p-3 text-right font-black">Gross Margin (Rp)</th>
                         <th className="p-3 text-right font-black">Margin %</th>
                       </tr>
@@ -1235,7 +1462,7 @@ function AdminVendoringPage() {
                                           className="bg-white border border-ink/30 rounded-lg px-2 py-1 text-[10px] shadow-2xs space-y-0.5"
                                         >
                                           <div className="font-black text-ink">{v.variant || "Standard"}</div>
-                                          <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono">
+                                          <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono flex-wrap">
                                             <span className="font-bold text-ink">
                                               Terjual: <span className="text-brand-orange">{v.qty_sold} pcs</span>
                                             </span>
@@ -1245,8 +1472,13 @@ function AdminVendoringPage() {
                                               </span>
                                             )}
                                             {v.unit_cost > 0 && (
-                                              <span className="text-rose-700 font-semibold">
+                                              <span className="text-neutral-700 font-semibold">
                                                 HPP: Rp {Number(v.unit_cost).toLocaleString("id-ID")}
+                                              </span>
+                                            )}
+                                            {v.paid_cost > 0 && (
+                                              <span className="text-rose-700 font-bold bg-rose-50 px-1 rounded">
+                                                Ditransfer: Rp {Number(v.paid_cost).toLocaleString("id-ID")}
                                               </span>
                                             )}
                                           </div>
@@ -1278,18 +1510,18 @@ function AdminVendoringPage() {
                                 </div>
                                 {row.qty_po > 0 && (
                                   <div className="text-[9px] text-brand-orange font-bold">
-                                    dari PO Vendor
+                                    kesepakatan PO
                                   </div>
                                 )}
                               </td>
 
                               <td className="p-3.5 text-right font-mono">
                                 <div className="font-black text-xs text-rose-700">
-                                  Rp {Number(row.total_cogs).toLocaleString("id-ID")}
+                                  Rp {Number(row.total_cogs || row.paid_cogs || 0).toLocaleString("id-ID")}
                                 </div>
                                 {row.po_total_cost > 0 && (
-                                  <div className="text-[9px] text-muted-foreground">
-                                    Total PO: Rp {Number(row.po_total_cost).toLocaleString("id-ID")}
+                                  <div className="text-[9px] text-muted-foreground font-semibold">
+                                    Kontrak: Rp {Number(row.po_total_cost).toLocaleString("id-ID")}
                                   </div>
                                 )}
                               </td>
@@ -2145,6 +2377,310 @@ function AdminVendoringPage() {
           </div>
         </div>,
         document.body
+      )}
+
+      {/* VENDOR ORDER PAYMENT & TERMIN MODAL */}
+      {isPaymentModalOpen && selectedPaymentPo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/70 backdrop-blur-xs overflow-y-auto">
+          <div className="bg-background border-4 border-ink rounded-2xl w-full max-w-2xl p-6 space-y-5 shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] relative my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b-2 border-ink pb-3">
+              <div>
+                <h2 className="text-base font-black text-ink uppercase tracking-wide flex items-center gap-2">
+                  <CreditCard className="w-5 h-5 text-emerald-700" />
+                  Skema Pembayaran &amp; Bukti Transfer Vendor
+                </h2>
+                <p className="text-xs text-muted-foreground font-semibold mt-0.5">
+                  PO: <b className="text-ink font-mono">{selectedPaymentPo.po_number}</b> • Vendor: <b className="text-brand-orange">{selectedPaymentPo.vendor_name}</b>
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={closePaymentModal}
+                className="p-1.5 border-2 border-ink rounded-lg bg-cream hover:bg-rose-500 hover:text-white cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Financial Summary Card in Modal */}
+            {(() => {
+              const livePo = vendorOrders.find((o) => o.id === selectedPaymentPo.id) || selectedPaymentPo;
+              const totalCost = Number(livePo.total_cost || 0);
+              const totalPaid = Number(livePo.total_paid || 0);
+              const remaining = Math.max(0, totalCost - totalPaid);
+              const progressPct = livePo.payment_progress_pct || 0;
+
+              return (
+                <div className="bg-emerald-50/70 border-2 border-emerald-700 p-4 rounded-xl space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+                    <div className="bg-white p-2.5 rounded-lg border border-ink/20 shadow-2xs">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Total Kontrak PO</span>
+                      <div className="text-sm font-black text-ink">Rp {totalCost.toLocaleString("id-ID")}</div>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-lg border border-ink/20 shadow-2xs">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Sudah Ditransfer</span>
+                      <div className="text-sm font-black text-emerald-700">Rp {totalPaid.toLocaleString("id-ID")}</div>
+                    </div>
+                    <div className="bg-white p-2.5 rounded-lg border border-ink/20 shadow-2xs">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Sisa Tagihan</span>
+                      <div className="text-sm font-black text-rose-700">Rp {remaining.toLocaleString("id-ID")}</div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-[11px] font-extrabold text-ink">
+                      <span>Status Pembayaran:</span>
+                      <span className="text-emerald-800 font-mono">{progressPct}% Selesai</span>
+                    </div>
+                    <div className="w-full bg-neutral-200 h-2 rounded-full overflow-hidden border border-ink/20">
+                      <div className="bg-emerald-600 h-full transition-all" style={{ width: `${progressPct}%` }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Riwayat Pembayaran Termin */}
+            {(() => {
+              const livePo = vendorOrders.find((o) => o.id === selectedPaymentPo.id) || selectedPaymentPo;
+              const payments = livePo.payments || [];
+
+              return (
+                <div className="space-y-3">
+                  <h3 className="text-xs font-black uppercase text-ink flex items-center justify-between">
+                    <span>Daftar Transfer / Termin Terbayar:</span>
+                    <span className="text-[10px] font-bold text-muted-foreground font-mono">{payments.length} transaksi</span>
+                  </h3>
+
+                  {payments.length === 0 ? (
+                    <div className="p-5 text-center text-xs font-bold text-muted-foreground bg-cream/30 border-2 border-dashed border-ink/30 rounded-xl">
+                      Belum ada catatan transfer untuk PO ini. Silakan masukkan termin pembayaran di bawah.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                      {payments.map((pmt) => (
+                        <div
+                          key={pmt.id}
+                          className="bg-white border-2 border-ink/30 p-3 rounded-xl flex items-center justify-between gap-3 shadow-2xs"
+                        >
+                          <div className="space-y-1 flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-black text-xs text-ink">{pmt.term_name}</span>
+                              <span className="text-[10px] font-bold text-muted-foreground bg-neutral-100 px-1.5 py-0.5 rounded border border-ink/10">
+                                📅 {new Date(pmt.payment_date).toLocaleDateString("id-ID")}
+                              </span>
+                            </div>
+                            <div className="text-sm font-black text-emerald-700 font-mono">
+                              Rp {Number(pmt.amount).toLocaleString("id-ID")}
+                            </div>
+                            {pmt.notes && (
+                              <p className="text-[10px] text-muted-foreground italic">"{pmt.notes}"</p>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {pmt.proof_image ? (
+                              <button
+                                type="button"
+                                onClick={() => setZoomProofImage(pmt.proof_image || null)}
+                                className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-300 rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                title="Lihat Foto Bukti Transfer"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> Bukti
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground italic px-2">Tanpa Bukti</span>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (confirm(`Hapus catatan pembayaran "${pmt.term_name}" sebesar Rp ${Number(pmt.amount).toLocaleString("id-ID")}?`)) {
+                                  deletePaymentMutation.mutate({ id: livePo.id, paymentId: pmt.id });
+                                }
+                              }}
+                              className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
+                              title="Hapus Termin"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* FORM TAMBAH TERMIN PEMBAYARAN BARU */}
+            <form onSubmit={handlePaymentSubmit} className="space-y-3 bg-cream/30 border-2 border-ink p-4 rounded-xl text-xs">
+              <div className="flex items-center justify-between border-b border-ink/20 pb-2">
+                <span className="font-black text-ink uppercase tracking-wide flex items-center gap-1.5">
+                  <Plus className="w-4 h-4 text-brand-orange" />
+                  Catat Transfer / Termin Baru
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentTermName("DP 30%");
+                      setPaymentAmount(Math.round(Number(selectedPaymentPo.total_cost || 0) * 0.3));
+                    }}
+                    className="px-2 py-0.5 bg-white hover:bg-cream border border-ink/40 rounded text-[10px] font-bold cursor-pointer"
+                  >
+                    DP 30%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentTermName("DP 50%");
+                      setPaymentAmount(Math.round(Number(selectedPaymentPo.total_cost || 0) * 0.5));
+                    }}
+                    className="px-2 py-0.5 bg-white hover:bg-cream border border-ink/40 rounded text-[10px] font-bold cursor-pointer"
+                  >
+                    DP 50%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const livePo = vendorOrders.find((o) => o.id === selectedPaymentPo.id) || selectedPaymentPo;
+                      setPaymentTermName("Pelunasan");
+                      setPaymentAmount(Math.max(0, Number(livePo.total_cost || 0) - Number(livePo.total_paid || 0)));
+                    }}
+                    className="px-2 py-0.5 bg-white hover:bg-cream border border-ink/40 rounded text-[10px] font-bold cursor-pointer"
+                  >
+                    Pelunasan
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-ink uppercase mb-1">Nama Termin / Skema *</label>
+                  <input
+                    type="text"
+                    value={paymentTermName}
+                    onChange={(e) => setPaymentTermName(e.target.value)}
+                    placeholder="Contoh: DP 50% / Pelunasan"
+                    className="w-full px-3 py-2 border-2 border-ink rounded-xl bg-white font-bold focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-ink uppercase mb-1">Nominal Transfer (Rp) *</label>
+                  <input
+                    type="number"
+                    value={paymentAmount}
+                    onChange={(e) => setPaymentAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                    placeholder="Nominal transfer"
+                    className="w-full px-3 py-2 border-2 border-ink rounded-xl bg-white font-black font-mono focus:outline-none"
+                    min={1}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-ink uppercase mb-1">Tanggal Transfer *</label>
+                  <input
+                    type="date"
+                    value={paymentDate}
+                    onChange={(e) => setPaymentDate(e.target.value)}
+                    className="w-full px-3 py-2 border-2 border-ink rounded-xl bg-white font-bold focus:outline-none"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-ink uppercase mb-1">Foto Bukti Transfer (Opsional)</label>
+                  <div className="flex items-center gap-2">
+                    <label className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-3 py-2 bg-white hover:bg-cream border-2 border-ink rounded-xl font-bold transition-all shadow-2xs">
+                      <Upload className="w-3.5 h-3.5 text-brand-blue" />
+                      <span>{isUploadingProof ? "Mengunggah..." : paymentProofImg ? "Ganti Foto Bukti" : "Upload Bukti"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleProofUpload}
+                        className="hidden"
+                        disabled={isUploadingProof}
+                      />
+                    </label>
+
+                    {paymentProofImg && (
+                      <div className="relative group">
+                        <img
+                          src={paymentProofImg}
+                          alt="Preview Bukti"
+                          onClick={() => setZoomProofImage(paymentProofImg)}
+                          className="w-9 h-9 object-cover rounded-lg border-2 border-ink cursor-pointer hover:opacity-90 shadow-2xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setPaymentProofImg(null)}
+                          className="absolute -top-1 -right-1 bg-rose-600 text-white rounded-full p-0.5 shadow cursor-pointer"
+                          title="Hapus Bukti"
+                        >
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-ink uppercase mb-1">Catatan Tambahan (Opsional)</label>
+                <input
+                  type="text"
+                  value={paymentNotes}
+                  onChange={(e) => setPaymentNotes(e.target.value)}
+                  placeholder="Contoh: Transfer via BCA ke Rekening Vendor an Bapak Budi"
+                  className="w-full px-3 py-2 border-2 border-ink rounded-xl bg-white font-medium focus:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={closePaymentModal}
+                  className="px-4 py-2 border-2 border-ink rounded-xl font-bold bg-neutral-200 hover:bg-neutral-300 cursor-pointer"
+                >
+                  Tutup
+                </button>
+                <button
+                  type="submit"
+                  disabled={createPaymentMutation.isPending || isUploadingProof}
+                  className="px-5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-black uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  {createPaymentMutation.isPending ? "Menyimpan..." : "Simpan Transfer"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ZOOM PROOF IMAGE MODAL */}
+      {zoomProofImage && (
+        <div
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-ink/80 backdrop-blur-sm cursor-pointer"
+          onClick={() => setZoomProofImage(null)}
+        >
+          <div className="relative max-w-xl max-h-[85vh] bg-white border-4 border-ink rounded-2xl p-2 shadow-[8px_8px_0px_0px_rgba(27,27,27,1)]" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setZoomProofImage(null)}
+              className="absolute -top-3 -right-3 p-1.5 bg-rose-600 text-white border-2 border-ink rounded-full hover:bg-rose-700 shadow-md cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <img src={zoomProofImage} alt="Bukti Transfer Zoom" className="max-h-[80vh] w-auto object-contain rounded-xl mx-auto" />
+          </div>
+        </div>
       )}
 
     </div>

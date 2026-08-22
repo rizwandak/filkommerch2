@@ -5178,7 +5178,7 @@ export const getProductionSummary = async (req: Request, res: Response) => {
   }
 };
 
-// Get Vendor Orders (PO)
+// Get Vendor Orders (PO) with Payment Progress
 export const getVendorOrders = async (req: Request, res: Response) => {
   try {
     const orders = await query<any>(
@@ -5197,12 +5197,77 @@ export const getVendorOrders = async (req: Request, res: Response) => {
         [o.id]
       );
       o.items = items;
+
+      const payments = await query<any>(
+        "SELECT * FROM vendor_order_payments WHERE vendor_order_id = ? ORDER BY payment_date ASC, id ASC",
+        [o.id]
+      );
+      o.payments = payments || [];
+
+      const totalPaid = (payments || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      const totalCost = Number(o.total_cost || 0);
+      o.total_paid = totalPaid;
+      o.remaining_cost = Math.max(0, totalCost - totalPaid);
+      o.payment_progress_pct = totalCost > 0 ? Math.min(100, Math.round((totalPaid / totalCost) * 100)) : 0;
+      o.payment_status = totalPaid >= totalCost && totalCost > 0 ? "paid" : totalPaid > 0 ? "partial" : "unpaid";
     }
 
     return res.json({ success: true, data: orders });
   } catch (error: any) {
     console.error("Error fetching vendor orders:", error);
     return res.status(500).json({ success: false, error: error.message, data: [] });
+  }
+};
+
+// Get Single Vendor Order Payments
+export const getVendorOrderPayments = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const payments = await query<any>(
+      "SELECT * FROM vendor_order_payments WHERE vendor_order_id = ? ORDER BY payment_date ASC, id ASC",
+      [id]
+    );
+    return res.json({ success: true, data: payments });
+  } catch (error: any) {
+    console.error("Error fetching vendor order payments:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Create Vendor Order Payment (Termin / Transfer)
+export const createVendorOrderPayment = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { term_name, amount, payment_date, proof_image, notes } = req.body;
+
+    if (!term_name || !amount || !payment_date) {
+      return res.status(400).json({
+        success: false,
+        error: "Nama termin/skema pembayaran, nominal transfer, dan tanggal pembayaran wajib diisi",
+      });
+    }
+
+    await query(
+      "INSERT INTO vendor_order_payments (vendor_order_id, term_name, amount, payment_date, proof_image, notes) VALUES (?, ?, ?, ?, ?, ?)",
+      [id, String(term_name).trim(), Number(amount), payment_date, proof_image || null, notes || null]
+    );
+
+    return res.json({ success: true, message: "Pembayaran termin vendor berhasil dicatat" });
+  } catch (error: any) {
+    console.error("Error creating vendor order payment:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Delete Vendor Order Payment
+export const deleteVendorOrderPayment = async (req: Request, res: Response) => {
+  try {
+    const { id, paymentId } = req.params;
+    await query("DELETE FROM vendor_order_payments WHERE id = ? AND vendor_order_id = ?", [paymentId, id]);
+    return res.json({ success: true, message: "Catatan pembayaran termin vendor berhasil dihapus" });
+  } catch (error: any) {
+    console.error("Error deleting vendor order payment:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -5369,13 +5434,94 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
     );
     const totalRevenue = Number(revRows[0]?.total_rev || 0);
 
-    // 2. Fetch all active Vendor Orders and items (where status != 'cancelled')
+    // 2. Fetch Bundle Components Map to dissolve bundles into individual products
+    const bundleItemsRows = await query<any>(
+      `SELECT bi.bundle_product_id, bi.component_product_id, bi.quantity as comp_qty,
+              p.name as bundle_name, p_comp.name as component_name, p_comp.vendor_cost as comp_vendor_cost, p_comp.filkom_price as comp_price
+       FROM bundle_items bi
+       JOIN products p ON bi.bundle_product_id = p.id
+       JOIN products p_comp ON bi.component_product_id = p_comp.id`
+    );
+
+    const bundleComponentsMap: Record<number, Array<{ component_product_id: number; comp_qty: number; comp_price: number }>> = {};
+    const bundleProductIds = new Set<number>();
+    for (const bi of bundleItemsRows) {
+      const bId = Number(bi.bundle_product_id);
+      bundleProductIds.add(bId);
+      if (!bundleComponentsMap[bId]) bundleComponentsMap[bId] = [];
+      bundleComponentsMap[bId].push({
+        component_product_id: Number(bi.component_product_id),
+        comp_qty: Number(bi.comp_qty) || 1,
+        comp_price: Number(bi.comp_price) || 0,
+      });
+    }
+
+    // Also get all products for fallback name matching
+    const allProducts = await query<any>("SELECT id, name, product_type, vendor_cost, cost_price FROM products");
+    const productsById: Record<number, any> = {};
+    const productsByName: Record<string, any> = {};
+    for (const p of allProducts) {
+      productsById[p.id] = p;
+      productsByName[p.name.trim().toLowerCase()] = p;
+      if (p.product_type === "bundle") {
+        bundleProductIds.add(p.id);
+      }
+    }
+
+    // Helper to sanitize product name (removing DP 50%, Pelunasan, Bundle tags)
+    const cleanProductName = (name?: string | null) => {
+      if (!name) return "";
+      return name
+        .replace(/^\[KOMPONEN BUNDLE\]\s*/i, "")
+        .replace(/^Pelunasan\s*—\s*/i, "")
+        .replace(/\s*\(?(dp\s*50%|dp|lunas|pelunasan)\)?/gi, "")
+        .trim();
+    };
+
+    // Helper to sanitize variant key (merging M/DP and M/LUNAS into M)
+    const cleanVariantKey = (rawSize?: string | null, rawColor?: string | null) => {
+      const sanitize = (str?: string | null) => {
+        if (!str) return "";
+        let s = str.trim();
+        s = s.replace(/\s*\(?(dp\s*50%|dp|lunas|pelunasan)\)?/gi, "").trim();
+        if (/^(dp|lunas|pelunasan|default|all size|one size|standard|-|ukuran tidak diisi)$/i.test(s)) {
+          return "";
+        }
+        return s;
+      };
+
+      const cSize = sanitize(rawSize);
+      const cColor = sanitize(rawColor);
+
+      const parts = [cSize, cColor].filter(Boolean);
+      return parts.join(" / ") || "Standard";
+    };
+
+    // 3. Fetch all active Vendor Orders payments (Realized COGS)
+    const paymentRows = await query<any>(
+      `SELECT vop.*, vo.id as vo_id, vo.total_cost as vo_total_cost
+       FROM vendor_order_payments vop
+       JOIN vendor_orders vo ON vop.vendor_order_id = vo.id
+       WHERE vo.status != 'cancelled'`
+    );
+
+    const poPaymentsMap: Record<number, number> = {};
+    let totalPaidCogs = 0;
+    for (const p of paymentRows) {
+      const vId = Number(p.vendor_order_id);
+      const amt = Number(p.amount || 0);
+      poPaymentsMap[vId] = (poPaymentsMap[vId] || 0) + amt;
+      totalPaidCogs += amt;
+    }
+
+    // 4. Fetch all active Vendor Orders and items (where status != 'cancelled')
     const vendorPoRows = await query<any>(
       `SELECT 
         voi.*, 
         vo.po_number, 
         vo.status as po_status, 
         vo.vendor_id, 
+        vo.total_cost as vo_total_cost,
         v.name as vendor_name, 
         p.name as catalog_product_name,
         p.vendor_cost as base_vendor_cost,
@@ -5387,12 +5533,14 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
        WHERE vo.status != 'cancelled'`
     );
 
-    // 3. Total COGS from all active Vendor Orders
+    // Total Committed COGS from all active Vendor Orders contracts
     const cogsRows = await query<any>(
       "SELECT COALESCE(SUM(total_cost), 0) as total_cogs FROM vendor_orders WHERE status != 'cancelled'"
     );
-    const totalCogs = Number(cogsRows[0]?.total_cogs || 0);
+    const totalCommittedCogs = Number(cogsRows[0]?.total_cogs || 0);
 
+    // Primary COGS displayed is Realized COGS (Kas Keluar Vendor yang sudah ditransfer)
+    const totalCogs = totalPaidCogs;
     const grossMargin = totalRevenue - totalCogs;
     const marginPercent = totalRevenue > 0 ? Number(((grossMargin / totalRevenue) * 100).toFixed(1)) : 0;
 
@@ -5400,14 +5548,16 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
     const vendorPoMap: Record<number, {
       total_po_qty: number;
       total_po_cost: number;
+      total_paid_cost: number;
       vendors: Set<string>;
       pos: Set<string>;
-      variants: Array<{
+      variants: Record<string, {
         size: string;
         color: string;
         quantity: number;
         unit_cost: number;
         subtotal_cost: number;
+        paid_cost: number;
         vendor_name: string;
         po_number: string;
       }>;
@@ -5419,29 +5569,47 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
         vendorPoMap[pid] = {
           total_po_qty: 0,
           total_po_cost: 0,
+          total_paid_cost: 0,
           vendors: new Set(),
           pos: new Set(),
-          variants: [],
+          variants: {},
         };
       }
       const qty = Number(item.quantity || 0);
       const sub = Number(item.subtotal_cost || (item.unit_cost * qty) || 0);
+      
+      const voId = Number(item.vendor_order_id);
+      const voTotal = Number(item.vo_total_cost || 0);
+      const voPaid = poPaymentsMap[voId] || 0;
+      const itemPaid = voTotal > 0 ? Math.round((sub / voTotal) * voPaid) : 0;
+
       vendorPoMap[pid].total_po_qty += qty;
       vendorPoMap[pid].total_po_cost += sub;
+      vendorPoMap[pid].total_paid_cost += itemPaid;
+
       if (item.vendor_name) vendorPoMap[pid].vendors.add(item.vendor_name);
       if (item.po_number) vendorPoMap[pid].pos.add(item.po_number);
-      vendorPoMap[pid].variants.push({
-        size: item.size || "",
-        color: item.color || "",
-        quantity: qty,
-        unit_cost: Number(item.unit_cost || 0),
-        subtotal_cost: sub,
-        vendor_name: item.vendor_name || "",
-        po_number: item.po_number || "",
-      });
+
+      const vKey = cleanVariantKey(item.size, item.color);
+      if (!vendorPoMap[pid].variants[vKey]) {
+        vendorPoMap[pid].variants[vKey] = {
+          size: item.size || "",
+          color: item.color || "",
+          quantity: 0,
+          unit_cost: Number(item.unit_cost || 0),
+          subtotal_cost: 0,
+          paid_cost: 0,
+          vendor_name: item.vendor_name || "",
+          po_number: item.po_number || "",
+        };
+      }
+      vendorPoMap[pid].variants[vKey].quantity += qty;
+      vendorPoMap[pid].variants[vKey].subtotal_cost += sub;
+      vendorPoMap[pid].variants[vKey].paid_cost += itemPaid;
+      if (item.unit_cost) vendorPoMap[pid].variants[vKey].unit_cost = Number(item.unit_cost);
     }
 
-    // 4. Fetch sales item rows
+    // 5. Fetch sales item rows
     const salesItemRows = await query<any>(
       `SELECT 
         oi.*,
@@ -5459,16 +5627,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
       orderParams
     );
 
-    // Also get all products for fallback name matching
-    const allProducts = await query<any>("SELECT id, name, product_type, vendor_cost, cost_price FROM products");
-    const productsById: Record<number, any> = {};
-    const productsByName: Record<string, any> = {};
-    for (const p of allProducts) {
-      productsById[p.id] = p;
-      productsByName[p.name.trim().toLowerCase()] = p;
-    }
-
-    // Group sales by product
+    // Group sales by individual product (dissolving bundles)
     const productSalesMap: Record<number, {
       product_id: number;
       product_name: string;
@@ -5478,157 +5637,226 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
       variants_sold: Record<string, { size: string; color: string; qty: number; revenue: number }>;
     }> = {};
 
+    const addSalesToProduct = (pId: number, rawName: string, size: string, color: string, qty: number, rev: number, baseCost: number) => {
+      if (!pId) return;
+      if (!productSalesMap[pId]) {
+        const matchedCatalog = productsById[pId];
+        const cleanName = cleanProductName(matchedCatalog?.name || rawName || `Produk #${pId}`);
+        productSalesMap[pId] = {
+          product_id: pId,
+          product_name: cleanName,
+          qty_sold: 0,
+          revenue: 0,
+          base_vendor_cost: Number(baseCost || matchedCatalog?.vendor_cost || matchedCatalog?.cost_price || 0),
+          variants_sold: {},
+        };
+      }
+
+      productSalesMap[pId].qty_sold += qty;
+      productSalesMap[pId].revenue += rev;
+
+      const varKey = cleanVariantKey(size, color);
+      if (!productSalesMap[pId].variants_sold[varKey]) {
+        productSalesMap[pId].variants_sold[varKey] = {
+          size: size || "",
+          color: color || "",
+          qty: 0,
+          revenue: 0,
+        };
+      }
+      productSalesMap[pId].variants_sold[varKey].qty += qty;
+      productSalesMap[pId].variants_sold[varKey].revenue += rev;
+    };
+
+    // Process sales rows with bundle dissolution
     for (const r of salesItemRows) {
       let pId = r.product_id || r.catalog_p_id;
-      let cleanName = (r.product_name || r.raw_product_name || "")
-        .replace(/^\[KOMPONEN BUNDLE\]\s*/i, "")
-        .replace(/^Pelunasan\s*—\s*/i, "")
-        .replace(/\s*\(DP\s*50%\)/i, "")
-        .trim();
+      const rawName = r.product_name || r.raw_product_name || "";
+      const cleanName = cleanProductName(rawName);
 
       if (!pId && cleanName) {
         const found = productsByName[cleanName.toLowerCase()];
         if (found) pId = found.id;
       }
 
-      if (!pId) pId = 0;
-
-      if (!productSalesMap[pId]) {
-        const matchedCatalog = productsById[pId];
-        productSalesMap[pId] = {
-          product_id: pId,
-          product_name: matchedCatalog?.name || cleanName || `Produk #${pId}`,
-          qty_sold: 0,
-          revenue: 0,
-          base_vendor_cost: Number(r.base_vendor_cost || r.base_cost_price || matchedCatalog?.vendor_cost || matchedCatalog?.cost_price || 0),
-          variants_sold: {},
-        };
-      }
-
       const q = Number(r.quantity || 1);
       const rev = Number(r.subtotal || (r.unit_price || r.price || 0) * q || 0);
-      productSalesMap[pId].qty_sold += q;
-      productSalesMap[pId].revenue += rev;
 
-      const varKey = [r.size, r.color]
-        .map((s) => (s || "").trim())
-        .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard" && s !== "Ukuran Tidak Diisi")
-        .join(" / ") || "Standard";
+      // If this row is a bundle container (e.g. "Brand New Days Pack" or "Starter Pack")
+      if (bundleProductIds.has(pId) || r.product_type === "bundle") {
+        // Check if component items are already in this order as [KOMPONEN BUNDLE]
+        const hasComponentRows = salesItemRows.some(
+          (i: any) =>
+            i.order_id === r.order_id &&
+            ((i.raw_product_name && i.raw_product_name.includes("[KOMPONEN BUNDLE]")) ||
+              (i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")))
+        );
 
-      if (!productSalesMap[pId].variants_sold[varKey]) {
-        productSalesMap[pId].variants_sold[varKey] = {
-          size: r.size || "",
-          color: r.color || "",
-          qty: 0,
-          revenue: 0,
-        };
+        if (hasComponentRows) {
+          // Find component items for this order and distribute the bundle container revenue across them
+          const orderComponentRows = salesItemRows.filter(
+            (i: any) =>
+              i.order_id === r.order_id &&
+              ((i.raw_product_name && i.raw_product_name.includes("[KOMPONEN BUNDLE]")) ||
+                (i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")))
+          );
+          if (orderComponentRows.length > 0 && rev > 0) {
+            const revenuePerComp = Math.round(rev / orderComponentRows.length);
+            for (const cr of orderComponentRows) {
+              cr.subtotal = (Number(cr.subtotal) || 0) + revenuePerComp;
+            }
+          }
+          // Do not add the bundle container row itself
+          continue;
+        } else {
+          // If no component rows were stored, expand the bundle into its components
+          const comps = bundleComponentsMap[pId];
+          if (comps && comps.length > 0) {
+            const revPerComp = Math.round(rev / comps.length);
+            for (const comp of comps) {
+              const compP = productsById[comp.component_product_id];
+              const compQty = q * comp.comp_qty;
+              addSalesToProduct(
+                comp.component_product_id,
+                compP?.name || `Produk #${comp.component_product_id}`,
+                r.size,
+                r.color,
+                compQty,
+                revPerComp,
+                Number(compP?.vendor_cost || compP?.cost_price || 0)
+              );
+            }
+          }
+          continue;
+        }
       }
-      productSalesMap[pId].variants_sold[varKey].qty += q;
-      productSalesMap[pId].variants_sold[varKey].revenue += rev;
+
+      // Regular individual product or [KOMPONEN BUNDLE] row
+      addSalesToProduct(
+        pId,
+        rawName,
+        r.size,
+        r.color,
+        q,
+        rev,
+        Number(r.base_vendor_cost || r.base_cost_price || 0)
+      );
     }
 
-    // Now gather all product IDs (from sales + from vendor POs)
+    // Now gather all individual product IDs (excluding bundle containers)
     const allPids = new Set<number>([
       ...Object.keys(productSalesMap).map(Number),
       ...Object.keys(vendorPoMap).map(Number),
     ]);
 
-    const productBreakdown = Array.from(allPids).map((pid) => {
-      const sales = productSalesMap[pid];
-      const vendorData = vendorPoMap[pid];
-      const catalogP = productsById[pid];
+    const productBreakdown = Array.from(allPids)
+      .filter((pid) => !bundleProductIds.has(pid) && productsById[pid]?.product_type !== "bundle")
+      .map((pid) => {
+        const sales = productSalesMap[pid];
+        const vendorData = vendorPoMap[pid];
+        const catalogP = productsById[pid];
 
-      const pName = sales?.product_name || catalogP?.name || (vendorData?.variants[0]?.size ? `Produk #${pid}` : `Produk #${pid}`);
-      const qtySold = sales?.qty_sold || 0;
-      const revenue = sales?.revenue || 0;
+        const rawName = sales?.product_name || catalogP?.name || `Produk #${pid}`;
+        const pName = cleanProductName(rawName);
+        const qtySold = sales?.qty_sold || 0;
+        const revenue = sales?.revenue || 0;
 
-      const poQty = vendorData?.total_po_qty || 0;
-      const poTotalCost = vendorData?.total_po_cost || 0;
+        const poQty = vendorData?.total_po_qty || 0;
+        const poTotalCost = vendorData?.total_po_cost || 0;
+        const paidCogsProd = vendorData?.total_paid_cost || 0;
 
-      // Unit COGS determination:
-      // Priority 1: Weighted average from Vendor PO items
-      // Priority 2: base vendor_cost / cost_price from product catalog
-      let unitCogs = 0;
-      if (vendorData && vendorData.total_po_qty > 0) {
-        unitCogs = Math.round(vendorData.total_po_cost / vendorData.total_po_qty);
-      } else if (sales?.base_vendor_cost) {
-        unitCogs = sales.base_vendor_cost;
-      } else if (catalogP?.vendor_cost || catalogP?.cost_price) {
-        unitCogs = Number(catalogP.vendor_cost || catalogP.cost_price || 0);
-      }
+        // Total COGS for this product: Realized Kas Keluar Vendor
+        const totalCogsProd = paidCogsProd;
+        const margin = revenue - totalCogsProd;
+        const marginPct = revenue > 0 ? Number(((margin / revenue) * 100).toFixed(1)) : (totalCogsProd > 0 ? -100 : 0);
 
-      // Total COGS for this product:
-      // If there is vendor PO issued, use poTotalCost (or unitCogs * qtySold)
-      const totalCogsProd = poTotalCost > 0 ? poTotalCost : unitCogs * qtySold;
-      const margin = revenue - totalCogsProd;
-      const marginPct = revenue > 0 ? Number(((margin / revenue) * 100).toFixed(1)) : (totalCogsProd > 0 ? -100 : 0);
-
-      // Build structured variants list
-      const variantDetails: Array<{
-        variant: string;
-        size: string;
-        color: string;
-        qty_sold: number;
-        qty_po: number;
-        unit_cost: number;
-        subtotal_cost: number;
-      }> = [];
-
-      // Combine variant keys from both vendor PO and sales
-      const varKeyMap: Record<string, { size: string; color: string; qty_sold: number; qty_po: number; unit_cost: number }> = {};
-
-      if (vendorData?.variants) {
-        for (const v of vendorData.variants) {
-          const key = [v.size, v.color]
-            .map((s) => (s || "").trim())
-            .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard")
-            .join(" / ") || "Standard";
-
-          if (!varKeyMap[key]) {
-            varKeyMap[key] = { size: v.size, color: v.color, qty_sold: 0, qty_po: 0, unit_cost: v.unit_cost };
-          }
-          varKeyMap[key].qty_po += v.quantity;
-          if (v.unit_cost) varKeyMap[key].unit_cost = v.unit_cost;
+        // Unit COGS determination based on contract or paid
+        let unitCogs = 0;
+        if (vendorData && vendorData.total_po_qty > 0) {
+          unitCogs = Math.round(vendorData.total_po_cost / vendorData.total_po_qty);
+        } else if (sales?.base_vendor_cost) {
+          unitCogs = sales.base_vendor_cost;
+        } else if (catalogP?.vendor_cost || catalogP?.cost_price) {
+          unitCogs = Number(catalogP.vendor_cost || catalogP.cost_price || 0);
         }
-      }
 
-      if (sales?.variants_sold) {
-        for (const [key, v] of Object.entries(sales.variants_sold)) {
-          if (!varKeyMap[key]) {
-            varKeyMap[key] = { size: v.size, color: v.color, qty_sold: 0, qty_po: 0, unit_cost: unitCogs };
+        // Build merged, clean variant details (no DP/Lunas splits)
+        const variantDetails: Array<{
+          variant: string;
+          size: string;
+          color: string;
+          qty_sold: number;
+          qty_po: number;
+          unit_cost: number;
+          subtotal_cost: number;
+          paid_cost: number;
+        }> = [];
+
+        const varKeyMap: Record<string, { size: string; color: string; qty_sold: number; qty_po: number; unit_cost: number; paid_cost: number }> = {};
+
+        if (vendorData?.variants) {
+          for (const [key, v] of Object.entries(vendorData.variants)) {
+            const cleanKey = cleanVariantKey(v.size, v.color);
+            if (!varKeyMap[cleanKey]) {
+              varKeyMap[cleanKey] = { size: v.size, color: v.color, qty_sold: 0, qty_po: 0, unit_cost: v.unit_cost, paid_cost: 0 };
+            }
+            varKeyMap[cleanKey].qty_po += v.quantity;
+            varKeyMap[cleanKey].paid_cost += v.paid_cost;
+            if (v.unit_cost) varKeyMap[cleanKey].unit_cost = v.unit_cost;
           }
-          varKeyMap[key].qty_sold += v.qty;
         }
-      }
 
-      for (const [vLabel, vData] of Object.entries(varKeyMap)) {
-        variantDetails.push({
-          variant: vLabel,
-          size: vData.size,
-          color: vData.color,
-          qty_sold: vData.qty_sold,
-          qty_po: vData.qty_po,
-          unit_cost: vData.unit_cost,
-          subtotal_cost: vData.unit_cost * (vData.qty_po || vData.qty_sold),
+        if (sales?.variants_sold) {
+          for (const [key, v] of Object.entries(sales.variants_sold)) {
+            const cleanKey = cleanVariantKey(v.size, v.color);
+            if (!varKeyMap[cleanKey]) {
+              varKeyMap[cleanKey] = { size: v.size, color: v.color, qty_sold: 0, qty_po: 0, unit_cost: unitCogs, paid_cost: 0 };
+            }
+            varKeyMap[cleanKey].qty_sold += v.qty;
+          }
+        }
+
+        for (const [vLabel, vData] of Object.entries(varKeyMap)) {
+          variantDetails.push({
+            variant: vLabel,
+            size: vData.size,
+            color: vData.color,
+            qty_sold: vData.qty_sold,
+            qty_po: vData.qty_po,
+            unit_cost: vData.unit_cost,
+            subtotal_cost: vData.unit_cost * (vData.qty_po || vData.qty_sold),
+            paid_cost: vData.paid_cost,
+          });
+        }
+
+        // Sort variant details naturally (S, M, L, XL, XXL or alphabetical)
+        const sizeOrder: Record<string, number> = { xs: 1, s: 2, m: 3, l: 4, xl: 5, xxl: 6, "2xl": 6, xxxl: 7, "3xl": 7 };
+        variantDetails.sort((a, b) => {
+          const aKey = a.variant.toLowerCase().trim();
+          const bKey = b.variant.toLowerCase().trim();
+          const aOrder = sizeOrder[aKey] ?? 99;
+          const bOrder = sizeOrder[bKey] ?? 99;
+          if (aOrder !== bOrder) return aOrder - bOrder;
+          return b.qty_sold - a.qty_sold || a.variant.localeCompare(b.variant);
         });
-      }
 
-      return {
-        product_id: pid,
-        product_name: pName,
-        qty_sold: qtySold,
-        qty_po: poQty,
-        revenue,
-        unit_cogs: unitCogs,
-        total_cogs: totalCogsProd,
-        po_total_cost: poTotalCost,
-        margin,
-        margin_percent: marginPct,
-        vendor_names: Array.from(vendorData?.vendors || []),
-        po_numbers: Array.from(vendorData?.pos || []),
-        variants_detail: variantDetails,
-      };
-    });
+        return {
+          product_id: pid,
+          product_name: pName,
+          qty_sold: qtySold,
+          qty_po: poQty,
+          revenue,
+          unit_cogs: unitCogs,
+          total_cogs: totalCogsProd,
+          po_total_cost: poTotalCost,
+          paid_cogs: paidCogsProd,
+          margin,
+          margin_percent: marginPct,
+          vendor_names: Array.from(vendorData?.vendors || []),
+          po_numbers: Array.from(vendorData?.pos || []),
+          variants_detail: variantDetails,
+        };
+      });
 
     // Sort by revenue descending
     productBreakdown.sort((a, b) => b.revenue - a.revenue || b.qty_sold - a.qty_sold);
@@ -5637,7 +5865,9 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
       success: true,
       data: {
         totalRevenue,
-        totalCogs,
+        totalCogs: totalPaidCogs,
+        totalPaidCogs,
+        totalCommittedCogs,
         grossMargin,
         marginPercent,
         productBreakdown,

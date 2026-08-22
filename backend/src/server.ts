@@ -418,6 +418,9 @@ app.post("/api/admin/vendoring/orders", checkRole(["admin"]), apiControllers.cre
 app.put("/api/admin/vendoring/orders/:id", checkRole(["admin"]), apiControllers.updateVendorOrder);
 app.put("/api/admin/vendoring/orders/:id/status", checkRole(["admin"]), apiControllers.updateVendorOrderStatus);
 app.delete("/api/admin/vendoring/orders/:id", checkRole(["admin"]), apiControllers.deleteVendorOrder);
+app.get("/api/admin/vendoring/orders/:id/payments", checkRole(["admin"]), apiControllers.getVendorOrderPayments);
+app.post("/api/admin/vendoring/orders/:id/payments", checkRole(["admin"]), apiControllers.createVendorOrderPayment);
+app.delete("/api/admin/vendoring/orders/:id/payments/:paymentId", checkRole(["admin"]), apiControllers.deleteVendorOrderPayment);
 app.get("/api/admin/vendoring/financials", checkRole(["admin"]), apiControllers.getFinancialOverview);
 
 // CSV Import API Route

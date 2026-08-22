@@ -1807,6 +1807,18 @@ export interface VendorOrderItem {
   notes?: string | null;
 }
 
+export interface VendorOrderPayment {
+  id: number;
+  vendor_order_id: number;
+  term_name: string;
+  amount: number;
+  payment_date: string;
+  proof_image?: string | null;
+  notes?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface VendorOrder {
   id: number;
   po_number: string;
@@ -1816,6 +1828,10 @@ export interface VendorOrder {
   contact_person?: string;
   status: "draft" | "sent" | "in_production" | "completed" | "cancelled";
   total_cost: number;
+  total_paid?: number;
+  remaining_cost?: number;
+  payment_progress_pct?: number;
+  payment_status?: "paid" | "partial" | "unpaid";
   notes?: string | null;
   deadline?: string | null;
   sent_at?: string | null;
@@ -1823,6 +1839,7 @@ export interface VendorOrder {
   created_at?: string;
   updated_at?: string;
   items?: VendorOrderItem[];
+  payments?: VendorOrderPayment[];
 }
 
 // Fetch All Vendors
@@ -1988,6 +2005,54 @@ export const deleteVendorOrderServerAction = createServerFn({ method: "POST" })
     } catch (e: any) {
       console.warn("deleteVendorOrderServerAction error:", e);
       return { success: false, error: e.message || "Failed to delete vendor order" };
+    }
+  });
+
+// Get Vendor Order Payments (Termin Transfer)
+export const getVendorOrderPaymentsServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders/${data.id}/payments`);
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getVendorOrderPaymentsServerAction error:", e);
+      return { success: false, error: e.message || "Failed to fetch vendor order payments" };
+    }
+  });
+
+// Create Vendor Order Payment (Termin Transfer)
+export const createVendorOrderPaymentServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number; term_name: string; amount: number; payment_date: string; proof_image?: string | null; notes?: string | null }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders/${data.id}/payments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("createVendorOrderPaymentServerAction error:", e);
+      return { success: false, error: e.message || "Failed to record vendor order payment" };
+    }
+  });
+
+// Delete Vendor Order Payment
+export const deleteVendorOrderPaymentServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number; paymentId: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders/${data.id}/payments/${data.paymentId}`, {
+        method: "DELETE",
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("deleteVendorOrderPaymentServerAction error:", e);
+      return { success: false, error: e.message || "Failed to delete vendor order payment" };
     }
   });
 

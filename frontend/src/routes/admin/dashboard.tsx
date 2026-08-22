@@ -1204,8 +1204,8 @@ function AdminDashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {visitors?.list && visitors.list.length > 0 ? (
-                      visitors.list.map((v, i) => (
+                    {Boolean((visitors as any)?.list && (visitors as any).list.length > 0) ? (
+                      ((visitors as any).list as any[]).map((v: any, i: number) => (
                         <tr key={i} className="hover:bg-muted/50 transition-colors">
                           <td className="px-4 py-3 whitespace-nowrap text-ink">
                             {new Date(v.created_at).toLocaleString("id-ID", {

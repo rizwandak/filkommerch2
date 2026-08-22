@@ -331,8 +331,8 @@ function AdminTransactionsPage() {
   const handleOpenReceiptModal = () => {
     if (!managedTransaction) return;
     const cashierDisplayName = isCashier
-      ? (user?.name || "Kasir")
-      : (managedTransaction.cashier_name || user?.name || "Admin");
+      ? ((user as any)?.name || "Kasir")
+      : (managedTransaction.cashier_name || (user as any)?.name || "Admin");
     const data = formatTransactionToReceiptData(managedTransaction, managedItems, cashierDisplayName);
     setReceiptData(data);
     setReceiptModalOpen(true);
@@ -1983,11 +1983,7 @@ function AdminTransactionsPage() {
                                                 );
                                               })()}
                                               <div className="flex items-center gap-1.5">
-                                                 {subOrder.order_status !== "completed" &&
-                                                   subOrder.order_status !== "cancelled" &&
-                                                   subOrder.order_status !== "cancel" &&
-                                                   subOrder.order_status !== "expire" &&
-                                                   !isCashier && (
+                                                 {subOrder.order_status !== "completed" && !isCashier && (
                                                      <Button
                                                        size="sm"
                                                        onClick={() => handleOpenQuickComplete(subOrder)}
@@ -2122,8 +2118,6 @@ function AdminTransactionsPage() {
                               <div className="flex justify-end gap-1.5 items-center">
                                 {order.order_status !== "completed" &&
                                   order.order_status !== "cancelled" &&
-                                  order.order_status !== "cancel" &&
-                                  order.order_status !== "expire" &&
                                   !isCashier && (
                                     <Button
                                       size="sm"
@@ -3158,7 +3152,7 @@ function AdminTransactionsPage() {
                               value={managedFulfillmentProof}
                               onChange={(url) => setManagedFulfillmentProof(url)}
                               onRemove={() => setManagedFulfillmentProof("")}
-                              resolveImageUrl={resolveImageUrl}
+                              resolveImageUrl={(url) => resolveImageUrl(url) || url}
                               isRequired={managedStatus === "completed"}
                               label="Foto Bukti Pengambilan / Serah Terima Barang"
                             />
@@ -3567,7 +3561,7 @@ function AdminTransactionsPage() {
                   value={quickCompleteProof}
                   onChange={(url) => setQuickCompleteProof(url)}
                   onRemove={() => setQuickCompleteProof("")}
-                  resolveImageUrl={resolveImageUrl}
+                  resolveImageUrl={(url) => resolveImageUrl(url) || url}
                   isRequired={true}
                   label="Foto Bukti Serah Terima / Pengambilan Barang"
                 />
