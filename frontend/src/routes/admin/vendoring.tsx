@@ -23,6 +23,9 @@ import {
   TrendingUp,
   Printer,
   Upload,
+  ChevronDown,
+  ChevronUp,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -79,6 +82,7 @@ function AdminVendoringPage() {
   const [customPaymentNotes, setCustomPaymentNotes] = useState<string>("");
   const [spkSignerName, setSpkSignerName] = useState<string>("Manajemen FILKOM Merch UB");
   const [spkSignatureImg, setSpkSignatureImg] = useState<string | null>(null);
+  const [expandedFinancialRows, setExpandedFinancialRows] = useState<Record<number, boolean>>({});
 
   const openSpkModal = (po: VendorOrder) => {
     setSelectedSpkPo(po);
@@ -534,20 +538,58 @@ function AdminVendoringPage() {
     }
   };
 
+  // Helpers for variant extraction without DP/Lunas
+  const cleanVariantText = (txt?: string | null) => {
+    if (!txt) return "";
+    const s = txt.trim();
+    if (/^(dp\s*50%|dp|lunas|pelunasan)$/i.test(s)) return "";
+    return s.replace(/\s*\(?(dp\s*50%|dp|lunas|pelunasan)\)?/gi, "").trim();
+  };
+
+  const getProductVariantOptions = (prod?: any) => {
+    if (!prod || !Array.isArray(prod.variants) || prod.variants.length === 0) {
+      return { hasSize: false, hasColor: false, sizes: [], colors: [] };
+    }
+    const activeVars = prod.variants.filter((v: any) => v.is_active !== false);
+
+    const rawSizes = activeVars.map((v: any) => cleanVariantText(v.size)).filter(Boolean);
+    const rawColors = activeVars.map((v: any) => cleanVariantText(v.color)).filter(Boolean);
+
+    const distinctSizes = Array.from(new Set(rawSizes)).filter((s: any) => s.toLowerCase() !== "default");
+    const distinctColors = Array.from(new Set(rawColors)).filter((c: any) => c.toLowerCase() !== "default");
+
+    return {
+      hasSize: distinctSizes.length > 0,
+      hasColor: distinctColors.length > 0,
+      sizes: distinctSizes as string[],
+      colors: distinctColors as string[],
+    };
+  };
+
+  const getDefaultItemForProduct = (prod?: any) => {
+    if (!prod) {
+      return { product_id: 1, size: "All Size", color: "", quantity: 10, unit_cost: 50000 };
+    }
+    const { hasSize, hasColor, sizes, colors } = getProductVariantOptions(prod);
+    const defaultSize = hasSize ? sizes[0] : (hasColor ? "" : "All Size");
+    const defaultColor = hasColor ? colors[0] : "";
+    const defaultCost = prod.vendor_cost || prod.cost_price || 50000;
+    return {
+      product_id: prod.id,
+      size: defaultSize,
+      color: defaultColor,
+      quantity: 10,
+      unit_cost: defaultCost,
+    };
+  };
+
   const openCreatePoModal = () => {
     setEditingPo(null);
     setSelectedVendorId("");
     setPoDeadline("");
     setPoNotes("");
-    setPoItems([
-      {
-        product_id: productsList[0]?.id || 1,
-        size: "All Size",
-        color: "",
-        quantity: 10,
-        unit_cost: (productsList[0] as any)?.cost_price || (productsList[0] as any)?.vendor_cost || 50000,
-      },
-    ]);
+    const defaultProd = productsList[0];
+    setPoItems([getDefaultItemForProduct(defaultProd)]);
     setIsPoModalOpen(true);
   };
 
@@ -558,23 +600,15 @@ function AdminVendoringPage() {
     setPoNotes(po.notes || "");
     const mappedItems = (po.items || []).map((it) => ({
       product_id: it.product_id,
-      size: it.size || "",
-      color: it.color || "",
+      size: cleanVariantText(it.size) || it.size || "",
+      color: cleanVariantText(it.color) || it.color || "",
       quantity: it.quantity,
       unit_cost: it.unit_cost,
     }));
     setPoItems(
       mappedItems.length > 0
         ? mappedItems
-        : [
-            {
-              product_id: productsList[0]?.id || 1,
-              size: "All Size",
-              color: "",
-              quantity: 10,
-              unit_cost: (productsList[0] as any)?.cost_price || (productsList[0] as any)?.vendor_cost || 50000,
-            },
-          ]
+        : [getDefaultItemForProduct(productsList[0])]
     );
     setIsPoModalOpen(true);
   };
@@ -588,13 +622,7 @@ function AdminVendoringPage() {
     const defaultProd = productsList[0];
     setPoItems((prev) => [
       ...prev,
-      {
-        product_id: defaultProd?.id || 1,
-        size: "M",
-        color: "",
-        quantity: 10,
-        unit_cost: (defaultProd as any)?.cost_price || (defaultProd as any)?.vendor_cost || 50000,
-      },
+      getDefaultItemForProduct(defaultProd),
     ]);
   };
 
@@ -1121,47 +1149,170 @@ function AdminVendoringPage() {
 
               {/* Product Breakdown Table */}
               <div className="bg-background border-2 border-ink rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-3 p-4">
-                <h4 className="font-extrabold text-sm text-ink uppercase">Rincian Revenue &amp; Margin Per Produk</h4>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <h4 className="font-black text-sm text-ink uppercase tracking-wide flex items-center gap-2">
+                      <Package className="w-4 h-4 text-brand-orange" />
+                      Rincian Revenue &amp; Margin Per Produk
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground font-medium">
+                      Laporan terpadu penjualan produk, HPP kesepakatan Vendor Orders, dan rincian varian.
+                    </p>
+                  </div>
+                </div>
+
                 <div className="overflow-x-auto border-2 border-ink/20 rounded-xl">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="bg-cream border-b-2 border-ink text-ink font-extrabold uppercase">
-                        <th className="p-3">Nama Produk</th>
-                        <th className="p-3 text-center">Qty Terjual</th>
-                        <th className="p-3 text-right">Revenue (Rp)</th>
-                        <th className="p-3 text-right">COGS Unit (Rp)</th>
-                        <th className="p-3 text-right">Total COGS (Rp)</th>
-                        <th className="p-3 text-right font-black">Margin (Rp)</th>
+                        <th className="p-3">Nama Produk &amp; Detail Varian</th>
+                        <th className="p-3 text-center">Qty Terjual / PO</th>
+                        <th className="p-3 text-right">Revenue (Omset)</th>
+                        <th className="p-3 text-right">COGS Unit (HPP)</th>
+                        <th className="p-3 text-right">Total COGS (Vendor)</th>
+                        <th className="p-3 text-right font-black">Gross Margin (Rp)</th>
                         <th className="p-3 text-right font-black">Margin %</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-ink/10">
-                      {(financialData?.productBreakdown || []).map((row: any) => (
-                        <tr key={row.product_id} className="hover:bg-cream/20">
-                          <td className="p-3 font-extrabold text-ink">{row.product_name}</td>
-                          <td className="p-3 text-center font-bold">{row.qty_sold} pcs</td>
-                          <td className="p-3 text-right font-mono font-bold">
-                            <div>Rp {Number(row.revenue).toLocaleString("id-ID")}</div>
-                            {row.is_dp && (
-                              <div className="text-[9px] text-muted-foreground font-semibold mt-0.5">
-                                DP Masuk: Rp {Number(row.dp_revenue || 0).toLocaleString("id-ID")}
-                              </div>
-                            )}
-                          </td>
-                          <td className="p-3 text-right font-mono text-muted-foreground">
-                            Rp {Number(row.unit_cogs).toLocaleString("id-ID")}
-                          </td>
-                          <td className="p-3 text-right font-mono text-rose-700 font-bold">
-                            Rp {Number(row.total_cogs).toLocaleString("id-ID")}
-                          </td>
-                          <td className={`p-3 text-right font-mono font-black ${row.margin >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                            Rp {Number(row.margin).toLocaleString("id-ID")}
-                          </td>
-                          <td className={`p-3 text-right font-extrabold font-mono ${row.margin_percent >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                            {row.margin_percent}%
+                      {(financialData?.productBreakdown || []).length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="p-8 text-center text-muted-foreground font-bold">
+                            Belum ada data penjualan atau PO Vendor untuk batch ini.
                           </td>
                         </tr>
-                      ))}
+                      ) : (
+                        (financialData?.productBreakdown || []).map((row: any) => {
+                          const hasVariants = row.variants_detail && row.variants_detail.length > 0;
+                          const isExpanded = expandedFinancialRows[row.product_id] ?? true;
+
+                          return (
+                            <tr key={row.product_id} className="hover:bg-cream/20 align-top transition-colors">
+                              <td className="p-3.5 space-y-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-black text-sm text-ink">{row.product_name}</span>
+                                  {row.po_numbers && row.po_numbers.length > 0 && (
+                                    <span className="text-[9px] font-bold font-mono bg-blue-100 text-blue-800 border border-blue-300 px-1.5 py-0.5 rounded">
+                                      PO: {row.po_numbers.join(", ")}
+                                    </span>
+                                  )}
+                                </div>
+
+                                {row.vendor_names && row.vendor_names.length > 0 && (
+                                  <div className="text-[10px] font-bold text-brand-orange flex items-center gap-1">
+                                    <Building className="w-3 h-3" /> Mitra: {row.vendor_names.join(", ")}
+                                  </div>
+                                )}
+
+                                {/* Detail Varian */}
+                                {hasVariants && (
+                                  <div className="pt-1 space-y-1">
+                                    <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-muted-foreground">
+                                      <span className="flex items-center gap-1">
+                                        <Layers className="w-3 h-3 text-ink/70" /> Detail Varian ({row.variants_detail.length}):
+                                      </span>
+                                      {row.variants_detail.length > 4 && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setExpandedFinancialRows((prev) => ({
+                                              ...prev,
+                                              [row.product_id]: !isExpanded,
+                                            }))
+                                          }
+                                          className="text-brand-blue hover:underline cursor-pointer flex items-center gap-0.5 text-[9px] font-bold"
+                                        >
+                                          {isExpanded ? "Sembunyikan" : `Lihat Semua (${row.variants_detail.length})`}
+                                          {isExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+                                        </button>
+                                      )}
+                                    </div>
+
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {(isExpanded ? row.variants_detail : row.variants_detail.slice(0, 4)).map((v: any, vIdx: number) => (
+                                        <div
+                                          key={vIdx}
+                                          className="bg-white border border-ink/30 rounded-lg px-2 py-1 text-[10px] shadow-2xs space-y-0.5"
+                                        >
+                                          <div className="font-black text-ink">{v.variant || "Standard"}</div>
+                                          <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono">
+                                            <span className="font-bold text-ink">
+                                              Terjual: <span className="text-brand-orange">{v.qty_sold} pcs</span>
+                                            </span>
+                                            {v.qty_po > 0 && (
+                                              <span className="text-neutral-500 font-semibold">
+                                                PO: {v.qty_po} pcs
+                                              </span>
+                                            )}
+                                            {v.unit_cost > 0 && (
+                                              <span className="text-rose-700 font-semibold">
+                                                HPP: Rp {Number(v.unit_cost).toLocaleString("id-ID")}
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="p-3.5 text-center font-mono">
+                                <div className="font-black text-xs text-ink">{row.qty_sold} pcs</div>
+                                {row.qty_po > 0 && (
+                                  <div className="text-[10px] text-muted-foreground font-semibold">
+                                    (PO: {row.qty_po} pcs)
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="p-3.5 text-right font-mono">
+                                <div className="font-black text-xs text-ink">
+                                  Rp {Number(row.revenue).toLocaleString("id-ID")}
+                                </div>
+                              </td>
+
+                              <td className="p-3.5 text-right font-mono">
+                                <div className="font-bold text-xs text-muted-foreground">
+                                  Rp {Number(row.unit_cogs).toLocaleString("id-ID")}
+                                </div>
+                                {row.qty_po > 0 && (
+                                  <div className="text-[9px] text-brand-orange font-bold">
+                                    dari PO Vendor
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className="p-3.5 text-right font-mono">
+                                <div className="font-black text-xs text-rose-700">
+                                  Rp {Number(row.total_cogs).toLocaleString("id-ID")}
+                                </div>
+                                {row.po_total_cost > 0 && (
+                                  <div className="text-[9px] text-muted-foreground">
+                                    Total PO: Rp {Number(row.po_total_cost).toLocaleString("id-ID")}
+                                  </div>
+                                )}
+                              </td>
+
+                              <td className={`p-3.5 text-right font-mono font-black text-xs ${row.margin >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                                Rp {Number(row.margin).toLocaleString("id-ID")}
+                              </td>
+
+                              <td className="p-3.5 text-right">
+                                <span
+                                  className={`inline-block px-2 py-1 rounded-md font-black text-[11px] font-mono border ${
+                                    row.margin_percent >= 0
+                                      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                      : "bg-rose-100 text-rose-800 border-rose-300"
+                                  }`}
+                                >
+                                  {row.margin_percent > 0 ? `+${row.margin_percent}%` : `${row.margin_percent}%`}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1308,92 +1459,204 @@ function AdminVendoringPage() {
                   <button
                     type="button"
                     onClick={handleAddPoItemRow}
-                    className="px-2.5 py-1 bg-brand-orange text-cream rounded border border-ink font-bold text-[10px] flex items-center gap-1 cursor-pointer"
+                    className="px-2.5 py-1 bg-brand-orange text-cream rounded border border-ink font-bold text-[10px] flex items-center gap-1 cursor-pointer hover:bg-ink transition-colors shadow-2xs"
                   >
                     <Plus className="w-3 h-3" /> Tambah Baris Item
                   </button>
                 </div>
 
-                {poItems.map((item, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-white border border-ink/20 p-2 rounded-lg">
-                    <div className="col-span-4">
-                      <select
-                        value={item.product_id}
-                        onChange={(e) => {
-                          const pId = Number(e.target.value);
-                          const matchedP = productsList.find((p) => p.id === pId);
-                          setPoItems((prev) =>
-                            prev.map((it, i) =>
-                              i === idx ? { ...it, product_id: pId, unit_cost: (matchedP as any)?.cost_price || (matchedP as any)?.vendor_cost || it.unit_cost } : it
-                            )
-                          );
-                        }}
-                        className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold"
-                      >
-                        {productsList.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                {poItems.map((item, idx) => {
+                  const currentProd = productsList.find((p) => p.id === item.product_id);
+                  const { hasSize, hasColor, sizes, colors } = getProductVariantOptions(currentProd);
 
-                    <div className="col-span-2">
-                      <input
-                        type="text"
-                        placeholder="Size/Var"
-                        value={item.size}
-                        onChange={(e) =>
-                          setPoItems((prev) =>
-                            prev.map((it, i) => (i === idx ? { ...it, size: e.target.value } : it))
-                          )
-                        }
-                        className="w-full p-1.5 border border-ink/40 rounded text-[11px]"
-                      />
-                    </div>
+                  const isTwoVariants = hasSize && hasColor;
+                  const isOneVariant = (hasSize && !hasColor) || (!hasSize && hasColor);
+                  const isNoVariant = !hasSize && !hasColor;
 
-                    <div className="col-span-2">
-                      <input
-                        type="number"
-                        placeholder="Qty"
-                        value={item.quantity}
-                        onChange={(e) =>
-                          setPoItems((prev) =>
-                            prev.map((it, i) => (i === idx ? { ...it, quantity: Number(e.target.value) } : it))
-                          )
-                        }
-                        className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold text-center"
-                        min={1}
-                      />
-                    </div>
-
-                    <div className="col-span-3">
-                      <input
-                        type="number"
-                        placeholder="Harga Satuan (Rp)"
-                        value={item.unit_cost}
-                        onChange={(e) =>
-                          setPoItems((prev) =>
-                            prev.map((it, i) => (i === idx ? { ...it, unit_cost: Number(e.target.value) } : it))
-                          )
-                        }
-                        className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold font-mono"
-                      />
-                    </div>
-
-                    <div className="col-span-1 text-right">
-                      {poItems.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => handleRemovePoItemRow(idx)}
-                          className="p-1 text-rose-600 hover:text-rose-800"
+                  return (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-12 gap-2 items-center bg-white border border-ink/20 p-2.5 rounded-lg shadow-2xs"
+                    >
+                      {/* Product Selector */}
+                      <div className={isTwoVariants ? "col-span-3" : isOneVariant ? "col-span-4" : "col-span-4"}>
+                        <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Produk</label>
+                        <select
+                          value={item.product_id}
+                          onChange={(e) => {
+                            const pId = Number(e.target.value);
+                            const matchedP = productsList.find((p) => p.id === pId);
+                            const defaults = getDefaultItemForProduct(matchedP);
+                            setPoItems((prev) =>
+                              prev.map((it, i) =>
+                                i === idx ? { ...it, ...defaults, quantity: it.quantity } : it
+                              )
+                            );
+                          }}
+                          className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold bg-cream/10 focus:outline-none"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                          {productsList.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {cleanVariantText(p.name)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* 2 VARIANT DROPDOWNS: e.g. Kaos / Jaket (Ukuran & Warna/Desain) */}
+                      {isTwoVariants && (
+                        <>
+                          <div className="col-span-2">
+                            <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Ukuran</label>
+                            <select
+                              value={item.size}
+                              onChange={(e) =>
+                                setPoItems((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, size: e.target.value } : it))
+                                )
+                              }
+                              className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold bg-white focus:outline-none"
+                            >
+                              {sizes.map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                              {!sizes.includes(item.size) && item.size && (
+                                <option value={item.size}>{item.size}</option>
+                              )}
+                            </select>
+                          </div>
+
+                          <div className="col-span-2">
+                            <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Warna / Desain</label>
+                            <select
+                              value={item.color}
+                              onChange={(e) =>
+                                setPoItems((prev) =>
+                                  prev.map((it, i) => (i === idx ? { ...it, color: e.target.value } : it))
+                                )
+                              }
+                              className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold bg-white focus:outline-none"
+                            >
+                              {colors.map((c) => (
+                                <option key={c} value={c}>
+                                  {c}
+                                </option>
+                              ))}
+                              {!colors.includes(item.color) && item.color && (
+                                <option value={item.color}>{item.color}</option>
+                              )}
+                            </select>
+                          </div>
+                        </>
                       )}
+
+                      {/* 1 VARIANT DROPDOWN: e.g. Pin Tas / Gantungan Kunci (1 jenis varian desain) */}
+                      {isOneVariant && (
+                        <div className="col-span-3">
+                          <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">
+                            {hasSize ? "Ukuran / Tipe" : "Varian / Desain"}
+                          </label>
+                          <select
+                            value={hasSize ? item.size : (item.color || item.size)}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setPoItems((prev) =>
+                                prev.map((it, i) =>
+                                  i === idx
+                                    ? hasSize
+                                      ? { ...it, size: val }
+                                      : { ...it, color: val, size: it.size || "All Size" }
+                                    : it
+                                )
+                              );
+                            }}
+                            className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold bg-white focus:outline-none"
+                          >
+                            {(hasSize ? sizes : colors).map((v) => (
+                              <option key={v} value={v}>
+                                {v}
+                              </option>
+                            ))}
+                            {!(hasSize ? sizes : colors).includes(hasSize ? item.size : item.color) && (item.size || item.color) && (
+                              <option value={hasSize ? item.size : item.color}>
+                                {hasSize ? item.size : item.color}
+                              </option>
+                            )}
+                          </select>
+                        </div>
+                      )}
+
+                      {/* 0 VARIANT: Standard / All Size */}
+                      {isNoVariant && (
+                        <div className="col-span-3">
+                          <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Varian</label>
+                          <input
+                            type="text"
+                            placeholder="All Size"
+                            value={item.size || "All Size"}
+                            onChange={(e) =>
+                              setPoItems((prev) =>
+                                prev.map((it, i) => (i === idx ? { ...it, size: e.target.value } : it))
+                              )
+                            }
+                            className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold bg-neutral-100/70 focus:outline-none"
+                          />
+                        </div>
+                      )}
+
+                      {/* Qty Input */}
+                      <div className="col-span-2">
+                        <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5 text-center">Qty</label>
+                        <input
+                          type="number"
+                          placeholder="Qty"
+                          value={item.quantity}
+                          onChange={(e) =>
+                            setPoItems((prev) =>
+                              prev.map((it, i) => (i === idx ? { ...it, quantity: Number(e.target.value) } : it))
+                            )
+                          }
+                          className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-black text-center focus:outline-none"
+                          min={1}
+                          required
+                        />
+                      </div>
+
+                      {/* Unit Cost Input */}
+                      <div className="col-span-2">
+                        <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5 text-right">Harga Satuan (Rp)</label>
+                        <input
+                          type="number"
+                          placeholder="Harga Satuan (Rp)"
+                          value={item.unit_cost}
+                          onChange={(e) =>
+                            setPoItems((prev) =>
+                              prev.map((it, i) => (i === idx ? { ...it, unit_cost: Number(e.target.value) } : it))
+                            )
+                          }
+                          className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold font-mono text-right focus:outline-none"
+                          required
+                        />
+                      </div>
+
+                      {/* Action Trash Button */}
+                      <div className="col-span-1 text-center pt-3.5">
+                        {poItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemovePoItemRow(idx)}
+                            className="p-1 text-rose-600 hover:text-rose-800 cursor-pointer"
+                            title="Hapus baris item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 mx-auto" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div>

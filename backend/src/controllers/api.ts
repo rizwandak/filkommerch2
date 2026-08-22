@@ -5362,61 +5362,276 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
       }
     }
 
+    // 1. Total Revenue from paid/settled orders
     const revRows = await query<any>(
       `SELECT COALESCE(SUM(COALESCE(o.gross_amount, o.subtotal, 0)), 0) as total_rev FROM orders o ${orderWhere}`,
       orderParams
     );
     const totalRevenue = Number(revRows[0]?.total_rev || 0);
 
-    let cogsWhere = "WHERE status != 'cancelled'";
-    const cogsParams: any[] = [];
-    if (batchFilter !== "all") {
-      // Option to filter POs by batch if PO vendor orders have batch/campaign or campaign_id reference
-    }
+    // 2. Fetch all active Vendor Orders and items (where status != 'cancelled')
+    const vendorPoRows = await query<any>(
+      `SELECT 
+        voi.*, 
+        vo.po_number, 
+        vo.status as po_status, 
+        vo.vendor_id, 
+        v.name as vendor_name, 
+        p.name as catalog_product_name,
+        p.vendor_cost as base_vendor_cost,
+        p.cost_price as base_cost_price
+       FROM vendor_order_items voi
+       JOIN vendor_orders vo ON voi.vendor_order_id = vo.id
+       LEFT JOIN vendors v ON vo.vendor_id = v.id
+       LEFT JOIN products p ON voi.product_id = p.id
+       WHERE vo.status != 'cancelled'`
+    );
 
+    // 3. Total COGS from all active Vendor Orders
     const cogsRows = await query<any>(
-      `SELECT COALESCE(SUM(total_cost), 0) as total_cogs FROM vendor_orders ${cogsWhere}`,
-      cogsParams
+      "SELECT COALESCE(SUM(total_cost), 0) as total_cogs FROM vendor_orders WHERE status != 'cancelled'"
     );
     const totalCogs = Number(cogsRows[0]?.total_cogs || 0);
 
     const grossMargin = totalRevenue - totalCogs;
     const marginPercent = totalRevenue > 0 ? Number(((grossMargin / totalRevenue) * 100).toFixed(1)) : 0;
 
-    // Per-product breakdown
-    const productRevRows = await query<any>(
+    // Build map of vendor PO items by product_id
+    const vendorPoMap: Record<number, {
+      total_po_qty: number;
+      total_po_cost: number;
+      vendors: Set<string>;
+      pos: Set<string>;
+      variants: Array<{
+        size: string;
+        color: string;
+        quantity: number;
+        unit_cost: number;
+        subtotal_cost: number;
+        vendor_name: string;
+        po_number: string;
+      }>;
+    }> = {};
+
+    for (const item of vendorPoRows) {
+      const pid = item.product_id || 0;
+      if (!vendorPoMap[pid]) {
+        vendorPoMap[pid] = {
+          total_po_qty: 0,
+          total_po_cost: 0,
+          vendors: new Set(),
+          pos: new Set(),
+          variants: [],
+        };
+      }
+      const qty = Number(item.quantity || 0);
+      const sub = Number(item.subtotal_cost || (item.unit_cost * qty) || 0);
+      vendorPoMap[pid].total_po_qty += qty;
+      vendorPoMap[pid].total_po_cost += sub;
+      if (item.vendor_name) vendorPoMap[pid].vendors.add(item.vendor_name);
+      if (item.po_number) vendorPoMap[pid].pos.add(item.po_number);
+      vendorPoMap[pid].variants.push({
+        size: item.size || "",
+        color: item.color || "",
+        quantity: qty,
+        unit_cost: Number(item.unit_cost || 0),
+        subtotal_cost: sub,
+        vendor_name: item.vendor_name || "",
+        po_number: item.po_number || "",
+      });
+    }
+
+    // 4. Fetch sales item rows
+    const salesItemRows = await query<any>(
       `SELECT 
-        oi.product_id,
+        oi.*,
+        oi.product_name as raw_product_name,
         COALESCE(p.name, oi.product_name) as product_name,
-        SUM(oi.quantity) as qty_sold,
-        SUM(oi.subtotal) as revenue,
-        COALESCE(p.vendor_cost, p.cost_price, 0) as unit_cogs
+        p.id as catalog_p_id,
+        p.product_type,
+        p.vendor_cost as base_vendor_cost,
+        p.cost_price as base_cost_price
        FROM order_items oi
        JOIN orders o ON oi.order_id = o.order_id
        LEFT JOIN products p ON oi.product_id = p.id
        ${orderWhere}
-       GROUP BY oi.product_id, product_name, p.vendor_cost, p.cost_price`,
+       ORDER BY product_name ASC`,
       orderParams
     );
 
-    const productBreakdown = productRevRows.map((r: any) => {
-      const rev = Number(r.revenue || 0);
-      const uCogs = Number(r.unit_cogs || 0);
-      const totCogs = uCogs * Number(r.qty_sold || 0);
-      const margin = rev - totCogs;
-      const mPct = rev > 0 ? Number(((margin / rev) * 100).toFixed(1)) : 0;
+    // Also get all products for fallback name matching
+    const allProducts = await query<any>("SELECT id, name, product_type, vendor_cost, cost_price FROM products");
+    const productsById: Record<number, any> = {};
+    const productsByName: Record<string, any> = {};
+    for (const p of allProducts) {
+      productsById[p.id] = p;
+      productsByName[p.name.trim().toLowerCase()] = p;
+    }
+
+    // Group sales by product
+    const productSalesMap: Record<number, {
+      product_id: number;
+      product_name: string;
+      qty_sold: number;
+      revenue: number;
+      base_vendor_cost: number;
+      variants_sold: Record<string, { size: string; color: string; qty: number; revenue: number }>;
+    }> = {};
+
+    for (const r of salesItemRows) {
+      let pId = r.product_id || r.catalog_p_id;
+      let cleanName = (r.product_name || r.raw_product_name || "")
+        .replace(/^\[KOMPONEN BUNDLE\]\s*/i, "")
+        .replace(/^Pelunasan\s*—\s*/i, "")
+        .replace(/\s*\(DP\s*50%\)/i, "")
+        .trim();
+
+      if (!pId && cleanName) {
+        const found = productsByName[cleanName.toLowerCase()];
+        if (found) pId = found.id;
+      }
+
+      if (!pId) pId = 0;
+
+      if (!productSalesMap[pId]) {
+        const matchedCatalog = productsById[pId];
+        productSalesMap[pId] = {
+          product_id: pId,
+          product_name: matchedCatalog?.name || cleanName || `Produk #${pId}`,
+          qty_sold: 0,
+          revenue: 0,
+          base_vendor_cost: Number(r.base_vendor_cost || r.base_cost_price || matchedCatalog?.vendor_cost || matchedCatalog?.cost_price || 0),
+          variants_sold: {},
+        };
+      }
+
+      const q = Number(r.quantity || 1);
+      const rev = Number(r.subtotal || (r.unit_price || r.price || 0) * q || 0);
+      productSalesMap[pId].qty_sold += q;
+      productSalesMap[pId].revenue += rev;
+
+      const varKey = [r.size, r.color]
+        .map((s) => (s || "").trim())
+        .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard" && s !== "Ukuran Tidak Diisi")
+        .join(" / ") || "Standard";
+
+      if (!productSalesMap[pId].variants_sold[varKey]) {
+        productSalesMap[pId].variants_sold[varKey] = {
+          size: r.size || "",
+          color: r.color || "",
+          qty: 0,
+          revenue: 0,
+        };
+      }
+      productSalesMap[pId].variants_sold[varKey].qty += q;
+      productSalesMap[pId].variants_sold[varKey].revenue += rev;
+    }
+
+    // Now gather all product IDs (from sales + from vendor POs)
+    const allPids = new Set<number>([
+      ...Object.keys(productSalesMap).map(Number),
+      ...Object.keys(vendorPoMap).map(Number),
+    ]);
+
+    const productBreakdown = Array.from(allPids).map((pid) => {
+      const sales = productSalesMap[pid];
+      const vendorData = vendorPoMap[pid];
+      const catalogP = productsById[pid];
+
+      const pName = sales?.product_name || catalogP?.name || (vendorData?.variants[0]?.size ? `Produk #${pid}` : `Produk #${pid}`);
+      const qtySold = sales?.qty_sold || 0;
+      const revenue = sales?.revenue || 0;
+
+      const poQty = vendorData?.total_po_qty || 0;
+      const poTotalCost = vendorData?.total_po_cost || 0;
+
+      // Unit COGS determination:
+      // Priority 1: Weighted average from Vendor PO items
+      // Priority 2: base vendor_cost / cost_price from product catalog
+      let unitCogs = 0;
+      if (vendorData && vendorData.total_po_qty > 0) {
+        unitCogs = Math.round(vendorData.total_po_cost / vendorData.total_po_qty);
+      } else if (sales?.base_vendor_cost) {
+        unitCogs = sales.base_vendor_cost;
+      } else if (catalogP?.vendor_cost || catalogP?.cost_price) {
+        unitCogs = Number(catalogP.vendor_cost || catalogP.cost_price || 0);
+      }
+
+      // Total COGS for this product:
+      // If there is vendor PO issued, use poTotalCost (or unitCogs * qtySold)
+      const totalCogsProd = poTotalCost > 0 ? poTotalCost : unitCogs * qtySold;
+      const margin = revenue - totalCogsProd;
+      const marginPct = revenue > 0 ? Number(((margin / revenue) * 100).toFixed(1)) : (totalCogsProd > 0 ? -100 : 0);
+
+      // Build structured variants list
+      const variantDetails: Array<{
+        variant: string;
+        size: string;
+        color: string;
+        qty_sold: number;
+        qty_po: number;
+        unit_cost: number;
+        subtotal_cost: number;
+      }> = [];
+
+      // Combine variant keys from both vendor PO and sales
+      const varKeyMap: Record<string, { size: string; color: string; qty_sold: number; qty_po: number; unit_cost: number }> = {};
+
+      if (vendorData?.variants) {
+        for (const v of vendorData.variants) {
+          const key = [v.size, v.color]
+            .map((s) => (s || "").trim())
+            .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard")
+            .join(" / ") || "Standard";
+
+          if (!varKeyMap[key]) {
+            varKeyMap[key] = { size: v.size, color: v.color, qty_sold: 0, qty_po: 0, unit_cost: v.unit_cost };
+          }
+          varKeyMap[key].qty_po += v.quantity;
+          if (v.unit_cost) varKeyMap[key].unit_cost = v.unit_cost;
+        }
+      }
+
+      if (sales?.variants_sold) {
+        for (const [key, v] of Object.entries(sales.variants_sold)) {
+          if (!varKeyMap[key]) {
+            varKeyMap[key] = { size: v.size, color: v.color, qty_sold: 0, qty_po: 0, unit_cost: unitCogs };
+          }
+          varKeyMap[key].qty_sold += v.qty;
+        }
+      }
+
+      for (const [vLabel, vData] of Object.entries(varKeyMap)) {
+        variantDetails.push({
+          variant: vLabel,
+          size: vData.size,
+          color: vData.color,
+          qty_sold: vData.qty_sold,
+          qty_po: vData.qty_po,
+          unit_cost: vData.unit_cost,
+          subtotal_cost: vData.unit_cost * (vData.qty_po || vData.qty_sold),
+        });
+      }
 
       return {
-        product_id: r.product_id,
-        product_name: r.product_name,
-        qty_sold: Number(r.qty_sold || 0),
-        revenue: rev,
-        unit_cogs: uCogs,
-        total_cogs: totCogs,
+        product_id: pid,
+        product_name: pName,
+        qty_sold: qtySold,
+        qty_po: poQty,
+        revenue,
+        unit_cogs: unitCogs,
+        total_cogs: totalCogsProd,
+        po_total_cost: poTotalCost,
         margin,
-        margin_percent: mPct,
+        margin_percent: marginPct,
+        vendor_names: Array.from(vendorData?.vendors || []),
+        po_numbers: Array.from(vendorData?.pos || []),
+        variants_detail: variantDetails,
       };
     });
+
+    // Sort by revenue descending
+    productBreakdown.sort((a, b) => b.revenue - a.revenue || b.qty_sold - a.qty_sold);
 
     return res.json({
       success: true,
