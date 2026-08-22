@@ -68,13 +68,14 @@ export function NotificationBell({ variant = "header" }: NotificationBellProps) 
           "x-user-id": String(user.id),
         },
       });
-      const data = await res.json();
-      if (data.success) {
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      if (data && data.success) {
         setNotifications(data.notifications || []);
         setUnreadCount(data.unreadCount || 0);
       }
     } catch (err) {
-      console.error("Failed to fetch notifications:", err);
+      // Silently catch network/JSON parse errors
     } finally {
       setLoading(false);
     }

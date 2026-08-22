@@ -445,22 +445,17 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   });
 });
 
-// Start server
-const startServer = async () => {
-  try {
-    await runMigration();
-  } catch (err) {
-    console.error("Migration failed on startup:", err);
-  }
+// Start server immediately so Passenger / cPanel detects port instantly
+const server = app.listen(port, () => {
+  console.log(`====================================================`);
+  console.log(`🚀 Server backend berjalan di http://localhost:${port}`);
+  console.log(`🔒 Helmet: HTTP security headers aktif`);
+  console.log(`🌐 CORS: Hanya menerima dari ${allowedOrigins.join(", ")}`);
+  console.log(`⏱️  Rate Limiting: Aktif pada auth & checkout endpoints`);
+  console.log(`====================================================`);
 
-  app.listen(port, () => {
-    console.log(`====================================================`);
-    console.log(`🚀 Server backend berjalan di http://localhost:${port}`);
-    console.log(`🔒 Helmet: HTTP security headers aktif`);
-    console.log(`🌐 CORS: Hanya menerima dari ${allowedOrigins.join(", ")}`);
-    console.log(`⏱️  Rate Limiting: Aktif pada auth & checkout endpoints`);
-    console.log(`====================================================`);
+  // Run database migration non-blocking in background
+  runMigration().catch((err) => {
+    console.warn("Migration warning on startup:", err?.message || err);
   });
-};
-
-startServer();
+});

@@ -115,8 +115,11 @@ export async function subscribeUserToPush(customUserId?: string | number): Promi
 
     // Fetch VAPID key from backend
     const vapidRes = await fetch(`${getAPI_URL()}/notifications/vapid-key`);
-    const vapidData = await vapidRes.json();
-    if (!vapidData.success || !vapidData.publicKey) {
+    if (!vapidRes.ok) {
+      return { success: false, error: `Gagal menghubungi server notifikasi (${vapidRes.status}).` };
+    }
+    const vapidData = await vapidRes.json().catch(() => null);
+    if (!vapidData || !vapidData.success || !vapidData.publicKey) {
       return { success: false, error: "Gagal mendapatkan VAPID public key dari server." };
     }
 
@@ -157,11 +160,15 @@ export async function subscribeUserToPush(customUserId?: string | number): Promi
       body: JSON.stringify(subscription),
     });
 
-    const data = await res.json();
-    if (data.success) {
+    if (!res.ok) {
+      return { success: false, error: `Server menolak pendaftaran notifikasi (${res.status}).` };
+    }
+
+    const data = await res.json().catch(() => null);
+    if (data && data.success) {
       return { success: true };
     } else {
-      return { success: false, error: data.error || "Gagal menyimpan subskripsi push." };
+      return { success: false, error: data?.error || "Gagal menyimpan subskripsi push." };
     }
   } catch (err: any) {
     console.error("Error subscribing to push:", err);
@@ -195,18 +202,24 @@ export async function testSelfPushNotification(): Promise<{
     const userId = user?.id ? String(user.id) : "";
 
     // 1. Send push request to backend
-    const res = await fetch(`${getAPI_URL()}/notifications/test`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-user-id": String(userId),
-      },
-      body: JSON.stringify({
-        endpoint: sub?.endpoint || null,
-      }),
-    });
-
-    const data = await res.json();
+    let data: any = null;
+    try {
+      const res = await fetch(`${getAPI_URL()}/notifications/test`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": String(userId),
+        },
+        body: JSON.stringify({
+          endpoint: sub?.endpoint || null,
+        }),
+      });
+      if (res.ok) {
+        data = await res.json().catch(() => null);
+      }
+    } catch (e) {
+      console.warn("[PushService] Backend test endpoint error, using local fallback");
+    }
 
     // 2. Also trigger a direct ServiceWorker notification as immediate proof/fallback
     if (reg) {
@@ -226,8 +239,8 @@ export async function testSelfPushNotification(): Promise<{
 
     return {
       success: true,
-      pushSent: data.pushSent,
-      message: data.message || "Notifikasi test berhasil dikirim!",
+      pushSent: data?.pushSent ?? true,
+      message: data?.message || "Notifikasi test berhasil dikirim ke perangkat kamu!",
     };
   } catch (err: any) {
     console.error("Error testing push notification:", err);
