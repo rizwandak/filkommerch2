@@ -5253,6 +5253,62 @@ export const createVendorOrder = async (req: Request, res: Response) => {
   }
 };
 
+// Update Vendor Order (PO / SPK)
+export const updateVendorOrder = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const { id } = req.params;
+    const { vendor_id, deadline, notes, status, items } = req.body;
+
+    if (!vendor_id || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: "Vendor ID dan minimal 1 item pesanan wajib diisi" });
+    }
+
+    await connection.beginTransaction();
+
+    let totalCost = 0;
+    for (const item of items) {
+      totalCost += (Number(item.unit_cost) || 0) * (Number(item.quantity) || 0);
+    }
+
+    const updateHeaderFields: string[] = ["vendor_id = ?", "total_cost = ?", "notes = ?", "deadline = ?"];
+    const updateHeaderParams: any[] = [vendor_id, totalCost, notes || null, deadline || null];
+
+    if (status) {
+      updateHeaderFields.push("status = ?");
+      updateHeaderParams.push(status);
+    }
+
+    updateHeaderParams.push(id);
+    await connection.execute(
+      `UPDATE vendor_orders SET ${updateHeaderFields.join(", ")} WHERE id = ?`,
+      updateHeaderParams
+    );
+
+    // Delete existing vendor_order_items and re-insert updated items
+    await connection.execute("DELETE FROM vendor_order_items WHERE vendor_order_id = ?", [id]);
+
+    for (const item of items) {
+      const uCost = Number(item.unit_cost) || 0;
+      const qty = Number(item.quantity) || 0;
+      const sub = uCost * qty;
+      await connection.query(
+        "INSERT INTO vendor_order_items (vendor_order_id, product_id, size, color, quantity, unit_cost, subtotal_cost, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [id, item.product_id, item.size || null, item.color || null, qty, uCost, sub, item.notes || null]
+      );
+    }
+
+    await connection.commit();
+    return res.json({ success: true, message: "Purchase Order / SPK Vendor berhasil diperbarui" });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error updating vendor order:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
 // Update Vendor Order Status
 export const updateVendorOrderStatus = async (req: Request, res: Response) => {
   try {

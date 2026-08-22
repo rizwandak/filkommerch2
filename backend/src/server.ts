@@ -415,6 +415,7 @@ app.delete("/api/admin/vendors/:id", checkRole(["admin"]), apiControllers.delete
 app.get("/api/admin/vendoring/summary", checkRole(["admin"]), apiControllers.getProductionSummary);
 app.get("/api/admin/vendoring/orders", checkRole(["admin"]), apiControllers.getVendorOrders);
 app.post("/api/admin/vendoring/orders", checkRole(["admin"]), apiControllers.createVendorOrder);
+app.put("/api/admin/vendoring/orders/:id", checkRole(["admin"]), apiControllers.updateVendorOrder);
 app.put("/api/admin/vendoring/orders/:id/status", checkRole(["admin"]), apiControllers.updateVendorOrderStatus);
 app.delete("/api/admin/vendoring/orders/:id", checkRole(["admin"]), apiControllers.deleteVendorOrder);
 app.get("/api/admin/vendoring/financials", checkRole(["admin"]), apiControllers.getFinancialOverview);

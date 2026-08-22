@@ -33,6 +33,7 @@ import {
   getProductionSummaryServerAction,
   getVendorOrdersServerAction,
   createVendorOrderServerAction,
+  updateVendorOrderServerAction,
   updateVendorOrderStatusServerAction,
   deleteVendorOrderServerAction,
   getFinancialOverviewServerAction,
@@ -65,6 +66,7 @@ function AdminVendoringPage() {
 
   // Vendor PO Modal State
   const [isPoModalOpen, setIsPoModalOpen] = useState(false);
+  const [editingPo, setEditingPo] = useState<VendorOrder | null>(null);
   const [selectedVendorId, setSelectedVendorId] = useState<number | "">("");
   const [poDeadline, setPoDeadline] = useState("");
   const [poNotes, setPoNotes] = useState("");
@@ -442,6 +444,23 @@ function AdminVendoringPage() {
     },
   });
 
+  const updatePoMutation = useMutation({
+    mutationFn: (data: any) => updateVendorOrderServerAction({ data }),
+    onSuccess: (res: any) => {
+      if (res?.success) {
+        toast.success("SPK / Purchase Order Vendor berhasil diperbarui!");
+        queryClient.invalidateQueries({ queryKey: ["adminVendorOrders"] });
+        queryClient.invalidateQueries({ queryKey: ["financialOverview"] });
+        closePoModal();
+      } else {
+        toast.error("Gagal update PO: " + (res?.error || ""));
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Terjadi kesalahan saat memperbarui PO");
+    },
+  });
+
   const updatePoStatusMutation = useMutation({
     mutationFn: ({ id, status }: { id: number; status: string }) =>
       updateVendorOrderStatusServerAction({ data: { id, status } }),
@@ -516,6 +535,7 @@ function AdminVendoringPage() {
   };
 
   const openCreatePoModal = () => {
+    setEditingPo(null);
     setSelectedVendorId("");
     setPoDeadline("");
     setPoNotes("");
@@ -531,8 +551,37 @@ function AdminVendoringPage() {
     setIsPoModalOpen(true);
   };
 
+  const openEditPoModal = (po: VendorOrder) => {
+    setEditingPo(po);
+    setSelectedVendorId(po.vendor_id);
+    setPoDeadline(po.deadline ? new Date(po.deadline).toISOString().split("T")[0] : "");
+    setPoNotes(po.notes || "");
+    const mappedItems = (po.items || []).map((it) => ({
+      product_id: it.product_id,
+      size: it.size || "",
+      color: it.color || "",
+      quantity: it.quantity,
+      unit_cost: it.unit_cost,
+    }));
+    setPoItems(
+      mappedItems.length > 0
+        ? mappedItems
+        : [
+            {
+              product_id: productsList[0]?.id || 1,
+              size: "All Size",
+              color: "",
+              quantity: 10,
+              unit_cost: (productsList[0] as any)?.cost_price || (productsList[0] as any)?.vendor_cost || 50000,
+            },
+          ]
+    );
+    setIsPoModalOpen(true);
+  };
+
   const closePoModal = () => {
     setIsPoModalOpen(false);
+    setEditingPo(null);
   };
 
   const handleAddPoItemRow = () => {
@@ -563,12 +612,22 @@ function AdminVendoringPage() {
       toast.error("Minimal harus ada 1 item pesanan");
       return;
     }
-    createPoMutation.mutate({
-      vendor_id: Number(selectedVendorId),
-      deadline: poDeadline || null,
-      notes: poNotes || null,
-      items: poItems,
-    });
+    if (editingPo) {
+      updatePoMutation.mutate({
+        id: editingPo.id,
+        vendor_id: Number(selectedVendorId),
+        deadline: poDeadline || null,
+        notes: poNotes || null,
+        items: poItems,
+      });
+    } else {
+      createPoMutation.mutate({
+        vendor_id: Number(selectedVendorId),
+        deadline: poDeadline || null,
+        notes: poNotes || null,
+        items: poItems,
+      });
+    }
   };
 
   const handleExportPoCSV = (po: VendorOrder) => {
@@ -918,6 +977,14 @@ function AdminVendoringPage() {
                       </select>
 
                       <button
+                        onClick={() => openEditPoModal(po)}
+                        className="px-3 py-1.5 bg-white text-ink border-2 border-ink rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-cream shadow-2xs cursor-pointer transition-all"
+                        title="Edit Rincian SPK / PO Vendor"
+                      >
+                        <Edit2 className="w-3.5 h-3.5 text-brand-blue" /> Edit SPK
+                      </button>
+
+                      <button
                         onClick={() => openSpkModal(po)}
                         className="px-3 py-1.5 bg-brand-orange text-cream border-2 border-ink rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-ink shadow-2xs cursor-pointer transition-all"
                         title="Cetak Surat Perintah Kerja (SPK) Vendor"
@@ -1195,8 +1262,13 @@ function AdminVendoringPage() {
       {isPoModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-xs overflow-y-auto">
           <div className="bg-background border-4 border-ink rounded-2xl w-full max-w-3xl my-8 p-6 space-y-4 shadow-[10px_10px_0px_0px_rgba(27,27,27,1)] relative max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-black text-ink uppercase tracking-wide border-b-2 border-ink pb-2">
-              Buat Purchase Order (PO) Vendor Baru
+            <h2 className="text-lg font-black text-ink uppercase tracking-wide border-b-2 border-ink pb-2 flex items-center justify-between">
+              <span>{editingPo ? `Edit Surat Perintah Kerja (SPK) — ${editingPo.po_number}` : "Buat Purchase Order (PO) Vendor Baru"}</span>
+              {editingPo && (
+                <span className="text-[10px] bg-brand-blue/10 text-brand-blue border border-brand-blue/30 px-2 py-0.5 rounded font-mono">
+                  MODE EDIT
+                </span>
+              )}
             </h2>
 
             <form onSubmit={handlePoSubmit} className="space-y-4 text-xs">
@@ -1345,10 +1417,12 @@ function AdminVendoringPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={createPoMutation.isPending}
+                  disabled={createPoMutation.isPending || updatePoMutation.isPending}
                   className="px-5 py-2 bg-brand-orange text-cream font-bold uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-ink cursor-pointer"
                 >
-                  {createPoMutation.isPending ? "Memuat..." : "Terbitkan PO Vendor"}
+                  {editingPo
+                    ? (updatePoMutation.isPending ? "Menyimpan Perubahan..." : "Simpan Perubahan SPK")
+                    : (createPoMutation.isPending ? "Menerbitkan..." : "Terbitkan PO Vendor")}
                 </button>
               </div>
             </form>
@@ -1437,6 +1511,17 @@ function AdminVendoringPage() {
                 </h2>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                    const currentPo = selectedSpkPo;
+                    closeSpkModal();
+                    if (currentPo) openEditPoModal(currentPo);
+                  }}
+                  className="px-3.5 py-2 bg-white text-ink font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-cream cursor-pointer transition-all flex items-center gap-1.5"
+                  title="Edit Data / Rincian SPK Ini"
+                >
+                  <Edit2 className="w-4 h-4 text-brand-blue" /> Edit SPK
+                </button>
                 <button
                   onClick={handleExportWordSpk}
                   className="px-3.5 py-2 bg-blue-600 text-white font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-ink cursor-pointer transition-all flex items-center gap-1.5"

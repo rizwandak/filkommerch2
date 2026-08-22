@@ -1939,6 +1939,24 @@ export const createVendorOrderServerAction = createServerFn({ method: "POST" })
     }
   });
 
+// Update Vendor Order (PO / SPK)
+export const updateVendorOrderServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number; vendor_id: number; deadline?: string | null; notes?: string | null; status?: string; items: any[] }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders/${data.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("updateVendorOrderServerAction error:", e);
+      return { success: false, error: e.message || "Failed to update vendor order" };
+    }
+  });
+
 // Update Vendor Order Status
 export const updateVendorOrderStatusServerAction = createServerFn({ method: "POST" })
   .validator((data: { id: number; status: string }) => data)
