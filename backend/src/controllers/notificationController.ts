@@ -471,3 +471,88 @@ export async function debugPushStatus(req: Request, res: Response) {
     return res.status(500).json({ success: false, error: err.message });
   }
 }
+
+/**
+ * User / Self Endpoint: Test sending a push notification to the current device/user
+ */
+export async function testPushNotification(req: Request, res: Response) {
+  try {
+    const pool = getPool();
+    const rawUserId = (req as any).user?.id || (req as any).headers["x-user-id"];
+    const parsedUserId = (rawUserId && !isNaN(Number(rawUserId)) && Number(rawUserId) > 0) ? Number(rawUserId) : null;
+    const { endpoint } = req.body || {};
+
+    const payload = {
+      title: "🔔 FILKOM Merch — Test Notifikasi Berhasil!",
+      body: "Keren! Push notifikasi di perangkatmu sudah aktif. Kamu akan mendapatkan info ketersediaan jaket PO, pembayaran QRIS, & update pesanan.",
+      icon: "/logo-fm.png",
+      badge: "/pwa-192x192.png",
+      url: "/orders",
+      data: {
+        type: "TEST_NOTIFICATION",
+        timestamp: Date.now(),
+      },
+    };
+
+    let pushSent = false;
+    let pushSentCount = 0;
+    let errorReason = "";
+
+    // 1. If endpoint is provided, try sending directly to this specific subscription endpoint
+    if (endpoint) {
+      const [subs] = await pool.query<any[]>(
+        "SELECT id, endpoint, p256dh, auth FROM push_subscriptions WHERE endpoint = ? LIMIT 1",
+        [endpoint]
+      );
+      if (subs && subs.length > 0) {
+        const sub = subs[0];
+        try {
+          const webPush = (await import("web-push")).default;
+          await webPush.sendNotification(
+            {
+              endpoint: sub.endpoint,
+              keys: { p256dh: sub.p256dh, auth: sub.auth },
+            },
+            JSON.stringify({
+              title: payload.title,
+              body: payload.body,
+              icon: payload.icon,
+              badge: payload.badge,
+              data: { url: payload.url, ...(payload.data || {}) },
+            })
+          );
+          pushSent = true;
+          pushSentCount++;
+        } catch (err: any) {
+          console.warn("[PushTest] Failed sending directly to endpoint:", err.message);
+          errorReason = err.message;
+        }
+      }
+    }
+
+    // 2. If not sent yet via endpoint, try sending via user_id
+    if (!pushSent && parsedUserId) {
+      const resUser = await sendPushToUser(pool, parsedUserId, payload);
+      if (resUser.success && resUser.sentCount > 0) {
+        pushSent = true;
+        pushSentCount = resUser.sentCount;
+      } else {
+        errorReason = resUser.reason || resUser.error || errorReason;
+      }
+    }
+
+    return res.json({
+      success: true,
+      pushSent,
+      sentCount: pushSentCount,
+      message: pushSent
+        ? "Push notifikasi berhasil dikirim ke perangkat kamu!"
+        : "Subskripsi perangkat belum terdaftar di database server. Pastikan tombol Izinkan/Allow sudah ditekan.",
+      reason: errorReason,
+    });
+  } catch (err: any) {
+    console.error("[NotificationController] testPushNotification error:", err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+}
+

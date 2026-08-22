@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getStoreSettings, getActivePreOrderCampaignServerAction } from "@/backend/server-actions";
 import { isPreOrderOpen } from "@/lib/pre-order-utils";
 import { VerificationModal } from "@frontend/components/VerificationModal";
+import { NotificationActivationModal } from "./NotificationActivationModal";
 import { toast } from "sonner";
 import {
   ShoppingBag,
@@ -23,6 +24,7 @@ import {
   LayoutDashboard,
   MonitorSmartphone,
   ArrowRight,
+  Bell,
 } from "lucide-react";
 
 import logo from "@/assets/logo-fm.jpg";
@@ -121,6 +123,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
+  const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [localQuery, setLocalQuery] = useState("");
 
   const displayQuery = searchQuery !== undefined ? searchQuery : localQuery;
@@ -461,6 +464,24 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                           <HackerModeToggle />
                         </div>
 
+                        {/* Notification Status & Test Hub */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsNotifModalOpen(true);
+                            setUserMenuOpen(false);
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-xs font-bold text-foreground hover:bg-secondary flex items-center justify-between border-b border-border transition-colors cursor-pointer"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Bell className="w-4 h-4 text-brand-orange" />
+                            Status Notifikasi Web
+                          </span>
+                          <span className="text-[9px] bg-brand-orange/15 text-brand-orange border border-brand-orange/30 px-1.5 py-0.5 rounded font-black">
+                            CEK 🔔
+                          </span>
+                        </button>
+
                         {user.type === "admin" && (
                           <Link
                             to="/admin/dashboard"
@@ -509,6 +530,25 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                           <span className="text-xs font-bold text-foreground">Mode Tampilan</span>
                           <HackerModeToggle />
                         </div>
+
+                        {/* Notification Status Hub for Guests */}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsNotifModalOpen(true);
+                            setUserMenuOpen(false);
+                          }}
+                          className="w-full px-4 py-2.5 text-left text-xs font-bold text-foreground hover:bg-secondary flex items-center justify-between border-b border-border transition-colors cursor-pointer"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Bell className="w-4 h-4 text-brand-orange" />
+                            Status Notifikasi Web
+                          </span>
+                          <span className="text-[9px] bg-brand-orange/15 text-brand-orange border border-brand-orange/30 px-1.5 py-0.5 rounded font-black">
+                            AKTIFKAN 🔔
+                          </span>
+                        </button>
+
                         <Link
                           to="/login"
                           className="block px-4 py-3 text-sm font-bold text-foreground hover:bg-secondary"
@@ -630,6 +670,22 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                             Pesanan Saya
                           </Link>
                           <button
+                            type="button"
+                            onClick={() => {
+                              setIsNotifModalOpen(true);
+                              setMobileToolsOpen(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-bold text-foreground bg-orange-50/70 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/60 rounded-lg border border-brand-orange/30 flex items-center justify-between cursor-pointer"
+                          >
+                            <span className="flex items-center gap-2">
+                              <Bell className="w-3.5 h-3.5 text-brand-orange" />
+                              Status Notifikasi Web
+                            </span>
+                            <span className="text-[9px] font-black text-brand-orange bg-white dark:bg-ink px-1.5 py-0.5 rounded border border-brand-orange/40">
+                              CEK 🔔
+                            </span>
+                          </button>
+                          <button
                             onClick={() => {
                               logout();
                               setMobileToolsOpen(false);
@@ -643,13 +699,32 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                         </div>
                       </div>
                     ) : (
-                      <Link
-                        to="/login"
-                        className="block w-full text-center py-2 text-xs font-extrabold text-cream bg-ink hover:bg-brand-orange hover:text-ink rounded-lg border border-ink transition-colors"
-                        onClick={() => setMobileToolsOpen(false)}
-                      >
-                        Sign In Akun UB
-                      </Link>
+                      <div className="space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsNotifModalOpen(true);
+                            setMobileToolsOpen(false);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-bold text-foreground bg-orange-50/70 dark:bg-orange-950/40 hover:bg-orange-100 dark:hover:bg-orange-900/60 rounded-lg border border-brand-orange/30 flex items-center justify-between cursor-pointer"
+                        >
+                          <span className="flex items-center gap-2">
+                            <Bell className="w-3.5 h-3.5 text-brand-orange" />
+                            Status Notifikasi Web
+                          </span>
+                          <span className="text-[9px] font-black text-brand-orange bg-white dark:bg-ink px-1.5 py-0.5 rounded border border-brand-orange/40">
+                            AKTIFKAN 🔔
+                          </span>
+                        </button>
+
+                        <Link
+                          to="/login"
+                          className="block w-full text-center py-2 text-xs font-extrabold text-cream bg-ink hover:bg-brand-orange hover:text-ink rounded-lg border border-ink transition-colors"
+                          onClick={() => setMobileToolsOpen(false)}
+                        >
+                          Sign In Akun UB
+                        </Link>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -878,6 +953,12 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
       <VerificationModal
         isOpen={isVerifyOpen}
         onClose={() => setIsVerifyOpen(false)}
+      />
+
+      {/* Web Push Notification Activation & Status Modal */}
+      <NotificationActivationModal
+        isOpen={isNotifModalOpen}
+        onClose={() => setIsNotifModalOpen(false)}
       />
 
       {/* Floating Notification Bell for Mobile */}

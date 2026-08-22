@@ -426,6 +426,7 @@ app.delete("/api/admin/import/orders/:campaignId", checkRole(["admin"]), apiCont
 // Notification API Routes
 app.get("/api/notifications/vapid-key", notificationControllers.getVapidKey);
 app.post("/api/notifications/subscribe", notificationControllers.subscribePush);
+app.post("/api/notifications/test", notificationControllers.testPushNotification);
 app.get("/api/notifications", notificationControllers.getUserNotifications);
 app.put("/api/notifications/:id/read", notificationControllers.markAsRead);
 app.post("/api/admin/notifications/send", checkRole(["admin", "cashier"]), notificationControllers.adminSendNotification);
