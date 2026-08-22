@@ -5609,10 +5609,25 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
       if (item.unit_cost) vendorPoMap[pid].variants[vKey].unit_cost = Number(item.unit_cost);
     }
 
+    // Find all linked LNS (pelunasan) orders to know which DP orders are already settled
+    const lnsOrderRows = await query<any>(
+      `SELECT o.order_id, o.notes FROM orders o WHERE (o.order_id LIKE 'LNS%' OR o.notes LIKE '%Pelunasan untuk Order:%') AND o.order_status NOT IN ('cancelled', 'cancel') AND (o.payment_status IN ('paid', 'settlement') OR o.order_status IN ('completed', 'settlement', 'capture'))`
+    );
+    const settledParentOrderIds = new Set<string>();
+    for (const l of lnsOrderRows) {
+      const match = l.notes && l.notes.match(/Pelunasan untuk Order:\s*([A-Za-z0-9-]+)/);
+      if (match && match[1]) settledParentOrderIds.add(match[1]);
+      const parts = (l.order_id || "").split("-");
+      if (parts.length >= 3) {
+        settledParentOrderIds.add(parts.slice(1, parts.length - 1).join("-"));
+      }
+    }
+
     // 5. Fetch sales item rows
     const salesItemRows = await query<any>(
       `SELECT 
         oi.*,
+        o.notes as order_notes,
         oi.product_name as raw_product_name,
         COALESCE(p.name, oi.product_name) as product_name,
         p.id as catalog_p_id,
@@ -5633,11 +5648,12 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
       product_name: string;
       qty_sold: number;
       revenue: number;
+      expected_revenue: number;
       base_vendor_cost: number;
-      variants_sold: Record<string, { size: string; color: string; qty: number; revenue: number }>;
+      variants_sold: Record<string, { size: string; color: string; qty: number; revenue: number; expected_revenue: number }>;
     }> = {};
 
-    const addSalesToProduct = (pId: number, rawName: string, size: string, color: string, qty: number, rev: number, baseCost: number) => {
+    const addSalesToProduct = (pId: number, rawName: string, size: string, color: string, qty: number, rev: number, expRev: number, baseCost: number) => {
       if (!pId) return;
       if (!productSalesMap[pId]) {
         const matchedCatalog = productsById[pId];
@@ -5647,6 +5663,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
           product_name: cleanName,
           qty_sold: 0,
           revenue: 0,
+          expected_revenue: 0,
           base_vendor_cost: Number(baseCost || matchedCatalog?.vendor_cost || matchedCatalog?.cost_price || 0),
           variants_sold: {},
         };
@@ -5654,6 +5671,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
 
       productSalesMap[pId].qty_sold += qty;
       productSalesMap[pId].revenue += rev;
+      productSalesMap[pId].expected_revenue += expRev;
 
       const varKey = cleanVariantKey(size, color);
       if (!productSalesMap[pId].variants_sold[varKey]) {
@@ -5662,11 +5680,15 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
           color: color || "",
           qty: 0,
           revenue: 0,
+          expected_revenue: 0,
         };
       }
       productSalesMap[pId].variants_sold[varKey].qty += qty;
       productSalesMap[pId].variants_sold[varKey].revenue += rev;
+      productSalesMap[pId].variants_sold[varKey].expected_revenue += expRev;
     };
+
+    let totalExpectedRemaining = 0;
 
     // Process sales rows with bundle dissolution
     for (const r of salesItemRows) {
@@ -5681,6 +5703,24 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
 
       const q = Number(r.quantity || 1);
       const rev = Number(r.subtotal || (r.unit_price || r.price || 0) * q || 0);
+
+      // Check if this is an unsettled DP item
+      const isDp = String(r.color || "").toUpperCase().includes("DP") ||
+                   String(r.size || "").toUpperCase().includes("DP") ||
+                   String(rawName).toUpperCase().includes("DP 50%") ||
+                   String(r.order_notes || "").toUpperCase().includes("DP");
+
+      const isLunas = String(r.color || "").toUpperCase().includes("LUNAS") ||
+                      String(r.size || "").toUpperCase().includes("LUNAS") ||
+                      String(rawName).toUpperCase().includes("LUNAS") ||
+                      String(r.order_id || "").startsWith("LNS");
+
+      let remainingDp = 0;
+      if (isDp && !isLunas && !settledParentOrderIds.has(r.order_id)) {
+        remainingDp = rev; // DP 50%, remaining expected is equal to DP amount
+        totalExpectedRemaining += remainingDp;
+      }
+      const expRev = rev + remainingDp;
 
       // If this row is a bundle container (e.g. "Brand New Days Pack" or "Starter Pack")
       if (bundleProductIds.has(pId) || r.product_type === "bundle") {
@@ -5702,8 +5742,10 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
           );
           if (orderComponentRows.length > 0 && rev > 0) {
             const revenuePerComp = Math.round(rev / orderComponentRows.length);
+            const expRevPerComp = Math.round(expRev / orderComponentRows.length);
             for (const cr of orderComponentRows) {
               cr.subtotal = (Number(cr.subtotal) || 0) + revenuePerComp;
+              cr.expected_subtotal = (Number(cr.expected_subtotal) || 0) + expRevPerComp;
             }
           }
           // Do not add the bundle container row itself
@@ -5713,6 +5755,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
           const comps = bundleComponentsMap[pId];
           if (comps && comps.length > 0) {
             const revPerComp = Math.round(rev / comps.length);
+            const expRevPerComp = Math.round(expRev / comps.length);
             for (const comp of comps) {
               const compP = productsById[comp.component_product_id];
               const compQty = q * comp.comp_qty;
@@ -5723,6 +5766,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
                 r.color,
                 compQty,
                 revPerComp,
+                expRevPerComp,
                 Number(compP?.vendor_cost || compP?.cost_price || 0)
               );
             }
@@ -5739,6 +5783,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
         r.color,
         q,
         rev,
+        expRev,
         Number(r.base_vendor_cost || r.base_cost_price || 0)
       );
     }
@@ -5760,6 +5805,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
         const pName = cleanProductName(rawName);
         const qtySold = sales?.qty_sold || 0;
         const revenue = sales?.revenue || 0;
+        const expectedRevenueProd = sales?.expected_revenue || revenue;
 
         const poQty = vendorData?.total_po_qty || 0;
         const poTotalCost = vendorData?.total_po_cost || 0;
@@ -5769,6 +5815,9 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
         const totalCogsProd = paidCogsProd;
         const margin = revenue - totalCogsProd;
         const marginPct = revenue > 0 ? Number(((margin / revenue) * 100).toFixed(1)) : (totalCogsProd > 0 ? -100 : 0);
+
+        const expMargin = expectedRevenueProd - poTotalCost;
+        const expMarginPct = expectedRevenueProd > 0 ? Number(((expMargin / expectedRevenueProd) * 100).toFixed(1)) : 0;
 
         // Unit COGS determination based on contract or paid
         let unitCogs = 0;
@@ -5846,12 +5895,15 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
           qty_sold: qtySold,
           qty_po: poQty,
           revenue,
+          expected_revenue: expectedRevenueProd,
           unit_cogs: unitCogs,
           total_cogs: totalCogsProd,
           po_total_cost: poTotalCost,
           paid_cogs: paidCogsProd,
           margin,
           margin_percent: marginPct,
+          expected_margin: expMargin,
+          expected_margin_percent: expMarginPct,
           vendor_names: Array.from(vendorData?.vendors || []),
           po_numbers: Array.from(vendorData?.pos || []),
           variants_detail: variantDetails,
@@ -5861,15 +5913,35 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
     // Sort by revenue descending
     productBreakdown.sort((a, b) => b.revenue - a.revenue || b.qty_sold - a.qty_sold);
 
+    const expectedRevenue = totalRevenue + totalExpectedRemaining;
+    const realCashMargin = totalRevenue - totalPaidCogs;
+    const realCashMarginPercent = totalRevenue > 0 ? Number(((realCashMargin / totalRevenue) * 100).toFixed(1)) : 0;
+    const netCashMarginVsPO = totalRevenue - totalCommittedCogs;
+    const expectedMargin = expectedRevenue - totalCommittedCogs;
+    const expectedMarginPercent = expectedRevenue > 0 ? Number(((expectedMargin / expectedRevenue) * 100).toFixed(1)) : 0;
+
     return res.json({
       success: true,
       data: {
+        // 1. Total revenue asli sekarang
         totalRevenue,
-        totalCogs: totalPaidCogs,
-        totalPaidCogs,
+        // 2. Total revenue expected jika lunas semua
+        expectedRevenue,
+        unsettledDpRemaining: totalExpectedRemaining,
+        // 3. Total COGS ke vendor (Kontrak PO)
         totalCommittedCogs,
-        grossMargin,
-        marginPercent,
+        // 4. Total yang sudah dibayarkan/ditransfer ke vendor
+        totalPaidCogs,
+        totalCogs: totalPaidCogs,
+        // 5. Total margin real sekarang
+        realCashMargin,
+        realCashMarginPercent,
+        grossMargin: realCashMargin,
+        marginPercent: realCashMarginPercent,
+        netCashMarginVsPO,
+        // 6. Total margin expected jika lunas semua
+        expectedMargin,
+        expectedMarginPercent,
         productBreakdown,
       },
     });

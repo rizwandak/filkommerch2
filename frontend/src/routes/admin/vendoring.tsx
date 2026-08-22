@@ -1337,39 +1337,120 @@ function AdminVendoringPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* 4 Summary Stat Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-orange-50/70 border-2 border-brand-orange p-5 rounded-2xl space-y-1 shadow-[3px_3px_0px_0px_rgba(234,88,12,0.4)]">
-                  <span className="text-[10px] font-black uppercase text-brand-orange">TOTAL REVENUE (OMSET)</span>
-                  <div className="text-2xl font-black text-ink">
+              {/* 6 Comprehensive Financial Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* 1. Total Revenue Asli Sekarang */}
+                <div className="bg-orange-50/80 border-2 border-brand-orange p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(234,88,12,0.4)] relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-brand-orange tracking-wider">
+                      1. TOTAL REVENUE SEKARANG
+                    </span>
+                    <span className="text-[9px] font-extrabold bg-amber-200/60 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
+                      Kas Masuk
+                    </span>
+                  </div>
+                  <div className="text-2xl font-black text-ink font-mono">
                     Rp {Number(financialData?.totalRevenue || 0).toLocaleString("id-ID")}
                   </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">Dari transaksi pesanan terbayar</p>
+                  <p className="text-[10px] text-muted-foreground font-medium">
+                    Uang riil yang sudah masuk dari transaksi pelanggan (DP + Lunas)
+                  </p>
                 </div>
 
-                <div className="bg-rose-50/70 border-2 border-rose-600 p-5 rounded-2xl space-y-1 shadow-[3px_3px_0px_0px_rgba(225,29,72,0.4)]">
-                  <span className="text-[10px] font-black uppercase text-rose-700">REALIZED COGS (KAS KELUAR VENDOR)</span>
-                  <div className="text-2xl font-black text-ink">
-                    Rp {Number(financialData?.totalPaidCogs || financialData?.totalCogs || 0).toLocaleString("id-ID")}
+                {/* 2. Total Revenue Expected Jika Lunas Semua */}
+                <div className="bg-blue-50/80 border-2 border-blue-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(37,99,235,0.4)] relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-blue-800 tracking-wider">
+                      2. EXPECTED REVENUE (LUNAS 100%)
+                    </span>
+                    <span className="text-[9px] font-extrabold bg-blue-200/60 text-blue-900 px-1.5 py-0.5 rounded border border-blue-300">
+                      Proyeksi Omset
+                    </span>
                   </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">Total uang yang sudah ditransfer ke vendor</p>
+                  <div className="text-2xl font-black text-blue-950 font-mono">
+                    Rp {Number(financialData?.expectedRevenue || financialData?.totalRevenue || 0).toLocaleString("id-ID")}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-medium flex items-center justify-between">
+                    <span>Termasuk sisa pelunasan DP:</span>
+                    <b className="text-blue-700 font-mono">+Rp {Number(financialData?.unsettledDpRemaining || 0).toLocaleString("id-ID")}</b>
+                  </p>
                 </div>
 
-                <div className="bg-purple-50/70 border-2 border-purple-600 p-5 rounded-2xl space-y-1 shadow-[3px_3px_0px_0px_rgba(147,51,234,0.4)]">
-                  <span className="text-[10px] font-black uppercase text-purple-800">TOTAL KONTRAK PO VENDOR</span>
-                  <div className="text-2xl font-black text-ink">
+                {/* 3. Total COGS ke Vendor (Kontrak PO) */}
+                <div className="bg-purple-50/80 border-2 border-purple-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(147,51,234,0.4)] relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-purple-800 tracking-wider">
+                      3. TOTAL COGS VENDOR (KONTRAK PO)
+                    </span>
+                    <span className="text-[9px] font-extrabold bg-purple-200/60 text-purple-900 px-1.5 py-0.5 rounded border border-purple-300">
+                      Total Kewajiban
+                    </span>
+                  </div>
+                  <div className="text-2xl font-black text-ink font-mono">
                     Rp {Number(financialData?.totalCommittedCogs || 0).toLocaleString("id-ID")}
                   </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">Total komitmen kontrak seluruh PO aktif</p>
+                  <p className="text-[10px] text-muted-foreground font-medium">
+                    Total nilai seluruh SPK/PO vendor yang diterbitkan
+                  </p>
                 </div>
 
-                <div className="bg-emerald-50/70 border-2 border-emerald-600 p-5 rounded-2xl space-y-1 shadow-[3px_3px_0px_0px_rgba(16,185,129,0.4)]">
-                  <span className="text-[10px] font-black uppercase text-emerald-800">GROSS MARGIN (LABA RIIL)</span>
-                  <div className="text-2xl font-black text-ink">
-                    Rp {Number(financialData?.grossMargin || 0).toLocaleString("id-ID")}
+                {/* 4. Total yang Sudah Ditransfer ke Vendor */}
+                <div className="bg-rose-50/80 border-2 border-rose-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(225,29,72,0.4)] relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-rose-700 tracking-wider">
+                      4. SUDAH DITRANSFER KE VENDOR
+                    </span>
+                    <span className="text-[9px] font-extrabold bg-rose-200/60 text-rose-900 px-1.5 py-0.5 rounded border border-rose-300">
+                      Kas Keluar Riil
+                    </span>
+                  </div>
+                  <div className="text-2xl font-black text-rose-900 font-mono">
+                    Rp {Number(financialData?.totalPaidCogs || 0).toLocaleString("id-ID")}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-medium flex items-center justify-between">
+                    <span>Sisa hutang PO vendor:</span>
+                    <b className="text-rose-700 font-mono">
+                      Rp {Math.max(0, Number(financialData?.totalCommittedCogs || 0) - Number(financialData?.totalPaidCogs || 0)).toLocaleString("id-ID")}
+                    </b>
+                  </p>
+                </div>
+
+                {/* 5. Total Margin Real Sekarang */}
+                <div className="bg-emerald-50/80 border-2 border-emerald-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(16,185,129,0.4)] relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider">
+                      5. MARGIN REAL SEKARANG (KAS)
+                    </span>
+                    <span className="text-[9px] font-extrabold bg-emerald-200/70 text-emerald-900 px-1.5 py-0.5 rounded border border-emerald-300">
+                      {financialData?.realCashMarginPercent ?? financialData?.marginPercent ?? 0}%
+                    </span>
+                  </div>
+                  <div className={`text-2xl font-black font-mono ${(financialData?.realCashMargin ?? financialData?.grossMargin ?? 0) >= 0 ? "text-emerald-800" : "text-rose-700"}`}>
+                    Rp {Number(financialData?.realCashMargin ?? financialData?.grossMargin ?? 0).toLocaleString("id-ID")}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground font-medium flex items-center justify-between">
+                    <span>Net vs Total Kontrak PO:</span>
+                    <b className={`font-mono ${(financialData?.netCashMarginVsPO ?? 0) >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                      Rp {Number(financialData?.netCashMarginVsPO || 0).toLocaleString("id-ID")}
+                    </b>
+                  </p>
+                </div>
+
+                {/* 6. Total Margin Expected Jika Lunas Semua */}
+                <div className="bg-teal-50/80 border-2 border-teal-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(13,148,136,0.4)] relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-teal-800 tracking-wider">
+                      6. EXPECTED MARGIN (LUNAS SEMUA)
+                    </span>
+                    <span className="text-[9px] font-extrabold bg-teal-200/70 text-teal-900 px-1.5 py-0.5 rounded border border-teal-300">
+                      {financialData?.expectedMarginPercent || 0}%
+                    </span>
+                  </div>
+                  <div className={`text-2xl font-black font-mono ${(financialData?.expectedMargin || 0) >= 0 ? "text-teal-900" : "text-rose-700"}`}>
+                    Rp {Number(financialData?.expectedMargin || 0).toLocaleString("id-ID")}
                   </div>
                   <p className="text-[10px] text-muted-foreground font-medium">
-                    Omset dikurangi Kas Keluar ({financialData?.marginPercent || 0}%)
+                    Proyeksi Laba Bersih Akhir (Revenue Expected - Total Kontrak PO)
                   </p>
                 </div>
               </div>
@@ -1383,7 +1464,7 @@ function AdminVendoringPage() {
                       Rincian Revenue &amp; Margin Per Produk
                     </h4>
                     <p className="text-[11px] text-muted-foreground font-medium">
-                      Laporan terpadu penjualan produk, realisasi kas keluar vendor, dan komitmen kontrak PO.
+                      Laporan terpadu penjualan produk, realisasi kas masuk vs kas keluar, dan proyeksi margin jika lunas semua.
                     </p>
                   </div>
                 </div>
@@ -1394,11 +1475,11 @@ function AdminVendoringPage() {
                       <tr className="bg-cream border-b-2 border-ink text-ink font-extrabold uppercase">
                         <th className="p-3">Nama Produk &amp; Detail Varian</th>
                         <th className="p-3 text-center">Qty Terjual / PO</th>
-                        <th className="p-3 text-right">Revenue (Omset)</th>
+                        <th className="p-3 text-right">Revenue Saat Ini (vs Expected)</th>
                         <th className="p-3 text-right">HPP PO Satuan</th>
-                        <th className="p-3 text-right">COGS Terbayar (Kas Keluar)</th>
-                        <th className="p-3 text-right font-black">Gross Margin (Rp)</th>
-                        <th className="p-3 text-right font-black">Margin %</th>
+                        <th className="p-3 text-right">COGS Ditransfer (vs Kontrak PO)</th>
+                        <th className="p-3 text-right font-black">Margin Kas (vs Expected)</th>
+                        <th className="p-3 text-right font-black">Margin Expected %</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-ink/10">
@@ -1502,6 +1583,11 @@ function AdminVendoringPage() {
                                 <div className="font-black text-xs text-ink">
                                   Rp {Number(row.revenue).toLocaleString("id-ID")}
                                 </div>
+                                {row.expected_revenue && row.expected_revenue !== row.revenue && (
+                                  <div className="text-[9px] text-blue-700 font-bold">
+                                    Exp: Rp {Number(row.expected_revenue).toLocaleString("id-ID")}
+                                  </div>
+                                )}
                               </td>
 
                               <td className="p-3.5 text-right font-mono">
@@ -1517,7 +1603,7 @@ function AdminVendoringPage() {
 
                               <td className="p-3.5 text-right font-mono">
                                 <div className="font-black text-xs text-rose-700">
-                                  Rp {Number(row.total_cogs || row.paid_cogs || 0).toLocaleString("id-ID")}
+                                  Rp {Number(row.paid_cogs || row.total_cogs || 0).toLocaleString("id-ID")}
                                 </div>
                                 {row.po_total_cost > 0 && (
                                   <div className="text-[9px] text-muted-foreground font-semibold">
@@ -1526,19 +1612,28 @@ function AdminVendoringPage() {
                                 )}
                               </td>
 
-                              <td className={`p-3.5 text-right font-mono font-black text-xs ${row.margin >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                                Rp {Number(row.margin).toLocaleString("id-ID")}
+                              <td className="p-3.5 text-right font-mono">
+                                <div className={`font-black text-xs ${row.margin >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
+                                  Rp {Number(row.margin).toLocaleString("id-ID")}
+                                </div>
+                                {row.expected_margin !== undefined && (
+                                  <div className={`text-[9px] font-bold ${row.expected_margin >= 0 ? "text-teal-700" : "text-rose-600"}`}>
+                                    Exp: Rp {Number(row.expected_margin).toLocaleString("id-ID")}
+                                  </div>
+                                )}
                               </td>
 
                               <td className="p-3.5 text-right">
                                 <span
                                   className={`inline-block px-2 py-1 rounded-md font-black text-[11px] font-mono border ${
-                                    row.margin_percent >= 0
-                                      ? "bg-emerald-100 text-emerald-800 border-emerald-300"
+                                    (row.expected_margin_percent ?? row.margin_percent) >= 0
+                                      ? "bg-teal-100 text-teal-900 border-teal-300"
                                       : "bg-rose-100 text-rose-800 border-rose-300"
                                   }`}
                                 >
-                                  {row.margin_percent > 0 ? `+${row.margin_percent}%` : `${row.margin_percent}%`}
+                                  {(row.expected_margin_percent ?? row.margin_percent) > 0
+                                    ? `+${row.expected_margin_percent ?? row.margin_percent}%`
+                                    : `${row.expected_margin_percent ?? row.margin_percent}%`}
                                 </span>
                               </td>
                             </tr>
