@@ -197,8 +197,9 @@ class BluetoothThermalPrinter {
       await this.setStyle("large");
       await this.printLine(data.store_name);
       await this.setStyle("normal");
-      await this.printLine("RECEIPT");
-      await this.printLine(`ID: ${data.sale_id}`);
+      await this.printLine("Universitas Brawijaya");
+      await this.printLine("Gedung A FILKOM UB Malang");
+      await this.printLine(`No: ${data.sale_id}`);
       await this.printLine(`${data.date} ${data.time}`);
       await this.printSeparator();
 
@@ -230,8 +231,7 @@ class BluetoothThermalPrinter {
 
       await this.printSeparator();
 
-      // Payment info
-      await this.printLine(`Payment: ${data.payment_method}`);
+      // Customer info
       await this.printLine(`Cashier: ${data.cashier_name}`);
       if (data.customer_name) {
         await this.printLine(`Customer: ${data.customer_name}`);
@@ -240,8 +240,10 @@ class BluetoothThermalPrinter {
       // Footer
       await this.printLine("");
       await this.setAlignment(1);
-      await this.printLine("Thank you for your purchase!");
-      await this.printLine("Terima kasih atas pembelian Anda");
+      await this.printLine("Terima kasih telah membeli!");
+      await this.printLine("Wear Your Faculty.");
+      await this.printLine("web: filkommerch.com");
+      await this.printLine("IG/TikTok: @filkommerchub");
 
       // Finish
       await this.printLine("\n\n\n");

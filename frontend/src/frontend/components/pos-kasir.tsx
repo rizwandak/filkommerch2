@@ -44,6 +44,7 @@ import {
   getUsersAdmin,
 } from "@backend/server-actions";
 import { bluetoothPrinter, type ReceiptData } from "@frontend/lib/bluetooth-printer";
+import { cleanProductName, cleanVariantPart } from "@frontend/lib/receipt-printer";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logoFM from "@/assets/logo-fm.jpg";
 
@@ -751,12 +752,18 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
           sale_id: result.sale_id!,
           date: new Date().toLocaleDateString("id-ID"),
           time: new Date().toLocaleTimeString("id-ID"),
-          items: cart.map((item) => ({
-            name: item.product_name,
-            qty: item.quantity,
-            price: item.unit_price,
-            subtotal: item.unit_price * item.quantity,
-          })),
+          items: cart.map((item) => {
+            const cleanName = cleanProductName(item.product_name);
+            const variantParts = [cleanVariantPart(item.size), cleanVariantPart(item.color)].filter(Boolean);
+            const variantInfo = variantParts.join(" / ");
+            const displayName = variantInfo ? `${cleanName} (${variantInfo})` : cleanName;
+            return {
+              name: displayName,
+              qty: item.quantity,
+              price: item.unit_price,
+              subtotal: item.unit_price * item.quantity,
+            };
+          }),
           subtotal,
           discount,
           tax: 0,
@@ -1455,16 +1462,19 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     <img
                       src={logoFilkom}
                       alt="Logo FILKOM"
-                      className="w-11 h-auto grayscale filter brightness-100 contrast-100"
+                      className="w-10 h-auto grayscale filter brightness-100 contrast-100"
                     />
                     <img
                       src={logoFM}
                       alt="Logo FM"
-                      className="w-11 h-auto grayscale filter brightness-100 contrast-100"
+                      className="w-10 h-auto grayscale filter brightness-100 contrast-100"
                     />
                   </div>
-                  <div className="text-[10px]">FILKOM MERCH</div>
-                  <div className="text-[9px] font-normal">Universitas Brawijaya</div>
+                  <div className="text-[11px] font-bold tracking-wider">FILKOM MERCH</div>
+                  <div className="text-[8.5px] font-semibold text-black">Universitas Brawijaya</div>
+                  <div className="text-[7.5px] font-normal leading-tight text-gray-700 mt-1 max-w-[240px]">
+                    Gedung A Fakultas Ilmu Komputer UB, Ketawanggede, Kec. Lowokwaru, Kota Malang, Jawa Timur 65113
+                  </div>
                 </div>
 
                 <div className="border-t border-dashed border-black my-2"></div>
@@ -1478,7 +1488,6 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   {currentReceiptData.customer_name && (
                     <div>Pelanggan: {currentReceiptData.customer_name}</div>
                   )}
-                  <div>Bayar: {currentReceiptData.payment_method}</div>
                 </div>
 
                 <div className="border-t border-dashed border-black my-2"></div>
@@ -1518,10 +1527,14 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
 
                 <div className="border-t border-dashed border-black my-2"></div>
 
-                <div className="text-center text-[9px] space-y-0.5">
-                  <div>Terima kasih telah membeli!</div>
+                <div className="text-center text-[9px] space-y-1">
+                  <div className="font-bold">Terima kasih telah membeli!</div>
                   <div className="text-[8px] italic font-normal text-gray-500">
                     Wear Your Faculty.
+                  </div>
+                  <div className="text-[7.5px] text-gray-600 font-normal leading-tight pt-1">
+                    <div>filkommerch.com</div>
+                    <div>IG & TikTok: @filkommerchub</div>
                   </div>
                 </div>
               </div>

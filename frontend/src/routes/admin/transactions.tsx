@@ -50,9 +50,18 @@ import {
   RotateCcw,
   Megaphone,
   FileText,
+  Printer,
 } from "lucide-react";
+import logoFilkom from "@/assets/logo_filkom.png";
+import logoFM from "@/assets/logo-fm.jpg";
+import {
+  formatTransactionToReceiptData,
+  printBrowserReceipt,
+  type ReceiptData,
+} from "@frontend/lib/receipt-printer";
 import { BroadcastNotificationModal } from "@/components/BroadcastNotificationModal";
 import { SentNotificationsHistoryModal } from "@/components/SentNotificationsHistoryModal";
+import { LiveCameraCapture } from "@/components/LiveCameraCapture";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -314,6 +323,95 @@ function AdminTransactionsPage() {
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [zoomMedia, setZoomMedia] = useState<{ url: string, type: string } | null>(null);
+
+  // Receipt Modal States
+  const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+  const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
+
+  const handleOpenReceiptModal = () => {
+    if (!managedTransaction) return;
+    const cashierDisplayName = isCashier
+      ? (user?.name || "Kasir")
+      : (managedTransaction.cashier_name || user?.name || "Admin");
+    const data = formatTransactionToReceiptData(managedTransaction, managedItems, cashierDisplayName);
+    setReceiptData(data);
+    setReceiptModalOpen(true);
+  };
+
+  // Quick Complete / Pickup States & Handlers (Solusi 2)
+  const [quickCompleteOpen, setQuickCompleteOpen] = useState(false);
+  const [quickCompleteOrder, setQuickCompleteOrder] = useState<any>(null);
+  const [quickCompleteProof, setQuickCompleteProof] = useState<string>("");
+  const [uploadingQuickProof, setUploadingQuickProof] = useState(false);
+  const [savingQuickComplete, setSavingQuickComplete] = useState(false);
+
+  const handleOpenQuickComplete = (order: any) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah status transaksi.");
+      return;
+    }
+    setQuickCompleteOrder(order);
+    setQuickCompleteProof(order.fulfillment_proof_url || "");
+    setQuickCompleteOpen(true);
+  };
+
+  const handleUploadQuickProofFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingQuickProof(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`${API_BASE_URL}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.url || data.path) {
+        setQuickCompleteProof(data.url || data.path);
+        toast.success("Foto bukti serah terima berhasil diunggah");
+      } else {
+        toast.error(data.error || "Gagal mengunggah file");
+      }
+    } catch {
+      toast.error("Gagal mengunggah foto bukti");
+    } finally {
+      setUploadingQuickProof(false);
+    }
+  };
+
+  const handleConfirmQuickComplete = async () => {
+    if (!quickCompleteOrder) return;
+    if (!quickCompleteProof) {
+      toast.error("Wajib mengunggah foto bukti serah terima / pengambilan barang!");
+      return;
+    }
+    setSavingQuickComplete(true);
+    try {
+      const result = await updateOrderStatus({
+        data: {
+          id: quickCompleteOrder.order_id,
+          status: "completed",
+          shipping_address: quickCompleteOrder.shipping_address || "Ambil di FILKOM Merch (gratis)",
+          fulfillment_type: quickCompleteOrder.fulfillment_type || "pickup",
+          fulfillment_proof_url: quickCompleteProof,
+        },
+      });
+      if (result.success) {
+        toast.success(`Pesanan #${quickCompleteOrder.order_id} berhasil diselesaikan (sudah diambil)!`);
+        await loadTransactions();
+        setQuickCompleteOpen(false);
+        setQuickCompleteOrder(null);
+        setQuickCompleteProof("");
+      } else {
+        toast.error(result.error || "Gagal menyelesaikan pesanan");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan saat menyelesaikan pesanan");
+    } finally {
+      setSavingQuickComplete(false);
+    }
+  };
 
   const getAdminRequestHeaders = () => {
     const role = user?.type === "admin" ? user.role : undefined;
@@ -595,6 +693,12 @@ function AdminTransactionsPage() {
       return;
     }
     if (!managedTransaction || !managedStatus) return;
+
+    if (managedStatus === "completed" && !managedFulfillmentProof) {
+      toast.error("Wajib mengunggah foto bukti serah terima / pengambilan barang sebelum menyelesaikan pesanan!");
+      return;
+    }
+
     setSavingManaged(true);
     try {
       const finalAddress =
@@ -1878,14 +1982,31 @@ function AdminTransactionsPage() {
                                                   </span>
                                                 );
                                               })()}
-                                              <Button
-                                                variant="outline"
-                                                size="sm"
-                                                className="h-8 text-xs font-black border-2 border-ink bg-white hover:bg-cream"
-                                                onClick={() => void handleOpenManagement(subOrder.order_id, "online")}
-                                              >
-                                                Kelola
-                                              </Button>
+                                              <div className="flex items-center gap-1.5">
+                                                 {subOrder.order_status !== "completed" &&
+                                                   subOrder.order_status !== "cancelled" &&
+                                                   subOrder.order_status !== "cancel" &&
+                                                   subOrder.order_status !== "expire" &&
+                                                   !isCashier && (
+                                                     <Button
+                                                       size="sm"
+                                                       onClick={() => handleOpenQuickComplete(subOrder)}
+                                                       className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                                                       title="Tandai pesanan sudah diambil / selesai dan unggah foto bukti"
+                                                     >
+                                                       <CheckCircle2 className="w-3.5 h-3.5" />
+                                                       <span>{subOrder.fulfillment_type === "shipping" ? "Selesai" : "Diambil"}</span>
+                                                     </Button>
+                                                   )}
+                                                 <Button
+                                                   variant="outline"
+                                                   size="sm"
+                                                   className="h-8 text-xs font-black border-2 border-ink bg-white hover:bg-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                                                   onClick={() => void handleOpenManagement(subOrder.order_id, "online")}
+                                                 >
+                                                   Kelola
+                                                 </Button>
+                                               </div>
                                             </div>
                                           </div>
                                         ))}
@@ -1998,7 +2119,22 @@ function AdminTransactionsPage() {
                               {new Date(order.created_at).toLocaleString("id-ID")}
                             </td>
                             <td className="p-3 text-right">
-                              <div className="flex justify-end gap-1 items-center">
+                              <div className="flex justify-end gap-1.5 items-center">
+                                {order.order_status !== "completed" &&
+                                  order.order_status !== "cancelled" &&
+                                  order.order_status !== "cancel" &&
+                                  order.order_status !== "expire" &&
+                                  !isCashier && (
+                                    <Button
+                                      size="sm"
+                                      onClick={() => handleOpenQuickComplete(order)}
+                                      className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                                      title="Tandai pesanan sudah diambil / selesai dan unggah foto bukti"
+                                    >
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>{order.fulfillment_type === "shipping" ? "Selesai" : "Diambil"}</span>
+                                    </Button>
+                                  )}
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -2443,9 +2579,22 @@ function AdminTransactionsPage() {
                     </div>
 
                     <div className="border-t border-dashed border-border pt-3">
-                      <p className="font-bold uppercase tracking-wider text-muted-foreground mb-1 text-[10px]">
-                        DETAIL STRUK
-                      </p>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-bold uppercase tracking-wider text-muted-foreground text-[10px]">
+                          DETAIL STRUK
+                        </p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={handleOpenReceiptModal}
+                          className="h-6 px-2 text-[10px] font-extrabold border-2 border-ink bg-white hover:bg-brand-orange hover:text-white transition-colors cursor-pointer shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1"
+                          title="Cetak Struk Transaksi (Ukuran Thermal)"
+                        >
+                          <Printer className="w-3 h-3 text-brand-orange group-hover:text-white" />
+                          Cetak Struk
+                        </Button>
+                      </div>
                       <p className="font-semibold text-brand-blue font-mono text-sm">
                         {managedTransaction.order_id || managedTransaction.sale_id}
                       </p>
@@ -2896,9 +3045,96 @@ function AdminTransactionsPage() {
                         </p>
                       </div>
 
+                      {/* Quick Action Status Panel (Solusi 1) */}
+                      <div className="bg-cream/40 border-2 border-ink p-3 rounded-xl space-y-2 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-black uppercase text-ink flex items-center gap-1.5">
+                            ⚡ Aksi Cepat Alur Pesanan
+                          </span>
+                          <span className="text-[10px] text-muted-foreground font-bold">
+                            {managedFulfillmentType === "pickup" ? "📦 Ambil di Store" : "🚚 Pengiriman Kurir"}
+                          </span>
+                        </div>
+
+                        {managedFulfillmentType === "pickup" ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setManagedStatus("ready_for_pickup")}
+                              className={`p-2.5 rounded-lg border-2 text-xs font-extrabold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                                managedStatus === "ready_for_pickup"
+                                  ? "border-teal-700 bg-teal-100 text-teal-950 shadow-[2px_2px_0px_0px_rgba(13,148,136,1)] scale-[1.02]"
+                                  : "border-ink/30 bg-white text-ink hover:bg-teal-50"
+                              }`}
+                            >
+                              <span className="flex items-center gap-1 font-black">
+                                <Package className="w-3.5 h-3.5 text-teal-700" /> Siap Diambil
+                              </span>
+                              <span className="text-[9px] font-normal text-muted-foreground">Barang siap di store</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setManagedStatus("completed")}
+                              className={`p-2.5 rounded-lg border-2 text-xs font-extrabold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                                managedStatus === "completed"
+                                  ? "border-emerald-700 bg-emerald-100 text-emerald-950 shadow-[2px_2px_0px_0px_rgba(16,185,129,1)] scale-[1.02]"
+                                  : "border-emerald-600 bg-emerald-50/80 text-emerald-900 hover:bg-emerald-100"
+                              }`}
+                            >
+                              <span className="flex items-center gap-1 font-black text-emerald-800">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Sudah Diambil (Selesai)
+                              </span>
+                              <span className="text-[9px] font-semibold text-emerald-700">Wajib foto serah terima</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setManagedStatus("shipped")}
+                              className={`p-2.5 rounded-lg border-2 text-xs font-extrabold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                                managedStatus === "shipped"
+                                  ? "border-blue-700 bg-blue-100 text-blue-950 shadow-[2px_2px_0px_0px_rgba(29,78,216,1)] scale-[1.02]"
+                                  : "border-ink/30 bg-white text-ink hover:bg-blue-50"
+                              }`}
+                            >
+                              <span className="flex items-center gap-1 font-black">
+                                <Truck className="w-3.5 h-3.5 text-blue-700" /> Sedang Dikirim
+                              </span>
+                              <span className="text-[9px] font-normal text-muted-foreground">Diserahkan ke kurir</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => setManagedStatus("completed")}
+                              className={`p-2.5 rounded-lg border-2 text-xs font-extrabold flex flex-col items-center justify-center gap-1 transition-all cursor-pointer ${
+                                managedStatus === "completed"
+                                  ? "border-emerald-700 bg-emerald-100 text-emerald-950 shadow-[2px_2px_0px_0px_rgba(16,185,129,1)] scale-[1.02]"
+                                  : "border-emerald-600 bg-emerald-50/80 text-emerald-900 hover:bg-emerald-100"
+                              }`}
+                            >
+                              <span className="flex items-center gap-1 font-black text-emerald-800">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Selesai / Diterima
+                              </span>
+                              <span className="text-[9px] font-semibold text-emerald-700">Wajib foto bukti/resi</span>
+                            </button>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between pt-0.5 text-[10px]">
+                          <span className="text-muted-foreground">Status Aktif: <strong className="text-ink uppercase font-mono">{managedStatus}</strong></span>
+                          {managedStatus === "completed" && !managedFulfillmentProof && (
+                            <span className="text-red-600 font-extrabold flex items-center gap-1 animate-pulse">
+                              <AlertCircle className="w-3 h-3" /> Wajib Unggah Foto Bukti
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
                       <div className="space-y-3">
                         <div className="space-y-1">
-                          <Label className="text-xs font-semibold text-ink">Status Transaksi</Label>
+                          <Label className="text-xs font-semibold text-ink">Status Transaksi (Manual / Opsi Lain)</Label>
                           <Select value={managedStatus} onValueChange={setManagedStatus}>
                             <SelectTrigger className="h-9">
                               <SelectValue placeholder="Pilih status" />
@@ -2915,54 +3151,17 @@ function AdminTransactionsPage() {
                           </Select>
                         </div>
 
-                        {/* Photo Proof Upload for Siap Diambil / Sedang Diantar / Selesai */}
+                        {/* Live Camera / Photo Proof Upload for Siap Diambil / Sedang Diantar / Selesai */}
                         {(managedStatus === "ready_for_pickup" || managedStatus === "shipped" || managedStatus === "completed" || managedStatus === "settlement") && (
-                          <div className="space-y-2">
-                            <Label className="text-xs font-bold text-ink">Foto Bukti Pengambilan / Penerimaan Barang</Label>
-
-                            <div className="border-2 border-dashed border-ink/40 bg-cream/30 hover:bg-cream/60 rounded-xl p-3.5 text-center transition flex flex-col items-center justify-center gap-2">
-                              {managedFulfillmentProof ? (
-                                <div className="relative w-full flex flex-col items-center gap-2">
-                                  <div className="relative w-40 h-28 rounded-lg border-2 border-ink overflow-hidden shadow-sm">
-                                    <img src={resolveImageUrl(managedFulfillmentProof)} alt="Bukti Pengambilan/Penerimaan" className="w-full h-full object-cover" />
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded">
-                                      ✓ Foto Bukti Terunggah
-                                    </span>
-                                    <label className="cursor-pointer text-[10px] font-extrabold uppercase text-brand-orange hover:underline">
-                                      {uploadingFulfillmentProof ? "Mengunggah..." : "Ganti Foto"}
-                                      <input
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        disabled={uploadingFulfillmentProof}
-                                        onChange={(e) => void handleUploadFulfillmentProofFile(e)}
-                                      />
-                                    </label>
-                                  </div>
-                                </div>
-                              ) : (
-                                <label className="cursor-pointer w-full flex flex-col items-center justify-center py-2 text-xs gap-1.5">
-                                  <div className="w-10 h-10 rounded-full bg-cream border border-ink/30 flex items-center justify-center text-ink">
-                                    <Upload className="w-5 h-5 text-brand-orange" />
-                                  </div>
-                                  <span className="font-extrabold text-ink uppercase tracking-wider text-[11px]">
-                                    {uploadingFulfillmentProof ? "Sedang Mengunggah Foto..." : "Klik Untuk Unggah Foto Bukti"}
-                                  </span>
-                                  <span className="text-[10px] text-muted-foreground">
-                                    Format: JPG, PNG, WEBP (Foto serah terima / foto resi)
-                                  </span>
-                                  <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    disabled={uploadingFulfillmentProof}
-                                    onChange={(e) => void handleUploadFulfillmentProofFile(e)}
-                                  />
-                                </label>
-                              )}
-                            </div>
+                          <div className="pt-1">
+                            <LiveCameraCapture
+                              value={managedFulfillmentProof}
+                              onChange={(url) => setManagedFulfillmentProof(url)}
+                              onRemove={() => setManagedFulfillmentProof("")}
+                              resolveImageUrl={resolveImageUrl}
+                              isRequired={managedStatus === "completed"}
+                              label="Foto Bukti Pengambilan / Serah Terima Barang"
+                            />
                           </div>
                         )}
 
@@ -3299,15 +3498,26 @@ function AdminTransactionsPage() {
             </div>
           )}
 
-          <DialogFooter className="mt-4 border-t pt-4 flex items-center justify-between">
-            <Button
-              type="button"
-              onClick={() => openNotifModalForOrder(managedTransaction)}
-              variant="outline"
-              className="border-2 border-brand-orange text-brand-orange hover:bg-brand-orange/10 font-bold text-xs"
-            >
-              💬 Custom Message
-            </Button>
+          <DialogFooter className="mt-4 border-t pt-4 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                onClick={() => openNotifModalForOrder(managedTransaction)}
+                variant="outline"
+                className="border-2 border-brand-orange text-brand-orange hover:bg-brand-orange/10 font-bold text-xs"
+              >
+                💬 Custom Message
+              </Button>
+              <Button
+                type="button"
+                onClick={handleOpenReceiptModal}
+                className="bg-ink hover:bg-brand-orange text-white font-bold uppercase tracking-wider text-xs px-4 h-9 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="Cetak Struk Transaksi (Ukuran Thermal 58mm)"
+              >
+                <Printer className="w-4 h-4 text-white" />
+                Cetak Struk
+              </Button>
+            </div>
             <Button
               onClick={() => setManagementOpen(false)}
               className="bg-ink text-white font-bold uppercase tracking-wider text-xs px-6"
@@ -3317,6 +3527,204 @@ function AdminTransactionsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Quick Complete / Pickup Modal Dialog (Solusi 2) */}
+      <Dialog open={quickCompleteOpen} onOpenChange={setQuickCompleteOpen}>
+        <DialogContent className="max-w-md bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5">
+          <DialogHeader>
+            <DialogTitle className="display text-lg tracking-wide text-ink flex items-center gap-2 uppercase">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              Konfirmasi Pengambilan Pesanan
+            </DialogTitle>
+          </DialogHeader>
+
+          {quickCompleteOrder && (
+            <div className="space-y-4 py-2 text-xs">
+              <div className="bg-cream/40 border-2 border-ink/30 p-3 rounded-xl space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-muted-foreground text-[10px] uppercase">No. Pesanan:</span>
+                  <span className="font-mono font-black text-brand-blue text-xs">{quickCompleteOrder.order_id}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-muted-foreground text-[10px] uppercase">Pembeli:</span>
+                  <span className="font-extrabold text-ink uppercase">{quickCompleteOrder.customer_name}</span>
+                </div>
+                {quickCompleteOrder.customer_nim && (
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-muted-foreground text-[10px] uppercase">NIM:</span>
+                    <span className="font-medium text-ink">{quickCompleteOrder.customer_nim}</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-center border-t border-ink/10 pt-1.5 mt-1">
+                  <span className="font-bold text-muted-foreground text-[10px] uppercase">Total Tagihan:</span>
+                  <span className="font-black text-brand-orange text-xs">Rp {Number(quickCompleteOrder.gross_amount).toLocaleString("id-ID")}</span>
+                </div>
+              </div>
+
+              {/* Live Camera / Photo Bukti Pengambilan (Wajib) */}
+              <div className="pt-1">
+                <LiveCameraCapture
+                  value={quickCompleteProof}
+                  onChange={(url) => setQuickCompleteProof(url)}
+                  onRemove={() => setQuickCompleteProof("")}
+                  resolveImageUrl={resolveImageUrl}
+                  isRequired={true}
+                  label="Foto Bukti Serah Terima / Pengambilan Barang"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="mt-2 border-t pt-3 flex w-full justify-between gap-2 sm:justify-between">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setQuickCompleteOpen(false);
+                setQuickCompleteOrder(null);
+                setQuickCompleteProof("");
+              }}
+              className="border-2 border-ink text-xs font-bold uppercase tracking-wider flex-1"
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              disabled={!quickCompleteProof || uploadingQuickProof || savingQuickComplete}
+              onClick={() => void handleConfirmQuickComplete()}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:text-gray-500 text-white text-xs font-black uppercase tracking-wider flex-1 py-5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+            >
+              {savingQuickComplete ? "Menyimpan..." : "✅ Selesaikan Pesanan"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receipt Modal Preview Dialog */}
+      {receiptModalOpen && receiptData && (
+        <Dialog
+          open={receiptModalOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setReceiptModalOpen(false);
+              setReceiptData(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-md bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+            <DialogHeader>
+              <DialogTitle className="display text-lg tracking-wider text-ink uppercase text-center">
+                Struk Transaksi
+              </DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4 py-2 flex flex-col items-center">
+              {/* Receipt Preview */}
+              <div className="bg-white text-black p-4 w-[280px] shadow-sm border border-gray-200 font-mono text-[10px] leading-relaxed select-none">
+                <div className="text-center font-bold mb-2 flex flex-col items-center">
+                  <div className="flex justify-center items-center gap-3 mb-1.5">
+                    <img
+                      src={logoFilkom}
+                      alt="Logo FILKOM"
+                      className="w-10 h-auto grayscale filter brightness-100 contrast-100"
+                    />
+                    <img
+                      src={logoFM}
+                      alt="Logo FM"
+                      className="w-10 h-auto grayscale filter brightness-100 contrast-100"
+                    />
+                  </div>
+                  <div className="text-[11px] font-bold tracking-wider">FILKOM MERCH</div>
+                  <div className="text-[8.5px] font-semibold text-black">Universitas Brawijaya</div>
+                  <div className="text-[7.5px] font-normal leading-tight text-gray-700 mt-1 max-w-[240px]">
+                    Gedung A Fakultas Ilmu Komputer UB, Ketawanggede, Kec. Lowokwaru, Kota Malang, Jawa Timur 65113
+                  </div>
+                </div>
+
+                <div className="border-t border-dashed border-black my-2"></div>
+
+                <div className="space-y-0.5 text-[9px]">
+                  <div>No: {receiptData.sale_id}</div>
+                  <div>
+                    Tgl: {receiptData.date} {receiptData.time}
+                  </div>
+                  <div>Kasir: {receiptData.cashier_name}</div>
+                  {receiptData.customer_name && (
+                    <div>Pelanggan: {receiptData.customer_name}</div>
+                  )}
+                </div>
+
+                <div className="border-t border-dashed border-black my-2"></div>
+
+                <div className="space-y-1.5">
+                  {receiptData.items.map((item, idx) => (
+                    <div key={idx} className="text-[9px]">
+                      <div className="font-bold">{item.name}</div>
+                      <div className="flex justify-between text-[8px]">
+                        <span>
+                          {item.qty} x Rp {item.price.toLocaleString("id-ID")}
+                        </span>
+                        <span>Rp {item.subtotal.toLocaleString("id-ID")}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="border-t border-dashed border-black my-2"></div>
+
+                <div className="space-y-0.5 text-[9px] font-bold">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>Rp {receiptData.subtotal.toLocaleString("id-ID")}</span>
+                  </div>
+                  {receiptData.discount > 0 && (
+                    <div className="flex justify-between text-red-600">
+                      <span>Diskon:</span>
+                      <span>-Rp {receiptData.discount.toLocaleString("id-ID")}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between border-t border-dashed border-black mt-1 pt-1 text-xs">
+                    <span>TOTAL:</span>
+                    <span>Rp {receiptData.total.toLocaleString("id-ID")}</span>
+                  </div>
+                </div>
+
+                <div className="border-t border-dashed border-black my-2"></div>
+
+                <div className="text-center text-[9px] space-y-1">
+                  <div className="font-bold">Terima kasih telah membeli!</div>
+                  <div className="text-[8px] italic font-normal text-gray-500">
+                    Wear Your Faculty.
+                  </div>
+                  <div className="text-[7.5px] text-gray-600 font-normal leading-tight pt-1">
+                    <div>filkommerch.com</div>
+                    <div>IG & TikTok: @filkommerchub</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter className="flex w-full justify-between gap-2 sm:justify-between">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setReceiptModalOpen(false);
+                  setReceiptData(null);
+                }}
+                className="border-2 border-ink text-xs font-bold uppercase tracking-wider flex-1"
+              >
+                Tutup
+              </Button>
+              <Button
+                onClick={() => printBrowserReceipt(receiptData)}
+                className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest flex-1 py-5 px-6 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+              >
+                <Printer className="mr-2 h-4 w-4" /> Cetak Struk
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Filter Modal Dialog */}
       <Dialog open={filterModalOpen} onOpenChange={setFilterModalOpen}>
