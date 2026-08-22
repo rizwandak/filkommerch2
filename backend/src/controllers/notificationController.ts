@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import webPush from "web-push";
 import { getPool } from "../config/database";
 import { getVapidPublicKey, sendPushToUser, sendPushBroadcast } from "../services/pushService";
 
@@ -507,7 +508,6 @@ export async function testPushNotification(req: Request, res: Response) {
       if (subs && subs.length > 0) {
         const sub = subs[0];
         try {
-          const webPush = (await import("web-push")).default;
           await webPush.sendNotification(
             {
               endpoint: sub.endpoint,

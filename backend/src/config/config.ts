@@ -27,15 +27,10 @@ export const config = {
 
 // Validate required env vars
 export function validateConfig() {
-  const required = ["DB_HOST", "DB_USER", "DB_NAME", "MAYAR_API_KEY"];
-
-  const missing = required.filter((key) => !process.env[key]);
-
-  if (missing.length > 0 && process.env.NODE_ENV === "production") {
-    throw new Error(`Missing required environment variables: ${missing.join(", ")}`);
-  }
+  const recommended = ["DB_HOST", "DB_USER", "DB_NAME"];
+  const missing = recommended.filter((key) => !process.env[key]);
 
   if (missing.length > 0) {
-    console.warn(`Missing environment variables: ${missing.join(", ")}`);
+    console.warn(`[Config] Missing environment variables: ${missing.join(", ")}. Using default fallbacks.`);
   }
 }
