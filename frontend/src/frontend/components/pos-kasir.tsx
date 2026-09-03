@@ -1465,7 +1465,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
             <div className="py-2 flex-1 overflow-y-auto flex flex-col items-center">
               {/* Receipt Preview - Exact 50mm Thermal Paper Roll (Vertical & Slender) */}
               <div className="bg-[#ede8dc]/50 border border-ink/10 rounded-xl p-3 sm:p-5 flex justify-center w-full overflow-x-auto">
-                <div className="w-[50mm] min-w-[50mm] max-w-[50mm] bg-white text-black px-[2.5mm] py-[5mm] shadow-md border border-gray-300 font-mono text-[7.5px] leading-[1.3] select-none rounded-xs space-y-2">
+                <div className="w-[50mm] min-w-[50mm] max-w-[50mm] bg-white text-black pl-[0.5mm] pr-[4.5mm] py-[5mm] shadow-md border border-gray-300 font-mono text-[7.5px] leading-[1.3] select-none rounded-xs space-y-2">
                   {/* Header */}
                   <div className="text-center font-bold flex flex-col items-center">
                     <div className="flex justify-center items-center gap-1.5 mb-1.5">

@@ -171,16 +171,20 @@ export function printBrowserReceipt(data: ReceiptData) {
           }
           html, body {
             width: 100%;
-            max-width: 48mm;
             margin: 0 !important;
-            margin-left: 0 !important;
-            padding: 1mm 0mm 6mm 0mm;
-            padding-left: 0 !important;
+            padding: 0 !important;
             font-family: 'Consolas', 'Courier New', Courier, monospace;
             font-size: 7.5px;
             color: #000;
             background: #fff;
             line-height: 1.3;
+          }
+          .receipt-wrapper {
+            width: 100%;
+            max-width: 48mm;
+            margin: 0 !important;
+            margin-left: -3mm !important;
+            padding: 1mm 0mm 6mm 0mm;
           }
           .text-center {
             text-align: center;
@@ -234,11 +238,15 @@ export function printBrowserReceipt(data: ReceiptData) {
             }
             html, body {
               width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            .receipt-wrapper {
+              width: 48mm !important;
               max-width: 48mm !important;
               margin: 0 !important;
-              margin-left: 0 !important;
+              margin-left: -3mm !important;
               padding: 0 !important;
-              padding-left: 0 !important;
             }
           }
         </style>
@@ -248,57 +256,59 @@ export function printBrowserReceipt(data: ReceiptData) {
           <button class="no-print-btn" onclick="window.print()">🖨️ Cetak ke Thermal 50mm</button>
         </div>
 
-        <div class="header text-center">
-          <div style="display: flex; justify-content: center; align-items: center; gap: 5px; margin-bottom: 4px;">
-            <img src="${logoFilkom}" style="width: 24px; height: auto; filter: grayscale(100%);" />
-            <img src="${logoFM}" style="width: 24px; height: auto; filter: grayscale(100%);" />
+        <div class="receipt-wrapper">
+          <div class="header text-center">
+            <div style="display: flex; justify-content: center; align-items: center; gap: 5px; margin-bottom: 4px;">
+              <img src="${logoFilkom}" style="width: 24px; height: auto; filter: grayscale(100%);" />
+              <img src="${logoFM}" style="width: 24px; height: auto; filter: grayscale(100%);" />
+            </div>
+            <div style="font-size: 10px; font-weight: 900; letter-spacing: 0.8px;">FILKOM MERCH</div>
+            <div style="font-size: 7.5px; font-weight: bold; margin-top: 1px;">Universitas Brawijaya</div>
+            <div style="font-size: 6.5px; line-height: 1.3; color: #222; margin-top: 2px;">
+              Gedung A FILKOM UB<br/>
+              Lowokwaru, Kota Malang
+            </div>
           </div>
-          <div style="font-size: 10px; font-weight: 900; letter-spacing: 0.8px;">FILKOM MERCH</div>
-          <div style="font-size: 7.5px; font-weight: bold; margin-top: 1px;">Universitas Brawijaya</div>
-          <div style="font-size: 6.5px; line-height: 1.3; color: #222; margin-top: 2px;">
-            Gedung A FILKOM UB<br/>
-            Lowokwaru, Kota Malang
+          
+          <div class="divider"></div>
+          
+          <div class="info">
+            <div><strong>No:</strong> ${data.sale_id}</div>
+            <div><strong>Tgl:</strong> ${data.date} ${data.time}</div>
+            <div><strong>Kasir:</strong> ${data.cashier_name}</div>
+            ${paymentMethodHtml}
+            ${customerHtml}
           </div>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="info">
-          <div><strong>No:</strong> ${data.sale_id}</div>
-          <div><strong>Tgl:</strong> ${data.date} ${data.time}</div>
-          <div><strong>Kasir:</strong> ${data.cashier_name}</div>
-          ${paymentMethodHtml}
-          ${customerHtml}
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="items">
-          ${itemsHtml}
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="total-section">
-          <div style="display: flex; justify-content: space-between; font-size: 7.5px; margin-bottom: 2px;">
-            <span>Subtotal:</span>
-            <span>Rp ${data.subtotal.toLocaleString("id-ID")}</span>
+          
+          <div class="divider"></div>
+          
+          <div class="items">
+            ${itemsHtml}
           </div>
-          ${discountHtml}
-          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 900; margin-top: 3px; border-top: 1px dashed #000; padding-top: 3px;">
-            <span>TOTAL:</span>
-            <span>Rp ${data.total.toLocaleString("id-ID")}</span>
+          
+          <div class="divider"></div>
+          
+          <div class="total-section">
+            <div style="display: flex; justify-content: space-between; font-size: 7.5px; margin-bottom: 2px;">
+              <span>Subtotal:</span>
+              <span>Rp ${data.subtotal.toLocaleString("id-ID")}</span>
+            </div>
+            ${discountHtml}
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 900; margin-top: 3px; border-top: 1px dashed #000; padding-top: 3px;">
+              <span>TOTAL:</span>
+              <span>Rp ${data.total.toLocaleString("id-ID")}</span>
+            </div>
           </div>
-        </div>
-        
-        <div class="divider"></div>
-        
-        <div class="footer text-center">
-          <div style="font-weight: 900; letter-spacing: 0.5px;">*** TERIMA KASIH ***</div>
-          <div style="margin-top: 2px; font-style: italic; font-size: 7px; color: #444;">Wear Your Faculty.</div>
-          <div style="margin-top: 4px; font-size: 6.5px; line-height: 1.3; color: #333;">
-            <div>filkommerch.com</div>
-            <div>IG & TikTok: @filkommerchub</div>
+          
+          <div class="divider"></div>
+          
+          <div class="footer text-center">
+            <div style="font-weight: 900; letter-spacing: 0.5px;">*** TERIMA KASIH ***</div>
+            <div style="margin-top: 2px; font-style: italic; font-size: 7px; color: #444;">Wear Your Faculty.</div>
+            <div style="margin-top: 4px; font-size: 6.5px; line-height: 1.3; color: #333;">
+              <div>filkommerch.com</div>
+              <div>IG & TikTok: @filkommerchub</div>
+            </div>
           </div>
         </div>
 
