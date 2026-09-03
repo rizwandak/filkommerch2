@@ -1463,34 +1463,34 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
             </DialogHeader>
 
             <div className="py-2 flex-1 overflow-y-auto flex flex-col items-center">
-              {/* Receipt Preview - Exact 52mm Thermal Paper Roll */}
-              <div className="bg-[#ede8dc]/50 border border-ink/10 rounded-xl p-3 sm:p-4 flex justify-center w-full overflow-x-auto">
-                <div className="w-[52mm] min-w-[52mm] max-w-[52mm] bg-white text-black px-[1.5mm] py-[3mm] shadow-md border border-gray-300 font-mono text-[8px] leading-[1.25] select-none rounded-xs">
+              {/* Receipt Preview - Exact 50mm Thermal Paper Roll (Vertical & Slender) */}
+              <div className="bg-[#ede8dc]/50 border border-ink/10 rounded-xl p-3 sm:p-5 flex justify-center w-full overflow-x-auto">
+                <div className="w-[50mm] min-w-[50mm] max-w-[50mm] bg-white text-black px-[2.5mm] py-[5mm] shadow-md border border-gray-300 font-mono text-[7.5px] leading-[1.3] select-none rounded-xs space-y-2">
                   {/* Header */}
-                  <div className="text-center font-bold mb-1.5 flex flex-col items-center">
-                    <div className="flex justify-center items-center gap-2 mb-1">
+                  <div className="text-center font-bold flex flex-col items-center">
+                    <div className="flex justify-center items-center gap-1.5 mb-1.5">
                       <img
                         src={logoFilkom}
                         alt="Logo FILKOM"
-                        className="w-[28px] h-auto grayscale filter brightness-100 contrast-100"
+                        className="w-[24px] h-auto grayscale filter brightness-100 contrast-100"
                       />
                       <img
                         src={logoFM}
                         alt="Logo FM"
-                        className="w-[28px] h-auto grayscale filter brightness-100 contrast-100"
+                        className="w-[24px] h-auto grayscale filter brightness-100 contrast-100"
                       />
                     </div>
-                    <div className="text-[10px] font-black tracking-wide">FILKOM MERCH</div>
-                    <div className="text-[7.5px] font-bold text-black">Universitas Brawijaya</div>
-                    <div className="text-[6.5px] font-normal leading-tight text-gray-700 mt-0.5 max-w-[42mm]">
-                      Gedung A Fakultas Ilmu Komputer UB<br />Lowokwaru, Kota Malang
+                    <div className="text-[10px] font-black tracking-widest uppercase">FILKOM MERCH</div>
+                    <div className="text-[7.5px] font-bold text-black mt-0.5">Universitas Brawijaya</div>
+                    <div className="text-[6.5px] font-normal leading-tight text-gray-700 mt-1 max-w-[40mm]">
+                      Gedung A FILKOM UB<br />Lowokwaru, Kota Malang
                     </div>
                   </div>
 
-                  <div className="border-t border-dashed border-black my-1.5"></div>
+                  <div className="border-t border-dashed border-black"></div>
 
                   {/* Info */}
-                  <div className="space-y-0.5 text-[7.5px]">
+                  <div className="space-y-0.5 text-[7px] leading-snug">
                     <div><span className="font-bold">No:</span> {currentReceiptData.sale_id}</div>
                     <div><span className="font-bold">Tgl:</span> {currentReceiptData.date} {currentReceiptData.time}</div>
                     <div><span className="font-bold">Kasir:</span> {currentReceiptData.cashier_name}</div>
@@ -1502,25 +1502,25 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     )}
                   </div>
 
-                  <div className="border-t border-dashed border-black my-1.5"></div>
+                  <div className="border-t border-dashed border-black"></div>
 
                   {/* Items */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {currentReceiptData.items.map((item, idx) => (
-                      <div key={idx} className="text-[8px]">
+                      <div key={idx} className="text-[7.5px]">
                         <div className="font-bold leading-tight break-words">{item.name}</div>
-                        <div className="flex justify-between text-[7.5px] mt-0.5">
-                          <span>{item.qty} x Rp {item.price.toLocaleString("id-ID")}</span>
-                          <span className="font-bold">Rp {item.subtotal.toLocaleString("id-ID")}</span>
+                        <div className="flex justify-between text-[7px] mt-0.5 text-gray-800">
+                          <span>{item.qty}x @Rp {item.price.toLocaleString("id-ID")}</span>
+                          <span className="font-black text-black">Rp {item.subtotal.toLocaleString("id-ID")}</span>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="border-t border-dashed border-black my-1.5"></div>
+                  <div className="border-t border-dashed border-black"></div>
 
                   {/* Totals */}
-                  <div className="space-y-0.5 text-[8px] font-bold">
+                  <div className="space-y-1 text-[7.5px] font-bold">
                     <div className="flex justify-between">
                       <span>Subtotal:</span>
                       <span>Rp {currentReceiptData.subtotal.toLocaleString("id-ID")}</span>
@@ -1531,18 +1531,18 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                         <span>-Rp {currentReceiptData.discount.toLocaleString("id-ID")}</span>
                       </div>
                     )}
-                    <div className="flex justify-between border-t border-dashed border-black mt-1 pt-1 text-[9.5px] font-black">
+                    <div className="flex justify-between border-t border-dashed border-black pt-1 mt-1 text-[9.5px] font-black">
                       <span>TOTAL:</span>
                       <span>Rp {currentReceiptData.total.toLocaleString("id-ID")}</span>
                     </div>
                   </div>
 
-                  <div className="border-t border-dashed border-black my-1.5"></div>
+                  <div className="border-t border-dashed border-black"></div>
 
                   {/* Footer */}
-                  <div className="text-center text-[7.5px] space-y-0.5">
-                    <div className="font-black">Terima kasih telah membeli!</div>
-                    <div className="text-[7px] italic font-normal text-gray-500">
+                  <div className="text-center text-[7px] space-y-1 pt-0.5">
+                    <div className="font-black tracking-wider">*** TERIMA KASIH ***</div>
+                    <div className="italic font-normal text-gray-500 text-[6.5px]">
                       Wear Your Faculty.
                     </div>
                     <div className="text-[6.5px] text-gray-600 font-normal leading-tight pt-0.5">
@@ -1566,7 +1566,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 onClick={() => printBrowserReceipt(currentReceiptData)}
                 className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest w-full h-11 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
               >
-                <Printer className="mr-2 h-4 w-4" /> Cetak Struk (52mm)
+                <Printer className="mr-2 h-4 w-4" /> Cetak Struk (50mm)
               </Button>
             </div>
           </DialogContent>

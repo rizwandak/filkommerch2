@@ -120,15 +120,15 @@ export function printBrowserReceipt(data: ReceiptData) {
           ? '<span style="font-weight: normal; color: #555; margin-right: 2px;">[ ]</span> '
           : "";
       const suffixBadge = isPending
-        ? ' <span style="font-size: 7px; font-weight: bold; border: 1px solid #000; padding: 0 1px;">(MENYUSUL)</span>'
+        ? ' <span style="font-size: 6.5px; font-weight: bold; border: 1px solid #000; padding: 0 1px;">(MENYUSUL)</span>'
         : "";
 
       return `
-    <div style="margin-bottom: 4px;">
-      <div style="font-weight: bold; word-break: break-word; font-size: 8.5px; line-height: 1.2;">${checkmark}${item.name}${suffixBadge}</div>
-      <div style="display: flex; justify-content: space-between; font-size: 8px; margin-top: 1px;">
-        <span>${item.qty} x Rp ${item.price.toLocaleString("id-ID")}</span>
-        <span style="font-weight: bold;">Rp ${item.subtotal.toLocaleString("id-ID")}</span>
+    <div style="margin-bottom: 5px; padding-bottom: 2px;">
+      <div style="font-weight: bold; word-break: break-word; font-size: 8px; line-height: 1.25;">${checkmark}${item.name}${suffixBadge}</div>
+      <div style="display: flex; justify-content: space-between; font-size: 7.5px; margin-top: 2px;">
+        <span style="color: #333;">${item.qty}x @Rp ${item.price.toLocaleString("id-ID")}</span>
+        <span style="font-weight: 900;">Rp ${item.subtotal.toLocaleString("id-ID")}</span>
       </div>
     </div>
   `;
@@ -138,7 +138,7 @@ export function printBrowserReceipt(data: ReceiptData) {
   const discountHtml =
     data.discount > 0
       ? `
-    <div style="display: flex; justify-content: space-between; font-size: 8.5px; margin-bottom: 2px;">
+    <div style="display: flex; justify-content: space-between; font-size: 7.5px; margin-bottom: 2px;">
       <span>Diskon:</span>
       <span>-Rp ${data.discount.toLocaleString("id-ID")}</span>
     </div>
@@ -161,7 +161,7 @@ export function printBrowserReceipt(data: ReceiptData) {
         <title>Cetak Struk - ${data.sale_id}</title>
         <style>
           @page {
-            size: 52mm auto;
+            size: 50mm auto;
             margin: 0;
           }
           * {
@@ -170,38 +170,38 @@ export function printBrowserReceipt(data: ReceiptData) {
             print-color-adjust: exact !important;
           }
           html, body {
-            width: 48mm;
-            max-width: 48mm;
+            width: 42mm;
+            max-width: 42mm;
             margin: 0 auto;
-            padding: 2mm 0.5mm 5mm 0.5mm;
+            padding: 3mm 0mm 8mm 0mm;
             font-family: 'Consolas', 'Courier New', Courier, monospace;
-            font-size: 8px;
+            font-size: 7.5px;
             color: #000;
             background: #fff;
-            line-height: 1.25;
+            line-height: 1.3;
           }
           .text-center {
             text-align: center;
           }
           .divider {
             border-top: 1px dashed #000;
-            margin: 4px 0;
+            margin: 5px 0;
           }
           .header {
-            margin-bottom: 5px;
+            margin-bottom: 6px;
           }
           .info {
-            font-size: 7.5px;
-            margin-bottom: 4px;
-            line-height: 1.3;
+            font-size: 7px;
+            margin-bottom: 5px;
+            line-height: 1.35;
           }
           .total-section {
             font-weight: bold;
-            margin-top: 3px;
+            margin-top: 4px;
           }
           .footer {
-            margin-top: 6px;
-            font-size: 7.5px;
+            margin-top: 8px;
+            font-size: 7px;
           }
           .no-print-bar {
             text-align: center;
@@ -226,8 +226,8 @@ export function printBrowserReceipt(data: ReceiptData) {
               display: none !important;
             }
             html, body {
-              width: 48mm !important;
-              max-width: 48mm !important;
+              width: 42mm !important;
+              max-width: 42mm !important;
               margin: 0 auto !important;
               padding: 0 !important;
             }
@@ -236,18 +236,18 @@ export function printBrowserReceipt(data: ReceiptData) {
       </head>
       <body>
         <div class="no-print-bar">
-          <button class="no-print-btn" onclick="window.print()">🖨️ Cetak ke Thermal 52mm</button>
+          <button class="no-print-btn" onclick="window.print()">🖨️ Cetak ke Thermal 50mm</button>
         </div>
 
         <div class="header text-center">
-          <div style="display: flex; justify-content: center; align-items: center; gap: 6px; margin-bottom: 3px;">
-            <img src="${logoFilkom}" style="width: 30px; height: auto; filter: grayscale(100%);" />
-            <img src="${logoFM}" style="width: 30px; height: auto; filter: grayscale(100%);" />
+          <div style="display: flex; justify-content: center; align-items: center; gap: 5px; margin-bottom: 4px;">
+            <img src="${logoFilkom}" style="width: 24px; height: auto; filter: grayscale(100%);" />
+            <img src="${logoFM}" style="width: 24px; height: auto; filter: grayscale(100%);" />
           </div>
-          <div style="font-size: 10.5px; font-weight: 900; letter-spacing: 0.5px;">FILKOM MERCH</div>
-          <div style="font-size: 8px; font-weight: bold;">Universitas Brawijaya</div>
-          <div style="font-size: 7px; line-height: 1.2; color: #222; margin-top: 2px;">
-            Gedung A Fakultas Ilmu Komputer UB<br/>
+          <div style="font-size: 10px; font-weight: 900; letter-spacing: 0.8px;">FILKOM MERCH</div>
+          <div style="font-size: 7.5px; font-weight: bold; margin-top: 1px;">Universitas Brawijaya</div>
+          <div style="font-size: 6.5px; line-height: 1.3; color: #222; margin-top: 2px;">
+            Gedung A FILKOM UB<br/>
             Lowokwaru, Kota Malang
           </div>
         </div>
@@ -271,12 +271,12 @@ export function printBrowserReceipt(data: ReceiptData) {
         <div class="divider"></div>
         
         <div class="total-section">
-          <div style="display: flex; justify-content: space-between; font-size: 8.5px; margin-bottom: 2px;">
+          <div style="display: flex; justify-content: space-between; font-size: 7.5px; margin-bottom: 2px;">
             <span>Subtotal:</span>
             <span>Rp ${data.subtotal.toLocaleString("id-ID")}</span>
           </div>
           ${discountHtml}
-          <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: 900; margin-top: 2px; border-top: 1px dashed #000; padding-top: 2px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 9.5px; font-weight: 900; margin-top: 3px; border-top: 1px dashed #000; padding-top: 3px;">
             <span>TOTAL:</span>
             <span>Rp ${data.total.toLocaleString("id-ID")}</span>
           </div>
@@ -285,9 +285,9 @@ export function printBrowserReceipt(data: ReceiptData) {
         <div class="divider"></div>
         
         <div class="footer text-center">
-          <div style="font-weight: 900;">Terima kasih telah membeli!</div>
-          <div style="margin-top: 1px; font-style: italic; font-size: 7.5px;">Wear Your Faculty.</div>
-          <div style="margin-top: 3px; font-size: 7px; line-height: 1.2;">
+          <div style="font-weight: 900; letter-spacing: 0.5px;">*** TERIMA KASIH ***</div>
+          <div style="margin-top: 2px; font-style: italic; font-size: 7px; color: #444;">Wear Your Faculty.</div>
+          <div style="margin-top: 4px; font-size: 6.5px; line-height: 1.3; color: #333;">
             <div>filkommerch.com</div>
             <div>IG & TikTok: @filkommerchub</div>
           </div>
