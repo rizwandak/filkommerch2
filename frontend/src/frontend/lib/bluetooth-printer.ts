@@ -16,6 +16,7 @@ export interface ReceiptData {
     qty: number;
     price: number;
     subtotal: number;
+    pickup_status?: "pending" | "ready" | "picked_up";
   }>;
   subtotal: number;
   discount: number;
@@ -206,8 +207,16 @@ class BluetoothThermalPrinter {
       // Items
       await this.setAlignment(0); // Left
       for (const item of data.items) {
+        let prefix = "";
+        let suffix = "";
+        if (item.pickup_status === "picked_up" || item.pickup_status === "ready") {
+          prefix = "[V] ";
+        } else if (item.pickup_status === "pending") {
+          prefix = "[ ] ";
+          suffix = " (MENYUSUL)";
+        }
         // Item name
-        await this.printLine(item.name);
+        await this.printLine(`${prefix}${item.name}${suffix}`);
         // Qty x Price = Subtotal
         const qtyLine = `${item.qty}x ${this.formatCurrency(item.price)} = ${this.formatCurrency(item.subtotal)}`;
         await this.printLine(qtyLine);

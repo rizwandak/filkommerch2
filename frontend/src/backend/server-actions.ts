@@ -317,7 +317,29 @@ export interface OrderItem {
   discount_amount: number;
   subtotal: number;
   sku_snapshot: string | null;
+  pickup_status?: "pending" | "ready" | "picked_up";
+  picked_up_at?: string | null;
+  picked_up_by?: number | null;
+  picked_up_by_name?: string | null;
+  pickup_proof_url?: string | null;
   created_at?: string;
+}
+
+export interface PickupLog {
+  id: number;
+  order_id: string;
+  order_item_id: number;
+  product_name?: string;
+  size?: string;
+  color?: string;
+  previous_status: string;
+  new_status: string;
+  actor_id?: number | null;
+  actor_name: string;
+  actor_role: string;
+  notes?: string | null;
+  proof_url?: string | null;
+  created_at: string;
 }
 
 export interface TransactionDetails {

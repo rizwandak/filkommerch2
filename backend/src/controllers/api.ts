@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { query, queryOne, execute, getConnection } from "../config/database";
 import { config } from "../config/config";
 import bcrypt from "bcryptjs";
+import { createAndSendNotification } from "./notificationController";
 
 
 // ============ GENERAL HELPERS & DYNAMIC PRICING ============
@@ -6664,5 +6665,212 @@ export const trackVisit = async (req: Request, res: Response) => {
     // Fail silently to not disrupt the frontend
     console.error("Error tracking visit:", error);
     return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============ PARTIAL PICKUP & MONITORING ============
+
+// Update pickup status for single or batch order items (Admin/Cashier)
+export const updateOrderItemPickupStatus = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const { orderId } = req.params;
+    const { items, notes, proof_url } = req.body; // items: Array<{ id: number, status: 'pending' | 'ready' | 'picked_up', proof_url?: string }>
+    
+    const actorId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const actorName = req.header("x-user-name") || "Admin/Kasir";
+    const actorRole = req.header("x-user-role") || "admin";
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: "Daftar item tidak valid" });
+    }
+
+    await connection.beginTransaction();
+
+    for (const item of items) {
+      const { id: itemId, status: newStatus } = item;
+      if (!["pending", "ready", "picked_up"].includes(newStatus)) {
+        continue;
+      }
+
+      const itemProofUrl = item.proof_url || proof_url || null;
+
+      // Get current item status
+      const [currentRows] = await connection.query<any[]>(
+        "SELECT id, order_id, product_name, pickup_status, pickup_proof_url FROM order_items WHERE id = ? AND order_id = ?",
+        [itemId, orderId]
+      );
+
+      if (!currentRows || currentRows.length === 0) continue;
+      const currentItem = currentRows[0];
+      const prevStatus = currentItem.pickup_status || "pending";
+
+      if (prevStatus === newStatus && !itemProofUrl) continue;
+
+      let pickedUpAt = null;
+      let pickedUpBy = null;
+      let pickedUpByName = null;
+      let finalProofUrl = null;
+
+      if (newStatus === "picked_up") {
+        pickedUpAt = new Date();
+        pickedUpBy = actorId;
+        pickedUpByName = actorName;
+        finalProofUrl = itemProofUrl || currentItem.pickup_proof_url || null;
+      }
+
+      await connection.query(
+        `UPDATE order_items 
+         SET pickup_status = ?, 
+             picked_up_at = ?, 
+             picked_up_by = ?, 
+             picked_up_by_name = ?,
+             pickup_proof_url = ?
+         WHERE id = ? AND order_id = ?`,
+        [newStatus, pickedUpAt, pickedUpBy, pickedUpByName, finalProofUrl, itemId, orderId]
+      );
+
+      // Insert audit log
+      await connection.query(
+        `INSERT INTO order_item_pickup_logs 
+         (order_id, order_item_id, previous_status, new_status, actor_id, actor_name, actor_role, notes, proof_url) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [orderId, itemId, prevStatus, newStatus, actorId, actorName, actorRole, notes || `Status diubah dari ${prevStatus} menjadi ${newStatus}`, finalProofUrl]
+      );
+    }
+
+    await connection.commit();
+
+    // Fetch updated items
+    const updatedItems = await query<any>(
+      `SELECT oi.*, p.image_url 
+       FROM order_items oi 
+       LEFT JOIN products p ON p.id = oi.product_id 
+       WHERE oi.order_id = ?`,
+      [orderId]
+    );
+
+    return res.json({
+      success: true,
+      message: "Status pengambilan berhasil diperbarui",
+      items: updatedItems,
+    });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error updating order item pickup status:", error);
+    return res.status(500).json({ success: false, error: "Gagal memperbarui status pengambilan: " + error.message });
+  } finally {
+    connection.release();
+  }
+};
+
+// Get pickup audit logs for an order (Admin/Cashier)
+export const getOrderItemPickupLogs = async (req: Request, res: Response) => {
+  try {
+    const { orderId } = req.params;
+    const logs = await query<any>(
+      `SELECT l.*, oi.product_name, oi.size, oi.color 
+       FROM order_item_pickup_logs l
+       LEFT JOIN order_items oi ON oi.id = l.order_item_id
+       WHERE l.order_id = ?
+       ORDER BY l.created_at DESC`,
+      [orderId]
+    );
+
+    return res.json({ success: true, logs: logs || [] });
+  } catch (error: any) {
+    console.error("Error getting order item pickup logs:", error);
+    return res.status(500).json({ success: false, error: "Gagal mengambil riwayat pengambilan" });
+  }
+};
+
+// Send notification (in-app + web push) for ready pickup items (Admin/Cashier)
+export const notifyPartialPickup = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const { orderId } = req.params;
+    const { readyItemIds, title, message } = req.body;
+
+    const actorId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const actorName = req.header("x-user-name") || "Admin/Kasir";
+    const actorRole = req.header("x-user-role") || "admin";
+
+    // Get order details
+    const order = await queryOne<any>(
+      "SELECT user_id, customer_name, customer_email, customer_phone FROM orders WHERE order_id = ?",
+      [orderId]
+    );
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+    }
+
+    await connection.beginTransaction();
+
+    // If readyItemIds provided, update their status from pending to ready
+    if (readyItemIds && Array.isArray(readyItemIds) && readyItemIds.length > 0) {
+      for (const itemId of readyItemIds) {
+        const [rows] = await connection.query<any[]>(
+          "SELECT id, pickup_status FROM order_items WHERE id = ? AND order_id = ?",
+          [itemId, orderId]
+        );
+        if (rows && rows.length > 0) {
+          const prevStatus = rows[0].pickup_status || "pending";
+          if (prevStatus === "pending") {
+            await connection.query(
+              "UPDATE order_items SET pickup_status = 'ready' WHERE id = ? AND order_id = ?",
+              [itemId, orderId]
+            );
+            await connection.query(
+              `INSERT INTO order_item_pickup_logs 
+               (order_id, order_item_id, previous_status, new_status, actor_id, actor_name, actor_role, notes) 
+               VALUES (?, ?, ?, 'ready', ?, ?, ?, 'Notifikasi kesiapan barang dikirim')`,
+              [orderId, itemId, prevStatus, actorId, actorName, actorRole]
+            );
+          }
+        }
+      }
+    }
+
+    await connection.commit();
+
+    // Send in-app and web push notification
+    const defaultTitle = title || "📦 Barang Pesanan Siap Diambil!";
+    const defaultMessage =
+      message ||
+      `Halo ${order.customer_name}, sebagian barang pesanan Anda dengan nomor #${orderId} telah siap diambil di FILKOM Merch!`;
+
+    const notifResult = await createAndSendNotification({
+      userId: order.user_id,
+      orderId: orderId,
+      customerEmail: order.customer_email,
+      customerPhone: order.customer_phone,
+      title: defaultTitle,
+      message: defaultMessage,
+      type: "PICKUP_READY",
+      link: `/orders/${orderId}`,
+    });
+
+    // Fetch updated items
+    const updatedItems = await query<any>(
+      `SELECT oi.*, p.image_url 
+       FROM order_items oi 
+       LEFT JOIN products p ON p.id = oi.product_id 
+       WHERE oi.order_id = ?`,
+      [orderId]
+    );
+
+    return res.json({
+      success: true,
+      message: "Notifikasi berhasil dikirim ke pembeli",
+      notification: notifResult,
+      items: updatedItems,
+    });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error notifying partial pickup:", error);
+    return res.status(500).json({ success: false, error: "Gagal mengirim notifikasi: " + error.message });
+  } finally {
+    connection.release();
   }
 };

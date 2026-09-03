@@ -361,6 +361,9 @@ app.get("/api/admin/orders", checkRole(["admin", "cashier"]), apiControllers.get
 app.put("/api/admin/orders/:id/status", checkRole(["admin", "cashier"]), apiControllers.updateOrderStatus);
 app.put("/api/admin/orders/:id/verify-payment", checkRole(["admin", "cashier"]), apiControllers.verifyPaymentProof);
 app.delete("/api/admin/orders/:id", checkRole(["admin"]), apiControllers.deleteOrder);
+app.put("/api/admin/orders/:orderId/items/pickup-status", checkRole(["admin", "cashier"]), apiControllers.updateOrderItemPickupStatus);
+app.get("/api/admin/orders/:orderId/pickup-logs", checkRole(["admin", "cashier"]), apiControllers.getOrderItemPickupLogs);
+app.post("/api/admin/orders/:orderId/notify-pickup", checkRole(["admin", "cashier"]), apiControllers.notifyPartialPickup);
 app.get("/api/admin/activity-logs", checkRole(["admin", "cashier"]), apiControllers.getActivityLogs);
 
 // Admin Voucher API Routes

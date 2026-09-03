@@ -14,6 +14,9 @@ import {
   User,
   UserPlus,
   CheckCircle2,
+  Calculator,
+  Coins,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@frontend/components/ui/button";
@@ -44,7 +47,8 @@ import {
   getUsersAdmin,
 } from "@backend/server-actions";
 import { bluetoothPrinter, type ReceiptData } from "@frontend/lib/bluetooth-printer";
-import { cleanProductName, cleanVariantPart } from "@frontend/lib/receipt-printer";
+import { cleanProductName, cleanVariantPart, printBrowserReceipt } from "@frontend/lib/receipt-printer";
+import { resolveImageUrl } from "@/lib/image-resolver";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logoFM from "@/assets/logo-fm.jpg";
 
@@ -222,156 +226,8 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
 
   const [currentReceiptData, setCurrentReceiptData] = useState<ReceiptData | null>(null);
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
-
-  const printBrowserReceipt = (data: ReceiptData) => {
-    const printWindow = window.open("", "_blank", "width=400,height=600");
-    if (!printWindow) {
-      toast.error("Gagal membuka jendela cetak. Pastikan pop-up diperbolehkan di browser Anda.");
-      return;
-    }
-
-    const itemsHtml = data.items
-      .map(
-        (item) => `
-      <div style="margin-bottom: 6px;">
-        <div style="font-weight: bold; word-break: break-word;">${item.name}</div>
-        <div style="display: flex; justify-content: space-between; font-size: 9px;">
-          <span>${item.qty} x Rp ${item.price.toLocaleString("id-ID")}</span>
-          <span>Rp ${item.subtotal.toLocaleString("id-ID")}</span>
-        </div>
-      </div>
-    `,
-      )
-      .join("");
-
-    const discountHtml =
-      data.discount > 0
-        ? `
-      <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
-        <span>Diskon:</span>
-        <span>-Rp ${data.discount.toLocaleString("id-ID")}</span>
-      </div>
-    `
-        : "";
-
-    const customerHtml = data.customer_name
-      ? `
-      <div>Pelanggan: ${data.customer_name}</div>
-    `
-      : "";
-
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Cetak Struk - FM</title>
-          <style>
-            @page {
-              size: 58mm auto;
-              margin: 0;
-            }
-            body {
-              width: 50mm;
-              margin: 0 auto;
-              padding: 4mm 2mm;
-              font-family: 'Courier New', Courier, monospace;
-              font-size: 10px;
-              color: #000;
-              background: #fff;
-              line-height: 1.3;
-            }
-            .text-center {
-              text-align: center;
-            }
-            .divider {
-              border-top: 1px dashed #000;
-              margin: 6px 0;
-            }
-            .header {
-              margin-bottom: 8px;
-            }
-            .logo {
-              font-size: 16px;
-              font-weight: bold;
-              letter-spacing: 2px;
-            }
-            .info {
-              font-size: 9px;
-              margin-bottom: 8px;
-            }
-            .total-section {
-              font-weight: bold;
-              margin-top: 6px;
-            }
-            .footer {
-              margin-top: 12px;
-              font-size: 9px;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header text-center">
-            <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 6px;">
-              <img src="${logoFilkom}" style="width: 42px; height: auto; filter: grayscale(100%);" />
-              <img src="${logoFM}" style="width: 42px; height: auto; filter: grayscale(100%);" />
-            </div>
-            <div style="font-size: 9px; font-weight: bold;">FILKOM MERCH</div>
-            <div style="font-size: 8px;">Universitas Brawijaya</div>
-          </div>
-          
-          <div class="divider"></div>
-          
-          <div class="info">
-            <div>No: ${data.sale_id}</div>
-            <div>Tgl: ${data.date} ${data.time}</div>
-            <div>Kasir: ${data.cashier_name}</div>
-            ${customerHtml}
-            <div>Bayar: ${data.payment_method}</div>
-          </div>
-          
-          <div class="divider"></div>
-          
-          <div class="items">
-            ${itemsHtml}
-          </div>
-          
-          <div class="divider"></div>
-          
-          <div class="total-section">
-            <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
-              <span>Subtotal:</span>
-              <span>Rp ${data.subtotal.toLocaleString("id-ID")}</span>
-            </div>
-            ${discountHtml}
-            <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin-top: 4px; border-top: 1px dashed #000; padding-top: 4px;">
-              <span>TOTAL:</span>
-              <span>Rp ${data.total.toLocaleString("id-ID")}</span>
-            </div>
-          </div>
-          
-          <div class="divider"></div>
-          
-          <div class="footer text-center">
-            <div>Terima kasih telah membeli!</div>
-            <div style="margin-top: 4px; font-style: italic; font-size: 8px;">Wear Your Faculty.</div>
-          </div>
-
-          <script>
-            window.onload = function() {
-              window.print();
-              setTimeout(function() {
-                window.close();
-              }, 500);
-            };
-          </script>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.open();
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  };
+  const [cashReceived, setCashReceived] = useState<number | string>("");
+  const [showQrisModal, setShowQrisModal] = useState(false);
 
   const handleCloseReceiptDialog = () => {
     setShowReceiptDialog(false);
@@ -381,6 +237,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     setSelectedUser(null);
     setDiscount(0);
     setNotes("");
+    setCashReceived("");
     setSearchQuery("");
   };
 
@@ -708,94 +565,111 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       setNotes("");
     }
   };
+  const recordSaleInDatabase = async (actualPaymentMethod?: string) => {
+    const isCash = (actualPaymentMethod || paymentMethod) === "Tunai" || paymentMethod === "cash";
+    const paymentMethodLabel =
+      actualPaymentMethod || (paymentMethod === "cash" ? "Tunai" : "QRIS Statis");
+
+    const saleInput: CreateSaleInput = {
+      admin_id,
+      cashier_name: admin_name,
+      payment_method: paymentMethodLabel,
+      items: cart,
+      subtotal,
+      discount,
+      tax: 0,
+      total,
+      notes: notes || undefined,
+      customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
+      customer_email: selectedUser ? selectedUser.email : undefined,
+      customer_phone: selectedUser ? (selectedUser.phone || undefined) : undefined,
+      customer_nim: selectedUser ? (selectedUser.nim || undefined) : undefined,
+      user_id: selectedUser ? selectedUser.id : undefined,
+      is_filkom_verified: selectedUser ? Boolean(selectedUser.is_filkom_verified) : undefined,
+      order_id: !isCash ? `POS-${Date.now()}` : undefined,
+    };
+
+    const result = await createSale({ data: saleInput });
+    if (!result.success) {
+      throw new Error(result.error);
+    }
+
+    const receiptData: ReceiptData = {
+      store_name,
+      sale_id: result.sale_id!,
+      date: new Date().toLocaleDateString("id-ID"),
+      time: new Date().toLocaleTimeString("id-ID"),
+      items: cart.map((item) => {
+        const cleanName = cleanProductName(item.product_name);
+        const variantParts = [cleanVariantPart(item.size), cleanVariantPart(item.color)].filter(Boolean);
+        const variantInfo = variantParts.join(" / ");
+        const displayName = variantInfo ? `${cleanName} (${variantInfo})` : cleanName;
+        return {
+          name: displayName,
+          qty: item.quantity,
+          price: item.unit_price,
+          subtotal: item.unit_price * item.quantity,
+        };
+      }),
+      subtotal,
+      discount,
+      tax: 0,
+      total,
+      payment_method: paymentMethodLabel,
+      cashier_name: admin_name,
+      customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
+    };
+
+    if (printerConnected) {
+      try {
+        await bluetoothPrinter.printReceipt(receiptData);
+      } catch {
+        // Bluetooth printer optional
+      }
+    }
+
+    toast.success(`Transaksi berhasil! #${result.sale_id}`);
+    setCurrentReceiptData(receiptData);
+    setShowReceiptDialog(true);
+    await loadData();
+  };
+
   const handlePayment = async () => {
     if (cart.length === 0) {
       toast.error("Keranjang kosong!");
       return;
     }
 
+    if (paymentMethod === "qris") {
+      setShowQrisModal(true);
+      return;
+    }
+
+    // Cash validation:
+    const cashNum = typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0;
+    if (cashNum > 0 && cashNum < total) {
+      toast.error(`Uang diterima (Rp ${cashNum.toLocaleString("id-ID")}) kurang dari total tagihan (Rp ${total.toLocaleString("id-ID")})`);
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      const saleId = `POS-${Date.now()}`;
-
-      const recordSaleInDatabase = async (actualPaymentMethod?: string) => {
-        const saleInput: CreateSaleInput = {
-          admin_id,
-          cashier_name: admin_name,
-          payment_method:
-            actualPaymentMethod || (paymentMethod === "cash" ? "Tunai" : "Online Payment"),
-          items: cart,
-          subtotal,
-          discount,
-          tax: 0,
-          total,
-          notes: notes || undefined,
-          customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
-          customer_email: selectedUser ? selectedUser.email : undefined,
-          customer_phone: selectedUser ? (selectedUser.phone || undefined) : undefined,
-          customer_nim: selectedUser ? (selectedUser.nim || undefined) : undefined,
-          user_id: selectedUser ? selectedUser.id : undefined,
-          is_filkom_verified: selectedUser ? Boolean(selectedUser.is_filkom_verified) : undefined,
-          order_id: paymentMethod !== "cash" ? saleId : undefined,
-        };
-
-        const result = await createSale({ data: saleInput });
-        if (!result.success) {
-          throw new Error(result.error);
-        }
-
-        const paymentMethodLabel =
-          actualPaymentMethod || (paymentMethod === "cash" ? "Tunai" : "Online Payment");
-
-        const receiptData: ReceiptData = {
-          store_name,
-          sale_id: result.sale_id!,
-          date: new Date().toLocaleDateString("id-ID"),
-          time: new Date().toLocaleTimeString("id-ID"),
-          items: cart.map((item) => {
-            const cleanName = cleanProductName(item.product_name);
-            const variantParts = [cleanVariantPart(item.size), cleanVariantPart(item.color)].filter(Boolean);
-            const variantInfo = variantParts.join(" / ");
-            const displayName = variantInfo ? `${cleanName} (${variantInfo})` : cleanName;
-            return {
-              name: displayName,
-              qty: item.quantity,
-              price: item.unit_price,
-              subtotal: item.unit_price * item.quantity,
-            };
-          }),
-          subtotal,
-          discount,
-          tax: 0,
-          total,
-          payment_method: paymentMethodLabel,
-          cashier_name: admin_name,
-          customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
-        };
-
-        if (printerConnected) {
-          try {
-            await bluetoothPrinter.printReceipt(receiptData);
-          } catch {
-            toast.warning("Transaksi berhasil, cetak struk gagal");
-          }
-        }
-
-        toast.success(`Transaksi berhasil! ${result.sale_id}`);
-        setCurrentReceiptData(receiptData);
-        setShowReceiptDialog(true);
-        await loadData();
-      };
-
-      if (paymentMethod === "qris") {
-        await recordSaleInDatabase("QRIS Statis");
-        setIsProcessing(false);
-      } else {
-        await recordSaleInDatabase("Tunai");
-        setIsProcessing(false);
-      }
+      await recordSaleInDatabase("Tunai");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Transaksi gagal");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleConfirmQrisPayment = async () => {
+    setIsProcessing(true);
+    try {
+      await recordSaleInDatabase("QRIS Statis");
+      setShowQrisModal(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Transaksi gagal");
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -1194,14 +1068,15 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               </div>
             </div>
 
-            <div className="space-y-1.5">
+            {/* Payment Method Selection */}
+            <div className="space-y-2">
               <p className="text-[9px] sm:text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
                 Metode Pembayaran
               </p>
               <div className="grid grid-cols-2 gap-2">
                 {(
                   [
-                    { key: "cash" as const, label: "TUNAI", icon: Banknote },
+                    { key: "cash" as const, label: "TUNAI (CASH)", icon: Banknote },
                     { key: "qris" as const, label: "QRIS STATIS", icon: QrCode },
                   ] as const
                 ).map(({ key, label, icon: Icon }) => (
@@ -1209,32 +1084,103 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     key={key}
                     type="button"
                     onClick={() => setPaymentMethod(key)}
-                    className={`flex flex-col items-center justify-center gap-1 rounded-lg py-2.5 text-[9px] font-bold tracking-wider transition-all duration-300 border cursor-pointer ${
+                    className={`flex flex-col items-center justify-center gap-1.5 rounded-lg py-2.5 text-[10px] font-bold tracking-wider transition-all duration-300 border cursor-pointer ${
                       paymentMethod === key
                         ? key === "cash"
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm font-extrabold scale-95"
-                          : "bg-amber-50 text-amber-900 border-amber-500 ring-2 ring-amber-500/20 shadow-sm font-extrabold scale-95"
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm font-extrabold"
+                          : "bg-amber-50 text-amber-900 border-amber-500 ring-2 ring-amber-500/20 shadow-sm font-extrabold"
                         : "bg-background text-muted-foreground border-border hover:bg-cream/40"
                     }`}
                   >
-                    <Icon className="h-4.5 w-4.5" />
+                    <Icon className="h-5 w-5" />
                     {label}
                   </button>
                 ))}
               </div>
-              {paymentMethod === "qris" && (
-                <div className="p-2 bg-amber-50 border border-amber-200 rounded-lg text-[10px] text-amber-900 flex items-center justify-between gap-1.5">
-                  <span className="font-semibold">📷 Scan Barcode QRIS Statis Toko</span>
-                  {storeSettings?.qris_static_url && (
-                    <a
-                      href={storeSettings.qris_static_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-bold text-amber-900 underline shrink-0"
+
+              {/* Cash Calculator & Change Section */}
+              {paymentMethod === "cash" && (
+                <div className="space-y-2 rounded-xl bg-emerald-50/60 border border-emerald-200 p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold text-emerald-900 flex items-center gap-1 uppercase">
+                      <Calculator className="w-3.5 h-3.5 text-emerald-700" /> Kalkulator Uang Tunai
+                    </span>
+                    {typeof cashReceived === "number" || (typeof cashReceived === "string" && cashReceived !== "") ? (
+                      <button
+                        type="button"
+                        onClick={() => setCashReceived("")}
+                        className="text-[9px] text-emerald-700 hover:text-emerald-950 font-bold underline cursor-pointer"
+                      >
+                        Reset
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="relative flex items-center">
+                    <span className="absolute left-2.5 text-[10px] font-bold text-emerald-700 pointer-events-none">
+                      Rp
+                    </span>
+                    <Input
+                      type="number"
+                      placeholder="Masukkan Uang Diterima..."
+                      value={cashReceived}
+                      onChange={(e) => setCashReceived(e.target.value ? parseInt(e.target.value) || 0 : "")}
+                      className="border-emerald-300 bg-white text-xs sm:text-sm text-ink pl-8 font-bold focus-visible:ring-emerald-500 h-9 rounded-md"
+                    />
+                  </div>
+
+                  {/* Quick Cash Chips */}
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setCashReceived(total)}
+                      className="text-[9px] px-2 py-1 bg-white border border-emerald-300 text-emerald-800 rounded font-bold hover:bg-emerald-100 transition cursor-pointer"
                     >
-                      Lihat QRIS
-                    </a>
-                  )}
+                      Uang Pas (Rp {total.toLocaleString("id-ID")})
+                    </button>
+                    {[20000, 50000, 100000, 200000, 500000]
+                      .filter((nom) => nom > total)
+                      .slice(0, 3)
+                      .map((nom) => (
+                        <button
+                          key={nom}
+                          type="button"
+                          onClick={() => setCashReceived(nom)}
+                          className="text-[9px] px-2 py-1 bg-white border border-emerald-300 text-emerald-800 rounded font-bold hover:bg-emerald-100 transition cursor-pointer"
+                        >
+                          Rp {nom.toLocaleString("id-ID")}
+                        </button>
+                      ))}
+                  </div>
+
+                  {/* Kembalian / Kekurangan Display */}
+                  {(typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0) >= total ? (
+                    <div className="p-2.5 bg-emerald-600 text-white rounded-lg flex justify-between items-center shadow-sm">
+                      <span className="text-[10px] font-bold tracking-wider uppercase">KEMBALIAN:</span>
+                      <span className="text-sm sm:text-base font-black">
+                        Rp {((typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0) - total).toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  ) : (typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0) > 0 ? (
+                    <div className="p-2 bg-red-100 text-red-800 border border-red-300 rounded-lg flex justify-between items-center text-[10px] font-bold">
+                      <span>UANG KURANG:</span>
+                      <span className="font-extrabold text-xs">
+                        -Rp {(total - (typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0)).toLocaleString("id-ID")}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+
+              {/* QRIS Statis Info */}
+              {paymentMethod === "qris" && (
+                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-[11px]">
+                    <QrCode className="w-3.5 h-3.5 text-amber-700" /> Pembayaran QRIS Statis
+                  </div>
+                  <p className="text-[10px] text-amber-800 leading-tight">
+                    Klik tombol di bawah untuk memunculkan QRIS toko dan konfirmasi jika pembeli sudah membayar.
+                  </p>
                 </div>
               )}
             </div>
@@ -1260,23 +1206,14 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => void handleConnectPrinter()}
-              className={`flex w-full items-center justify-center gap-2 rounded-lg py-2 text-xs transition duration-200 border cursor-pointer ${
-                printerConnected
-                  ? "bg-secondary text-brand-blue border-brand-blue/30 font-medium"
-                  : "border-border text-muted-foreground hover:bg-cream/50 bg-background"
-              }`}
-            >
-              <Printer className="h-3.5 w-3.5" />
-              {printerConnected ? "Printer Bluetooth Terhubung" : "Hubungkan Printer Bluetooth"}
-            </button>
-
             <Button
               onClick={() => void handlePayment()}
               disabled={cart.length === 0 || isProcessing}
-              className="display h-12 sm:h-14 w-full bg-ink text-white text-xs sm:text-sm font-bold tracking-widest uppercase hover:bg-brand-orange hover:shadow-lg hover:shadow-brand-orange/20 transition-all duration-300 disabled:opacity-50 rounded-lg cursor-pointer active:scale-[0.98]"
+              className={`display h-12 sm:h-14 w-full text-white text-xs sm:text-sm font-bold tracking-widest uppercase transition-all duration-300 disabled:opacity-50 rounded-lg cursor-pointer active:scale-[0.98] ${
+                paymentMethod === "qris"
+                  ? "bg-amber-600 hover:bg-amber-700 shadow-md shadow-amber-600/20"
+                  : "bg-ink hover:bg-brand-orange shadow-md shadow-brand-orange/20"
+              }`}
               size="lg"
             >
               {isProcessing ? (
@@ -1284,8 +1221,10 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   MEMPROSES...
                 </span>
+              ) : paymentMethod === "qris" ? (
+                "📱 BUKA QRIS & KONFIRMASI BAYAR"
               ) : (
-                "BAYAR & CETAK STRUK"
+                "💵 PROSES BAYAR TUNAI"
               )}
             </Button>
           </div>
@@ -1442,119 +1381,194 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
         </Dialog>
       )}
 
+      {/* Dialog QRIS Statis */}
+      <Dialog open={showQrisModal} onOpenChange={setShowQrisModal}>
+        <DialogContent className="sm:max-w-md w-[95vw] bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5">
+          <DialogHeader>
+            <DialogTitle className="display text-lg tracking-wider text-ink uppercase text-center flex items-center justify-center gap-2">
+              <QrCode className="w-5 h-5 text-brand-orange" />
+              Pembayaran QRIS Statis Toko
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 flex flex-col items-center">
+            {/* QR Image Box */}
+            <div className="bg-cream border-2 border-ink p-3 rounded-xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] flex flex-col items-center justify-center">
+              {storeSettings?.qris_static_url ? (
+                <img
+                  src={resolveImageUrl(storeSettings.qris_static_url)}
+                  alt="QRIS Toko"
+                  className="w-56 h-56 object-contain rounded-lg bg-white p-2"
+                />
+              ) : (
+                <div className="w-56 h-56 flex flex-col items-center justify-center text-center p-4 text-xs text-muted-foreground bg-white rounded-lg">
+                  <QrCode className="w-16 h-16 text-muted-foreground mb-2" />
+                  <span className="font-semibold text-ink">QRIS Statis Belum Diunggah</span>
+                  <span className="text-[10px] text-muted-foreground mt-1">Unggah gambar QRIS di Pengaturan Website Admin.</span>
+                </div>
+              )}
+            </div>
+
+            {/* Total tagihan */}
+            <div className="text-center w-full bg-amber-50 border border-amber-200 p-3.5 rounded-xl">
+              <div className="text-[11px] font-extrabold text-amber-800 uppercase tracking-wider">
+                Total Tagihan Pembeli
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-ink mt-0.5">
+                Rp {total.toLocaleString("id-ID")}
+              </div>
+              <p className="text-[11px] text-amber-900 mt-1 font-medium">
+                Minta pembeli memindai QRIS di atas dan memasukkan nominal yang tertera.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full shrink-0 mt-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowQrisModal(false)}
+              className="border-2 border-ink text-xs font-bold uppercase tracking-wider w-full h-11 cursor-pointer"
+            >
+              Batal / Tutup
+            </Button>
+            <Button
+              onClick={() => void handleConfirmQrisPayment()}
+              disabled={isProcessing}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-widest w-full h-11 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+            >
+              {isProcessing ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  MEMPROSES...
+                </span>
+              ) : (
+                "✅ SUDAH BAYAR (SELESAIKAN)"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {showReceiptDialog && currentReceiptData && (
         <Dialog
           open={showReceiptDialog}
           onOpenChange={(open) => !open && handleCloseReceiptDialog()}
         >
-          <DialogContent className="max-w-md bg-white border-2 border-ink">
-            <DialogHeader>
-              <DialogTitle className="display text-lg tracking-wider text-ink uppercase text-center">
-                Transaksi Berhasil!
+          <DialogContent className="sm:max-w-md w-[95vw] max-h-[92vh] flex flex-col bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-4 sm:p-5 overflow-hidden">
+            <DialogHeader className="shrink-0">
+              <DialogTitle className="display text-lg tracking-wider text-ink uppercase text-center flex items-center justify-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                Transaksi Sukses!
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-2 flex flex-col items-center">
-              {/* Receipt Preview */}
-              <div className="bg-white text-black p-4 w-[280px] shadow-sm border border-gray-200 font-mono text-[10px] leading-relaxed select-none">
-                <div className="text-center font-bold mb-2 flex flex-col items-center">
-                  <div className="flex justify-center items-center gap-3 mb-1.5">
-                    <img
-                      src={logoFilkom}
-                      alt="Logo FILKOM"
-                      className="w-10 h-auto grayscale filter brightness-100 contrast-100"
-                    />
-                    <img
-                      src={logoFM}
-                      alt="Logo FM"
-                      className="w-10 h-auto grayscale filter brightness-100 contrast-100"
-                    />
+            <div className="py-2 flex-1 overflow-y-auto flex flex-col items-center">
+              {/* Receipt Preview - Exact 52mm Thermal Paper Roll */}
+              <div className="bg-[#ede8dc]/50 border border-ink/10 rounded-xl p-3 sm:p-4 flex justify-center w-full overflow-x-auto">
+                <div className="w-[52mm] min-w-[52mm] max-w-[52mm] bg-white text-black px-[1.5mm] py-[3mm] shadow-md border border-gray-300 font-mono text-[8px] leading-[1.25] select-none rounded-xs">
+                  {/* Header */}
+                  <div className="text-center font-bold mb-1.5 flex flex-col items-center">
+                    <div className="flex justify-center items-center gap-2 mb-1">
+                      <img
+                        src={logoFilkom}
+                        alt="Logo FILKOM"
+                        className="w-[28px] h-auto grayscale filter brightness-100 contrast-100"
+                      />
+                      <img
+                        src={logoFM}
+                        alt="Logo FM"
+                        className="w-[28px] h-auto grayscale filter brightness-100 contrast-100"
+                      />
+                    </div>
+                    <div className="text-[10px] font-black tracking-wide">FILKOM MERCH</div>
+                    <div className="text-[7.5px] font-bold text-black">Universitas Brawijaya</div>
+                    <div className="text-[6.5px] font-normal leading-tight text-gray-700 mt-0.5 max-w-[42mm]">
+                      Gedung A Fakultas Ilmu Komputer UB<br />Lowokwaru, Kota Malang
+                    </div>
                   </div>
-                  <div className="text-[11px] font-bold tracking-wider">FILKOM MERCH</div>
-                  <div className="text-[8.5px] font-semibold text-black">Universitas Brawijaya</div>
-                  <div className="text-[7.5px] font-normal leading-tight text-gray-700 mt-1 max-w-[240px]">
-                    Gedung A Fakultas Ilmu Komputer UB, Ketawanggede, Kec. Lowokwaru, Kota Malang, Jawa Timur 65113
+
+                  <div className="border-t border-dashed border-black my-1.5"></div>
+
+                  {/* Info */}
+                  <div className="space-y-0.5 text-[7.5px]">
+                    <div><span className="font-bold">No:</span> {currentReceiptData.sale_id}</div>
+                    <div><span className="font-bold">Tgl:</span> {currentReceiptData.date} {currentReceiptData.time}</div>
+                    <div><span className="font-bold">Kasir:</span> {currentReceiptData.cashier_name}</div>
+                    {currentReceiptData.payment_method && (
+                      <div><span className="font-bold">Metode:</span> {currentReceiptData.payment_method}</div>
+                    )}
+                    {currentReceiptData.customer_name && (
+                      <div><span className="font-bold">Pelanggan:</span> {currentReceiptData.customer_name}</div>
+                    )}
                   </div>
-                </div>
 
-                <div className="border-t border-dashed border-black my-2"></div>
+                  <div className="border-t border-dashed border-black my-1.5"></div>
 
-                <div className="space-y-0.5 text-[9px]">
-                  <div>No: {currentReceiptData.sale_id}</div>
-                  <div>
-                    Tgl: {currentReceiptData.date} {currentReceiptData.time}
-                  </div>
-                  <div>Kasir: {currentReceiptData.cashier_name}</div>
-                  {currentReceiptData.customer_name && (
-                    <div>Pelanggan: {currentReceiptData.customer_name}</div>
-                  )}
-                </div>
-
-                <div className="border-t border-dashed border-black my-2"></div>
-
-                <div className="space-y-1.5">
-                  {currentReceiptData.items.map((item, idx) => (
-                    <div key={idx} className="text-[9px]">
-                      <div className="font-bold">{item.name}</div>
-                      <div className="flex justify-between text-[8px]">
-                        <span>
-                          {item.qty} x Rp {item.price.toLocaleString("id-ID")}
-                        </span>
-                        <span>Rp {item.subtotal.toLocaleString("id-ID")}</span>
+                  {/* Items */}
+                  <div className="space-y-1.5">
+                    {currentReceiptData.items.map((item, idx) => (
+                      <div key={idx} className="text-[8px]">
+                        <div className="font-bold leading-tight break-words">{item.name}</div>
+                        <div className="flex justify-between text-[7.5px] mt-0.5">
+                          <span>{item.qty} x Rp {item.price.toLocaleString("id-ID")}</span>
+                          <span className="font-bold">Rp {item.subtotal.toLocaleString("id-ID")}</span>
+                        </div>
                       </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-dashed border-black my-1.5"></div>
+
+                  {/* Totals */}
+                  <div className="space-y-0.5 text-[8px] font-bold">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>Rp {currentReceiptData.subtotal.toLocaleString("id-ID")}</span>
                     </div>
-                  ))}
-                </div>
-
-                <div className="border-t border-dashed border-black my-2"></div>
-
-                <div className="space-y-0.5 text-[9px] font-bold">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>Rp {currentReceiptData.subtotal.toLocaleString("id-ID")}</span>
-                  </div>
-                  {currentReceiptData.discount > 0 && (
-                    <div className="flex justify-between text-red-600">
-                      <span>Diskon:</span>
-                      <span>-Rp {currentReceiptData.discount.toLocaleString("id-ID")}</span>
+                    {currentReceiptData.discount > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>Diskon:</span>
+                        <span>-Rp {currentReceiptData.discount.toLocaleString("id-ID")}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between border-t border-dashed border-black mt-1 pt-1 text-[9.5px] font-black">
+                      <span>TOTAL:</span>
+                      <span>Rp {currentReceiptData.total.toLocaleString("id-ID")}</span>
                     </div>
-                  )}
-                  <div className="flex justify-between border-t border-dashed border-black mt-1 pt-1 text-xs">
-                    <span>TOTAL:</span>
-                    <span>Rp {currentReceiptData.total.toLocaleString("id-ID")}</span>
                   </div>
-                </div>
 
-                <div className="border-t border-dashed border-black my-2"></div>
+                  <div className="border-t border-dashed border-black my-1.5"></div>
 
-                <div className="text-center text-[9px] space-y-1">
-                  <div className="font-bold">Terima kasih telah membeli!</div>
-                  <div className="text-[8px] italic font-normal text-gray-500">
-                    Wear Your Faculty.
-                  </div>
-                  <div className="text-[7.5px] text-gray-600 font-normal leading-tight pt-1">
-                    <div>filkommerch.com</div>
-                    <div>IG & TikTok: @filkommerchub</div>
+                  {/* Footer */}
+                  <div className="text-center text-[7.5px] space-y-0.5">
+                    <div className="font-black">Terima kasih telah membeli!</div>
+                    <div className="text-[7px] italic font-normal text-gray-500">
+                      Wear Your Faculty.
+                    </div>
+                    <div className="text-[6.5px] text-gray-600 font-normal leading-tight pt-0.5">
+                      <div>filkommerch.com</div>
+                      <div>IG &amp; TikTok: @filkommerchub</div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
 
-            <DialogFooter className="flex w-full justify-between gap-2 sm:justify-between">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full shrink-0 pt-2">
               <Button
                 variant="outline"
                 onClick={handleCloseReceiptDialog}
-                className="border-2 border-ink text-xs font-bold uppercase tracking-wider flex-1"
+                className="border-2 border-ink text-xs font-bold uppercase tracking-wider w-full h-11 hover:bg-gray-100 cursor-pointer"
               >
-                Tutup
+                Selesai (Tanpa Struk)
               </Button>
               <Button
                 onClick={() => printBrowserReceipt(currentReceiptData)}
-                className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest flex-1 py-5 px-6 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest w-full h-11 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
               >
-                <Printer className="mr-2 h-4 w-4" /> Cetak Struk
+                <Printer className="mr-2 h-4 w-4" /> Cetak Struk (52mm)
               </Button>
-            </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       )}
@@ -1754,25 +1768,25 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
 
       {/* Modal Dialog for Customer Selection */}
       <Dialog open={showUserModal} onOpenChange={setShowUserModal}>
-        <DialogContent className="sm:max-w-md bg-card text-ink border-2 border-ink shadow-2xl">
-          <DialogHeader>
+        <DialogContent className="sm:max-w-lg w-[95vw] max-h-[90vh] flex flex-col bg-white text-ink border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-4 sm:p-5 overflow-hidden">
+          <DialogHeader className="shrink-0">
             <DialogTitle className="text-base font-extrabold uppercase flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-brand-orange" />
               Pilih Pelanggan Terdaftar
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div className="relative">
+          <div className="space-y-3 py-2 flex-1 overflow-hidden flex flex-col">
+            <div className="relative shrink-0">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Cari berdasarkan Nama, Email, atau NIM..."
                 value={userSearchQuery}
                 onChange={(e) => setUserSearchQuery(e.target.value)}
-                className="pl-9 text-xs sm:text-sm border-2 border-ink rounded-lg focus-visible:ring-brand-orange"
+                className="pl-9 text-xs sm:text-sm border-2 border-ink rounded-lg focus-visible:ring-brand-orange w-full"
               />
             </div>
 
-            <ScrollArea className="h-[280px] rounded-md border border-border p-2">
+            <div className="max-h-[300px] overflow-y-auto space-y-1.5 p-1 rounded-lg border border-border w-full">
               {filteredRegisteredUsers.length === 0 ? (
                 <div className="text-center py-8 text-xs text-muted-foreground space-y-2">
                   <p className="font-semibold">Pelanggan tidak ditemukan.</p>
@@ -1782,7 +1796,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 w-full">
                   {filteredRegisteredUsers.map((u) => {
                     const isFilkom = Boolean(u.is_filkom_verified);
                     const isSelected = selectedUser?.id === u.id;
@@ -1800,8 +1814,8 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                             : "border-border/80 bg-background"
                         }`}
                       >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
+                        <div className="min-w-0 flex-1 overflow-hidden">
+                          <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-bold text-xs sm:text-sm text-ink truncate">
                               {u.name}
                             </span>
@@ -1836,9 +1850,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   })}
                 </div>
               )}
-            </ScrollArea>
+            </div>
           </div>
-          <DialogFooter className="flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-border pt-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-border pt-3 w-full shrink-0">
             <p className="text-[10px] text-muted-foreground">
               * Transaksi akan otomatis terhubung ke akun pelanggan.
             </p>
@@ -1846,11 +1860,11 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               variant="outline"
               size="sm"
               onClick={() => setShowUserModal(false)}
-              className="text-xs font-bold border-ink"
+              className="text-xs font-bold border-ink cursor-pointer"
             >
               Tutup
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

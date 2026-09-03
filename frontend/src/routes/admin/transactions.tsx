@@ -16,6 +16,7 @@ import {
   DialogFooter,
 } from "@frontend/components/ui/dialog";
 import { SendNotificationModal } from "@/components/SendNotificationModal";
+import { PartialPickupModal } from "@/components/PartialPickupModal";
 import {
   Select,
   SelectContent,
@@ -51,6 +52,7 @@ import {
   Megaphone,
   FileText,
   Printer,
+  PackageCheck,
 } from "lucide-react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logoFM from "@/assets/logo-fm.jpg";
@@ -167,6 +169,19 @@ const getFulfillmentStatusBadge = (order: any) => {
 };
 
 const getStatusBadgeTextAndColor = getPaymentStatusBadge;
+
+const formatCompactDateTime = (dateStr: string | Date | null | undefined) => {
+  if (!dateStr) return { date: "-", time: "" };
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return { date: String(dateStr), time: "" };
+    const date = d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" });
+    const time = d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+    return { date, time };
+  } catch {
+    return { date: String(dateStr), time: "" };
+  }
+};
 
 type SortField = "no" | "order_id" | "customer_name" | "gross_amount" | "payment_status" | "fulfillment_status" | "created_at";
 type SortDirection = "asc" | "desc";
@@ -328,14 +343,88 @@ function AdminTransactionsPage() {
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
-  const handleOpenReceiptModal = () => {
+  const handleOpenReceiptModal = (customItems?: any[]) => {
     if (!managedTransaction) return;
     const cashierDisplayName = isCashier
       ? ((user as any)?.name || "Kasir")
       : (managedTransaction.cashier_name || (user as any)?.name || "Admin");
-    const data = formatTransactionToReceiptData(managedTransaction, managedItems, cashierDisplayName);
+    const data = formatTransactionToReceiptData(managedTransaction, customItems || managedItems, cashierDisplayName);
     setReceiptData(data);
     setReceiptModalOpen(true);
+  };
+
+  const handleDirectPrintReceipt = async (id: string, type: "online" | "offline") => {
+    try {
+      const cashierDisplayName = isCashier
+        ? ((user as any)?.name || "Kasir")
+        : ((user as any)?.name || "Admin");
+
+      if (type === "online") {
+        let order = onlineOrders.find((o) => o.order_id === id);
+        let items = rowItems[id];
+        if (!items || items.length === 0) {
+          const res = await getOrderById({ data: id });
+          if (res.success && res.order) {
+            order = res.order;
+            items = res.items || [];
+          }
+        }
+        if (order) {
+          const data = formatTransactionToReceiptData(order, items || [], cashierDisplayName);
+          setReceiptData(data);
+          setReceiptModalOpen(true);
+        } else {
+          toast.error("Data pesanan tidak ditemukan");
+        }
+      } else {
+        let sale = offlineSales.find((s) => s.sale_id === id);
+        let items = rowItems[id];
+        if (!items || items.length === 0) {
+          const res = await getOfflineSaleById({ data: id });
+          if (res.success && res.sale) {
+            sale = res.sale;
+            items = res.items || [];
+          }
+        }
+        if (sale) {
+          const data = formatTransactionToReceiptData(sale, items || [], cashierDisplayName);
+          setReceiptData(data);
+          setReceiptModalOpen(true);
+        } else {
+          toast.error("Data penjualan POS tidak ditemukan");
+        }
+      }
+    } catch (e) {
+      console.error("Gagal memuat struk:", e);
+      toast.error("Gagal memuat struk transaksi");
+    }
+  };
+
+  // Partial Pickup Modal States
+  const [partialPickupModalOpen, setPartialPickupModalOpen] = useState(false);
+  const [partialPickupOrder, setPartialPickupOrder] = useState<any>(null);
+  const [partialPickupItems, setPartialPickupItems] = useState<any[]>([]);
+
+  const handleOpenPartialPickup = async (order?: any) => {
+    const targetOrder = order || managedTransaction;
+    if (!targetOrder) return;
+    setPartialPickupOrder(targetOrder);
+
+    if (order && order.order_id !== managedTransaction?.order_id) {
+      try {
+        const result = await getOrderById({ data: order.order_id });
+        if (result.success && result.items) {
+          setPartialPickupItems(result.items);
+        } else {
+          setPartialPickupItems(order.items || []);
+        }
+      } catch {
+        setPartialPickupItems(order.items || []);
+      }
+    } else {
+      setPartialPickupItems(managedItems || []);
+    }
+    setPartialPickupModalOpen(true);
   };
 
   // Quick Complete / Pickup States & Handlers (Solusi 2)
@@ -1842,20 +1931,325 @@ function AdminTransactionsPage() {
                 </div>
               )}
             </CardHeader>
-            <CardContent>
-              <div className="border rounded-lg overflow-x-auto">
+            <CardContent className="p-3 sm:p-6">
+              {/* Responsive Mobile Card View (< lg screens) */}
+              <div className="block lg:hidden space-y-3">
+                {groupByCustomer ? (
+                  sortedGroupedCustomerOrders.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground font-bold bg-white rounded-xl border-2 border-ink/20">
+                      Tidak ada data pembeli yang cocok dengan filter
+                    </div>
+                  ) : (
+                    sortedGroupedCustomerOrders.map((group, idx) => {
+                      const isExpanded = !!expandedRows[`group-${group.key}`];
+                      return (
+                        <div key={group.key} className="bg-white border-2 border-ink/20 rounded-xl p-3.5 shadow-sm space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="font-black text-ink uppercase text-sm tracking-wide">
+                                {group.customer_name}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground font-medium">
+                                {group.orders.length} Transaksi Tergabung
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] text-muted-foreground block font-bold">Total</span>
+                              <span className="font-mono font-black text-ink text-sm">
+                                Rp {Number(group.total_amount).toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-dashed border-border text-xs">
+                            <div>
+                              {group.pending_count === 0 ? (
+                                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold text-[10px]">
+                                  {group.paid_count} Lunas Terbayar
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-amber-100 text-amber-950 border-amber-300 font-bold text-[10px]">
+                                  {group.paid_count} Lunas • {group.pending_count} Pending
+                                </Badge>
+                              )}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 border-2 border-ink text-xs font-bold"
+                              onClick={() => {
+                                setExpandedRows((prev) => ({ ...prev, [`group-${group.key}`]: !isExpanded }));
+                              }}
+                            >
+                              {isExpanded ? "Tutup Detail" : `Lihat ${group.orders.length} Pesanan`}
+                            </Button>
+                          </div>
+
+                          {isExpanded && (
+                            <div className="space-y-2 pt-2 border-t border-border">
+                              {group.orders.map((subOrder) => (
+                                <div
+                                  key={subOrder.order_id}
+                                  className="p-3 bg-amber-50/40 border border-ink/20 rounded-lg space-y-2"
+                                >
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="font-mono font-bold text-brand-blue">{subOrder.order_id}</span>
+                                    <span className="font-black text-ink font-mono">
+                                      Rp {Number(subOrder.gross_amount).toLocaleString("id-ID")}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between text-[11px]">
+                                    <span className="text-muted-foreground">
+                                      {new Date(subOrder.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "short" })}
+                                    </span>
+                                    {(() => {
+                                      const payBadge = getPaymentStatusBadge(subOrder, dpPelunasanMap[subOrder.order_id]);
+                                      return (
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold border ${payBadge.color}`}>
+                                          {payBadge.text}
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
+                                  <div className="flex items-center justify-end gap-1.5 pt-1">
+                                    {subOrder.order_status !== "completed" && !isCashier && (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => void handleOpenPartialPickup(subOrder)}
+                                        className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase border-2 border-ink flex items-center gap-1 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                                        title="Pengambilan / Serah Terima Pesanan"
+                                      >
+                                        <PackageCheck className="w-3 h-3" />
+                                        <span>{subOrder.fulfillment_type === "shipping" ? "Selesai" : "Pengambilan"}</span>
+                                      </Button>
+                                    )}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs font-black border-2 border-ink bg-white"
+                                      onClick={() => void handleOpenManagement(subOrder.order_id, "online")}
+                                    >
+                                      Kelola
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )
+                ) : sortedOnlineOrders.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground font-bold bg-white rounded-xl border-2 border-ink/20">
+                    Tidak ada pesanan online yang cocok
+                  </div>
+                ) : (
+                  sortedOnlineOrders.map((order, idx) => {
+                    const payBadge = getPaymentStatusBadge(order, dpPelunasanMap[order.order_id]);
+                    const fulBadge = getFulfillmentStatusBadge(order);
+                    const isExpanded = !!expandedRows[order.order_id];
+                    const addr = String((order as any).shipping_address || "").toLowerCase();
+                    const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
+                    const dt = formatCompactDateTime(order.created_at);
+
+                    return (
+                      <div
+                        key={order.order_id}
+                        className={`bg-white border-2 border-ink/20 rounded-xl p-3.5 shadow-sm space-y-2.5 transition-all ${
+                          order.voucher_code || order.discount_amount > 0 ? "border-orange-300 bg-orange-50/20" : ""
+                        }`}
+                      >
+                        {/* Card Top: Order ID + Tags + Date */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-xs font-black text-brand-blue">{order.order_id}</span>
+                            {isDpOrder(order) && (
+                              <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-[9px] px-1 py-0 font-black">
+                                DP
+                              </Badge>
+                            )}
+                            {dpPelunasanMap[order.order_id] && (
+                              <Badge className="bg-purple-100 text-purple-900 border-purple-300 text-[9px] px-1 py-0 font-black">
+                                +Pelunasan
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 text-[11px] text-muted-foreground shrink-0 font-medium">
+                            <Clock className="w-3 h-3 text-muted-foreground/60" />
+                            <span>{dt.date}, {dt.time}</span>
+                          </div>
+                        </div>
+
+                        {/* Customer & Total Row */}
+                        <div className="flex items-start justify-between gap-2 pt-1 border-t border-border/40">
+                          <div className="min-w-0">
+                            <p className="font-extrabold text-ink uppercase text-xs truncate">
+                              {order.customer_name}
+                            </p>
+                            <div className="flex items-center gap-1 mt-0.5">
+                              {isPickup ? (
+                                <Badge className="bg-emerald-50 text-emerald-950 border-emerald-300 text-[9px] px-1.5 py-0 uppercase font-extrabold flex items-center gap-1">
+                                  <Store className="w-2.5 h-2.5 text-emerald-700" /> Ambil Store
+                                </Badge>
+                              ) : (
+                                <Badge className="bg-blue-50 text-blue-950 border-blue-300 text-[9px] px-1.5 py-0 uppercase font-extrabold flex items-center gap-1">
+                                  <Truck className="w-2.5 h-2.5 text-blue-700" /> Diantar
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] text-muted-foreground block font-bold">Total Belanja</span>
+                            <span className="font-mono font-black text-ink text-sm">
+                              Rp {Number(order.gross_amount).toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Badges Status */}
+                        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                          <Badge className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${payBadge.color}`}>
+                            {payBadge.text}
+                          </Badge>
+                          <Badge className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${fulBadge.color}`}>
+                            {fulBadge.text}
+                          </Badge>
+                        </div>
+
+                        {/* Connected Pelunasan Banner in Mobile Card */}
+                        {dpPelunasanMap[order.order_id] && (() => {
+                          const linkedLns = dpPelunasanMap[order.order_id];
+                          const lnsBadge = getStatusBadgeTextAndColor(linkedLns);
+                          return (
+                            <div className="p-2.5 bg-purple-50 border border-purple-300 rounded-lg text-xs space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black text-purple-900 uppercase">↪ Pelunasan Terhubung</span>
+                                <Badge className={`px-1.5 py-0 text-[9px] font-bold uppercase ${lnsBadge.color}`}>
+                                  {lnsBadge.text}
+                                </Badge>
+                              </div>
+                              <div className="flex items-center justify-between font-mono text-[11px]">
+                                <span className="text-purple-900 font-bold">{linkedLns.order_id}</span>
+                                <span className="font-black text-purple-950">
+                                  Sisa: Rp {Number(linkedLns.gross_amount).toLocaleString("id-ID")}
+                                </span>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleOpenManagement(linkedLns.order_id, "online")}
+                                className="w-full h-7 border border-purple-900 bg-purple-600 text-white font-black text-[10px] uppercase shadow-xs"
+                              >
+                                Kelola Pelunasan ↗
+                              </Button>
+                            </div>
+                          );
+                        })()}
+
+                        {/* Inline items accordion if expanded */}
+                        {isExpanded && (
+                          <div className="p-2.5 bg-cream/40 border border-border rounded-lg space-y-2 text-xs">
+                            <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase pb-1 border-b border-border">
+                              <span>Daftar Item</span>
+                              <span>Subtotal</span>
+                            </div>
+                            {rowItemsLoading[order.order_id] ? (
+                              <p className="text-[11px] text-muted-foreground animate-pulse">Memuat item...</p>
+                            ) : (
+                              (rowItems[order.order_id] || []).map((item: any, i: number) => (
+                                <div key={i} className="flex justify-between items-center text-xs py-0.5">
+                                  <div className="min-w-0 pr-2">
+                                    <p className="font-bold text-ink truncate uppercase">{item.product_name}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {item.quantity}x • {[item.size, item.color].filter(Boolean).join(" / ") || "Default"}
+                                    </p>
+                                  </div>
+                                  <span className="font-mono font-bold text-brand-blue shrink-0">
+                                    Rp {Number(item.subtotal).toLocaleString("id-ID")}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {/* Action Buttons Bar */}
+                        <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-border">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void toggleRow(order.order_id, "online")}
+                            className="h-8 px-2 text-[11px] font-bold text-muted-foreground hover:text-ink"
+                          >
+                            {isExpanded ? (
+                              <span className="flex items-center gap-1"><ChevronUp className="w-3.5 h-3.5" /> Tutup Item</span>
+                            ) : (
+                              <span className="flex items-center gap-1"><ChevronDown className="w-3.5 h-3.5" /> Lihat Item</span>
+                            )}
+                          </Button>
+
+                          <div className="flex items-center gap-1.5">
+                            {order.order_status !== "completed" && order.order_status !== "cancelled" && !isCashier && (
+                              <Button
+                                size="sm"
+                                onClick={() => void handleOpenPartialPickup(order)}
+                                className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase border-2 border-ink shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer"
+                                title="Pengambilan / Serah Terima Pesanan"
+                              >
+                                <PackageCheck className="w-3.5 h-3.5" />
+                                <span>{order.fulfillment_type === "shipping" ? "Selesai" : "Pengambilan"}</span>
+                              </Button>
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleOpenManagement(order.order_id, "online")}
+                              className="h-8 px-2.5 border-2 border-ink bg-white text-ink font-bold text-xs uppercase shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)]"
+                            >
+                              Kelola
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleDirectPrintReceipt(order.order_id, "online")}
+                              className="h-8 px-2 border-2 border-ink bg-white hover:bg-cream text-ink font-bold text-xs uppercase shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer"
+                              title="Cetak Struk"
+                            >
+                              <Printer className="w-3.5 h-3.5 text-brand-orange" />
+                              <span className="hidden sm:inline">Struk</span>
+                            </Button>
+                            {!isCashier && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:bg-red-50"
+                                onClick={() => void handleDeleteOrder(order.order_id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Compact Desktop Table View (lg+ screens) */}
+              <div className="hidden lg:block border rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-cream">
                     <tr>
-                      <th className="w-10 p-3"></th>
-                      <SortHeaderColumn label="NO" field="no" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      <th className="w-9 p-2.5"></th>
+                      <SortHeaderColumn label="NO" field="no" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
                       <SortHeaderColumn label="ORDER ID" field="order_id" currentField={sortField} direction={sortDirection} onSort={handleSort} />
                       <SortHeaderColumn label="PELANGGAN" field="customer_name" currentField={sortField} direction={sortDirection} onSort={handleSort} />
                       <SortHeaderColumn label="TOTAL" field="gross_amount" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
-                      <SortHeaderColumn label="STATUS PEMBAYARAN" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
-                      <SortHeaderColumn label="STATUS PENERIMAAN" field="fulfillment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                      <SortHeaderColumn label="STATUS" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
                       <SortHeaderColumn label="TANGGAL" field="created_at" currentField={sortField} direction={sortDirection} onSort={handleSort} />
-                      <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
+                      <th className="p-2.5 text-right text-xs font-semibold tracking-wider text-ink uppercase pr-4">
                         Aksi
                       </th>
                     </tr>
@@ -1864,7 +2258,7 @@ function AdminTransactionsPage() {
                     {groupByCustomer ? (
                       sortedGroupedCustomerOrders.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="p-8 text-center text-muted-foreground font-bold">
+                          <td colSpan={8} className="p-8 text-center text-muted-foreground font-bold">
                             Tidak ada data pembeli yang cocok dengan filter
                           </td>
                         </tr>
@@ -1874,7 +2268,7 @@ function AdminTransactionsPage() {
                           return (
                             <Fragment key={group.key}>
                               <tr className="border-t border-border hover:bg-cream/20 transition-colors">
-                                <td className="p-3 text-center">
+                                <td className="p-2.5 text-center">
                                   <Button
                                     variant="ghost"
                                     size="icon"
@@ -1890,60 +2284,64 @@ function AdminTransactionsPage() {
                                     )}
                                   </Button>
                                 </td>
-                                <td className="p-3 font-semibold text-xs text-ink">{idx + 1}</td>
-                                <td className="p-3 font-mono text-xs">
+                                <td className="p-2.5 font-semibold text-xs text-ink text-center">{idx + 1}</td>
+                                <td className="p-2.5 font-mono text-xs">
                                   <Badge className="bg-blue-100 text-blue-900 border-blue-300 font-bold text-[10px] uppercase">
                                     {group.orders.length} Transaksi
                                   </Badge>
-                                  <div className="text-[10px] text-muted-foreground mt-0.5 max-w-[200px] truncate font-mono">
+                                  <div className="text-[10px] text-muted-foreground mt-0.5 max-w-[180px] truncate font-mono">
                                     {group.orders.map((o) => o.order_id).join(", ")}
                                   </div>
                                 </td>
-                                <td className="p-3">
-                                  <p className="font-bold text-ink uppercase text-xs tracking-wide">
+                                <td className="p-2.5">
+                                  <p className="font-bold text-ink uppercase text-xs tracking-wide truncate max-w-[180px]">
                                     {group.customer_name}
                                   </p>
-                                  <p className="text-[10px] text-muted-foreground">
-                                    {group.customer_email} {group.customer_phone !== "-" ? `• ${group.customer_phone}` : ""}
-                                  </p>
                                 </td>
-                                <td className="p-3 text-right font-black text-ink">
+                                <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
                                   Rp {Number(group.total_amount).toLocaleString("id-ID")}
                                 </td>
-                                <td className="p-3 text-center">
-                                  {group.pending_count === 0 ? (
-                                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold text-[10px]">
-                                      {group.paid_count} Lunas Terbayar
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="bg-amber-100 text-amber-950 border-amber-300 font-bold text-[10px]">
-                                      {group.paid_count} Lunas • {group.pending_count} Pending
-                                    </Badge>
-                                  )}
+                                <td className="p-2.5 text-center whitespace-nowrap">
+                                  <div className="inline-flex flex-col items-center gap-1">
+                                    {group.pending_count === 0 ? (
+                                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold text-[10px]">
+                                        {group.paid_count} Lunas
+                                      </Badge>
+                                    ) : (
+                                      <Badge className="bg-amber-100 text-amber-950 border-amber-300 font-bold text-[10px]">
+                                        {group.paid_count} Lunas • {group.pending_count} Pending
+                                      </Badge>
+                                    )}
+                                    <span className="text-[10px] text-muted-foreground font-semibold">
+                                      {group.orders.length} Pesanan
+                                    </span>
+                                  </div>
                                 </td>
-                                <td className="p-3 text-center text-xs text-muted-foreground font-bold">
-                                  {group.orders.length} Transaksi Tergabung
+                                <td className="p-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                                  <div className="font-medium text-ink text-[11px] leading-tight">
+                                    {formatCompactDateTime(group.latest_created_at).date}
+                                  </div>
+                                  <div className="text-[10px] text-muted-foreground font-mono">
+                                    {formatCompactDateTime(group.latest_created_at).time}
+                                  </div>
                                 </td>
-                                <td className="p-3 text-xs text-muted-foreground font-medium">
-                                  {new Date(group.latest_created_at).toLocaleString("id-ID")}
-                                </td>
-                                <td className="p-3 text-right">
+                                <td className="p-2.5 text-right whitespace-nowrap pr-4">
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="h-8 border-2 border-ink text-xs font-bold"
+                                    className="h-7 border-2 border-ink text-xs font-bold"
                                     onClick={() => {
                                       setExpandedRows((prev) => ({ ...prev, [`group-${group.key}`]: !isExpanded }));
                                     }}
                                   >
-                                    {isExpanded ? "Tutup Detail" : "Lihat Rincian"}
+                                    {isExpanded ? "Tutup" : "Rincian"}
                                   </Button>
                                 </td>
                               </tr>
 
                               {isExpanded && (
                                 <tr>
-                                  <td colSpan={9} className="p-4 bg-amber-50/40 border-t border-b border-border">
+                                  <td colSpan={8} className="p-4 bg-amber-50/40 border-t border-b border-border">
                                     <div className="space-y-3 pl-2 sm:pl-4">
                                       <p className="text-xs font-black uppercase text-ink tracking-wider flex items-center gap-2">
                                         <Users className="w-4 h-4 text-brand-orange" />
@@ -1983,26 +2381,26 @@ function AdminTransactionsPage() {
                                                 );
                                               })()}
                                               <div className="flex items-center gap-1.5">
-                                                 {subOrder.order_status !== "completed" && !isCashier && (
-                                                     <Button
-                                                       size="sm"
-                                                       onClick={() => handleOpenQuickComplete(subOrder)}
-                                                       className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
-                                                       title="Tandai pesanan sudah diambil / selesai dan unggah foto bukti"
-                                                     >
-                                                       <CheckCircle2 className="w-3.5 h-3.5" />
-                                                       <span>{subOrder.fulfillment_type === "shipping" ? "Selesai" : "Diambil"}</span>
-                                                     </Button>
-                                                   )}
-                                                 <Button
-                                                   variant="outline"
-                                                   size="sm"
-                                                   className="h-8 text-xs font-black border-2 border-ink bg-white hover:bg-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-                                                   onClick={() => void handleOpenManagement(subOrder.order_id, "online")}
-                                                 >
-                                                   Kelola
-                                                 </Button>
-                                               </div>
+                                                {subOrder.order_status !== "completed" && !isCashier && (
+                                                  <Button
+                                                    size="sm"
+                                                    onClick={() => void handleOpenPartialPickup(subOrder)}
+                                                    className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                                                    title="Pengambilan / Serah Terima Pesanan"
+                                                  >
+                                                    <PackageCheck className="w-3.5 h-3.5" />
+                                                    <span>{subOrder.fulfillment_type === "shipping" ? "Selesai" : "Pengambilan"}</span>
+                                                  </Button>
+                                                )}
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="h-8 text-xs font-black border-2 border-ink bg-white hover:bg-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                                                  onClick={() => void handleOpenManagement(subOrder.order_id, "online")}
+                                                >
+                                                  Kelola
+                                                </Button>
+                                              </div>
                                             </div>
                                           </div>
                                         ))}
@@ -2017,21 +2415,21 @@ function AdminTransactionsPage() {
                       )
                     ) : sortedOnlineOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="p-8 text-center text-muted-foreground">
+                        <td colSpan={8} className="p-8 text-center text-muted-foreground">
                           Tidak ada pesanan online yang cocok
                         </td>
                       </tr>
                     ) : (
                       sortedOnlineOrders.map((order, idx) => (
-                        <>
+                        <Fragment key={order.order_id}>
                           <tr
-                            key={order.order_id}
-                            className={`border-t border-border transition-colors ${order.voucher_code || order.discount_amount > 0
-                              ? "bg-orange-50/50 hover:bg-orange-100/60"
-                              : "hover:bg-cream/10"
-                              }`}
+                            className={`border-t border-border transition-colors ${
+                              order.voucher_code || order.discount_amount > 0
+                                ? "bg-orange-50/50 hover:bg-orange-100/60"
+                                : "hover:bg-cream/10"
+                            }`}
                           >
-                            <td className="p-3 text-center">
+                            <td className="p-2.5 text-center">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -2045,106 +2443,121 @@ function AdminTransactionsPage() {
                                 )}
                               </Button>
                             </td>
-                            <td className="p-3 font-semibold text-xs text-ink">
+                            <td className="p-2.5 font-semibold text-xs text-ink text-center">
                               {idx + 1}
                             </td>
-                            <td className="p-3 font-mono text-xs text-brand-blue font-bold">
+                            <td className="p-2.5 font-mono text-xs text-brand-blue font-bold whitespace-nowrap">
                               <div>{order.order_id}</div>
-                              <div className="flex flex-wrap gap-1 mt-1">
-                                {isDpOrder(order) && (
-                                  <Badge className="bg-amber-100 text-amber-800 border-amber-300 text-[9px] px-1.5 py-0 uppercase font-black">
-                                    Pesanan DP
-                                  </Badge>
-                                )}
-                                {dpPelunasanMap[order.order_id] && (
-                                  <Badge className="bg-purple-100 text-purple-800 border-purple-300 text-[9px] px-1.5 py-0 uppercase font-black">
-                                    + Pelunasan
-                                  </Badge>
-                                )}
+                              <div className="flex items-center gap-1 mt-1 flex-wrap">
                                 {(() => {
                                   const addr = String((order as any).shipping_address || "").toLowerCase();
                                   const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
                                   return isPickup ? (
-                                    <Badge className="bg-emerald-50 text-emerald-950 border-emerald-300 text-[9px] px-1.5 py-0 uppercase font-extrabold flex items-center gap-1">
-                                      <Store className="w-2.5 h-2.5 text-emerald-700" /> Ambil Store
-                                    </Badge>
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-950 border border-emerald-300">
+                                      <Store className="w-2.5 h-2.5 text-emerald-700" /> Ambil
+                                    </span>
                                   ) : (
-                                    <Badge className="bg-blue-50 text-blue-950 border-blue-300 text-[9px] px-1.5 py-0 uppercase font-extrabold flex items-center gap-1" title={order.shipping_address || undefined}>
-                                      <Truck className="w-2.5 h-2.5 text-blue-700" /> Diantar
+                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 text-blue-950 border border-blue-300">
+                                      <Truck className="w-2.5 h-2.5 text-blue-700" /> Antar
+                                    </span>
+                                  );
+                                })()}
+                                {isDpOrder(order) && (
+                                  <span className="px-1 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                                    DP
+                                  </span>
+                                )}
+                                {dpPelunasanMap[order.order_id] && (
+                                  <span className="px-1 py-0.2 rounded text-[9px] font-black bg-purple-100 text-purple-900 border border-purple-300">
+                                    +Lunas
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-2.5">
+                              <p className="font-bold text-ink uppercase text-xs truncate max-w-[150px] xl:max-w-[190px]" title={order.customer_name}>
+                                {order.customer_name}
+                              </p>
+                            </td>
+                            <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
+                              Rp {Number(order.gross_amount).toLocaleString("id-ID")}
+                            </td>
+                            <td className="p-2.5 text-center whitespace-nowrap">
+                              <div className="inline-flex flex-col items-center gap-1">
+                                {(() => {
+                                  const payBadge = getPaymentStatusBadge(order, dpPelunasanMap[order.order_id]);
+                                  return (
+                                    <Badge
+                                      className={`px-2 py-0.2 rounded-full text-[9px] font-black uppercase tracking-wider ${payBadge.color}`}
+                                    >
+                                      {payBadge.text}
+                                    </Badge>
+                                  );
+                                })()}
+                                {(() => {
+                                  const fulBadge = getFulfillmentStatusBadge(order);
+                                  return (
+                                    <Badge
+                                      className={`px-2 py-0.2 rounded-full text-[9px] font-bold uppercase tracking-wider ${fulBadge.color}`}
+                                    >
+                                      {fulBadge.text}
                                     </Badge>
                                   );
                                 })()}
                               </div>
                             </td>
-                            <td className="p-3">
-                              <p className="font-semibold text-ink uppercase text-xs tracking-wide">
-                                {order.customer_name}
-                              </p>
-                              <p className="text-[10px] text-muted-foreground">
-                                {order.customer_email}
-                              </p>
-                            </td>
-                            <td className="p-3 text-right font-bold text-ink">
-                              Rp {Number(order.gross_amount).toLocaleString("id-ID")}
-                            </td>
-                            <td className="p-3 text-center">
+                            <td className="p-2.5 text-xs text-muted-foreground whitespace-nowrap">
                               {(() => {
-                                const payBadge = getPaymentStatusBadge(order, dpPelunasanMap[order.order_id]);
+                                const dt = formatCompactDateTime(order.created_at);
                                 return (
-                                  <Badge
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${payBadge.color}`}
-                                  >
-                                    {payBadge.text}
-                                  </Badge>
+                                  <>
+                                    <div className="font-medium text-ink text-[11px] leading-tight">{dt.date}</div>
+                                    <div className="text-[10px] text-muted-foreground font-mono">{dt.time}</div>
+                                  </>
                                 );
                               })()}
                             </td>
-                            <td className="p-3 text-center">
-                              {(() => {
-                                const fulBadge = getFulfillmentStatusBadge(order);
-                                return (
-                                  <Badge
-                                    className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider ${fulBadge.color}`}
-                                  >
-                                    {fulBadge.text}
-                                  </Badge>
-                                );
-                              })()}
-                            </td>
-                            <td className="p-3 text-xs text-muted-foreground">
-                              {new Date(order.created_at).toLocaleString("id-ID")}
-                            </td>
-                            <td className="p-3 text-right">
-                              <div className="flex justify-end gap-1.5 items-center">
+                            <td className="p-2.5 text-right whitespace-nowrap pr-4">
+                              <div className="flex justify-end gap-1 items-center">
                                 {order.order_status !== "completed" &&
                                   order.order_status !== "cancelled" &&
                                   !isCashier && (
                                     <Button
                                       size="sm"
-                                      onClick={() => handleOpenQuickComplete(order)}
-                                      className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
-                                      title="Tandai pesanan sudah diambil / selesai dan unggah foto bukti"
+                                      onClick={() => void handleOpenPartialPickup(order)}
+                                      className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer transition-colors"
+                                      title="Pengambilan / Serah Terima Pesanan (Penuh atau Parsial)"
                                     >
-                                      <CheckCircle2 className="w-3.5 h-3.5" />
-                                      <span>{order.fulfillment_type === "shipping" ? "Selesai" : "Diambil"}</span>
+                                      <PackageCheck className="w-3.5 h-3.5" />
+                                      <span>{order.fulfillment_type === "shipping" ? "Selesai" : "Pengambilan"}</span>
                                     </Button>
                                   )}
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   onClick={() => void handleOpenManagement(order.order_id, "online")}
-                                  className="border-2 border-ink hover:bg-cream text-ink font-bold text-xs uppercase tracking-wider flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                                  className="h-7 px-2.5 border border-ink hover:bg-cream text-ink font-bold text-xs uppercase shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]"
                                 >
                                   Kelola
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void handleDirectPrintReceipt(order.order_id, "online")}
+                                  className="h-7 w-7 p-0 border border-ink hover:bg-cream text-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center justify-center cursor-pointer"
+                                  title="Cetak Struk Transaksi"
+                                >
+                                  <Printer className="w-3.5 h-3.5 text-brand-orange" />
                                 </Button>
                                 {!isCashier && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="text-destructive hover:bg-red-50"
+                                    className="h-7 w-7 text-destructive hover:bg-red-50"
                                     onClick={() => void handleDeleteOrder(order.order_id)}
+                                    title="Hapus Pesanan"
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
                               </div>
@@ -2155,27 +2568,27 @@ function AdminTransactionsPage() {
                             const lnsBadge = getStatusBadgeTextAndColor(linkedLns);
                             return (
                               <tr className="bg-purple-50/80 border-b-2 border-purple-300">
-                                <td colSpan={9} className="p-2.5 px-6">
-                                  <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
+                                <td colSpan={8} className="p-2 px-4">
+                                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                                     <div className="flex items-center gap-2">
-                                      <span className="px-2 py-0.5 bg-purple-700 text-white rounded font-black text-[10px] uppercase tracking-wider">
-                                        ↪ Transaksi Pelunasan Terhubung
+                                      <span className="px-1.5 py-0.2 bg-purple-700 text-white rounded font-black text-[9px] uppercase tracking-wider">
+                                        ↪ Pelunasan Terhubung
                                       </span>
-                                      <span className="font-mono font-black text-purple-950">
+                                      <span className="font-mono font-black text-purple-950 text-[11px]">
                                         {linkedLns.order_id}
                                       </span>
                                       <span className="text-[10px] text-purple-700 font-medium">
-                                        ({new Date(linkedLns.created_at).toLocaleString("id-ID")})
+                                        ({formatCompactDateTime(linkedLns.created_at).date})
                                       </span>
                                     </div>
 
-                                    <div className="flex items-center gap-3">
-                                      <span className="text-purple-800 text-[10px] font-bold">Sisa Pelunasan:</span>
-                                      <span className="font-bold text-purple-950 font-mono">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-purple-800 text-[10px] font-bold">Sisa:</span>
+                                      <span className="font-bold text-purple-950 font-mono text-[11px]">
                                         Rp {Number(linkedLns.gross_amount).toLocaleString("id-ID")}
                                       </span>
 
-                                      <Badge className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${lnsBadge.color}`}>
+                                      <Badge className={`px-2 py-0.2 rounded-full text-[9px] font-bold uppercase tracking-wider ${lnsBadge.color}`}>
                                         {lnsBadge.text}
                                       </Badge>
 
@@ -2183,7 +2596,7 @@ function AdminTransactionsPage() {
                                         variant="outline"
                                         size="sm"
                                         onClick={() => void handleOpenManagement(linkedLns.order_id, "online")}
-                                        className="border-2 border-purple-900 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[10px] uppercase tracking-wider h-7 shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] cursor-pointer"
+                                        className="border border-purple-900 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[9px] uppercase tracking-wider h-6 px-2 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
                                       >
                                         Kelola Pelunasan ↗
                                       </Button>
@@ -2191,11 +2604,11 @@ function AdminTransactionsPage() {
                                         <Button
                                           variant="ghost"
                                           size="icon"
-                                          className="h-7 w-7 text-red-600 hover:bg-red-100/80 cursor-pointer"
+                                          className="h-6 w-6 text-red-600 hover:bg-red-100/80 cursor-pointer"
                                           title="Hapus transaksi pelunasan ini"
                                           onClick={() => void handleDeleteOrder(linkedLns.order_id)}
                                         >
-                                          <Trash2 className="h-3.5 w-3.5" />
+                                          <Trash2 className="h-3 w-3" />
                                         </Button>
                                       )}
                                     </div>
@@ -2206,7 +2619,7 @@ function AdminTransactionsPage() {
                           })()}
                           {expandedRows[order.order_id] && (
                             <tr className="bg-[#FCFAF7] border-b border-border">
-                              <td colSpan={9} className="p-4 pl-12">
+                              <td colSpan={8} className="p-3 pl-8 sm:pl-12">
                                 {rowItemsLoading[order.order_id] ? (
                                   <p className="text-xs text-muted-foreground animate-pulse">Memuat item...</p>
                                 ) : (
@@ -2270,7 +2683,7 @@ function AdminTransactionsPage() {
                               </td>
                             </tr>
                           )}
-                        </>
+                        </Fragment>
                       ))
                     )}
                   </tbody>
@@ -2287,25 +2700,152 @@ function AdminTransactionsPage() {
                 Penjualan Offline / POS ({sortedOfflineSales.length})
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="border rounded-lg overflow-x-auto">
+            <CardContent className="p-3 sm:p-6">
+              {/* Responsive Mobile Card View (< lg screens) */}
+              <div className="block lg:hidden space-y-3">
+                {sortedOfflineSales.length === 0 ? (
+                  <div className="p-8 text-center text-muted-foreground font-bold bg-white rounded-xl border-2 border-ink/20">
+                    Tidak ada penjualan offline
+                  </div>
+                ) : (
+                  sortedOfflineSales.map((sale, idx) => {
+                    const isExpanded = !!expandedRows[sale.sale_id];
+                    const dt = formatCompactDateTime(sale.created_at);
+                    return (
+                      <div
+                        key={sale.sale_id}
+                        className="bg-white border-2 border-ink/20 rounded-xl p-3.5 shadow-sm space-y-2.5"
+                      >
+                        {/* Top: Sale ID + Status + Date */}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono text-xs font-black text-brand-blue">{sale.sale_id}</span>
+                          <div className="flex items-center gap-1.5">
+                            <Badge
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColor[sale.status] || statusColor.completed}`}
+                            >
+                              {sale.status}
+                            </Badge>
+                            <span className="text-[11px] text-muted-foreground font-medium">
+                              {dt.date}, {dt.time}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Customer & Total Row */}
+                        <div className="flex items-start justify-between gap-2 pt-1 border-t border-border/40">
+                          <div>
+                            <p className="font-bold text-ink uppercase text-xs">
+                              {sale.customer_name || "Walk-in"}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground">
+                              Kasir: {sale.cashier_name || "-"} • {sale.payment_method}
+                            </p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <span className="text-[10px] text-muted-foreground block font-bold">Total</span>
+                            <span className="font-mono font-black text-ink text-sm">
+                              Rp {Number(sale.total).toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Inline items accordion if expanded */}
+                        {isExpanded && (
+                          <div className="p-2.5 bg-cream/40 border border-border rounded-lg space-y-2 text-xs">
+                            <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase pb-1 border-b border-border">
+                              <span>Daftar Item</span>
+                              <span>Subtotal</span>
+                            </div>
+                            {rowItemsLoading[sale.sale_id] ? (
+                              <p className="text-[11px] text-muted-foreground animate-pulse">Memuat item...</p>
+                            ) : (
+                              (rowItems[sale.sale_id] || []).map((item: any, i: number) => (
+                                <div key={i} className="flex justify-between items-center text-xs py-0.5">
+                                  <div className="min-w-0 pr-2">
+                                    <p className="font-bold text-ink truncate uppercase">{item.product_name}</p>
+                                    <p className="text-[10px] text-muted-foreground">
+                                      {item.quantity}x • {[item.size, item.color].filter(Boolean).join(" / ") || "Default"}
+                                    </p>
+                                  </div>
+                                  <span className="font-mono font-bold text-brand-blue shrink-0">
+                                    Rp {Number(item.subtotal).toLocaleString("id-ID")}
+                                  </span>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        )}
+
+                        {/* Action buttons */}
+                        <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-border">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void toggleRow(sale.sale_id, "offline")}
+                            className="h-8 px-2 text-[11px] font-bold text-muted-foreground hover:text-ink"
+                          >
+                            {isExpanded ? (
+                              <span className="flex items-center gap-1"><ChevronUp className="w-3.5 h-3.5" /> Tutup Item</span>
+                            ) : (
+                              <span className="flex items-center gap-1"><ChevronDown className="w-3.5 h-3.5" /> Lihat Item</span>
+                            )}
+                          </Button>
+                          <div className="flex items-center gap-1.5">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleOpenManagement(sale.sale_id, "offline")}
+                              className="h-8 px-3 border-2 border-ink bg-white text-ink font-bold text-xs uppercase shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)]"
+                            >
+                              Kelola
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => void handleDirectPrintReceipt(sale.sale_id, "offline")}
+                              className="h-8 px-2 border-2 border-ink bg-white hover:bg-cream text-ink font-bold text-xs uppercase shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer"
+                              title="Cetak Struk POS"
+                            >
+                              <Printer className="w-3.5 h-3.5 text-brand-orange" />
+                              <span className="hidden sm:inline">Struk</span>
+                            </Button>
+                            {!isCashier && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:bg-red-50"
+                                onClick={() => void handleDeleteSale(sale.sale_id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Compact Desktop Table View (lg+ screens) */}
+              <div className="hidden lg:block border rounded-lg overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-cream">
                     <tr>
-                      <th className="w-10 p-3"></th>
-                      <SortHeaderColumn label="NO" field="no" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      <th className="w-9 p-2.5"></th>
+                      <SortHeaderColumn label="NO" field="no" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
                       <SortHeaderColumn label="SALE ID" field="order_id" currentField={sortField} direction={sortDirection} onSort={handleSort} />
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
+                      <th className="p-2.5 text-left text-xs font-semibold tracking-wider text-ink uppercase">
                         Kasir
                       </th>
                       <SortHeaderColumn label="PELANGGAN" field="customer_name" currentField={sortField} direction={sortDirection} onSort={handleSort} />
                       <SortHeaderColumn label="TOTAL" field="gross_amount" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
-                      <th className="p-3 text-left text-xs font-semibold tracking-wider text-ink uppercase">
+                      <th className="p-2.5 text-left text-xs font-semibold tracking-wider text-ink uppercase">
                         Pembayaran
                       </th>
                       <SortHeaderColumn label="STATUS" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
                       <SortHeaderColumn label="TANGGAL" field="created_at" currentField={sortField} direction={sortDirection} onSort={handleSort} />
-                      <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
+                      <th className="p-2.5 text-right text-xs font-semibold tracking-wider text-ink uppercase pr-4">
                         Aksi
                       </th>
                     </tr>
@@ -2319,12 +2859,11 @@ function AdminTransactionsPage() {
                       </tr>
                     ) : (
                       sortedOfflineSales.map((sale, idx) => (
-                        <>
+                        <Fragment key={sale.sale_id}>
                           <tr
-                            key={sale.sale_id}
                             className="border-t border-border hover:bg-cream/10 transition-colors"
                           >
-                            <td className="p-3 text-center">
+                            <td className="p-2.5 text-center">
                               <Button
                                 variant="ghost"
                                 size="icon"
@@ -2338,52 +2877,69 @@ function AdminTransactionsPage() {
                                 )}
                               </Button>
                             </td>
-                            <td className="p-3 font-semibold text-xs text-ink">
+                            <td className="p-2.5 font-semibold text-xs text-ink text-center">
                               {idx + 1}
                             </td>
-                            <td className="p-3 font-mono text-xs text-brand-blue font-bold">
+                            <td className="p-2.5 font-mono text-xs text-brand-blue font-bold whitespace-nowrap">
                               {sale.sale_id}
                             </td>
-                            <td className="p-3 font-semibold text-ink uppercase text-xs tracking-wide">
+                            <td className="p-2.5 font-semibold text-ink uppercase text-xs tracking-wide truncate max-w-[120px]">
                               {sale.cashier_name || "-"}
                             </td>
-                            <td className="p-3 font-medium text-ink">
+                            <td className="p-2.5 font-medium text-ink truncate max-w-[150px]">
                               {sale.customer_name || "Walk-in"}
                             </td>
-                            <td className="p-3 text-right font-bold text-ink">
+                            <td className="p-2.5 text-right font-bold text-ink whitespace-nowrap">
                               Rp {Number(sale.total).toLocaleString("id-ID")}
                             </td>
-                            <td className="p-3 text-muted-foreground text-xs">
+                            <td className="p-2.5 text-muted-foreground text-xs whitespace-nowrap">
                               {sale.payment_method}
                             </td>
-                            <td className="p-3 text-center">
+                            <td className="p-2.5 text-center whitespace-nowrap">
                               <Badge
-                                className={`px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase tracking-wider ${statusColor[sale.status] || statusColor.completed}`}
+                                className={`px-2 py-0.2 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor[sale.status] || statusColor.completed}`}
                               >
                                 {sale.status}
                               </Badge>
                             </td>
-                            <td className="p-3 text-xs text-muted-foreground">
-                              {new Date(sale.created_at).toLocaleString("id-ID")}
+                            <td className="p-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                              {(() => {
+                                const dt = formatCompactDateTime(sale.created_at);
+                                return (
+                                  <>
+                                    <div className="font-medium text-ink text-[11px] leading-tight">{dt.date}</div>
+                                    <div className="text-[10px] text-muted-foreground font-mono">{dt.time}</div>
+                                  </>
+                                );
+                              })()}
                             </td>
-                            <td className="p-3 text-right">
+                            <td className="p-2.5 text-right whitespace-nowrap pr-4">
                               <div className="flex justify-end gap-1 items-center">
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   onClick={() => void handleOpenManagement(sale.sale_id, "offline")}
-                                  className="border-2 border-ink hover:bg-cream text-ink font-bold text-xs uppercase tracking-wider flex items-center gap-1 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                                  className="h-7 px-2.5 border border-ink hover:bg-cream text-ink font-bold text-xs uppercase shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]"
                                 >
                                   Kelola
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => void handleDirectPrintReceipt(sale.sale_id, "offline")}
+                                  className="h-7 w-7 p-0 border border-ink hover:bg-cream text-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center justify-center cursor-pointer"
+                                  title="Cetak Struk POS"
+                                >
+                                  <Printer className="w-3.5 h-3.5 text-brand-orange" />
                                 </Button>
                                 {!isCashier && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="text-destructive hover:bg-red-50"
+                                    className="h-7 w-7 text-destructive hover:bg-red-50"
                                     onClick={() => void handleDeleteSale(sale.sale_id)}
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </Button>
                                 )}
                               </div>
@@ -2391,7 +2947,7 @@ function AdminTransactionsPage() {
                           </tr>
                           {expandedRows[sale.sale_id] && (
                             <tr className="bg-[#FCFAF7] border-b border-border">
-                              <td colSpan={10} className="p-4 pl-12">
+                              <td colSpan={10} className="p-3 pl-8 sm:pl-12">
                                 {rowItemsLoading[sale.sale_id] ? (
                                   <p className="text-xs text-muted-foreground animate-pulse">Memuat item...</p>
                                 ) : (
@@ -2443,7 +2999,7 @@ function AdminTransactionsPage() {
                               </td>
                             </tr>
                           )}
-                        </>
+                        </Fragment>
                       ))
                     )}
                   </tbody>
@@ -2926,7 +3482,20 @@ function AdminTransactionsPage() {
                 <div className="space-y-4">
                   {/* Items List */}
                   <div className="border border-border rounded-lg p-4 bg-white shadow-sm space-y-3">
-                    <h4 className="text-xs font-bold text-ink uppercase tracking-wider">Item Yang Dibeli</h4>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold text-ink uppercase tracking-wider">Item Yang Dibeli</h4>
+                      {managedType === "online" && (
+                        <button
+                          type="button"
+                          onClick={() => void handleOpenPartialPickup()}
+                          className="flex items-center gap-1.5 text-[11px] font-black bg-brand-orange/10 hover:bg-brand-orange/20 text-brand-orange border border-brand-orange/30 px-2.5 py-1 rounded-lg transition-all shadow-2xs cursor-pointer"
+                          title="Buka checklist pengambilan parsial dan kirim notifikasi"
+                        >
+                          <PackageCheck className="w-3.5 h-3.5" />
+                          <span>Pengambilan Parsial & Notif</span>
+                        </button>
+                      )}
+                    </div>
                     <div className="border border-border rounded overflow-x-auto text-xs">
                       <table className="w-full">
                         <thead className="bg-cream">
@@ -2936,6 +3505,9 @@ function AdminTransactionsPage() {
                             <th className="p-2 text-right text-ink font-semibold">Harga</th>
                             <th className="p-2 text-center text-ink font-semibold">Qty</th>
                             <th className="p-2 text-right text-ink font-semibold">Total</th>
+                            {managedType === "online" && (
+                              <th className="p-2 text-center text-ink font-semibold">Status Ambil</th>
+                            )}
                           </tr>
                         </thead>
                         <tbody>
@@ -2952,6 +3524,23 @@ function AdminTransactionsPage() {
                               <td className="p-2 text-right font-bold text-brand-blue">
                                 Rp {Number(item.subtotal).toLocaleString("id-ID")}
                               </td>
+                              {managedType === "online" && (
+                                <td className="p-2 text-center">
+                                  {item.pickup_status === "picked_up" ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-300">
+                                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Diambil
+                                    </span>
+                                  ) : item.pickup_status === "ready" ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded border border-blue-300">
+                                      <PackageCheck className="w-3 h-3 text-blue-600" /> Siap
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded border border-amber-300">
+                                      <Clock className="w-3 h-3 text-amber-600" /> Menyusul
+                                    </span>
+                                  )}
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </tbody>
@@ -3522,77 +4111,7 @@ function AdminTransactionsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Quick Complete / Pickup Modal Dialog (Solusi 2) */}
-      <Dialog open={quickCompleteOpen} onOpenChange={setQuickCompleteOpen}>
-        <DialogContent className="max-w-md bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5">
-          <DialogHeader>
-            <DialogTitle className="display text-lg tracking-wide text-ink flex items-center gap-2 uppercase">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-              Konfirmasi Pengambilan Pesanan
-            </DialogTitle>
-          </DialogHeader>
 
-          {quickCompleteOrder && (
-            <div className="space-y-4 py-2 text-xs">
-              <div className="bg-cream/40 border-2 border-ink/30 p-3 rounded-xl space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-muted-foreground text-[10px] uppercase">No. Pesanan:</span>
-                  <span className="font-mono font-black text-brand-blue text-xs">{quickCompleteOrder.order_id}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-muted-foreground text-[10px] uppercase">Pembeli:</span>
-                  <span className="font-extrabold text-ink uppercase">{quickCompleteOrder.customer_name}</span>
-                </div>
-                {quickCompleteOrder.customer_nim && (
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold text-muted-foreground text-[10px] uppercase">NIM:</span>
-                    <span className="font-medium text-ink">{quickCompleteOrder.customer_nim}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center border-t border-ink/10 pt-1.5 mt-1">
-                  <span className="font-bold text-muted-foreground text-[10px] uppercase">Total Tagihan:</span>
-                  <span className="font-black text-brand-orange text-xs">Rp {Number(quickCompleteOrder.gross_amount).toLocaleString("id-ID")}</span>
-                </div>
-              </div>
-
-              {/* Live Camera / Photo Bukti Pengambilan (Wajib) */}
-              <div className="pt-1">
-                <LiveCameraCapture
-                  value={quickCompleteProof}
-                  onChange={(url) => setQuickCompleteProof(url)}
-                  onRemove={() => setQuickCompleteProof("")}
-                  resolveImageUrl={(url) => resolveImageUrl(url) || url}
-                  isRequired={true}
-                  label="Foto Bukti Serah Terima / Pengambilan Barang"
-                />
-              </div>
-            </div>
-          )}
-
-          <DialogFooter className="mt-2 border-t pt-3 flex w-full justify-between gap-2 sm:justify-between">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                setQuickCompleteOpen(false);
-                setQuickCompleteOrder(null);
-                setQuickCompleteProof("");
-              }}
-              className="border-2 border-ink text-xs font-bold uppercase tracking-wider flex-1"
-            >
-              Batal
-            </Button>
-            <Button
-              type="button"
-              disabled={!quickCompleteProof || uploadingQuickProof || savingQuickComplete}
-              onClick={() => void handleConfirmQuickComplete()}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 disabled:text-gray-500 text-white text-xs font-black uppercase tracking-wider flex-1 py-5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-            >
-              {savingQuickComplete ? "Menyimpan..." : "✅ Selesaikan Pesanan"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Receipt Modal Preview Dialog */}
       {receiptModalOpen && receiptData && (
@@ -3607,92 +4126,112 @@ function AdminTransactionsPage() {
         >
           <DialogContent className="max-w-md bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
             <DialogHeader>
-              <DialogTitle className="display text-lg tracking-wider text-ink uppercase text-center">
-                Struk Transaksi
+              <DialogTitle className="display text-base sm:text-lg tracking-wider text-ink uppercase text-center flex items-center justify-center gap-2">
+                <Printer className="w-4 h-4 text-brand-orange" />
+                <span>Struk Transaksi (52mm Thermal)</span>
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-2 flex flex-col items-center">
-              {/* Receipt Preview */}
-              <div className="bg-white text-black p-4 w-[280px] shadow-sm border border-gray-200 font-mono text-[10px] leading-relaxed select-none">
-                <div className="text-center font-bold mb-2 flex flex-col items-center">
-                  <div className="flex justify-center items-center gap-3 mb-1.5">
-                    <img
-                      src={logoFilkom}
-                      alt="Logo FILKOM"
-                      className="w-10 h-auto grayscale filter brightness-100 contrast-100"
-                    />
-                    <img
-                      src={logoFM}
-                      alt="Logo FM"
-                      className="w-10 h-auto grayscale filter brightness-100 contrast-100"
-                    />
+            <div className="py-2 flex flex-col items-center w-full">
+              {/* Receipt Preview - Exact 52mm Thermal Paper Roll */}
+              <div className="bg-[#ede8dc]/50 border border-ink/10 rounded-xl p-3 sm:p-4 flex justify-center w-full overflow-x-auto">
+                <div className="w-[52mm] min-w-[52mm] max-w-[52mm] bg-white text-black px-[1.5mm] py-[3mm] shadow-md border border-gray-300 font-mono text-[8px] leading-[1.25] select-none rounded-xs">
+                  {/* Header */}
+                  <div className="text-center font-bold mb-1.5 flex flex-col items-center">
+                    <div className="flex justify-center items-center gap-2 mb-1">
+                      <img
+                        src={logoFilkom}
+                        alt="Logo FILKOM"
+                        className="w-[28px] h-auto grayscale filter brightness-100 contrast-100"
+                      />
+                      <img
+                        src={logoFM}
+                        alt="Logo FM"
+                        className="w-[28px] h-auto grayscale filter brightness-100 contrast-100"
+                      />
+                    </div>
+                    <div className="text-[10px] font-black tracking-wide">FILKOM MERCH</div>
+                    <div className="text-[7.5px] font-bold text-black">Universitas Brawijaya</div>
+                    <div className="text-[6.5px] font-normal leading-tight text-gray-700 mt-0.5 max-w-[42mm]">
+                      Gedung A Fakultas Ilmu Komputer UB<br />Lowokwaru, Kota Malang
+                    </div>
                   </div>
-                  <div className="text-[11px] font-bold tracking-wider">FILKOM MERCH</div>
-                  <div className="text-[8.5px] font-semibold text-black">Universitas Brawijaya</div>
-                  <div className="text-[7.5px] font-normal leading-tight text-gray-700 mt-1 max-w-[240px]">
-                    Gedung A Fakultas Ilmu Komputer UB, Ketawanggede, Kec. Lowokwaru, Kota Malang, Jawa Timur 65113
+
+                  <div className="border-t border-dashed border-black my-1.5"></div>
+
+                  {/* Info */}
+                  <div className="space-y-0.5 text-[7.5px]">
+                    <div><span className="font-bold">No:</span> {receiptData.sale_id}</div>
+                    <div><span className="font-bold">Tgl:</span> {receiptData.date} {receiptData.time}</div>
+                    <div><span className="font-bold">Kasir:</span> {receiptData.cashier_name}</div>
+                    {receiptData.payment_method && (
+                      <div><span className="font-bold">Metode:</span> {receiptData.payment_method}</div>
+                    )}
+                    {receiptData.customer_name && (
+                      <div><span className="font-bold">Pelanggan:</span> {receiptData.customer_name}</div>
+                    )}
                   </div>
-                </div>
 
-                <div className="border-t border-dashed border-black my-2"></div>
+                  <div className="border-t border-dashed border-black my-1.5"></div>
 
-                <div className="space-y-0.5 text-[9px]">
-                  <div>No: {receiptData.sale_id}</div>
-                  <div>
-                    Tgl: {receiptData.date} {receiptData.time}
+                  {/* Items */}
+                  <div className="space-y-1.5">
+                    {receiptData.items.map((item, idx) => {
+                      const isReadyOrPicked = item.pickup_status === "picked_up" || item.pickup_status === "ready";
+                      const isPending = item.pickup_status === "pending";
+                      return (
+                        <div key={idx} className="text-[8px]">
+                          <div className="font-bold leading-tight break-words">
+                            {isReadyOrPicked && <span className="font-black mr-0.5">[✓] </span>}
+                            {isPending && <span className="font-normal text-gray-600 mr-0.5">[ ] </span>}
+                            {item.name}
+                            {isPending && (
+                              <span className="text-[6.5px] font-bold border border-black px-0.5 ml-1 inline-block">
+                                (MENYUSUL)
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex justify-between text-[7.5px] mt-0.5">
+                            <span>{item.qty} x Rp {item.price.toLocaleString("id-ID")}</span>
+                            <span className="font-bold">Rp {item.subtotal.toLocaleString("id-ID")}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <div>Kasir: {receiptData.cashier_name}</div>
-                  {receiptData.customer_name && (
-                    <div>Pelanggan: {receiptData.customer_name}</div>
-                  )}
-                </div>
 
-                <div className="border-t border-dashed border-black my-2"></div>
+                  <div className="border-t border-dashed border-black my-1.5"></div>
 
-                <div className="space-y-1.5">
-                  {receiptData.items.map((item, idx) => (
-                    <div key={idx} className="text-[9px]">
-                      <div className="font-bold">{item.name}</div>
-                      <div className="flex justify-between text-[8px]">
-                        <span>
-                          {item.qty} x Rp {item.price.toLocaleString("id-ID")}
-                        </span>
-                        <span>Rp {item.subtotal.toLocaleString("id-ID")}</span>
+                  {/* Totals */}
+                  <div className="space-y-0.5 text-[8px] font-bold">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>Rp {receiptData.subtotal.toLocaleString("id-ID")}</span>
+                    </div>
+                    {receiptData.discount > 0 && (
+                      <div className="flex justify-between text-red-600">
+                        <span>Diskon:</span>
+                        <span>-Rp {receiptData.discount.toLocaleString("id-ID")}</span>
                       </div>
+                    )}
+                    <div className="flex justify-between border-t border-dashed border-black mt-1 pt-1 text-[9.5px] font-black">
+                      <span>TOTAL:</span>
+                      <span>Rp {receiptData.total.toLocaleString("id-ID")}</span>
                     </div>
-                  ))}
-                </div>
-
-                <div className="border-t border-dashed border-black my-2"></div>
-
-                <div className="space-y-0.5 text-[9px] font-bold">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>Rp {receiptData.subtotal.toLocaleString("id-ID")}</span>
                   </div>
-                  {receiptData.discount > 0 && (
-                    <div className="flex justify-between text-red-600">
-                      <span>Diskon:</span>
-                      <span>-Rp {receiptData.discount.toLocaleString("id-ID")}</span>
+
+                  <div className="border-t border-dashed border-black my-1.5"></div>
+
+                  {/* Footer */}
+                  <div className="text-center text-[7.5px] space-y-0.5">
+                    <div className="font-black">Terima kasih telah membeli!</div>
+                    <div className="text-[7px] italic font-normal text-gray-500">
+                      Wear Your Faculty.
                     </div>
-                  )}
-                  <div className="flex justify-between border-t border-dashed border-black mt-1 pt-1 text-xs">
-                    <span>TOTAL:</span>
-                    <span>Rp {receiptData.total.toLocaleString("id-ID")}</span>
-                  </div>
-                </div>
-
-                <div className="border-t border-dashed border-black my-2"></div>
-
-                <div className="text-center text-[9px] space-y-1">
-                  <div className="font-bold">Terima kasih telah membeli!</div>
-                  <div className="text-[8px] italic font-normal text-gray-500">
-                    Wear Your Faculty.
-                  </div>
-                  <div className="text-[7.5px] text-gray-600 font-normal leading-tight pt-1">
-                    <div>filkommerch.com</div>
-                    <div>IG & TikTok: @filkommerchub</div>
+                    <div className="text-[6.5px] text-gray-600 font-normal leading-tight pt-0.5">
+                      <div>filkommerch.com</div>
+                      <div>IG &amp; TikTok: @filkommerchub</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -4141,6 +4680,61 @@ function AdminTransactionsPage() {
       <SentNotificationsHistoryModal
         isOpen={isHistoryModalOpen}
         onClose={() => setIsHistoryModalOpen(false)}
+      />
+
+      {/* Partial Pickup Management Modal */}
+      <PartialPickupModal
+        isOpen={partialPickupModalOpen}
+        onClose={() => setPartialPickupModalOpen(false)}
+        order={partialPickupOrder}
+        items={partialPickupItems}
+        currentUser={{
+          id: (user as any)?.id,
+          name: (user as any)?.name,
+          role: (user as any)?.role,
+        }}
+        onOrderCompleted={async (proofUrl) => {
+          if (!partialPickupOrder) return;
+          try {
+            const result = await updateOrderStatus({
+              data: {
+                id: partialPickupOrder.order_id,
+                status: "completed",
+                shipping_address: partialPickupOrder.shipping_address || "Ambil di FILKOM Merch (gratis)",
+                fulfillment_type: partialPickupOrder.fulfillment_type || "pickup",
+                fulfillment_proof_url: proofUrl,
+              },
+            });
+            if (result.success) {
+              toast.success(`Pesanan #${partialPickupOrder.order_id} berhasil diselesaikan (seluruh barang diambil)!`);
+              await loadTransactions();
+              setPartialPickupModalOpen(false);
+              setPartialPickupOrder(null);
+            } else {
+              toast.error(result.error || "Gagal menyelesaikan pesanan");
+            }
+          } catch {
+            toast.error("Terjadi kesalahan saat menyelesaikan pesanan");
+          }
+        }}
+        onItemsUpdated={(updatedItems) => {
+          setPartialPickupItems(updatedItems);
+          if (managedTransaction && managedTransaction.order_id === partialPickupOrder?.order_id) {
+            setManagedItems(updatedItems);
+          }
+          // Refresh list
+          loadTransactions();
+        }}
+        onPrintReceipt={() => {
+          if (partialPickupOrder) {
+            const cashierDisplayName = isCashier
+              ? ((user as any)?.name || "Kasir")
+              : (partialPickupOrder.cashier_name || (user as any)?.name || "Admin");
+            const data = formatTransactionToReceiptData(partialPickupOrder, partialPickupItems, cashierDisplayName);
+            setReceiptData(data);
+            setReceiptModalOpen(true);
+          }
+        }}
       />
     </div>
   );

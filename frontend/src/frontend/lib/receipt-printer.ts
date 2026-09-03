@@ -77,10 +77,12 @@ export function formatTransactionToReceiptData(
     const qty = Number(item.quantity) || 1;
     const price = Number(item.unit_price ?? item.price ?? 0);
     const subtotal = Number(item.subtotal ?? (qty * price));
-    return { name, qty, price, subtotal };
+    const pickup_status = item.pickup_status;
+    return { name, qty, price, subtotal, pickup_status };
   });
 
-  const subtotal = Number(transaction.subtotal || transaction.gross_amount || 0);
+  const itemsSum = formattedItems.reduce((acc, it) => acc + (it.subtotal || 0), 0);
+  const subtotal = Number(transaction.subtotal) || (itemsSum > 0 ? itemsSum : Number(transaction.gross_amount || 0));
   const discount = Number(transaction.discount || transaction.discount_amount || 0);
   const tax = Number(transaction.tax || transaction.tax_amount || 0);
   const total = Number(transaction.gross_amount || transaction.total || (subtotal - discount + tax));
@@ -103,116 +105,160 @@ export function formatTransactionToReceiptData(
     total,
     payment_method: paymentMethod,
     cashier_name: transaction.cashier_name || cashierName || "Admin",
-    customer_name: transaction.customer_name || undefined,
+    customer_name: transaction.customer_name || transaction.user_name || transaction.name || undefined,
   };
 }
 
 export function printBrowserReceipt(data: ReceiptData) {
-  const printWindow = window.open("", "_blank", "width=400,height=600");
-  if (!printWindow) {
-    toast.error("Gagal membuka jendela cetak. Pastikan pop-up diperbolehkan di browser Anda.");
-    return;
-  }
-
   const itemsHtml = data.items
-    .map(
-      (item) => `
-    <div style="margin-bottom: 6px;">
-      <div style="font-weight: bold; word-break: break-word;">${item.name}</div>
-      <div style="display: flex; justify-content: space-between; font-size: 9px;">
+    .map((item) => {
+      const isReadyOrPicked = item.pickup_status === "picked_up" || item.pickup_status === "ready";
+      const isPending = item.pickup_status === "pending";
+      const checkmark = isReadyOrPicked
+        ? '<span style="font-weight: 900; margin-right: 2px;">[✓]</span> '
+        : isPending
+          ? '<span style="font-weight: normal; color: #555; margin-right: 2px;">[ ]</span> '
+          : "";
+      const suffixBadge = isPending
+        ? ' <span style="font-size: 7px; font-weight: bold; border: 1px solid #000; padding: 0 1px;">(MENYUSUL)</span>'
+        : "";
+
+      return `
+    <div style="margin-bottom: 4px;">
+      <div style="font-weight: bold; word-break: break-word; font-size: 8.5px; line-height: 1.2;">${checkmark}${item.name}${suffixBadge}</div>
+      <div style="display: flex; justify-content: space-between; font-size: 8px; margin-top: 1px;">
         <span>${item.qty} x Rp ${item.price.toLocaleString("id-ID")}</span>
-        <span>Rp ${item.subtotal.toLocaleString("id-ID")}</span>
+        <span style="font-weight: bold;">Rp ${item.subtotal.toLocaleString("id-ID")}</span>
       </div>
     </div>
-  `,
-    )
+  `;
+    })
     .join("");
 
   const discountHtml =
     data.discount > 0
       ? `
-    <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
+    <div style="display: flex; justify-content: space-between; font-size: 8.5px; margin-bottom: 2px;">
       <span>Diskon:</span>
       <span>-Rp ${data.discount.toLocaleString("id-ID")}</span>
     </div>
   `
       : "";
 
+  const paymentMethodHtml = data.payment_method
+    ? `<div><strong>Metode:</strong> ${data.payment_method}</div>`
+    : "";
+
   const customerHtml = data.customer_name
-    ? `
-    <div>Pelanggan: ${data.customer_name}</div>
-  `
+    ? `<div><strong>Pelanggan:</strong> ${data.customer_name}</div>`
     : "";
 
   const htmlContent = `
     <!DOCTYPE html>
     <html>
       <head>
-        <title>Cetak Struk - FM</title>
+        <meta charset="utf-8" />
+        <title>Cetak Struk - ${data.sale_id}</title>
         <style>
           @page {
-            size: 58mm auto;
+            size: 52mm auto;
             margin: 0;
           }
-          body {
-            width: 50mm;
+          * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+          html, body {
+            width: 48mm;
+            max-width: 48mm;
             margin: 0 auto;
-            padding: 4mm 2mm;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 10px;
+            padding: 2mm 0.5mm 5mm 0.5mm;
+            font-family: 'Consolas', 'Courier New', Courier, monospace;
+            font-size: 8px;
             color: #000;
             background: #fff;
-            line-height: 1.3;
+            line-height: 1.25;
           }
           .text-center {
             text-align: center;
           }
           .divider {
             border-top: 1px dashed #000;
-            margin: 6px 0;
+            margin: 4px 0;
           }
           .header {
-            margin-bottom: 8px;
-          }
-          .logo {
-            font-size: 16px;
-            font-weight: bold;
-            letter-spacing: 2px;
+            margin-bottom: 5px;
           }
           .info {
-            font-size: 9px;
-            margin-bottom: 8px;
+            font-size: 7.5px;
+            margin-bottom: 4px;
+            line-height: 1.3;
           }
           .total-section {
             font-weight: bold;
-            margin-top: 6px;
+            margin-top: 3px;
           }
           .footer {
-            margin-top: 12px;
-            font-size: 9px;
+            margin-top: 6px;
+            font-size: 7.5px;
+          }
+          .no-print-bar {
+            text-align: center;
+            padding: 6px;
+            background: #f3f4f6;
+            margin-bottom: 6px;
+            border-radius: 4px;
+            font-family: sans-serif;
+          }
+          .no-print-btn {
+            background: #ea580c;
+            color: #fff;
+            border: none;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 11px;
+            cursor: pointer;
+          }
+          @media print {
+            .no-print-bar {
+              display: none !important;
+            }
+            html, body {
+              width: 48mm !important;
+              max-width: 48mm !important;
+              margin: 0 auto !important;
+              padding: 0 !important;
+            }
           }
         </style>
       </head>
       <body>
+        <div class="no-print-bar">
+          <button class="no-print-btn" onclick="window.print()">🖨️ Cetak ke Thermal 52mm</button>
+        </div>
+
         <div class="header text-center">
-          <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 6px;">
-            <img src="${logoFilkom}" style="width: 40px; height: auto; filter: grayscale(100%);" />
-            <img src="${logoFM}" style="width: 40px; height: auto; filter: grayscale(100%);" />
+          <div style="display: flex; justify-content: center; align-items: center; gap: 6px; margin-bottom: 3px;">
+            <img src="${logoFilkom}" style="width: 30px; height: auto; filter: grayscale(100%);" />
+            <img src="${logoFM}" style="width: 30px; height: auto; filter: grayscale(100%);" />
           </div>
-          <div style="font-size: 11px; font-weight: bold; letter-spacing: 1px;">FILKOM MERCH</div>
-          <div style="font-size: 8.5px; font-weight: bold; margin-bottom: 2px;">Universitas Brawijaya</div>
-          <div style="font-size: 7.5px; line-height: 1.25; color: #222;">
+          <div style="font-size: 10.5px; font-weight: 900; letter-spacing: 0.5px;">FILKOM MERCH</div>
+          <div style="font-size: 8px; font-weight: bold;">Universitas Brawijaya</div>
+          <div style="font-size: 7px; line-height: 1.2; color: #222; margin-top: 2px;">
             Gedung A Fakultas Ilmu Komputer UB<br/>
-            Ketawanggede, Kec. Lowokwaru, Kota Malang, Jawa Timur 65113
+            Lowokwaru, Kota Malang
           </div>
         </div>
         
         <div class="divider"></div>
         
         <div class="info">
-          <div>No: ${data.sale_id}</div>
-          <div>Tgl: ${data.date} ${data.time}</div>
-          <div>Kasir: ${data.cashier_name}</div>
+          <div><strong>No:</strong> ${data.sale_id}</div>
+          <div><strong>Tgl:</strong> ${data.date} ${data.time}</div>
+          <div><strong>Kasir:</strong> ${data.cashier_name}</div>
+          ${paymentMethodHtml}
           ${customerHtml}
         </div>
         
@@ -225,12 +271,12 @@ export function printBrowserReceipt(data: ReceiptData) {
         <div class="divider"></div>
         
         <div class="total-section">
-          <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
+          <div style="display: flex; justify-content: space-between; font-size: 8.5px; margin-bottom: 2px;">
             <span>Subtotal:</span>
             <span>Rp ${data.subtotal.toLocaleString("id-ID")}</span>
           </div>
           ${discountHtml}
-          <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; margin-top: 4px; border-top: 1px dashed #000; padding-top: 4px;">
+          <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: 900; margin-top: 2px; border-top: 1px dashed #000; padding-top: 2px;">
             <span>TOTAL:</span>
             <span>Rp ${data.total.toLocaleString("id-ID")}</span>
           </div>
@@ -239,17 +285,27 @@ export function printBrowserReceipt(data: ReceiptData) {
         <div class="divider"></div>
         
         <div class="footer text-center">
-          <div style="font-weight: bold;">Terima kasih telah membeli!</div>
-          <div style="margin-top: 2px; font-style: italic; font-size: 8px;">Wear Your Faculty.</div>
-          <div style="margin-top: 5px; font-size: 7.5px; line-height: 1.3;">
+          <div style="font-weight: 900;">Terima kasih telah membeli!</div>
+          <div style="margin-top: 1px; font-style: italic; font-size: 7.5px;">Wear Your Faculty.</div>
+          <div style="margin-top: 3px; font-size: 7px; line-height: 1.2;">
             <div>filkommerch.com</div>
             <div>IG & TikTok: @filkommerchub</div>
           </div>
         </div>
 
         <script>
-          window.onload = function() {
-            window.print();
+          function triggerPrint() {
+            window.focus();
+            setTimeout(function() {
+              window.print();
+            }, 300);
+          }
+          if (document.readyState === 'complete') {
+            triggerPrint();
+          } else {
+            window.addEventListener('load', triggerPrint);
+          }
+          window.onafterprint = function() {
             setTimeout(function() {
               window.close();
             }, 500);
@@ -259,7 +315,52 @@ export function printBrowserReceipt(data: ReceiptData) {
     </html>
   `;
 
-  printWindow.document.open();
-  printWindow.document.write(htmlContent);
-  printWindow.document.close();
+  // 1. Try opening print window
+  let printWindow: Window | null = null;
+  try {
+    printWindow = window.open("", "_blank", "width=420,height=650");
+  } catch {
+    printWindow = null;
+  }
+
+  if (printWindow && !printWindow.closed) {
+    try {
+      printWindow.document.open();
+      printWindow.document.write(htmlContent);
+      printWindow.document.close();
+      return;
+    } catch (e) {
+      console.warn("Popup printing document.write failed, falling back to iframe:", e);
+    }
+  }
+
+  // 2. Fallback: Hidden iframe printing (bypasses popup blockers seamlessly)
+  try {
+    let iframe = document.getElementById("receipt-print-iframe") as HTMLIFrameElement;
+    if (!iframe) {
+      iframe = document.createElement("iframe");
+      iframe.id = "receipt-print-iframe";
+      iframe.style.position = "fixed";
+      iframe.style.right = "0";
+      iframe.style.bottom = "0";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.style.border = "none";
+      document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (doc) {
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      }, 400);
+    }
+  } catch (err) {
+    console.error("Iframe print fallback failed:", err);
+    toast.error("Gagal membuka jendela cetak. Pastikan pop-up diperbolehkan di browser Anda.");
+  }
 }

@@ -293,6 +293,48 @@ export async function runMigration() {
           FOREIGN KEY (order_id) REFERENCES orders(order_id) ON DELETE CASCADE,
           UNIQUE KEY unique_user_order_claim (user_id, order_id)
         )`
+      },
+      {
+        name: "order_items.pickup_status",
+        sql: "ALTER TABLE order_items ADD COLUMN pickup_status ENUM('pending', 'ready', 'picked_up') DEFAULT 'pending'"
+      },
+      {
+        name: "order_items.picked_up_at",
+        sql: "ALTER TABLE order_items ADD COLUMN picked_up_at TIMESTAMP NULL DEFAULT NULL"
+      },
+      {
+        name: "order_items.picked_up_by",
+        sql: "ALTER TABLE order_items ADD COLUMN picked_up_by INT NULL DEFAULT NULL"
+      },
+      {
+        name: "order_items.picked_up_by_name",
+        sql: "ALTER TABLE order_items ADD COLUMN picked_up_by_name VARCHAR(100) NULL DEFAULT NULL"
+      },
+      {
+        name: "order_items.pickup_proof_url",
+        sql: "ALTER TABLE order_items ADD COLUMN pickup_proof_url VARCHAR(255) NULL DEFAULT NULL"
+      },
+      {
+        name: "order_item_pickup_logs",
+        sql: `CREATE TABLE IF NOT EXISTS order_item_pickup_logs (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          order_id VARCHAR(50) NOT NULL,
+          order_item_id INT NOT NULL,
+          previous_status VARCHAR(20) NOT NULL,
+          new_status VARCHAR(20) NOT NULL,
+          actor_id INT NULL,
+          actor_name VARCHAR(100) NOT NULL,
+          actor_role VARCHAR(20) NOT NULL,
+          notes TEXT NULL,
+          proof_url VARCHAR(255) NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_pickup_order_id (order_id),
+          INDEX idx_pickup_item_id (order_item_id)
+        )`
+      },
+      {
+        name: "order_item_pickup_logs.proof_url",
+        sql: "ALTER TABLE order_item_pickup_logs ADD COLUMN proof_url VARCHAR(255) NULL DEFAULT NULL"
       }
     ];
 
