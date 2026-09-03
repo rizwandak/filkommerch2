@@ -1299,7 +1299,7 @@ export const getPaymentMethods = async (req: Request, res: Response) => {
 export const getCategories = async (req: Request, res: Response) => {
   try {
     const categories = await query<any>(
-      "SELECT id, name, slug, is_active FROM categories WHERE is_active = TRUE ORDER BY name"
+      "SELECT id, name, slug, is_active FROM categories WHERE is_active = TRUE OR is_active IS NULL OR is_active = 1 ORDER BY name"
     );
     return res.json({ categories });
   } catch (error: any) {

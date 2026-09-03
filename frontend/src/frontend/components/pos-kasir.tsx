@@ -49,6 +49,7 @@ import {
 import { bluetoothPrinter, type ReceiptData } from "@frontend/lib/bluetooth-printer";
 import { cleanProductName, cleanVariantPart, printBrowserReceipt } from "@frontend/lib/receipt-printer";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import { getApiBaseUrl } from "@/lib/api-config";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logoFM from "@/assets/logo-fm.jpg";
 
@@ -250,7 +251,46 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
         getUsersAdmin().catch(() => ({ success: false, users: [] })),
       ]);
       if (productsResult?.products) setProducts(productsResult.products);
-      if (categoriesResult?.categories) setCategories(categoriesResult.categories);
+
+      let dbCategories: Category[] = [];
+      try {
+        const directCatRes = await fetch(`${getApiBaseUrl()}/api/categories`, {
+          cache: "no-store",
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (directCatRes.ok) {
+          const catJson = await directCatRes.json();
+          if (catJson && Array.isArray(catJson.categories)) {
+            dbCategories = catJson.categories;
+          }
+        }
+      } catch (e) {
+        console.warn("Direct fetch categories failed, using categoriesResult", e);
+      }
+
+      if (dbCategories.length === 0 && categoriesResult?.categories) {
+        dbCategories = categoriesResult.categories;
+      }
+
+      const catMap = new Map<string, Category>();
+      dbCategories.forEach((cat) => {
+        if (cat.id && cat.name) {
+          catMap.set(String(cat.id), cat);
+        }
+      });
+
+      (productsResult?.products || []).forEach((p: any) => {
+        if (p.category_id && p.category_name && !catMap.has(String(p.category_id))) {
+          catMap.set(String(p.category_id), {
+            id: p.category_id,
+            name: p.category_name,
+            slug: p.category_slug || "",
+            is_active: true,
+          });
+        }
+      });
+
+      setCategories(Array.from(catMap.values()));
       if (settingsResult?.settings) setStoreSettings(settingsResult.settings);
       if (usersResult?.success && usersResult.users) setRegisteredUsers(usersResult.users);
     } catch {
@@ -282,9 +322,12 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     product.variants.reduce((sum, v) => sum + v.stock, 0);
 
   const filteredProducts = products.filter((p) => {
-    // POS hanya melayani produk Ready Stock (bukan Pre-Order)
     const isReadyStock = p.sale_type !== "preorder" && p.sale_type !== "pre_order";
-    const matchCategory = categoryFilter === "all" || String(p.category_id) === categoryFilter;
+    const matchCategory =
+      categoryFilter === "all" ||
+      String(p.category_id) === categoryFilter ||
+      (p.category_name && p.category_name.toLowerCase() === categoryFilter.toLowerCase()) ||
+      (p.category_slug && p.category_slug.toLowerCase() === categoryFilter.toLowerCase());
     const q = searchQuery.trim().toLowerCase();
     const matchSearch =
       !q ||
@@ -1237,29 +1280,29 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
           open={!!activeProductForVariantSelection}
           onOpenChange={(open) => !open && setActiveProductForVariantSelection(null)}
         >
-          <DialogContent className="max-w-md bg-white border-2 border-ink">
+          <DialogContent className="sm:max-w-xl md:max-w-2xl max-w-[95vw] max-h-[92vh] overflow-y-auto bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 sm:p-6">
             <DialogHeader>
-              <DialogTitle className="display text-lg tracking-wider text-ink uppercase">
+              <DialogTitle className="display text-lg sm:text-xl tracking-wider text-ink uppercase">
                 Pilih Varian Produk
               </DialogTitle>
             </DialogHeader>
 
             <div className="space-y-4 py-2">
-              <div className="flex gap-4">
+              <div className="flex gap-4 items-center">
                 {activeProductForVariantSelection.image_url ? (
                   <img
                     src={activeProductForVariantSelection.image_url}
                     alt={activeProductForVariantSelection.name}
-                    className="w-20 h-20 rounded object-cover border border-ink"
+                    className="w-20 h-20 rounded-xl object-cover border-2 border-ink shrink-0 shadow-xs"
                   />
                 ) : (
-                  <div className="w-20 h-20 bg-cream rounded border border-ink" />
+                  <div className="w-20 h-20 bg-cream rounded-xl border-2 border-ink shrink-0" />
                 )}
                 <div>
-                  <h3 className="font-bold text-ink uppercase leading-snug">
+                  <h3 className="font-extrabold text-ink uppercase text-sm sm:text-base leading-snug">
                     {activeProductForVariantSelection.name}
                   </h3>
-                  <p className="text-brand-orange font-bold text-md mt-1">
+                  <p className="text-brand-orange font-black text-base sm:text-lg mt-0.5">
                     Rp {activeProductForVariantSelection.price.toLocaleString("id-ID")}
                   </p>
                 </div>
@@ -1275,7 +1318,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 if (uniqueColors.length === 0) return null;
                 return (
                   <div className="space-y-2">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    <p className="text-xs font-black text-muted-foreground uppercase tracking-wider">
                       Warna
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -1283,10 +1326,10 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                         <button
                           key={color}
                           onClick={() => setDialogSelectedColor(color)}
-                          className={`rounded px-3 py-1.5 text-xs font-semibold border-2 transition ${
+                          className={`rounded-lg min-h-[38px] px-3.5 py-1.5 text-xs font-bold border-2 transition-all cursor-pointer shadow-xs ${
                             dialogSelectedColor === color
-                              ? "bg-ink text-white border-ink shadow-sm scale-95"
-                              : "bg-background text-ink border-border hover:border-ink"
+                              ? "bg-ink text-white border-ink shadow-sm scale-[1.02]"
+                              : "bg-background text-ink border-border hover:border-ink hover:bg-cream/50"
                           }`}
                         >
                           {color}
@@ -1307,18 +1350,18 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 if (uniqueSizes.length === 0) return null;
                 return (
                   <div className="space-y-2">
-                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Ukuran
+                    <p className="text-xs font-black text-muted-foreground uppercase tracking-wider">
+                      Ukuran / Varian
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2.5">
                       {uniqueSizes.map((size) => (
                         <button
                           key={size}
                           onClick={() => setDialogSelectedSize(size)}
-                          className={`rounded w-11 h-10 flex items-center justify-center text-xs font-bold border-2 transition ${
+                          className={`rounded-lg min-h-[42px] px-4 py-2 text-xs font-bold border-2 transition-all flex items-center justify-center text-center cursor-pointer max-w-full leading-snug whitespace-normal break-words shadow-xs ${
                             dialogSelectedSize === size
-                              ? "bg-ink text-white border-ink shadow-sm scale-95"
-                              : "bg-background text-ink border-border hover:border-ink"
+                              ? "bg-ink text-white border-ink shadow-md scale-[1.02]"
+                              : "bg-background text-ink border-border hover:border-ink hover:bg-cream/50"
                           }`}
                         >
                           {size}
@@ -1339,9 +1382,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 const stock = matched ? matched.stock : 0;
                 return (
                   <div className="flex items-center justify-between border-t border-dashed border-border pt-3">
-                    <span className="text-xs text-muted-foreground">Ketersediaan Stok:</span>
+                    <span className="text-xs text-muted-foreground font-semibold">Ketersediaan Stok:</span>
                     <span
-                      className={`text-sm font-bold ${stock <= 3 ? "text-red-600" : "text-ink"}`}
+                      className={`text-sm font-black ${stock <= 3 ? "text-red-600" : "text-ink"}`}
                     >
                       {stock} pcs
                     </span>
@@ -1350,11 +1393,11 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               })()}
             </div>
 
-            <DialogFooter className="mt-4">
+            <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
               <Button
                 variant="outline"
                 onClick={() => setActiveProductForVariantSelection(null)}
-                className="border-2 border-ink text-xs font-bold uppercase tracking-wider hover:bg-cream"
+                className="border-2 border-ink text-xs font-bold uppercase tracking-wider hover:bg-cream cursor-pointer px-4 h-10"
               >
                 Batal
               </Button>
@@ -1372,7 +1415,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   addToCart(activeProductForVariantSelection, matched);
                   setActiveProductForVariantSelection(null);
                 }}
-                className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer px-5 h-10"
               >
                 Pilih Varian
               </Button>
@@ -1383,66 +1426,66 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
 
       {/* Dialog QRIS Statis */}
       <Dialog open={showQrisModal} onOpenChange={setShowQrisModal}>
-        <DialogContent className="sm:max-w-md w-[95vw] bg-white border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5">
+        <DialogContent className="sm:max-w-xl md:max-w-2xl w-[95vw] max-h-[95vh] overflow-y-auto bg-white border-2 border-ink shadow-[5px_5px_0px_0px_rgba(27,27,27,1)] p-5 sm:p-7">
           <DialogHeader>
-            <DialogTitle className="display text-lg tracking-wider text-ink uppercase text-center flex items-center justify-center gap-2">
-              <QrCode className="w-5 h-5 text-brand-orange" />
+            <DialogTitle className="display text-lg sm:text-xl tracking-wider text-ink uppercase text-center flex items-center justify-center gap-2">
+              <QrCode className="w-6 h-6 text-brand-orange" />
               Pembayaran QRIS Statis Toko
             </DialogTitle>
           </DialogHeader>
 
           <div className="space-y-4 py-2 flex flex-col items-center">
-            {/* QR Image Box */}
-            <div className="bg-cream border-2 border-ink p-3 rounded-xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] flex flex-col items-center justify-center">
+            {/* QR Image Box - Jauh Lebih Besar agar mudah di-scan */}
+            <div className="bg-cream border-2 border-ink p-4 sm:p-6 rounded-2xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] flex flex-col items-center justify-center w-full max-w-md">
               {storeSettings?.qris_static_url ? (
                 <img
                   src={resolveImageUrl(storeSettings.qris_static_url)}
                   alt="QRIS Toko"
-                  className="w-56 h-56 object-contain rounded-lg bg-white p-2"
+                  className="w-full max-w-[320px] sm:max-w-[360px] h-auto object-contain rounded-xl bg-white p-3 shadow-inner border border-gray-200"
                 />
               ) : (
-                <div className="w-56 h-56 flex flex-col items-center justify-center text-center p-4 text-xs text-muted-foreground bg-white rounded-lg">
-                  <QrCode className="w-16 h-16 text-muted-foreground mb-2" />
-                  <span className="font-semibold text-ink">QRIS Statis Belum Diunggah</span>
-                  <span className="text-[10px] text-muted-foreground mt-1">Unggah gambar QRIS di Pengaturan Website Admin.</span>
+                <div className="w-full max-w-[320px] h-72 flex flex-col items-center justify-center text-center p-6 text-xs text-muted-foreground bg-white rounded-xl">
+                  <QrCode className="w-20 h-20 text-muted-foreground mb-3" />
+                  <span className="font-bold text-ink text-sm">QRIS Statis Belum Diunggah</span>
+                  <span className="text-[11px] text-muted-foreground mt-1">Unggah gambar QRIS di Pengaturan Website Admin.</span>
                 </div>
               )}
             </div>
 
             {/* Total tagihan */}
-            <div className="text-center w-full bg-amber-50 border border-amber-200 p-3.5 rounded-xl">
-              <div className="text-[11px] font-extrabold text-amber-800 uppercase tracking-wider">
+            <div className="text-center w-full max-w-md bg-amber-50/90 border-2 border-amber-300 p-4 rounded-2xl shadow-xs">
+              <div className="text-xs font-black text-amber-900 uppercase tracking-widest">
                 Total Tagihan Pembeli
               </div>
-              <div className="text-2xl sm:text-3xl font-black text-ink mt-0.5">
+              <div className="text-3xl sm:text-4xl font-black text-ink mt-1 tracking-tight">
                 Rp {total.toLocaleString("id-ID")}
               </div>
-              <p className="text-[11px] text-amber-900 mt-1 font-medium">
-                Minta pembeli memindai QRIS di atas dan memasukkan nominal yang tertera.
+              <p className="text-xs text-amber-950 mt-1.5 font-medium">
+                Arahkan pembeli memindai QRIS di atas dan memasukkan nominal yang tertera.
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full shrink-0 mt-2">
+          <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md mx-auto shrink-0 mt-2">
             <Button
               variant="outline"
               onClick={() => setShowQrisModal(false)}
-              className="border-2 border-ink text-xs font-bold uppercase tracking-wider w-full h-11 cursor-pointer"
+              className="border-2 border-ink text-xs font-black uppercase tracking-wider flex-1 h-12 hover:bg-cream cursor-pointer"
             >
               Batal / Tutup
             </Button>
             <Button
               onClick={() => void handleConfirmQrisPayment()}
               disabled={isProcessing}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-widest w-full h-11 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider flex-[1.4] h-12 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
             >
               {isProcessing ? (
-                <span className="flex items-center gap-2">
+                <span className="flex items-center justify-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   MEMPROSES...
                 </span>
               ) : (
-                "✅ SUDAH BAYAR (SELESAIKAN)"
+                "✓ SUDAH BAYAR (SELESAIKAN)"
               )}
             </Button>
           </div>

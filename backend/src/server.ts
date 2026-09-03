@@ -326,7 +326,7 @@ app.get("/api/db-check", apiControllers.checkDatabaseConnection);
 app.get("/api/payment-methods", cacheMiddleware(300), apiControllers.getPaymentMethods);
 
 
-app.get("/api/categories", cacheMiddleware(120), apiControllers.getCategories);
+app.get("/api/categories", apiControllers.getCategories);
 app.post("/api/categories", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.createCategory);
 app.put("/api/categories/:id", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.updateCategory);
 app.delete("/api/categories/:id", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.deleteCategory);
