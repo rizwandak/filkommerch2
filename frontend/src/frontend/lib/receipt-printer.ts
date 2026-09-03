@@ -161,8 +161,8 @@ export function printBrowserReceipt(data: ReceiptData) {
         <title>Cetak Struk - ${data.sale_id}</title>
         <style>
           @page {
-            size: 50mm auto;
-            margin: 0;
+            size: auto;
+            margin: 0mm !important;
           }
           * {
             box-sizing: border-box;
@@ -170,10 +170,12 @@ export function printBrowserReceipt(data: ReceiptData) {
             print-color-adjust: exact !important;
           }
           html, body {
-            width: 42mm;
-            max-width: 42mm;
-            margin: 0 auto;
-            padding: 3mm 0mm 8mm 0mm;
+            width: 100%;
+            max-width: 48mm;
+            margin: 0 !important;
+            margin-left: 0 !important;
+            padding: 1mm 0mm 6mm 0mm;
+            padding-left: 0 !important;
             font-family: 'Consolas', 'Courier New', Courier, monospace;
             font-size: 7.5px;
             color: #000;
@@ -185,23 +187,28 @@ export function printBrowserReceipt(data: ReceiptData) {
           }
           .divider {
             border-top: 1px dashed #000;
-            margin: 5px 0;
+            margin: 4px 0;
+            width: 100%;
           }
           .header {
-            margin-bottom: 6px;
+            margin-bottom: 5px;
+            width: 100%;
           }
           .info {
             font-size: 7px;
-            margin-bottom: 5px;
+            margin-bottom: 4px;
             line-height: 1.35;
+            width: 100%;
           }
           .total-section {
             font-weight: bold;
             margin-top: 4px;
+            width: 100%;
           }
           .footer {
-            margin-top: 8px;
+            margin-top: 6px;
             font-size: 7px;
+            width: 100%;
           }
           .no-print-bar {
             text-align: center;
@@ -226,10 +233,12 @@ export function printBrowserReceipt(data: ReceiptData) {
               display: none !important;
             }
             html, body {
-              width: 42mm !important;
-              max-width: 42mm !important;
-              margin: 0 auto !important;
+              width: 100% !important;
+              max-width: 48mm !important;
+              margin: 0 !important;
+              margin-left: 0 !important;
               padding: 0 !important;
+              padding-left: 0 !important;
             }
           }
         </style>
