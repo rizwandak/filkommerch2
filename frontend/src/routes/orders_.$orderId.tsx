@@ -1054,17 +1054,15 @@ function OrderDetailComponent() {
                                     <CheckCircle className="w-3 h-3 text-emerald-600" /> Sudah Diambil / Diterima
                                   </span>
                                   {item.pickup_proof_url && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setActiveImage(resolveImageUrl(item.pickup_proof_url) || "");
-                                        setIsZoomOpen(true);
-                                      }}
+                                    <a
+                                      href={resolveImageUrl(item.pickup_proof_url) || item.pickup_proof_url}
+                                      target="_blank"
+                                      rel="noreferrer"
                                       className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
                                       title="Lihat Foto Bukti Serah Terima"
                                     >
                                       <Camera className="w-3 h-3 text-emerald-700" /> Foto Bukti
-                                    </button>
+                                    </a>
                                   )}
                                 </div>
                               ) : item.pickup_status === "ready" ? (

@@ -991,7 +991,7 @@ export function PartialPickupModal({
                   value={handoverProofUrl}
                   onChange={(url) => setHandoverProofUrl(url)}
                   onRemove={() => setHandoverProofUrl("")}
-                  resolveImageUrl={resolveImageUrl}
+                  resolveImageUrl={(url) => resolveImageUrl(url) || url}
                   label="Foto Bukti Serah Terima (Kamera / Upload)"
                 />
               </div>

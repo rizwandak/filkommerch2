@@ -343,12 +343,13 @@ function AdminTransactionsPage() {
   const [receiptModalOpen, setReceiptModalOpen] = useState(false);
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
 
-  const handleOpenReceiptModal = (customItems?: any[]) => {
+  const handleOpenReceiptModal = (customItems?: any) => {
     if (!managedTransaction) return;
     const cashierDisplayName = isCashier
       ? ((user as any)?.name || "Kasir")
       : (managedTransaction.cashier_name || (user as any)?.name || "Admin");
-    const data = formatTransactionToReceiptData(managedTransaction, customItems || managedItems, cashierDisplayName);
+    const itemsToUse = Array.isArray(customItems) ? customItems : managedItems;
+    const data = formatTransactionToReceiptData(managedTransaction, itemsToUse, cashierDisplayName);
     setReceiptData(data);
     setReceiptModalOpen(true);
   };
@@ -427,80 +428,7 @@ function AdminTransactionsPage() {
     setPartialPickupModalOpen(true);
   };
 
-  // Quick Complete / Pickup States & Handlers (Solusi 2)
-  const [quickCompleteOpen, setQuickCompleteOpen] = useState(false);
-  const [quickCompleteOrder, setQuickCompleteOrder] = useState<any>(null);
-  const [quickCompleteProof, setQuickCompleteProof] = useState<string>("");
-  const [uploadingQuickProof, setUploadingQuickProof] = useState(false);
-  const [savingQuickComplete, setSavingQuickComplete] = useState(false);
 
-  const handleOpenQuickComplete = (order: any) => {
-    if (isCashier) {
-      toast.error("Akses ditolak: Kasir tidak diizinkan mengubah status transaksi.");
-      return;
-    }
-    setQuickCompleteOrder(order);
-    setQuickCompleteProof(order.fulfillment_proof_url || "");
-    setQuickCompleteOpen(true);
-  };
-
-  const handleUploadQuickProofFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingQuickProof(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch(`${API_BASE_URL}/api/upload`, {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.url || data.path) {
-        setQuickCompleteProof(data.url || data.path);
-        toast.success("Foto bukti serah terima berhasil diunggah");
-      } else {
-        toast.error(data.error || "Gagal mengunggah file");
-      }
-    } catch {
-      toast.error("Gagal mengunggah foto bukti");
-    } finally {
-      setUploadingQuickProof(false);
-    }
-  };
-
-  const handleConfirmQuickComplete = async () => {
-    if (!quickCompleteOrder) return;
-    if (!quickCompleteProof) {
-      toast.error("Wajib mengunggah foto bukti serah terima / pengambilan barang!");
-      return;
-    }
-    setSavingQuickComplete(true);
-    try {
-      const result = await updateOrderStatus({
-        data: {
-          id: quickCompleteOrder.order_id,
-          status: "completed",
-          shipping_address: quickCompleteOrder.shipping_address || "Ambil di FILKOM Merch (gratis)",
-          fulfillment_type: quickCompleteOrder.fulfillment_type || "pickup",
-          fulfillment_proof_url: quickCompleteProof,
-        },
-      });
-      if (result.success) {
-        toast.success(`Pesanan #${quickCompleteOrder.order_id} berhasil diselesaikan (sudah diambil)!`);
-        await loadTransactions();
-        setQuickCompleteOpen(false);
-        setQuickCompleteOrder(null);
-        setQuickCompleteProof("");
-      } else {
-        toast.error(result.error || "Gagal menyelesaikan pesanan");
-      }
-    } catch {
-      toast.error("Terjadi kesalahan saat menyelesaikan pesanan");
-    } finally {
-      setSavingQuickComplete(false);
-    }
-  };
 
   const getAdminRequestHeaders = () => {
     const role = user?.type === "admin" ? user.role : undefined;
@@ -3137,7 +3065,7 @@ function AdminTransactionsPage() {
                           type="button"
                           size="sm"
                           variant="outline"
-                          onClick={handleOpenReceiptModal}
+                          onClick={() => handleOpenReceiptModal()}
                           className="h-6 px-2 text-[10px] font-extrabold border-2 border-ink bg-white hover:bg-brand-orange hover:text-white transition-colors cursor-pointer shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1"
                           title="Cetak Struk Transaksi (Ukuran Thermal)"
                         >
@@ -4093,7 +4021,7 @@ function AdminTransactionsPage() {
               </Button>
               <Button
                 type="button"
-                onClick={handleOpenReceiptModal}
+                onClick={() => handleOpenReceiptModal()}
                 className="bg-ink hover:bg-brand-orange text-white font-bold uppercase tracking-wider text-xs px-4 h-9 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5 cursor-pointer transition-colors"
                 title="Cetak Struk Transaksi (Ukuran Thermal 58mm)"
               >
