@@ -409,6 +409,14 @@ function AdminTransactionsPage() {
   const handleOpenPartialPickup = async (order?: any) => {
     const targetOrder = order || managedTransaction;
     if (!targetOrder) return;
+
+    // Tutup dialog kelola/struk terlebih dahulu agar tidak menahan pointer-events/fokus
+    setManagementOpen(false);
+    setReceiptModalOpen(false);
+    if (typeof document !== "undefined") {
+      document.body.style.pointerEvents = "auto";
+    }
+
     setPartialPickupOrder(targetOrder);
 
     if (order && order.order_id !== managedTransaction?.order_id) {
@@ -1939,25 +1947,33 @@ function AdminTransactionsPage() {
                                       );
                                     })()}
                                   </div>
-                                  <div className="flex items-center justify-end gap-1.5 pt-1">
-                                    {subOrder.order_status !== "completed" && !isCashier && (
-                                      <Button
-                                        size="sm"
-                                        onClick={() => void handleOpenPartialPickup(subOrder)}
-                                        className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase border-2 border-ink flex items-center gap-1 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-                                        title="Pengambilan / Serah Terima Pesanan"
-                                      >
-                                        <PackageCheck className="w-3 h-3" />
-                                        <span>{subOrder.fulfillment_type === "shipping" ? "Selesai" : "Pengambilan"}</span>
-                                      </Button>
-                                    )}
+                                  <div className="flex items-center justify-end gap-1.5 pt-1 flex-wrap">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => void handleOpenPartialPickup(subOrder)}
+                                      className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase border-2 border-ink flex items-center gap-1 shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                                      title="Pengambilan / Serah Terima Pesanan"
+                                    >
+                                      <PackageCheck className="w-3 h-3" />
+                                      <span>{subOrder.fulfillment_type === "shipping" ? "Selesai" : "Pengambilan"}</span>
+                                    </Button>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      className="h-7 px-2 text-xs font-black border-2 border-ink bg-white"
+                                      className="h-7 px-2 text-xs font-black border-2 border-ink bg-white hover:bg-cream cursor-pointer"
                                       onClick={() => void handleOpenManagement(subOrder.order_id, "online")}
                                     >
                                       Kelola
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 px-2 text-xs font-black border-2 border-ink bg-white hover:bg-brand-orange hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+                                      onClick={() => void handleDirectPrintReceipt(subOrder.order_id, "online")}
+                                      title="Cetak Struk Transaksi"
+                                    >
+                                      <Printer className="w-3 h-3" />
+                                      <span>Cetak</span>
                                     </Button>
                                   </div>
                                 </div>
@@ -2309,26 +2325,34 @@ function AdminTransactionsPage() {
                                                 );
                                               })()}
                                               <div className="flex items-center gap-1.5">
-                                                {subOrder.order_status !== "completed" && !isCashier && (
-                                                  <Button
-                                                    size="sm"
-                                                    onClick={() => void handleOpenPartialPickup(subOrder)}
-                                                    className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
-                                                    title="Pengambilan / Serah Terima Pesanan"
-                                                  >
-                                                    <PackageCheck className="w-3.5 h-3.5" />
-                                                    <span>{subOrder.fulfillment_type === "shipping" ? "Selesai" : "Pengambilan"}</span>
-                                                  </Button>
-                                                )}
-                                                <Button
-                                                  variant="outline"
-                                                  size="sm"
-                                                  className="h-8 text-xs font-black border-2 border-ink bg-white hover:bg-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
-                                                  onClick={() => void handleOpenManagement(subOrder.order_id, "online")}
-                                                >
-                                                  Kelola
-                                                </Button>
-                                              </div>
+                                                 <Button
+                                                   size="sm"
+                                                   onClick={() => void handleOpenPartialPickup(subOrder)}
+                                                   className="h-8 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                                                   title="Pengambilan / Serah Terima Pesanan"
+                                                 >
+                                                   <PackageCheck className="w-3.5 h-3.5" />
+                                                   <span>{subOrder.fulfillment_type === "shipping" ? "Selesai" : "Pengambilan"}</span>
+                                                 </Button>
+                                                 <Button
+                                                   variant="outline"
+                                                   size="sm"
+                                                   className="h-8 text-xs font-black border-2 border-ink bg-white hover:bg-cream shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                                                   onClick={() => void handleOpenManagement(subOrder.order_id, "online")}
+                                                 >
+                                                   Kelola
+                                                 </Button>
+                                                 <Button
+                                                   variant="outline"
+                                                   size="sm"
+                                                   className="h-8 px-2.5 text-xs font-black border-2 border-ink bg-white hover:bg-brand-orange hover:text-white transition-colors shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer flex items-center gap-1"
+                                                   onClick={() => void handleDirectPrintReceipt(subOrder.order_id, "online")}
+                                                   title="Cetak Struk Transaksi"
+                                                 >
+                                                   <Printer className="w-3.5 h-3.5" />
+                                                   <span>Cetak</span>
+                                                 </Button>
+                                               </div>
                                             </div>
                                           </div>
                                         ))}
@@ -4105,8 +4129,10 @@ function AdminTransactionsPage() {
                   {/* Items */}
                   <div className="space-y-2">
                     {receiptData.items.map((item, idx) => {
-                      const isReadyOrPicked = item.pickup_status === "picked_up" || item.pickup_status === "ready";
-                      const isPending = item.pickup_status === "pending";
+                      const isJacket = (item.name || "").toLowerCase().match(/jaket|jacket|varsity|hoodie|bomber/);
+                      const effectiveStatus = item.pickup_status || (isJacket ? "pending" : "ready");
+                      const isReadyOrPicked = effectiveStatus === "picked_up" || effectiveStatus === "ready";
+                      const isPending = effectiveStatus === "pending";
                       return (
                         <div key={idx} className="text-[7.5px]">
                           <div className="font-bold leading-tight break-words">

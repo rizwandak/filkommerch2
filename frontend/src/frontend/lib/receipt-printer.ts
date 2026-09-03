@@ -112,8 +112,10 @@ export function formatTransactionToReceiptData(
 export function printBrowserReceipt(data: ReceiptData) {
   const itemsHtml = data.items
     .map((item) => {
-      const isReadyOrPicked = item.pickup_status === "picked_up" || item.pickup_status === "ready";
-      const isPending = item.pickup_status === "pending";
+      const isJacket = (item.name || "").toLowerCase().match(/jaket|jacket|varsity|hoodie|bomber/);
+      const effectiveStatus = item.pickup_status || (isJacket ? "pending" : "ready");
+      const isReadyOrPicked = effectiveStatus === "picked_up" || effectiveStatus === "ready";
+      const isPending = effectiveStatus === "pending";
       const checkmark = isReadyOrPicked
         ? '<span style="font-weight: 900; margin-right: 2px;">[✓]</span> '
         : isPending

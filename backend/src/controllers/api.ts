@@ -1261,7 +1261,15 @@ export const getOrderById = async (req: Request, res: Response) => {
       [id]
     );
 
-    return res.json({ success: true, order, items, reviews });
+    const resolvedItems = items.map((oi: any) => {
+      if (!oi.pickup_status) {
+        const isJacket = (oi.product_name || "").toLowerCase().match(/jaket|jacket|varsity|hoodie|bomber/);
+        return { ...oi, pickup_status: isJacket ? "pending" : "ready" };
+      }
+      return oi;
+    });
+
+    return res.json({ success: true, order, items: resolvedItems, reviews });
   } catch (error: any) {
     console.error("Error fetching order:", error);
     return res.status(500).json({ success: false, error: "Failed to fetch order" });

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import {
   PackageCheck,
   X,
@@ -23,6 +24,27 @@ import { LiveCameraCapture } from "@/components/LiveCameraCapture";
 import { resolveImageUrl } from "@/lib/image-resolver";
 
 const getAPI_URL = () => `${getApiBaseUrl()}/api`;
+
+export const isJacketProduct = (productName?: string) => {
+  const name = (productName || "").toLowerCase();
+  return (
+    name.includes("jaket") ||
+    name.includes("jacket") ||
+    name.includes("varsity") ||
+    name.includes("hoodie") ||
+    name.includes("bomber")
+  );
+};
+
+export const getEffectiveItemStatus = (item: OrderItem): "pending" | "ready" | "picked_up" => {
+  if (item.pickup_status === "picked_up") return "picked_up";
+  if (item.pickup_status === "ready") return "ready";
+  if (item.pickup_status === "pending") return "pending";
+  // Aturan default:
+  // Jaket -> Menyusul (pending)
+  // Non-jaket -> Bukan Menyusul (ready)
+  return isJacketProduct(item.product_name) ? "pending" : "ready";
+};
 
 export interface PartialPickupModalProps {
   isOpen: boolean;
@@ -63,23 +85,31 @@ export function PartialPickupModal({
   const [isCompletingWholeOrder, setIsCompletingWholeOrder] = useState(false);
 
   useEffect(() => {
+    if (isOpen) {
+      if (typeof document !== "undefined") {
+        document.body.style.pointerEvents = "auto";
+        const prevOverflow = document.body.style.overflow;
+        document.body.style.overflow = "hidden";
+        return () => {
+          document.body.style.overflow = prevOverflow;
+          document.body.style.pointerEvents = "auto";
+        };
+      }
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
     if (isOpen && order) {
       setItems(initialItems || []);
 
-      // Auto-select items that are non-jacket or pending/ready
+      // Default pilih produk yang statusnya siap / non-jaket
       const defaultSelected = (initialItems || [])
         .filter((item) => {
-          const name = (item.product_name || "").toLowerCase();
-          const isJacket =
-            name.includes("jaket") ||
-            name.includes("varsity") ||
-            name.includes("hoodie") ||
-            name.includes("bomber");
-          return !isJacket;
+          const effective = getEffectiveItemStatus(item);
+          return effective === "ready";
         })
         .map((item) => item.id);
 
-      // If no non-jacket found, select all
       setSelectedItemIds(
         defaultSelected.length > 0
           ? defaultSelected
@@ -312,16 +342,30 @@ export function PartialPickupModal({
   // Stats
   const totalCount = items.length;
   const pickedCount = items.filter(
-    (i) => i.pickup_status === "picked_up",
+    (i) => getEffectiveItemStatus(i) === "picked_up",
   ).length;
-  const readyCount = items.filter((i) => i.pickup_status === "ready").length;
+  const readyCount = items.filter(
+    (i) => getEffectiveItemStatus(i) === "ready",
+  ).length;
   const pendingCount = items.filter(
-    (i) => !i.pickup_status || i.pickup_status === "pending",
+    (i) => getEffectiveItemStatus(i) === "pending",
   ).length;
 
-  return (
-    <div className="fixed inset-0 z-[1050] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-gray-900 rounded-2xl sm:rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-gray-200 dark:border-gray-800 text-left overflow-hidden">
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-200"
+      style={{ pointerEvents: "auto" }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="bg-white dark:bg-gray-900 rounded-2xl sm:rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-gray-200 dark:border-gray-800 text-left overflow-hidden relative z-10"
+        style={{ pointerEvents: "auto" }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0 bg-gradient-to-r from-orange-50/50 to-white dark:from-gray-900 dark:to-gray-900">
           <div className="flex items-center gap-3">
@@ -368,95 +412,99 @@ export function PartialPickupModal({
         </div>
 
         {/* Progress Bar Summary */}
-        <div className="px-5 py-3 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between gap-4 text-xs">
-          <div className="flex items-center gap-2 font-medium text-gray-600 dark:text-gray-300">
-            <span>Status Pengambilan:</span>
-            <div className="flex items-center gap-1 font-bold">
-              <span className="text-emerald-600">{pickedCount} Diambil</span>
-              <span>•</span>
-              <span className="text-blue-600">{readyCount} Siap</span>
-              <span>•</span>
-              <span className="text-amber-600">{pendingCount} Menyusul</span>
+        <div className="px-4 sm:px-6 py-3 bg-gray-50/70 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800 shrink-0">
+          <div className="flex items-center justify-between text-xs mb-1.5">
+            <span className="font-semibold text-gray-600 dark:text-gray-400">
+              Progres Pemenuhan:
+            </span>
+            <div className="flex items-center gap-3 text-[11px] font-bold">
+              <span className="text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> {pickedCount} Diambil
+              </span>
+              <span className="text-blue-700 dark:text-blue-400 flex items-center gap-1">
+                <PackageCheck className="w-3.5 h-3.5" /> {readyCount} Siap
+              </span>
+              <span className="text-amber-700 dark:text-amber-400 flex items-center gap-1">
+                <Clock className="w-3.5 h-3.5" /> {pendingCount} Menyusul
+              </span>
             </div>
           </div>
-
-          <div className="w-24 sm:w-32 bg-gray-200 dark:bg-gray-700 h-2 rounded-full overflow-hidden flex">
+          <div className="w-full h-2.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex">
             <div
+              style={{
+                width: `${totalCount ? (pickedCount / totalCount) * 100 : 0}%`,
+              }}
               className="bg-emerald-500 h-full transition-all duration-300"
-              style={{ width: `${(pickedCount / (totalCount || 1)) * 100}%` }}
-              title="Sudah Diambil"
+              title={`${pickedCount} diambil`}
             />
             <div
+              style={{
+                width: `${totalCount ? (readyCount / totalCount) * 100 : 0}%`,
+              }}
               className="bg-blue-500 h-full transition-all duration-300"
-              style={{ width: `${(readyCount / (totalCount || 1)) * 100}%` }}
-              title="Siap Diambil"
+              title={`${readyCount} siap diambil`}
+            />
+            <div
+              style={{
+                width: `${totalCount ? (pendingCount / totalCount) * 100 : 0}%`,
+              }}
+              className="bg-amber-400 h-full transition-all duration-300"
+              title={`${pendingCount} menyusul`}
             />
           </div>
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex border-b border-gray-100 dark:border-gray-800 px-5 pt-2 gap-2 text-xs font-bold bg-white dark:bg-gray-900">
+        {/* Tabs */}
+        <div className="flex border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shrink-0 px-4 sm:px-6 gap-2">
           <button
             onClick={() => setActiveTab("checklist")}
-            className={`pb-2.5 px-2 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`py-3 px-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === "checklist"
                 ? "border-brand-orange text-brand-orange"
-                : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             }`}
           >
-            <PackageCheck className="w-4 h-4" /> Checklist Produk (
-            {items.length})
+            <CheckCircle2 className="w-4 h-4" /> Checklist &amp; Serah Terima
           </button>
           <button
             onClick={() => setActiveTab("notification")}
-            className={`pb-2.5 px-2 border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+            className={`py-3 px-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
               activeTab === "notification"
                 ? "border-brand-orange text-brand-orange"
-                : "border-transparent text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
             }`}
           >
-            <Send className="w-4 h-4" /> Kirim Notifikasi Pengambilan
+            <Send className="w-4 h-4" /> Notifikasi WhatsApp Pembeli
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
-          {/* TAB 1: CHECKLIST */}
-          {activeTab === "checklist" && (
+        {/* Tab Content */}
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+          {activeTab === "checklist" ? (
             <div className="space-y-4">
-              {/* Opsi 1: Selesaikan Seluruh Pesanan Sekaligus */}
-              <div className="p-3.5 sm:p-4 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 dark:from-emerald-950/40 dark:via-teal-950/30 dark:to-emerald-950/40 rounded-2xl border-2 border-emerald-500/40 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="p-1 bg-emerald-600 text-white rounded-md flex items-center justify-center">
-                      <CheckCircle2 className="w-4 h-4" />
-                    </span>
-                    <span className="font-black text-xs sm:text-sm text-emerald-950 dark:text-emerald-200 uppercase tracking-wide">
-                      Ambil Semua Barang (Selesaikan Pesanan)
-                    </span>
+              {/* Top Quick Action Banner: Ambil Semua & Selesaikan */}
+              <div className="p-3.5 bg-gradient-to-r from-emerald-50 to-emerald-100/50 dark:from-emerald-950/30 dark:to-emerald-900/20 border-2 border-emerald-300 dark:border-emerald-800 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-emerald-600 text-white rounded-xl shrink-0 shadow-xs">
+                    <PackageCheck className="w-5 h-5" />
                   </div>
-                  <p className="text-[11px] text-emerald-800/90 dark:text-emerald-300">
-                    Pembeli mengambil seluruh barang sekaligus? Klik tombol di samping untuk foto serah terima dan selesaikan pesanan secara langsung.
-                  </p>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-black text-emerald-950 dark:text-emerald-200">
+                      Ambil Semua Barang Sekaligus (Selesaikan Pesanan)
+                    </h4>
+                    <p className="text-[11px] text-emerald-800 dark:text-emerald-400 mt-0.5">
+                      Pembeli mengambil seluruh item pesanan hari ini? Ambil foto bukti serah terima untuk menyelesaikan pesanan.
+                    </p>
+                  </div>
                 </div>
                 <button
                   type="button"
                   onClick={openCompleteAllModal}
-                  disabled={updatingStatus}
-                  className="self-start sm:self-center shrink-0 flex items-center gap-1.5 px-3.5 py-2 text-xs font-black uppercase tracking-wider bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl shadow-md transition-all cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
+                  <Camera className="w-4 h-4" />
                   <span>Ambil Semua &amp; Selesai</span>
                 </button>
-              </div>
-
-              {/* Pemisah visual */}
-              <div className="flex items-center gap-2 pt-1">
-                <span className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></span>
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-gray-500 dark:text-gray-400 px-2.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full">
-                  Atau Pengambilan Bertahap / Parsial per Item
-                </span>
-                <span className="h-px bg-gray-200 dark:bg-gray-700 flex-1"></span>
               </div>
 
               {/* Quick action bar */}
@@ -466,7 +514,7 @@ export function PartialPickupModal({
                     onClick={selectNonJacketOnly}
                     className="text-[11px] font-bold bg-white dark:bg-gray-800 text-brand-orange border border-orange-200 hover:bg-orange-50 px-2.5 py-1 rounded-lg transition-colors shadow-2xs cursor-pointer"
                   >
-                    Pilih Non-Jaket (Ready)
+                    Pilih Non-Jaket (Siap Diambil)
                   </button>
                   <button
                     onClick={selectAll}
@@ -510,27 +558,7 @@ export function PartialPickupModal({
                     disabled={updatingStatus || selectedItemIds.length === 0}
                     className="flex items-center gap-1 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1.5 rounded-lg transition-all shadow-xs disabled:opacity-50 cursor-pointer"
                   >
-                    <Camera className="w-3.5 h-3.5" /> Serahkan Terpilih (Foto)
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (selectedItemIds.length === 0) {
-                        toast.error("Pilih setidaknya 1 produk");
-                        return;
-                      }
-                      handleUpdateItemStatus(
-                        selectedItemIds.map((id) => ({
-                          id,
-                          status: "pending",
-                        })),
-                        "Anulir massal ke status Menyusul",
-                      );
-                    }}
-                    disabled={updatingStatus || selectedItemIds.length === 0}
-                    className="flex items-center gap-1 text-[11px] font-bold bg-gray-100 hover:bg-red-50 text-gray-700 hover:text-red-700 border border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 px-2.5 py-1.5 rounded-lg transition-all shadow-xs disabled:opacity-50 cursor-pointer"
-                    title="Anulir item terpilih kembali ke status Menyusul"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5 text-amber-600" /> Anulir Terpilih
+                    <Camera className="w-3.5 h-3.5" /> Serahkan Terpilih
                   </button>
                 </div>
               </div>
@@ -538,19 +566,11 @@ export function PartialPickupModal({
               {/* Items List */}
               <div className="space-y-2.5">
                 {items.map((item) => {
-                  const isPicked = item.pickup_status === "picked_up";
-                  const isReady = item.pickup_status === "ready";
-                  const isPending =
-                    !item.pickup_status || item.pickup_status === "pending";
+                  const effectiveStatus = getEffectiveItemStatus(item);
+                  const isPicked = effectiveStatus === "picked_up";
+                  const isReady = effectiveStatus === "ready";
                   const isSelected = selectedItemIds.includes(item.id);
-                  const isJacket =
-                    (item.product_name || "").toLowerCase().includes("jaket") ||
-                    (item.product_name || "")
-                      .toLowerCase()
-                      .includes("varsity") ||
-                    (item.product_name || "")
-                      .toLowerCase()
-                      .includes("hoodie");
+                  const isJacket = (item.product_name || "").toLowerCase().includes("jaket") || (item.product_name || "").toLowerCase().includes("varsity") || (item.product_name || "").toLowerCase().includes("hoodie");
 
                   return (
                     <div
@@ -560,9 +580,7 @@ export function PartialPickupModal({
                           ? "bg-emerald-50/40 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-900/40"
                           : isReady
                             ? "bg-blue-50/40 border-blue-200 dark:bg-blue-950/20 dark:border-blue-900/40"
-                            : isJacket
-                              ? "bg-amber-50/30 border-amber-200/80 dark:bg-amber-950/20 dark:border-amber-900/30"
-                              : "bg-white border-gray-200 dark:bg-gray-800/80 dark:border-gray-700"
+                            : "bg-white border-gray-200 dark:bg-gray-800/80 dark:border-gray-700"
                       }`}
                     >
                       <div className="flex items-start gap-3">
@@ -570,133 +588,83 @@ export function PartialPickupModal({
                           type="checkbox"
                           checked={isSelected}
                           onChange={() => toggleItemSelect(item.id)}
-                          className="mt-1 w-4 h-4 rounded text-brand-orange focus:ring-brand-orange border-gray-300 cursor-pointer"
+                          className="mt-1 rounded text-brand-orange focus:ring-brand-orange cursor-pointer w-4 h-4"
                         />
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm">
+                            <span className="font-bold text-gray-900 dark:text-white text-sm">
                               {item.product_name}
                             </span>
                             {isJacket && (
-                              <span className="text-[10px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-900/60 dark:text-amber-300 px-1.5 py-0.5 rounded border border-amber-300/60">
-                                🧥 Jaket/Varsity
+                              <span className="text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 px-1.5 py-0.5 rounded">
+                                Jaket
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+
+                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1 flex-wrap">
                             <span>
-                              {[item.size, item.color]
-                                .filter(
-                                  (v) =>
-                                    v &&
-                                    v !== "-" &&
-                                    v !== "One Size" &&
-                                    v !== "All Size",
-                                )
-                                .join(" / ") || "Standar"}
+                              Qty:{" "}
+                              <strong className="text-gray-800 dark:text-gray-200">
+                                {item.quantity}
+                              </strong>
                             </span>
-                            <span>•</span>
-                            <span className="font-semibold text-gray-700 dark:text-gray-300">
-                              {item.quantity} pcs
-                            </span>
-                            <span>•</span>
-                            <span>
-                              Rp{" "}
-                              {Number(
-                                item.subtotal || item.unit_price,
-                              ).toLocaleString("id-ID")}
-                            </span>
+                            {item.size &&
+                              item.size !== "-" &&
+                              item.size !== "One Size" && (
+                                <span>
+                                  Ukuran:{" "}
+                                  <strong className="text-gray-800 dark:text-gray-200">
+                                    {item.size}
+                                  </strong>
+                                </span>
+                              )}
                           </div>
 
-                          {/* Pickup metadata & Photo proof button */}
-                          {isPicked && (
-                            <div className="flex items-center gap-2 flex-wrap mt-1">
-                              {item.picked_up_at && (
-                                <div className="text-[10px] font-medium text-emerald-700 dark:text-emerald-400 flex items-center gap-1">
-                                  <UserCheck className="w-3 h-3" />
-                                  Diambil pada{" "}
-                                  {new Date(item.picked_up_at).toLocaleString(
-                                    "id-ID",
-                                  )}{" "}
-                                  {item.picked_up_by_name
-                                    ? `(Oleh: ${item.picked_up_by_name})`
-                                    : ""}
-                                </div>
-                              )}
-                              {item.pickup_proof_url ? (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setPreviewPhotoModal(item.pickup_proof_url!)
-                                  }
-                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-100/90 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
-                                  title="Lihat Foto Bukti Serah Terima"
-                                >
-                                  <Camera className="w-3 h-3 text-emerald-700" />
-                                  Foto Bukti
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => openHandoverModal([item])}
-                                  className="inline-flex items-center gap-1 text-[10px] font-medium text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 border border-gray-300 px-1.5 py-0.5 rounded-md transition-colors cursor-pointer"
-                                  title="Ambil / Upload Foto Bukti"
-                                >
-                                  <Camera className="w-3 h-3" />
-                                  + Foto Bukti
-                                </button>
-                              )}
+                          {/* Pickup proof if already taken */}
+                          {item.pickup_proof_url && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewPhotoModal(item.pickup_proof_url || null)}
+                                className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/70 hover:bg-emerald-200 dark:bg-emerald-950/60 px-2.5 py-1 rounded-lg transition-colors cursor-pointer border border-emerald-300 dark:border-emerald-800"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                                <span>Lihat Foto Bukti Pengambilan</span>
+                              </button>
                             </div>
                           )}
                         </div>
                       </div>
 
-                      {/* Status Badges & Action Buttons */}
-                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0 flex-wrap">
+                      {/* Action buttons per item */}
+                      <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
                         {isPicked ? (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 px-2.5 py-1 rounded-lg border border-emerald-300/70">
-                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />{" "}
-                              Sudah Diambil
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 px-2.5 py-1 rounded-lg border border-emerald-300">
+                              <CheckCircle2 className="w-3.5 h-3.5" /> Sudah Diambil
                             </span>
-                            {/* Anulir buttons */}
                             <button
                               onClick={() =>
                                 handleUpdateItemStatus(
                                   [{ id: item.id, status: "ready" }],
-                                  "Anulir pengambilan: dikembalikan ke Siap Diambil",
+                                  `Anulir penyerahan item #${item.id}`,
                                 )
                               }
-                              disabled={updatingStatus}
-                              className="inline-flex items-center gap-1 text-[10px] font-bold bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                              title="Batalkan serah terima, ubah kembali ke Siap Diambil"
+                              title="Batalkan status sudah diambil"
+                              className="p-1 text-gray-400 hover:text-amber-600 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                             >
-                              <RotateCcw className="w-3 h-3" /> Anulir ke Siap
-                            </button>
-                            <button
-                              onClick={() =>
-                                handleUpdateItemStatus(
-                                  [{ id: item.id, status: "pending" }],
-                                  "Anulir pengambilan: dikembalikan ke Menyusul",
-                                )
-                              }
-                              disabled={updatingStatus}
-                              className="inline-flex items-center gap-1 text-[10px] font-bold bg-gray-50 text-gray-600 hover:text-red-700 hover:bg-red-50 border border-gray-200 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                              title="Batalkan dan kembalikan ke status Menyusul"
-                            >
-                              <Undo2 className="w-3 h-3" /> ke Menyusul
+                              <Undo2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ) : isReady ? (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 px-2.5 py-1 rounded-lg border border-blue-300/70">
-                              <PackageCheck className="w-3.5 h-3.5 text-blue-600" />{" "}
-                              Siap Diambil
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 px-2.5 py-1 rounded-lg border border-blue-300">
+                              <PackageCheck className="w-3.5 h-3.5" /> Siap Diambil
                             </span>
                             <button
                               onClick={() => openHandoverModal([item])}
-                              disabled={updatingStatus}
-                              className="flex items-center gap-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                              className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
                             >
                               <Camera className="w-3.5 h-3.5" /> Serahkan
                             </button>
@@ -704,40 +672,36 @@ export function PartialPickupModal({
                               onClick={() =>
                                 handleUpdateItemStatus(
                                   [{ id: item.id, status: "pending" }],
-                                  "Anulir kesiapan: dikembalikan ke Menyusul",
+                                  `Kembalikan ke status menyusul item #${item.id}`,
                                 )
                               }
-                              disabled={updatingStatus}
-                              className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-lg transition-colors cursor-pointer"
-                              title="Anulir status siap, kembalikan ke Menyusul"
+                              title="Kembalikan ke Menyusul"
+                              className="p-1 text-gray-400 hover:text-amber-600 rounded hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                             >
-                              <RotateCcw className="w-3 h-3" /> Anulir ke Menyusul
+                              <RotateCcw className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="inline-flex items-center gap-1 text-[11px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 px-2.5 py-1 rounded-lg border border-amber-300/70">
-                              <Clock className="w-3.5 h-3.5 text-amber-600" />{" "}
-                              Menyusul
+                          <div className="flex items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 text-xs font-bold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 px-2.5 py-1 rounded-lg border border-amber-300">
+                              <Clock className="w-3.5 h-3.5" /> Menyusul
                             </span>
                             <button
                               onClick={() =>
                                 handleUpdateItemStatus(
                                   [{ id: item.id, status: "ready" }],
-                                  "Item ditandai siap diambil",
+                                  `Tandai item #${item.id} siap diambil`,
                                 )
                               }
-                              disabled={updatingStatus}
-                              className="text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200 px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
+                              className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
                             >
-                              Set Siap
+                              <PackageCheck className="w-3.5 h-3.5" /> Tandai Siap
                             </button>
                             <button
                               onClick={() => openHandoverModal([item])}
-                              disabled={updatingStatus}
-                              className="flex items-center gap-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg shadow-2xs transition-colors cursor-pointer"
+                              className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
                             >
-                              <Camera className="w-3.5 h-3.5" /> Diambil
+                              <Camera className="w-3.5 h-3.5" /> Serahkan
                             </button>
                           </div>
                         )}
@@ -747,89 +711,87 @@ export function PartialPickupModal({
                 })}
               </div>
             </div>
-          )}
-
-          {/* TAB 2: NOTIFICATION COMPOSER */}
-          {activeTab === "notification" && (
+          ) : (
+            /* Tab Notifikasi WhatsApp */
             <div className="space-y-4">
-              <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-200/80 dark:border-blue-800/40 text-xs text-blue-900 dark:text-blue-200 flex items-start gap-2.5">
+              <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-900/50 flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-bold">Notifikasi Pengambilan Parsial</p>
-                  <p className="mt-0.5 text-blue-800/80 dark:text-blue-300 text-[11px] leading-relaxed">
-                    Notifikasi akan otomatis dikirimkan ke{" "}
-                    <strong>In-App Lonceng</strong> dan{" "}
-                    <strong>Web Push (HP/Browser)</strong> milik pembeli. Anda
-                    dapat mengedit judul & isi pesan di bawah.
-                  </p>
-                </div>
+                <p className="text-xs text-blue-900 dark:text-blue-300 leading-relaxed">
+                  Pilih item yang sudah siap diambil di tab Checklist atau tombol di bawah ini. Teks pesan notifikasi WhatsApp akan terisi otomatis dan siap dikirim ke pembeli.
+                </p>
               </div>
 
-              {/* Items Selected Summary */}
-              <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-                <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1.5">
-                  Barang yang diinfokan sudah siap ({selectedItemIds.length}{" "}
-                  item):
-                </span>
-                <div className="flex flex-wrap gap-1.5">
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                  Pilih Produk yang Siap Diambil:
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {items.map((i) => {
-                    const isSel = selectedItemIds.includes(i.id);
+                    const isSelected = selectedItemIds.includes(i.id);
+                    const effective = getEffectiveItemStatus(i);
                     return (
-                      <button
+                      <div
                         key={i.id}
-                        type="button"
                         onClick={() => toggleItemSelect(i.id)}
-                        className={`text-xs px-2.5 py-1 rounded-lg font-medium border transition-all ${
-                          isSel
-                            ? "bg-emerald-500 text-white border-emerald-600 shadow-2xs"
-                            : "bg-white text-gray-600 border-gray-300 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-300"
+                        className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all flex items-center justify-between ${
+                          isSelected
+                            ? "bg-brand-orange/10 border-brand-orange font-bold text-brand-orange"
+                            : "bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
                         }`}
                       >
-                        {isSel ? "✓ " : "+ "}
-                        {i.product_name}
-                      </button>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => {}}
+                            className="rounded text-brand-orange"
+                          />
+                          <span className="truncate max-w-[180px]">
+                            {i.product_name}
+                          </span>
+                        </div>
+                        <span className="text-[10px] opacity-75 shrink-0">
+                          {effective === "ready" ? "Siap" : effective === "picked_up" ? "Diambil" : "Menyusul"}
+                        </span>
+                      </div>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Title & Message inputs */}
-              <div className="space-y-3">
-                <div>
-                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 block">
-                    Judul Notifikasi
-                  </label>
-                  <input
-                    type="text"
-                    value={notifTitle}
-                    onChange={(e) => setNotifTitle(e.target.value)}
-                    className="w-full px-3.5 py-2 text-xs sm:text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-orange/40"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 block">
-                    Isi Pesan Notifikasi (Dapat Disesuaikan)
-                  </label>
-                  <textarea
-                    rows={6}
-                    value={notifMessage}
-                    onChange={(e) => setNotifMessage(e.target.value)}
-                    className="w-full px-3.5 py-2.5 text-xs sm:text-sm rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-brand-orange/40 resize-none font-sans"
-                  />
-                </div>
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                  Judul Notifikasi
+                </label>
+                <input
+                  type="text"
+                  value={notifTitle}
+                  onChange={(e) => setNotifTitle(e.target.value)}
+                  className="w-full p-2.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+                />
               </div>
 
-              {/* Submit Button */}
-              <div className="flex justify-end pt-2">
+              <div>
+                <label className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 block">
+                  Isi Pesan WhatsApp
+                </label>
+                <textarea
+                  rows={6}
+                  value={notifMessage}
+                  onChange={(e) => setNotifMessage(e.target.value)}
+                  className="w-full p-3 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 font-mono"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowDoubleConfirm(true)}
-                  disabled={selectedItemIds.length === 0 || !notifTitle.trim()}
-                  className="flex items-center gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50"
+                  disabled={sendingNotif}
+                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow-md disabled:opacity-50 cursor-pointer"
                 >
-                  <Send className="w-4 h-4" />
-                  Kirim Notifikasi ke Pembeli
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Kirim Notifikasi via WhatsApp</span>
                 </button>
               </div>
             </div>
@@ -837,85 +799,56 @@ export function PartialPickupModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 flex items-center justify-between shrink-0">
-          <div className="text-xs text-gray-500">
-            Total {items.length} item dalam pesanan ini
-          </div>
+        <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0 bg-gray-50/50 dark:bg-gray-900/50">
+          <p className="text-[11px] text-gray-500">
+            *Status pengambilan tersinkronisasi langsung pada halaman lacak pesanan pembeli.
+          </p>
           <button
             onClick={onClose}
-            className="px-4 py-2 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 rounded-xl transition-colors shadow-2xs"
+            className="px-4 py-2 text-xs font-bold text-gray-700 bg-white dark:bg-gray-800 dark:text-gray-200 border border-gray-300 dark:border-gray-700 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
           >
             Tutup
           </button>
         </div>
       </div>
 
-      {/* DOUBLE CONFIRMATION NOTIF MODAL */}
+      {/* DOUBLE CONFIRM MODAL FOR NOTIF */}
       {showDoubleConfirm && (
-        <div className="fixed inset-0 z-[1100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-5 shadow-2xl border border-gray-200 dark:border-gray-700 text-left space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-amber-100 dark:bg-amber-950/60 text-amber-600 rounded-xl shrink-0">
-                <ShieldAlert className="w-6 h-6 text-amber-600" />
-              </div>
-              <div>
-                <h4 className="font-bold text-gray-900 dark:text-white text-base">
-                  Konfirmasi Pengiriman Notifikasi
-                </h4>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Pastikan rincian berikut sudah sesuai sebelum dikirim.
-                </p>
-              </div>
+        <div
+          className="fixed inset-0 z-[100000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-150"
+          style={{ pointerEvents: "auto" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowDoubleConfirm(false);
+          }}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-gray-200 dark:border-gray-700 text-left relative z-20"
+            style={{ pointerEvents: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 text-amber-600 mb-3">
+              <ShieldAlert className="w-6 h-6" />
+              <h4 className="font-black text-gray-900 dark:text-white text-sm">
+                Konfirmasi Kirim Notifikasi
+              </h4>
             </div>
-
-            <div className="p-3.5 bg-gray-50 dark:bg-gray-800 rounded-xl text-xs space-y-2 border border-gray-200/80 dark:border-gray-700">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Penerima:</span>
-                <span className="font-bold text-gray-800 dark:text-gray-200">
-                  {order.customer_name}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">No. Pesanan:</span>
-                <span className="font-mono font-bold text-brand-orange">
-                  #{order.order_id}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Item Ready:</span>
-                <span className="font-bold text-emerald-600">
-                  {selectedItemIds.length} Produk
-                </span>
-              </div>
-            </div>
-
-            <p className="text-xs text-gray-600 dark:text-gray-400">
-              Apakah Anda yakin ingin mengirim notifikasi kesiapan pengambilan
-              ini ke pembeli sekarang?
+            <p className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed mb-4">
+              Pesan WhatsApp akan dikirimkan langsung ke nomor pembeli{" "}
+              <strong>{order.customer_phone}</strong>. Lanjutkan?
             </p>
-
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <div className="flex items-center justify-end gap-2">
               <button
-                type="button"
                 onClick={() => setShowDoubleConfirm(false)}
-                disabled={sendingNotif}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer"
+                className="px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
               >
                 Batal
               </button>
               <button
-                type="button"
                 onClick={handleConfirmSendNotification}
                 disabled={sendingNotif}
                 className="flex items-center gap-2 bg-brand-orange hover:bg-brand-orange/90 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow-md disabled:opacity-50 cursor-pointer"
               >
-                {sendingNotif ? (
-                  <>Mengirim...</>
-                ) : (
-                  <>
-                    <Send className="w-3.5 h-3.5" /> Ya, Kirim Notifikasi
-                  </>
-                )}
+                {sendingNotif ? "Mengirim..." : "Ya, Kirim"}
               </button>
             </div>
           </div>
@@ -924,8 +857,18 @@ export function PartialPickupModal({
 
       {/* HANDOVER & PHOTO PROOF MODAL */}
       {handoverModalOpen && (
-        <div className="fixed inset-0 z-[1150] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl border border-gray-200 dark:border-gray-700 text-left overflow-hidden">
+        <div
+          className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs animate-in fade-in duration-150"
+          style={{ pointerEvents: "auto" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setHandoverModalOpen(false);
+          }}
+        >
+          <div
+            className="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl border border-gray-200 dark:border-gray-700 text-left overflow-hidden relative z-20"
+            style={{ pointerEvents: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Header */}
             <div className="p-4 sm:p-5 border-b border-gray-100 dark:border-gray-800 flex items-center justify-between shrink-0 bg-gradient-to-r from-emerald-50 to-white dark:from-gray-900 dark:to-gray-900">
               <div className="flex items-center gap-3">
@@ -934,13 +877,8 @@ export function PartialPickupModal({
                 </div>
                 <div>
                   <h4 className="font-black text-gray-900 dark:text-white text-base">
-                    {isCompletingWholeOrder ? "Bukti Pengambilan Seluruh Pesanan" : "Bukti Serah Terima Barang"}
+                    Bukti Serah Terima
                   </h4>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {isCompletingWholeOrder
-                      ? "Ambil foto bukti serah terima untuk menyelesaikan seluruh pesanan ini"
-                      : "Ambil foto langsung kamera atau upload file bukti pengambilan"}
-                  </p>
                 </div>
               </div>
               <button
@@ -953,7 +891,6 @@ export function PartialPickupModal({
 
             {/* Body */}
             <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4">
-              {/* Recipient & Items info */}
               <div className="p-3 bg-gray-50 dark:bg-gray-800/80 rounded-xl border border-gray-200 dark:border-gray-700 text-xs space-y-1.5">
                 <div className="flex justify-between items-center text-gray-500 font-medium">
                   <span>Penerima:</span>
@@ -963,19 +900,19 @@ export function PartialPickupModal({
                 </div>
                 <div className="flex justify-between items-center text-gray-500 font-medium">
                   <span>No. Pesanan:</span>
-                  <span className="font-mono font-bold text-brand-orange">
+                  <span className="font-mono font-bold text-gray-800 dark:text-gray-200">
                     #{order.order_id}
                   </span>
                 </div>
-                <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-1">
-                  <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider block mb-1">
-                    Barang yang Diserahkan ({handoverTargetItems.length} produk):
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-1.5 mt-1.5">
+                  <span className="text-gray-500 font-medium block mb-1">
+                    {isCompletingWholeOrder ? "Daftar Barang yang Diambil Semua:" : "Daftar Barang yang Diserahkan Saat Ini:"}
                   </span>
-                  <div className="space-y-1">
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
                     {handoverTargetItems.map((it) => (
                       <div
                         key={it.id}
-                        className="flex justify-between items-center font-medium text-gray-700 dark:text-gray-300"
+                        className="flex items-center justify-between text-gray-700 dark:text-gray-300 font-medium"
                       >
                         <span>• {it.product_name}</span>
                         <span className="font-bold shrink-0">{it.quantity} pcs</span>
@@ -985,39 +922,34 @@ export function PartialPickupModal({
                 </div>
               </div>
 
-              {/* Live Camera & File Upload Capture */}
-              <div>
-                <LiveCameraCapture
-                  value={handoverProofUrl}
-                  onChange={(url) => setHandoverProofUrl(url)}
-                  onRemove={() => setHandoverProofUrl("")}
-                  resolveImageUrl={(url) => resolveImageUrl(url) || url}
-                  label="Foto Bukti Serah Terima (Kamera / Upload)"
-                />
-              </div>
+              <LiveCameraCapture
+                value={handoverProofUrl}
+                onChange={(url) => setHandoverProofUrl(url)}
+                onRemove={() => setHandoverProofUrl("")}
+                resolveImageUrl={(url) => resolveImageUrl(url) || url}
+                label="Foto Bukti Serah Terima"
+              />
 
-              {/* Notes input */}
               <div>
                 <label className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-1 block">
-                  Catatan Serah Terima (Opsional)
+                  Catatan (Opsional)
                 </label>
                 <input
                   type="text"
                   value={handoverNotes}
                   onChange={(e) => setHandoverNotes(e.target.value)}
-                  placeholder="Contoh: Diambil langsung oleh pemesan / Diwakilkan teman"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500"
+                  placeholder="Contoh: Diambil langsung oleh ybs / teman"
+                  className="w-full p-2.5 text-xs rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
                 />
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="p-4 border-t border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 flex items-center justify-end gap-2 shrink-0">
+            {/* Footer actions */}
+            <div className="p-4 border-t border-gray-100 dark:border-gray-800 flex items-center justify-end gap-2 shrink-0 bg-gray-50/60 dark:bg-gray-900/60">
               <button
                 type="button"
                 onClick={() => setHandoverModalOpen(false)}
-                disabled={updatingStatus}
-                className="px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors cursor-pointer"
               >
                 Batal
               </button>
@@ -1025,13 +957,9 @@ export function PartialPickupModal({
                 type="button"
                 onClick={handleConfirmHandoverWithProof}
                 disabled={updatingStatus}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition-all shadow-md active:scale-95 disabled:opacity-50 cursor-pointer"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-md disabled:opacity-50 cursor-pointer"
               >
-                {updatingStatus
-                  ? "Menyimpan..."
-                  : isCompletingWholeOrder
-                    ? "✓ Selesaikan Pesanan (Semua Diambil)"
-                    : "✓ Selesaikan Serah Terima"}
+                Selesaikan
               </button>
             </div>
           </div>
@@ -1040,8 +968,18 @@ export function PartialPickupModal({
 
       {/* PREVIEW PHOTO LIGHTBOX */}
       {previewPhotoModal && (
-        <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="relative max-w-2xl w-full bg-black rounded-2xl overflow-hidden border border-gray-800 shadow-2xl flex flex-col items-center">
+        <div
+          className="fixed inset-0 z-[100010] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-150"
+          style={{ pointerEvents: "auto" }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setPreviewPhotoModal(null);
+          }}
+        >
+          <div
+            className="relative max-w-2xl w-full bg-black rounded-2xl overflow-hidden border border-gray-800 shadow-2xl flex flex-col items-center"
+            style={{ pointerEvents: "auto" }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="w-full flex items-center justify-between p-3.5 bg-gray-900/80 border-b border-gray-800 text-white text-xs font-bold">
               <div className="flex items-center gap-2">
                 <Camera className="w-4 h-4 text-emerald-400" />
@@ -1054,16 +992,17 @@ export function PartialPickupModal({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-3 flex items-center justify-center max-h-[75vh] overflow-hidden">
+            <div className="p-3">
               <img
                 src={resolveImageUrl(previewPhotoModal)}
-                alt="Foto Bukti Serah Terima"
+                alt="Foto Bukti"
                 className="max-h-[70vh] w-auto object-contain rounded-lg shadow-lg"
               />
             </div>
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
