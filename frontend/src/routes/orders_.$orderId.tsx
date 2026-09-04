@@ -1106,11 +1106,17 @@ function OrderDetailComponent() {
                                 <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-300 animate-pulse">
                                   📦 Siap Diambil di FILKOM Merch
                                 </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300">
-                                  <Clock className="w-3 h-3 text-amber-600" /> Proses Produksi (Menyusul)
-                                </span>
-                              )}
+                              ) : item.pickup_proof_url ? (
+                                <a
+                                  href={resolveImageUrl(item.pickup_proof_url) || item.pickup_proof_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+                                  title="Lihat Foto Bukti Serah Terima"
+                                >
+                                  <Camera className="w-3 h-3 text-emerald-700" /> Foto Bukti
+                                </a>
+                              ) : null}
                             </div>
                           )}
                         </div>
