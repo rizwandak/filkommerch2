@@ -4947,11 +4947,30 @@ export const submitOrderComplaint = async (req: Request, res: Response) => {
     const complaintText = notes || "Pembeli mengajukan komplain kecacatan produk (defect).";
     const mediaUrlsStr = mediaUrls && mediaUrls.length > 0 ? JSON.stringify(mediaUrls) : null;
 
+    // Check order status & completion deadline (H+3 days after completion)
+    const order = await queryOne<any>("SELECT * FROM orders WHERE order_id = ? LIMIT 1", [id]);
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+    }
+
+    if (order.order_status === "completed") {
+      const completedTime = order.completed_at ? new Date(order.completed_at).getTime() : (order.updated_at ? new Date(order.updated_at).getTime() : null);
+      if (completedTime) {
+        const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
+        if (Date.now() - completedTime > threeDaysMs) {
+          return res.status(400).json({
+            success: false,
+            error: "Batas waktu pengajuan komplain (maksimal 3 hari / H+3 setelah pesanan selesai) telah berakhir.",
+          });
+        }
+      }
+    }
+
     await execute(
       "UPDATE orders SET is_complained = 1, complaint_notes = ?, complaint_media_urls = ? WHERE order_id = ? OR notes LIKE ?",
       [complaintText, mediaUrlsStr, id, `%Pelunasan untuk Order: ${id}%`]
     );
-    return res.json({ success: true, message: "Komplain berhasil dicatat." });
+    return res.json({ success: true, message: "Komplain berhasil dicatat. Tim admin akan segera menindaklanjuti." });
   } catch (error: any) {
     console.error("Error submitting order complaint:", error);
     return res.status(500).json({ success: false, error: "Gagal mengajukan komplain" });
@@ -6852,6 +6871,23 @@ export const updateOrderItemPickupStatus = async (req: Request, res: Response) =
       );
     }
 
+    // Check if all items in this order are now picked_up
+    const [itemSummaryRows] = await connection.query<any[]>(
+      "SELECT COUNT(*) as total_items, SUM(CASE WHEN pickup_status = 'picked_up' THEN 1 ELSE 0 END) as picked_items FROM order_items WHERE order_id = ?",
+      [orderId]
+    );
+    const totalItems = Number(itemSummaryRows[0]?.total_items || 0);
+    const pickedItems = Number(itemSummaryRows[0]?.picked_items || 0);
+
+    let isWholeOrderCompleted = false;
+    if (totalItems > 0 && totalItems === pickedItems) {
+      isWholeOrderCompleted = true;
+      await connection.query(
+        "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed', completed_at = COALESCE(completed_at, NOW()), fulfillment_proof_url = COALESCE(?, fulfillment_proof_url) WHERE order_id = ? OR notes LIKE ?",
+        [proof_url || null, orderId, `%Pelunasan untuk Order: ${orderId}%`]
+      );
+    }
+
     await connection.commit();
 
     // Fetch updated items
@@ -6865,8 +6901,11 @@ export const updateOrderItemPickupStatus = async (req: Request, res: Response) =
 
     return res.json({
       success: true,
-      message: "Status pengambilan berhasil diperbarui",
+      message: isWholeOrderCompleted
+        ? "Seluruh barang telah diambil dan status pesanan otomatis diselesaikan (Completed)!"
+        : "Status pengambilan berhasil diperbarui",
       items: updatedItems,
+      order_completed: isWholeOrderCompleted,
     });
   } catch (error: any) {
     await connection.rollback();

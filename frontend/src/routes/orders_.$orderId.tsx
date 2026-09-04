@@ -686,6 +686,41 @@ function OrderDetailComponent() {
     }
   };
 
+  const complaintDeadlineInfo = (() => {
+    if (!order) return { canComplain: false, isComplained: false, label: "Ajukan Komplain", isExpired: false, badgeText: "" };
+    if (order.is_complained === 1) {
+      return { canComplain: true, isComplained: true, label: "Komplain Diajukan", isExpired: false, badgeText: "Sedang Ditinjau Admin" };
+    }
+    // If order is not yet completed (e.g. ready_for_pickup, shipped, processing)
+    if (order.order_status !== "completed") {
+      return { canComplain: true, isComplained: false, label: "Ajukan Komplain", isExpired: false, badgeText: "Bisa diajukan hingga H+3 setelah selesai" };
+    }
+    // If order is completed, check completed_at or updated_at
+    const completedDate = order.completed_at ? new Date(order.completed_at) : (order.updated_at ? new Date(order.updated_at) : null);
+    if (!completedDate || isNaN(completedDate.getTime())) {
+      return { canComplain: true, isComplained: false, label: "Ajukan Komplain (H+3)", isExpired: false, badgeText: "Maksimal H+3" };
+    }
+    const deadline = new Date(completedDate.getTime() + 3 * 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const isExpired = now.getTime() > deadline.getTime();
+    const remainingMs = deadline.getTime() - now.getTime();
+    const remainingHours = Math.max(0, Math.floor(remainingMs / (1000 * 60 * 60)));
+    const remainingDays = Math.ceil(remainingHours / 24);
+
+    return {
+      canComplain: !isExpired,
+      isComplained: false,
+      label: !isExpired
+        ? `Ajukan Komplain (${remainingDays > 1 ? `Sisa ${remainingDays} Hari` : `Sisa ${remainingHours} Jam`})`
+        : "Batas Komplain Berakhir (H+3)",
+      isExpired,
+      badgeText: !isExpired
+        ? `Bisa diajukan s/d ${deadline.toLocaleDateString("id-ID", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`
+        : "Batas waktu 3 hari setelah selesai telah berakhir",
+      deadline,
+    };
+  })();
+
   const fullOrder = { ...order, items };
   const isDp = isDpOrder(fullOrder, linkedPelunasan);
 
@@ -1367,14 +1402,21 @@ function OrderDetailComponent() {
 
             {/* Action Buttons */}
             <div className="flex flex-col gap-2">
-              {(order.order_status === "ready_for_pickup" || order.order_status === "shipped" || order.is_complained === 1) && (
-                <button
-                  onClick={() => setComplaintModalOpen(true)}
-                  className={`w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 border-2 border-ink text-xs font-bold uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer ${order.is_complained === 1 ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-50 text-red-700 hover:bg-red-100"}`}
-                >
-                  <ShieldAlert className="w-3.5 h-3.5" />
-                  {order.is_complained === 1 ? "Komplain Diajukan" : "Ajukan Komplain"}
-                </button>
+              {(complaintDeadlineInfo.canComplain || order.is_complained === 1) && (
+                <div className="space-y-1">
+                  <button
+                    onClick={() => setComplaintModalOpen(true)}
+                    className={`w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 border-2 border-ink text-xs font-bold uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:translate-x-[0.5px] hover:translate-y-[0.5px] hover:shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer ${order.is_complained === 1 ? "bg-red-600 text-white hover:bg-red-700" : "bg-red-50 text-red-700 hover:bg-red-100"}`}
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    {order.is_complained === 1 ? "Komplain Diajukan" : complaintDeadlineInfo.label}
+                  </button>
+                  {order.order_status === "completed" && order.is_complained !== 1 && complaintDeadlineInfo.badgeText && (
+                    <p className="text-[10px] text-center text-muted-foreground font-medium">
+                      🛡️ {complaintDeadlineInfo.badgeText}
+                    </p>
+                  )}
+                </div>
               )}
 
               {(order.order_status === "ready_for_pickup" || order.order_status === "shipped") && (
@@ -1708,7 +1750,7 @@ function OrderDetailComponent() {
             </div>
 
             <p className="text-xs text-ink/90 mb-6 leading-relaxed font-semibold">
-              Apakah Anda yakin telah menerima semua pesanan dengan baik? Setelah klik selesai, Anda tidak dapat lagi mengajukan komplain dan dapat langsung memberikan ulasan produk.
+              Apakah Anda yakin telah menerima semua pesanan dengan baik? Anda masih dapat mengajukan komplain hingga 3 hari (H+3) setelah pesanan selesai jika terdapat kendala atau kerusakan produk.
             </p>
 
             <div className="flex gap-3">

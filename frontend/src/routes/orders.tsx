@@ -115,7 +115,7 @@ function UserOrdersPage() {
   const [completingOrderId, setCompletingOrderId] = useState<string | null>(null);
 
   const handleConfirmCompletion = async (orderId: string) => {
-    if (!confirm("Apakah Anda yakin telah menerima semua pesanan dengan baik? Jika sudah diterima Anda tidak bisa mengajukan pengembalian dan hanya dapat memberikan penilaian produk.")) return;
+    if (!confirm("Apakah Anda yakin telah menerima semua pesanan dengan baik? Anda masih dapat mengajukan komplain hingga 3 hari (H+3) setelah pesanan selesai jika terdapat kendala produk.")) return;
 
     try {
       setCompletingOrderId(orderId);
