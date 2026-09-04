@@ -335,6 +335,10 @@ export async function runMigration() {
       {
         name: "order_item_pickup_logs.proof_url",
         sql: "ALTER TABLE order_item_pickup_logs ADD COLUMN proof_url VARCHAR(255) NULL DEFAULT NULL"
+      },
+      {
+        name: "orders.link_unassigned_by_email",
+        sql: "UPDATE orders o JOIN users u ON LOWER(TRIM(o.customer_email)) = LOWER(TRIM(u.email)) SET o.user_id = u.id WHERE o.user_id IS NULL AND o.customer_email IS NOT NULL AND o.customer_email != ''"
       }
     ];
 

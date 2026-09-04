@@ -284,6 +284,18 @@ export const loginUser = async (req: Request, res: Response) => {
       }
     }
 
+    // Auto-link any past unassigned orders for this email
+    if (dbUser && dbUser.id && dbUser.email) {
+      try {
+        await execute(
+          "UPDATE orders SET user_id = ? WHERE user_id IS NULL AND customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?))",
+          [dbUser.id, dbUser.email]
+        );
+      } catch (linkErr) {
+        console.warn("Notice: auto-linking orders on login failed:", linkErr);
+      }
+    }
+
     if (dbUser.role === "admin" || dbUser.role === "cashier") {
       return res.json({
         success: true,
@@ -336,6 +348,18 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
         [name, email, hash]
       );
       dbUser = await queryOne<any>("SELECT * FROM users WHERE id = ?", [result.insertId]);
+    }
+
+    // Auto-link any past unassigned orders for this email
+    if (dbUser && dbUser.id && dbUser.email) {
+      try {
+        await execute(
+          "UPDATE orders SET user_id = ? WHERE user_id IS NULL AND customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?))",
+          [dbUser.id, dbUser.email]
+        );
+      } catch (linkErr) {
+        console.warn("Notice: auto-linking orders on Google login failed:", linkErr);
+      }
     }
 
     if (dbUser.role === "admin" || dbUser.role === "cashier") {
@@ -1048,6 +1072,23 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
     const discountAmount = verifiedVoucherCode ? verifiedDiscountAmount : (Number(details.discountAmount) || 0);
     const grossAmount = calculatedSubtotal - discountAmount + shippingCost + serviceFee + taxAmount;
 
+    // Resolve order user_id: check if details.userId exists or if customerEmail matches a registered user
+    let orderUserId = details.userId || null;
+    if (!orderUserId && details.customerEmail) {
+      try {
+        const [matchedUsers] = await connection.execute(
+          "SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) LIMIT 1",
+          [details.customerEmail]
+        );
+        const matched = (matchedUsers as any[])[0];
+        if (matched && matched.id) {
+          orderUserId = matched.id;
+        }
+      } catch (err) {
+        console.warn("Notice: failed looking up user by customerEmail:", err);
+      }
+    }
+
     // 1. Insert order to database
     await connection.execute(
       `INSERT INTO orders (
@@ -1061,7 +1102,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         details.channel || "online",
         details.fulfillmentType || "shipping",
         "unfulfilled",
-        details.userId || null,
+        orderUserId,
         details.customerName,
         details.customerNim || null,
         details.customerEmail,
@@ -2836,11 +2877,65 @@ export const getUserOrders = async (req: Request, res: Response) => {
       console.error("Notice: auto-complete orders error", e);
     }
 
-    // Fetch orders
-    const orders = await query<any>(
-      "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
-      [userId]
-    );
+    let targetUserId: number | null = null;
+    let targetEmail = ((req.query.email as string) || "").trim();
+
+    if (userId) {
+      const parsedId = Number(userId);
+      if (!isNaN(parsedId) && parsedId > 0) {
+        targetUserId = parsedId;
+      } else if (userId.includes("@")) {
+        targetEmail = userId.trim();
+      }
+    }
+
+    // If we have targetUserId but not targetEmail, look up user's email
+    if (targetUserId && !targetEmail) {
+      try {
+        const u = await queryOne<any>("SELECT email FROM users WHERE id = ?", [targetUserId]);
+        if (u && u.email) {
+          targetEmail = u.email.trim();
+        }
+      } catch (err) {}
+    } else if (!targetUserId && targetEmail) {
+      try {
+        const u = await queryOne<any>("SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) LIMIT 1", [targetEmail]);
+        if (u && u.id) {
+          targetUserId = u.id;
+        }
+      } catch (err) {}
+    }
+
+    // Auto-link any past unassigned orders for this email
+    if (targetUserId && targetEmail) {
+      try {
+        await execute(
+          "UPDATE orders SET user_id = ? WHERE user_id IS NULL AND customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?))",
+          [targetUserId, targetEmail]
+        );
+      } catch (linkErr) {
+        console.warn("Notice: auto-linking orders by email in getUserOrders failed:", linkErr);
+      }
+    }
+
+    // Fetch orders matching user_id OR customer_email
+    let orders: any[] = [];
+    if (targetUserId && targetEmail) {
+      orders = await query<any>(
+        "SELECT * FROM orders WHERE user_id = ? OR (customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?))) ORDER BY created_at DESC",
+        [targetUserId, targetEmail]
+      );
+    } else if (targetUserId) {
+      orders = await query<any>(
+        "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
+        [targetUserId]
+      );
+    } else if (targetEmail) {
+      orders = await query<any>(
+        "SELECT * FROM orders WHERE customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?)) ORDER BY created_at DESC",
+        [targetEmail]
+      );
+    }
 
     if (orders.length === 0) {
       return res.json({ success: true, orders: [] });
@@ -2860,10 +2955,12 @@ export const getUserOrders = async (req: Request, res: Response) => {
     // Fetch reviews submitted for these orders
     let reviews: any[] = [];
     try {
-      reviews = await query<any>(
-        `SELECT * FROM product_reviews WHERE order_id IN (${placeholders}) AND user_id = ?`,
-        [...orderIds, userId]
-      );
+      if (targetUserId) {
+        reviews = await query<any>(
+          `SELECT * FROM product_reviews WHERE order_id IN (${placeholders}) AND user_id = ?`,
+          [...orderIds, targetUserId]
+        );
+      }
     } catch (e) {
       console.warn("Notice: product_reviews query error", e);
     }
@@ -6199,32 +6296,40 @@ export const importOrders = async (req: Request, res: Response) => {
 // ============ ORDER CLAIMS (BATCH 1) ============
 
 /**
- * Endpoint for users to search their unassigned orders by NIM or Phone
+ * Endpoint for users to search their unassigned orders by Email, NIM, or Phone
  */
 export const claimSearch = async (req: Request, res: Response) => {
   try {
-    const { nim, phone } = req.body;
-    if (!nim && !phone) {
-      return res.status(400).json({ success: false, error: "Masukkan NIM atau No HP" });
+    const { nim, phone, email } = req.body;
+    if (!nim && !phone && !email) {
+      return res.status(400).json({ success: false, error: "Masukkan Email, NIM, atau No HP" });
     }
 
-    // Search for orders where user_id IS NULL and batch_source = 'manual' or 'csv_import'
-    // Matching either customer_nim or customer_phone
+    // Search for orders where user_id IS NULL
+    // Matching either customer_email, customer_nim, or customer_phone
     const params: any[] = [];
-    let queryStr = `SELECT order_id, customer_name, customer_nim, customer_phone, gross_amount, created_at 
+    let queryStr = `SELECT order_id, customer_name, customer_nim, customer_phone, customer_email, gross_amount, created_at 
        FROM orders 
-       WHERE user_id IS NULL 
-         AND (batch_source = 'manual' OR batch_source = 'csv_import')`;
+       WHERE user_id IS NULL`;
 
-    if (nim && phone) {
-      queryStr += ` AND (customer_nim = ? OR customer_phone = ? OR customer_phone = CONCAT('0', ?))`;
-      params.push(nim, phone, phone.startsWith('62') ? phone.substring(2) : phone);
-    } else if (nim) {
-      queryStr += ` AND customer_nim = ?`;
-      params.push(nim);
-    } else if (phone) {
-      queryStr += ` AND (customer_phone = ? OR customer_phone = CONCAT('0', ?))`;
-      params.push(phone, phone.startsWith('62') ? phone.substring(2) : phone);
+    const searchConditions: string[] = [];
+    if (email && String(email).trim()) {
+      searchConditions.push(`(customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?)))`);
+      params.push(String(email).trim());
+    }
+    if (nim && String(nim).trim()) {
+      searchConditions.push(`customer_nim = ?`);
+      params.push(String(nim).trim());
+    }
+    if (phone && String(phone).trim()) {
+      const p = String(phone).trim();
+      const altP = p.startsWith("62") ? p.substring(2) : p.startsWith("0") ? p.substring(1) : p;
+      searchConditions.push(`(customer_phone = ? OR customer_phone = CONCAT('0', ?) OR customer_phone = CONCAT('62', ?))`);
+      params.push(p, altP, altP);
+    }
+
+    if (searchConditions.length > 0) {
+      queryStr += ` AND (${searchConditions.join(" OR ")})`;
     }
 
     queryStr += ` ORDER BY created_at DESC`;

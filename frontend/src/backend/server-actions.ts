@@ -1286,11 +1286,21 @@ export const deleteOfflineSale = createServerFn({ method: "POST" })
   });
 // Get user orders
 export const getUserOrders = createServerFn({ method: "GET" })
-  .validator((userId: number) => userId)
+  .validator((data: number | string | { userId?: number | string; email?: string }) => data)
   .handler(
-    async ({ data: userId }): Promise<{ success: boolean; orders: any[]; error?: string }> => {
+    async ({ data }): Promise<{ success: boolean; orders: any[]; error?: string }> => {
       try {
-        const res = await serverFetch(`${API_URL}/api/orders/user/${userId}`);
+        let uId = "0";
+        let emailQuery = "";
+        if (typeof data === "number" || typeof data === "string") {
+          uId = encodeURIComponent(String(data));
+        } else if (data && typeof data === "object") {
+          uId = data.userId ? encodeURIComponent(String(data.userId)) : "0";
+          if (data.email) {
+            emailQuery = `?email=${encodeURIComponent(data.email)}`;
+          }
+        }
+        const res = await serverFetch(`${API_URL}/api/orders/user/${uId}${emailQuery}`);
         if (!res.ok) throw new Error("Failed to fetch user orders");
         return res.json();
       } catch (error) {
@@ -2131,7 +2141,7 @@ export const deleteImportedOrdersServerAction = createServerFn({ method: "POST" 
 // ============ ORDER CLAIMS (BATCH 1) ============
 
 export const claimSearchServerAction = createServerFn({ method: "POST" })
-  .validator((data: { nim?: string; phone?: string }) => data)
+  .validator((data: { nim?: string; phone?: string; email?: string }) => data)
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();

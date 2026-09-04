@@ -147,7 +147,7 @@ function UserOrdersPage() {
     try {
       setLoading(true);
       const [result, settingsRes] = await Promise.all([
-        getUserOrders({ data: Number(user.id) }),
+        getUserOrders({ data: { userId: Number(user.id), email: user.email } }),
         getStoreSettings(),
       ]);
       if (result.success) {

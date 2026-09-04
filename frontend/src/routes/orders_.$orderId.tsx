@@ -280,7 +280,9 @@ function OrderDetailComponent() {
     try {
       const targetUserId = user?.id ? Number(user.id) : (order.user_id ? Number(order.user_id) : undefined);
       if (!targetUserId) return;
-      const res = await getUserOrders({ data: targetUserId });
+      const res = await getUserOrders({
+        data: { userId: targetUserId, email: user?.email || order?.customer_email },
+      });
       if (res.success && res.orders) {
         const found = res.orders.find(
           (o: any) =>

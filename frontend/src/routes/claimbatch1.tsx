@@ -19,6 +19,7 @@ export const Route = createFileRoute("/claimbatch1")({
 function ClaimBatch1Page() {
   const { user } = useAuth();
 
+  const [email, setEmail] = useState("");
   const [nim, setNim] = useState("");
   const [phone, setPhone] = useState("");
   const [isSearching, setIsSearching] = useState(false);
@@ -29,6 +30,12 @@ function ClaimBatch1Page() {
   const [activeTab, setActiveTab] = useState<"search" | "history">("search");
   const [claims, setClaims] = useState<any[]>([]);
   const [loadingClaims, setLoadingClaims] = useState(false);
+
+  useEffect(() => {
+    if (user?.email && !email) {
+      setEmail(user.email);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (user && activeTab === "history") {
@@ -54,8 +61,8 @@ function ClaimBatch1Page() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!nim.trim() && !phone.trim()) {
-      toast.error("Silakan isi NIM atau No HP (salah satu atau keduanya).");
+    if (!email.trim() && !nim.trim() && !phone.trim()) {
+      toast.error("Silakan isi Email, NIM, atau No HP.");
       return;
     }
 
@@ -71,6 +78,7 @@ function ClaimBatch1Page() {
 
       const res = await claimSearchServerAction({
         data: {
+          email: email.trim() || undefined,
           nim: nim.trim() || undefined,
           phone: cleanedPhone || undefined
         }
@@ -158,14 +166,24 @@ function ClaimBatch1Page() {
                   <Search className="w-5 h-5 text-brand-orange" />
                   Cari Data Pesananmu
                 </h2>
-                <p className="text-sm text-muted-foreground mt-1">Masukkan NIM dan/atau No HP yang kamu gunakan saat mengisi form pemesanan.</p>
+                <p className="text-sm text-muted-foreground mt-1">Masukkan Email, NIM, atau No HP yang kamu gunakan saat pemesanan.</p>
               </div>
 
               <div className="p-6">
                 <form onSubmit={handleSearch} className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <label className="font-bold text-sm uppercase">NIM Pembeli</label>
+                      <label className="font-bold text-sm uppercase">Email Pembeli</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Contoh: nama@gmail.com"
+                        className="w-full px-4 py-3 border-2 border-ink rounded-lg font-medium outline-none focus:border-brand-orange transition-colors"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="font-bold text-sm uppercase">NIM Pembeli (Opsional)</label>
                       <input
                         type="text"
                         value={nim}
@@ -189,7 +207,7 @@ function ClaimBatch1Page() {
                   <div className="pt-2">
                     <button
                       type="submit"
-                      disabled={isSearching || (!nim.trim() && !phone.trim())}
+                      disabled={isSearching || (!email.trim() && !nim.trim() && !phone.trim())}
                       className="w-full sm:w-auto bg-brand-orange text-white px-8 py-3 rounded-lg font-black uppercase tracking-wider border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] active:translate-y-1 active:shadow-none hover:bg-brand-orange/90 transition-all disabled:opacity-50 disabled:active:translate-y-0 flex items-center justify-center gap-2"
                     >
                       {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : "Cari Pesanan"}
