@@ -317,7 +317,6 @@ app.post("/api/payment/regenerate-token", checkoutLimiter, apiControllers.regene
 app.post("/api/auth/register", registerLimiter, apiControllers.registerBuyer);
 app.post("/api/auth/login", authLimiter, apiControllers.loginUser);
 app.post("/api/auth/google", authLimiter, apiControllers.loginGoogleUser);
-app.post("/api/auth/complete-profile", authLimiter, apiControllers.completeUserProfile);
 app.post("/api/auth/verify-filkom", verifyLimiter, verifyFilkomUser);
 
 // Catalog / General API Routes

@@ -309,7 +309,6 @@ export const loginUser = async (req: Request, res: Response) => {
           phone: dbUser.phone,
           address: dbUser.address,
           is_filkom_verified: dbUser.is_filkom_verified || 0,
-          onboarding_completed: dbUser.onboarding_completed ?? (dbUser.phone ? 1 : 0),
         }
       });
     }
@@ -332,8 +331,8 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
       // Create user automatically
       const hash = await bcrypt.hash("google_auth_" + Math.random().toString(36), 10);
       const result = await execute(
-        `INSERT INTO users (name, email, password_hash, role, onboarding_completed)
-         VALUES (?, ?, ?, 'customer', 0)`,
+        `INSERT INTO users (name, email, password_hash, role)
+         VALUES (?, ?, ?, 'customer')`,
         [name, email, hash]
       );
       dbUser = await queryOne<any>("SELECT * FROM users WHERE id = ?", [result.insertId]);
@@ -350,7 +349,6 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
           id: dbUser.id,
           nim: dbUser.nim,
           is_filkom_verified: dbUser.is_filkom_verified || 0,
-          onboarding_completed: 1,
         }
       });
     } else {
@@ -365,94 +363,12 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
           phone: dbUser.phone,
           address: dbUser.address,
           is_filkom_verified: dbUser.is_filkom_verified || 0,
-          onboarding_completed: dbUser.onboarding_completed ?? (dbUser.phone ? 1 : 0),
         }
       });
     }
   } catch (error: any) {
     console.error("Error with Google auth:", error);
     return res.status(500).json({ success: false, error: error.message || "Failed Google auth" });
-  }
-};
-
-// Complete User Profile (Mandatory Onboarding: Phone + NIM / Bukan FILKOM)
-export const completeUserProfile = async (req: Request, res: Response) => {
-  try {
-    const { userId, phone, isFilkom, nim } = req.body;
-    if (!userId) {
-      return res.status(400).json({ success: false, error: "User ID wajib disertakan" });
-    }
-
-    if (!phone || typeof phone !== "string" || phone.trim().length < 8) {
-      return res.status(400).json({ success: false, error: "Nomor WhatsApp / HP wajib diisi (minimal 8-15 digit angka)" });
-    }
-
-    const cleanPhone = phone.trim().replace(/[^\d+]/g, "");
-
-    const dbUser = await queryOne<any>("SELECT * FROM users WHERE id = ?", [userId]);
-    if (!dbUser) {
-      return res.status(404).json({ success: false, error: "Akun pengguna tidak ditemukan" });
-    }
-
-    let isFilkomVerified = 0;
-    let cleanNim: string | null = null;
-
-    if (isFilkom) {
-      if (!nim || typeof nim !== "string" || nim.trim().length < 5) {
-        return res.status(400).json({ success: false, error: "NIM wajib diisi untuk verifikasi Mahasiswa FILKOM" });
-      }
-      cleanNim = nim.trim().replace(/\s+/g, "");
-
-      // Check if NIM is already used by another user
-      const existingNim = await queryOne<any>(
-        "SELECT id FROM users WHERE nim = ? AND id != ?",
-        [cleanNim, userId]
-      );
-      if (existingNim) {
-        return res.status(400).json({ success: false, error: "NIM ini sudah terdaftar pada akun lain" });
-      }
-
-      isFilkomVerified = 1;
-    } else {
-      // Bukan Mahasiswa FILKOM
-      cleanNim = null;
-      isFilkomVerified = 0;
-    }
-
-    await execute(
-      `UPDATE users SET 
-        phone = ?, 
-        nim = ?, 
-        is_filkom_verified = ?, 
-        onboarding_completed = 1 
-       WHERE id = ?`,
-      [cleanPhone, cleanNim, isFilkomVerified, userId]
-    );
-
-    const updatedUser = await queryOne<any>("SELECT * FROM users WHERE id = ?", [userId]);
-
-    return res.json({
-      success: true,
-      message: isFilkomVerified === 1 
-        ? "Profil berhasil diperbarui dan akun Anda terverifikasi sebagai Mahasiswa FILKOM UB!" 
-        : "Profil berhasil disimpan. Selamat datang di FILKOM Merch!",
-      user: {
-        type: updatedUser.role === "admin" || updatedUser.role === "cashier" ? "admin" : "buyer",
-        role: updatedUser.role,
-        id: String(updatedUser.id),
-        email: updatedUser.email,
-        name: updatedUser.name,
-        username: updatedUser.name,
-        nim: updatedUser.nim,
-        phone: updatedUser.phone,
-        address: updatedUser.address,
-        is_filkom_verified: updatedUser.is_filkom_verified || 0,
-        onboarding_completed: 1,
-      }
-    });
-  } catch (error: any) {
-    console.error("Error completing user profile:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal memperbarui profil" });
   }
 };
 
@@ -2311,11 +2227,6 @@ export const createSale = async (req: Request, res: Response) => {
 
     // CASE 2: Cash/Debit POS Sale (No existing order)
     console.log("ℹ️ Creating new cash/debit POS sale in database");
-
-    if (!input.user_id && (!input.customer_email || input.customer_email === "pos@filkommerch.com" || input.customer_name === "Pelanggan POS")) {
-      throw new Error("Pembeli wajib dipilih dari akun pengguna terdaftar di website. Silakan arahkan pembeli login di web terlebih dahulu.");
-    }
-
     const saleId = `POS-${Date.now()}`;
     const resolvedItems: any[] = [];
     let calculatedSubtotal = 0;
@@ -2508,8 +2419,8 @@ export const createSale = async (req: Request, res: Response) => {
       `INSERT INTO orders (
         order_id, channel, fulfillment_type, fulfillment_status, user_id, cashier_id, customer_name,
         customer_email, customer_phone, customer_nim, subtotal, discount_amount, tax_amount, gross_amount,
-        payment_type, payment_status, order_status, notes, transaction_status
-      ) VALUES (?, 'pos', 'walk_in', 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'completed', ?, 'settlement')`,
+        payment_status, order_status, notes, transaction_status
+      ) VALUES (?, 'pos', 'walk_in', 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'completed', ?, 'settlement')`,
       [
         saleId,
         targetUserId,
@@ -2522,7 +2433,6 @@ export const createSale = async (req: Request, res: Response) => {
         discountAmount,
         taxAmount,
         grossAmount,
-        paymentLabel,
         input.notes || null
       ]
     );
@@ -2573,14 +2483,7 @@ export const createSale = async (req: Request, res: Response) => {
     }
 
     // 3. Create payments record
-    let paymentProvider = "cash";
-    const pm = (input.payment_method || "").toLowerCase();
-    if (pm.includes("debit")) {
-      paymentProvider = "debit";
-    } else if (pm.includes("qris")) {
-      paymentProvider = "qris";
-    }
-
+    const paymentProvider = input.payment_method?.toLowerCase() === "debit" ? "debit" : "cash";
     await connection.execute(
       `INSERT INTO payments (
         order_id, provider, payment_method, amount, status, paid_at

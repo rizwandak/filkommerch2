@@ -12,8 +12,6 @@ export interface AdminUser {
   is_google?: boolean;
   is_filkom_verified?: number;
   nim?: string;
-  phone?: string;
-  onboarding_completed?: number;
 }
 
 export interface BuyerUser {
@@ -25,8 +23,6 @@ export interface BuyerUser {
   is_filkom_verified?: number;
   nim?: string;
   is_google?: boolean;
-  phone?: string;
-  onboarding_completed?: number;
 }
 
 export type User = AdminUser | BuyerUser;
@@ -39,7 +35,6 @@ interface AuthContextType {
   logout: () => void;
   upsertBuyer: (buyer: BuyerUser) => void;
   setUser: React.Dispatch<React.SetStateAction<User | null>>;
-  updateUserProfile: (updatedFields: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -147,19 +142,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const updateUserProfile = (updatedFields: Partial<User>) => {
-    setUser((prev) => {
-      if (!prev) return null;
-      const updated = { ...prev, ...updatedFields } as User;
-      localStorage.setItem("user", JSON.stringify(updated));
-      syncAuthCookies(updated);
-      return updated;
-    });
-  };
-
   return (
     <AuthContext.Provider
-      value={{ user, loading, loginAsAdmin, loginAsGoogle, logout, upsertBuyer, setUser, updateUserProfile }}
+      value={{ user, loading, loginAsAdmin, loginAsGoogle, logout, upsertBuyer, setUser }}
     >
       {children}
     </AuthContext.Provider>
