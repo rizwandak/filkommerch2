@@ -9,11 +9,9 @@ export interface AdminUser {
   username: string;
   email: string;
   id?: number;
-  phone?: string;
   is_google?: boolean;
   is_filkom_verified?: number;
   nim?: string;
-  onboarding_completed?: number;
 }
 
 export interface BuyerUser {
@@ -22,12 +20,9 @@ export interface BuyerUser {
   email: string;
   name: string;
   picture?: string;
-  phone?: string;
-  address?: string;
   is_filkom_verified?: number;
   nim?: string;
   is_google?: boolean;
-  onboarding_completed?: number;
 }
 
 export type User = AdminUser | BuyerUser;

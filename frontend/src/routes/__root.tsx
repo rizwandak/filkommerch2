@@ -14,12 +14,11 @@ import { getStoreSettings } from "../backend/server-actions";
 import appCss from "../styles.css?url";
 import logoFm from "../assets/logo-fm.jpg";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AuthProvider, useAuth } from "../lib/auth";
+import { AuthProvider } from "../lib/auth";
 import { Toaster } from "@frontend/components/ui/sonner";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { SplashScreen } from "../components/SplashScreen";
 import { trackVisitServerAction } from "../backend/server-actions";
-import { MandatoryOnboardingModal } from "../components/MandatoryOnboardingModal";
 
 function NotFoundComponent() {
   return (
@@ -164,21 +163,7 @@ const getMarqueeText = (settings: any) => {
 
 function GlobalLayout() {
   const location = useLocation();
-  const router = useRouter();
-  const { user, loading } = useAuth();
   const isAdminOrCashier = location.pathname.startsWith("/admin") || location.pathname.startsWith("/pos");
-
-  // Auto-route to /login if user is not authenticated and trying to access pages other than /login
-  useEffect(() => {
-    if (loading) return;
-    const isPublicRoute =
-      location.pathname === "/login" ||
-      location.pathname.startsWith("/api");
-
-    if (!user && !isPublicRoute) {
-      router.navigate({ to: "/login" });
-    }
-  }, [user, loading, location.pathname, router]);
 
   if (isAdminOrCashier) {
     return (
@@ -192,7 +177,6 @@ function GlobalLayout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground selection:bg-brand-orange selection:text-cream overflow-x-hidden max-w-full w-full">
-      <MandatoryOnboardingModal />
       {/* Nested routes render here */}
       <div className="flex-1 flex flex-col min-w-0">
         <Outlet />
