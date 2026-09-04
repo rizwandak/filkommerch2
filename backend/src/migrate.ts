@@ -335,6 +335,14 @@ export async function runMigration() {
       {
         name: "order_item_pickup_logs.proof_url",
         sql: "ALTER TABLE order_item_pickup_logs ADD COLUMN proof_url VARCHAR(255) NULL DEFAULT NULL"
+      },
+      {
+        name: "users.onboarding_completed",
+        sql: "ALTER TABLE users ADD COLUMN onboarding_completed TINYINT(1) DEFAULT 0"
+      },
+      {
+        name: "users.onboarding_completed_backfill",
+        sql: "UPDATE users SET onboarding_completed = 1 WHERE phone IS NOT NULL AND phone != ''"
       }
     ];
 

@@ -14,10 +14,11 @@ import { getStoreSettings } from "../backend/server-actions";
 import appCss from "../styles.css?url";
 import logoFm from "../assets/logo-fm.jpg";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import { AuthProvider } from "../lib/auth";
+import { AuthProvider, useAuth } from "../lib/auth";
 import { Toaster } from "@frontend/components/ui/sonner";
 import { GoogleOAuthProvider } from "@react-oauth/google";
 import { SplashScreen } from "../components/SplashScreen";
+import { MandatoryOnboardingModal } from "../components/MandatoryOnboardingModal";
 import { trackVisitServerAction } from "../backend/server-actions";
 
 function NotFoundComponent() {
@@ -163,11 +164,25 @@ const getMarqueeText = (settings: any) => {
 
 function GlobalLayout() {
   const location = useLocation();
+  const router = useRouter();
+  const { user, loading } = useAuth();
   const isAdminOrCashier = location.pathname.startsWith("/admin") || location.pathname.startsWith("/pos");
+
+  const isAuthRoute =
+    location.pathname === "/login" ||
+    location.pathname.startsWith("/login") ||
+    location.pathname.startsWith("/api");
+
+  useEffect(() => {
+    if (!loading && !user && !isAuthRoute) {
+      router.navigate({ to: "/login" });
+    }
+  }, [user, loading, isAuthRoute, router]);
 
   if (isAdminOrCashier) {
     return (
       <div className="min-h-screen flex flex-col bg-background text-foreground">
+        <MandatoryOnboardingModal />
         <div className="flex-1 flex flex-col min-w-0">
           <Outlet />
         </div>
@@ -177,6 +192,7 @@ function GlobalLayout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground selection:bg-brand-orange selection:text-cream overflow-x-hidden max-w-full w-full">
+      <MandatoryOnboardingModal />
       {/* Nested routes render here */}
       <div className="flex-1 flex flex-col min-w-0">
         <Outlet />
