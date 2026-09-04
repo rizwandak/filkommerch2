@@ -608,7 +608,12 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       setNotes("");
     }
   };
-  const recordSaleInDatabase = async (actualPaymentMethod?: string) => {
+  const recordSaleInDatabase = async (actualPaymentMethod?: string, skipReceiptDialog = false) => {
+    if (!selectedUser) {
+      setShowUserModal(true);
+      throw new Error("Wajib memilih pembeli terdaftar! Arahkan pembeli untuk login di web filkommerch.com jika belum terdaftar.");
+    }
+
     const isCash = (actualPaymentMethod || paymentMethod) === "Tunai" || paymentMethod === "cash";
     const paymentMethodLabel =
       actualPaymentMethod || (paymentMethod === "cash" ? "Tunai" : "QRIS Statis");
@@ -623,13 +628,13 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       tax: 0,
       total,
       notes: notes || undefined,
-      customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
-      customer_email: selectedUser ? selectedUser.email : undefined,
-      customer_phone: selectedUser ? (selectedUser.phone || undefined) : undefined,
-      customer_nim: selectedUser ? (selectedUser.nim || undefined) : undefined,
-      user_id: selectedUser ? selectedUser.id : undefined,
-      is_filkom_verified: selectedUser ? Boolean(selectedUser.is_filkom_verified) : undefined,
-      order_id: !isCash ? `POS-${Date.now()}` : undefined,
+      customer_name: selectedUser.name,
+      customer_email: selectedUser.email,
+      customer_phone: selectedUser.phone || undefined,
+      customer_nim: selectedUser.nim || undefined,
+      user_id: selectedUser.id,
+      is_filkom_verified: Boolean(selectedUser.is_filkom_verified),
+      order_id: undefined, // CRITICAL FIX: Do NOT pass non-existent order_id for new cashier POS sales
     };
 
     const result = await createSale({ data: saleInput });
@@ -660,7 +665,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       total,
       payment_method: paymentMethodLabel,
       cashier_name: admin_name,
-      customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
+      customer_name: selectedUser.name,
     };
 
     if (printerConnected) {
@@ -672,14 +677,28 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     }
 
     toast.success(`Transaksi berhasil! #${result.sale_id}`);
-    setCurrentReceiptData(receiptData);
-    setShowReceiptDialog(true);
+    if (skipReceiptDialog) {
+      setCart([]);
+      setSelectedUser(null);
+      setCustomerName("");
+      setDiscount(0);
+      setNotes("");
+    } else {
+      setCurrentReceiptData(receiptData);
+      setShowReceiptDialog(true);
+    }
     await loadData();
   };
 
   const handlePayment = async () => {
     if (cart.length === 0) {
       toast.error("Keranjang kosong!");
+      return;
+    }
+
+    if (!selectedUser) {
+      toast.error("Pembeli wajib dipilih! Silakan pilih pelanggan terdaftar atau minta pembeli login di web terlebih dahulu.");
+      setShowUserModal(true);
       return;
     }
 
@@ -705,10 +724,16 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     }
   };
 
-  const handleConfirmQrisPayment = async () => {
+  const handleConfirmQrisPayment = async (printReceipt = true) => {
+    if (!selectedUser) {
+      toast.error("Pembeli wajib dipilih! Silakan pilih pelanggan terdaftar atau minta pembeli login di web terlebih dahulu.");
+      setShowUserModal(true);
+      return;
+    }
+
     setIsProcessing(true);
     try {
-      await recordSaleInDatabase("QRIS Statis");
+      await recordSaleInDatabase("QRIS Statis", !printReceipt);
       setShowQrisModal(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Transaksi gagal");
@@ -827,15 +852,13 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 const stock = getTotalStock(product);
                 const sizes = product.variants.filter((v) => v.stock > 0).map((v) => v.size);
 
-                const hasPromo = product.promo_price && Number(product.promo_price) > 0;
-                const displayPrice = hasPromo ? Number(product.promo_price) : Number(product.price);
-                const strikePrice = hasPromo
-                  ? product.original_price
-                    ? Number(product.original_price)
-                    : Number(product.price)
-                  : product.original_price
-                    ? Number(product.original_price)
-                    : null;
+                const filkomPrice = Number(product.filkom_price) > 0 
+                  ? Number(product.filkom_price) 
+                  : (Number(product.promo_price) > 0 ? Number(product.promo_price) : Number(product.price));
+                const regularPrice = Number(product.price);
+                const strikePrice = product.original_price
+                  ? Number(product.original_price)
+                  : (regularPrice > filkomPrice ? regularPrice : null);
 
                 return (
                   <button
@@ -895,15 +918,23 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                         </p>
                       )}
 
-                      <div className="mt-auto pt-2 flex items-baseline gap-1.5 flex-wrap">
-                        <span className="text-xs sm:text-sm font-extrabold text-brand-orange">
-                          Rp {displayPrice.toLocaleString("id-ID")}
-                        </span>
-                        {strikePrice && strikePrice > displayPrice && (
-                          <span className="text-[9px] sm:text-[10px] text-muted-foreground line-through decoration-muted-foreground/60">
-                            Rp {strikePrice.toLocaleString("id-ID")}
+                      <div className="mt-auto pt-2 flex flex-col gap-0.5">
+                        <div className="flex items-baseline gap-1.5 flex-wrap">
+                          <span className="text-xs sm:text-sm font-black text-brand-orange">
+                            Rp {filkomPrice.toLocaleString("id-ID")}
                           </span>
-                        )}
+                          <span className="text-[8px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1 py-0.2 rounded uppercase">
+                            FILKOM
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[9px] sm:text-[10px] text-muted-foreground flex-wrap font-medium">
+                          <span>Umum: Rp {regularPrice.toLocaleString("id-ID")}</span>
+                          {strikePrice && strikePrice > filkomPrice && strikePrice !== regularPrice && (
+                            <span className="line-through decoration-muted-foreground/60">
+                              Rp {strikePrice.toLocaleString("id-ID")}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <Badge
@@ -1028,9 +1059,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     <button
                       type="button"
                       onClick={() => handleSelectCustomer(null)}
-                      className="text-[10px] font-bold text-red-600 hover:underline shrink-0"
+                      className="text-[10px] font-bold text-red-600 hover:underline shrink-0 cursor-pointer"
                     >
-                      [Ganti]
+                      [Ganti Pembeli]
                     </button>
                   </div>
                   
@@ -1044,46 +1075,42 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                         Pelanggan Umum (Harga Reguler)
                       </span>
                     )}
+                    {selectedUser.phone && (
+                      <span className="text-muted-foreground font-mono">
+                        • WA: {selectedUser.phone}
+                      </span>
+                    )}
+                    {selectedUser.nim && (
+                      <span className="text-muted-foreground font-mono">
+                        • NIM: {selectedUser.nim}
+                      </span>
+                    )}
                     {selectedUser.email && (
-                      <span className="text-muted-foreground truncate max-w-[150px]">
+                      <span className="text-muted-foreground truncate max-w-[140px]">
                         • {selectedUser.email}
                       </span>
                     )}
                   </div>
                 </div>
               ) : (
-                <div className="space-y-1.5">
+                <div className="p-3 bg-amber-50 border-2 border-amber-500 rounded-lg space-y-2 shadow-xs">
+                  <div className="flex items-center gap-1.5 text-amber-900 font-extrabold text-xs">
+                    <span className="text-amber-600">⚠️</span>
+                    <span>PEMBELI WAJIB DIPILIH</span>
+                  </div>
+                  <p className="text-[10px] text-amber-950 leading-tight">
+                    Kasir wajib memilih nama pembeli terdaftar. Jika pembeli belum ada di daftar, arahkan untuk login akun Google di <strong>filkommerch.com</strong> &amp; verifikasi data.
+                  </p>
                   <Button
                     type="button"
-                    variant="outline"
                     onClick={() => setShowUserModal(true)}
-                    className="w-full h-9 text-xs font-bold border-2 border-ink bg-white hover:bg-cream/40 text-ink flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                    className="w-full h-9 text-xs font-black bg-amber-500 hover:bg-amber-600 text-ink border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
                   >
-                    <UserCheck className="w-4 h-4 text-brand-orange" />
-                    Pilih Pelanggan Terdaftar
+                    <UserCheck className="w-4 h-4 mr-1.5" />
+                    Pilih Pembeli Terdaftar (Wajib)
                   </Button>
-                  <p className="text-[10px] text-muted-foreground bg-amber-50/80 border border-amber-200 p-2 rounded-md leading-tight">
-                    💡 Pelanggan baru? Arahkan mendaftar/login di web <strong>filkommerch.com</strong> via Google Login (1-click) agar transaksi masuk ke akun mereka &amp; dapat Harga FILKOM.
-                  </p>
                 </div>
               )}
-
-              <div className="relative flex items-center">
-                <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">
-                  Pelanggan
-                </span>
-                <Input
-                  placeholder="Nama Pembeli (opsional)"
-                  value={customerName}
-                  onChange={(e) => {
-                    setCustomerName(e.target.value);
-                    if (selectedUser && e.target.value !== selectedUser.name) {
-                      setSelectedUser(null);
-                    }
-                  }}
-                  className="border-input bg-background text-xs sm:text-sm text-ink pl-24 focus-visible:ring-brand-blue h-9 rounded-md"
-                />
-              </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="relative flex items-center">
                   <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">
@@ -1302,9 +1329,17 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   <h3 className="font-extrabold text-ink uppercase text-sm sm:text-base leading-snug">
                     {activeProductForVariantSelection.name}
                   </h3>
-                  <p className="text-brand-orange font-black text-base sm:text-lg mt-0.5">
-                    Rp {activeProductForVariantSelection.price.toLocaleString("id-ID")}
-                  </p>
+                  <div className="flex items-baseline gap-2 mt-0.5 flex-wrap">
+                    <span className="text-brand-orange font-black text-base sm:text-lg">
+                      Rp {(Number(activeProductForVariantSelection.filkom_price) > 0 ? Number(activeProductForVariantSelection.filkom_price) : (Number(activeProductForVariantSelection.promo_price) > 0 ? Number(activeProductForVariantSelection.promo_price) : Number(activeProductForVariantSelection.price))).toLocaleString("id-ID")}
+                    </span>
+                    <span className="text-[8.5px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1 py-0.5 rounded uppercase">
+                      FILKOM
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-muted-foreground font-medium">
+                    Umum: Rp {Number(activeProductForVariantSelection.price).toLocaleString("id-ID")}
+                  </div>
                 </div>
               </div>
 
@@ -1466,27 +1501,42 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md mx-auto shrink-0 mt-2">
+          <div className="flex flex-col gap-2 w-full max-w-md mx-auto shrink-0 mt-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Button
+                type="button"
+                onClick={() => void handleConfirmQrisPayment(false)}
+                disabled={isProcessing}
+                variant="outline"
+                className="border-2 border-emerald-700 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-black uppercase tracking-wider h-12 shadow-xs cursor-pointer"
+              >
+                {isProcessing ? "Memproses..." : "✓ Selesai (Tanpa Struk)"}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleConfirmQrisPayment(true)}
+                disabled={isProcessing}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider h-12 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+              >
+                {isProcessing ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                    MEMPROSES...
+                  </span>
+                ) : (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <Printer className="w-4 h-4" />
+                    ✓ Cetak Struk
+                  </span>
+                )}
+              </Button>
+            </div>
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => setShowQrisModal(false)}
-              className="border-2 border-ink text-xs font-black uppercase tracking-wider flex-1 h-12 hover:bg-cream cursor-pointer"
+              className="text-xs font-bold text-muted-foreground hover:text-ink h-8 cursor-pointer"
             >
-              Batal / Tutup
-            </Button>
-            <Button
-              onClick={() => void handleConfirmQrisPayment()}
-              disabled={isProcessing}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider flex-[1.4] h-12 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-            >
-              {isProcessing ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  MEMPROSES...
-                </span>
-              ) : (
-                "✓ SUDAH BAYAR (SELESAIKAN)"
-              )}
+              Batal / Tutup QRIS
             </Button>
           </div>
         </DialogContent>

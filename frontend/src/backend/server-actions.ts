@@ -1083,6 +1083,27 @@ export const verifyFilkomUserAction = createServerFn({ method: "POST" })
     }
   });
 
+// Complete user profile onboarding (phone, NIM, status)
+export const completeUserProfile = createServerFn({ method: "POST" })
+  .validator((d: { userId: number | string; phone: string; isFilkom: boolean; nim?: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/auth/complete-profile`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      return data;
+    } catch (error: any) {
+      console.error("Error completing user profile:", error);
+      return { success: false, error: error.message || "Gagal memperbarui profil" };
+    }
+  });
+
 // ============ PRODUCT DETAILS ACTIONS ============
 
 // Get product by slug
