@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { AdminSidebar } from "@frontend/components/admin/admin-sidebar";
@@ -14,6 +14,22 @@ export const Route = createFileRoute("/admin")({
 function AdminLayout() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const [collapsed, setCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("admin_sidebar_collapsed") === "true";
+    }
+    return false;
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("admin_sidebar_collapsed", String(next));
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!loading && (!user || user.type !== "admin")) {
@@ -32,7 +48,10 @@ function AdminLayout() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
       <div className="hidden md:block h-full shrink-0">
-        <AdminSidebar />
+        <AdminSidebar
+          collapsed={collapsed}
+          onToggleCollapse={toggleCollapsed}
+        />
       </div>
 
       <div className="flex flex-1 flex-col min-w-0 h-full overflow-hidden">
