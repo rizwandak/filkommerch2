@@ -852,7 +852,17 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
             <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 xxl:grid-cols-5">
               {filteredProducts.map((product) => {
                 const stock = getTotalStock(product);
-                const sizes = product.variants.filter((v) => v.stock > 0).map((v) => v.size);
+                const sizes = Array.from(
+                  new Set(
+                    product.variants
+                      .filter((v) => v.stock > 0)
+                      .map((v) => v.size)
+                      .filter(
+                        (s) =>
+                          s && !/^(one size|all size|onesize|allsize|-)$/i.test(s.trim()),
+                      ),
+                  ),
+                );
 
                 const umumPrice = Number(product.price || 0);
                 const filkomPrice =
@@ -1274,139 +1284,267 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               </DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-2">
-              <div className="flex gap-4 items-center">
-                {activeProductForVariantSelection.image_url ? (
-                  <img
-                    src={activeProductForVariantSelection.image_url}
-                    alt={activeProductForVariantSelection.name}
-                    className="w-20 h-20 rounded-xl object-cover border-2 border-ink shrink-0 shadow-xs"
-                  />
-                ) : (
-                  <div className="w-20 h-20 bg-cream rounded-xl border-2 border-ink shrink-0" />
-                )}
-                <div>
-                  <h3 className="font-extrabold text-ink uppercase text-sm sm:text-base leading-snug">
-                    {activeProductForVariantSelection.name}
-                  </h3>
-                  <p className="text-brand-orange font-black text-base sm:text-lg mt-0.5">
-                    Rp {activeProductForVariantSelection.price.toLocaleString("id-ID")}
-                  </p>
-                </div>
-              </div>
+            {(() => {
+              const isDummyOneSize = (s?: string | null) =>
+                !s || /^(one size|all size|onesize|allsize|-)$/i.test(s.trim());
 
-              {/* Unique Colors */}
-              {(() => {
-                const uniqueColors = Array.from(
-                  new Set(
-                    activeProductForVariantSelection.variants.map((v) => v.color).filter(Boolean),
-                  ),
-                ) as string[];
-                if (uniqueColors.length === 0) return null;
-                return (
-                  <div className="space-y-2">
-                    <p className="text-xs font-black text-muted-foreground uppercase tracking-wider">
-                      Warna
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {uniqueColors.map((color) => (
-                        <button
-                          key={color}
-                          onClick={() => setDialogSelectedColor(color)}
-                          className={`rounded-lg min-h-[38px] px-3.5 py-1.5 text-xs font-bold border-2 transition-all cursor-pointer shadow-xs ${
-                            dialogSelectedColor === color
-                              ? "bg-ink text-white border-ink shadow-sm scale-[1.02]"
-                              : "bg-background text-ink border-border hover:border-ink hover:bg-cream/50"
-                          }`}
-                        >
-                          {color}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+              const uniqueColors = Array.from(
+                new Set(
+                  activeProductForVariantSelection.variants.map((v) => v.color).filter(Boolean),
+                ),
+              ) as string[];
 
-              {/* Unique Sizes */}
-              {(() => {
-                const uniqueSizes = Array.from(
-                  new Set(
-                    activeProductForVariantSelection.variants.map((v) => v.size).filter(Boolean),
-                  ),
-                ) as string[];
-                if (uniqueSizes.length === 0) return null;
-                return (
-                  <div className="space-y-2">
-                    <p className="text-xs font-black text-muted-foreground uppercase tracking-wider">
-                      Ukuran / Varian
-                    </p>
-                    <div className="flex flex-wrap gap-2.5">
-                      {uniqueSizes.map((size) => (
-                        <button
-                          key={size}
-                          onClick={() => setDialogSelectedSize(size)}
-                          className={`rounded-lg min-h-[42px] px-4 py-2 text-xs font-bold border-2 transition-all flex items-center justify-center text-center cursor-pointer max-w-full leading-snug whitespace-normal break-words shadow-xs ${
-                            dialogSelectedSize === size
-                              ? "bg-ink text-white border-ink shadow-md scale-[1.02]"
-                              : "bg-background text-ink border-border hover:border-ink hover:bg-cream/50"
-                          }`}
-                        >
-                          {size}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })()}
+              const validSizes = Array.from(
+                new Set(
+                  activeProductForVariantSelection.variants
+                    .map((v) => v.size)
+                    .filter((s) => s && !isDummyOneSize(s)),
+                ),
+              ) as string[];
 
-              {/* Stock Indicator */}
-              {(() => {
-                const matched = activeProductForVariantSelection.variants.find((v) => {
+              const matchedVariant =
+                activeProductForVariantSelection.variants.find((v) => {
                   const matchColor = !dialogSelectedColor || v.color === dialogSelectedColor;
-                  const matchSize = !dialogSelectedSize || v.size === dialogSelectedSize;
+                  const matchSize =
+                    validSizes.length === 0 ||
+                    !dialogSelectedSize ||
+                    v.size === dialogSelectedSize ||
+                    isDummyOneSize(v.size);
                   return matchColor && matchSize;
-                });
-                const stock = matched ? matched.stock : 0;
-                return (
-                  <div className="flex items-center justify-between border-t border-dashed border-border pt-3">
-                    <span className="text-xs text-muted-foreground font-semibold">Ketersediaan Stok:</span>
-                    <span
-                      className={`text-sm font-black ${stock <= 3 ? "text-red-600" : "text-ink"}`}
-                    >
-                      {stock} pcs
-                    </span>
-                  </div>
-                );
-              })()}
-            </div>
+                }) ||
+                activeProductForVariantSelection.variants.find(
+                  (v) => !dialogSelectedColor || v.color === dialogSelectedColor,
+                ) ||
+                activeProductForVariantSelection.variants[0];
 
-            <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
-              <Button
-                variant="outline"
-                onClick={() => setActiveProductForVariantSelection(null)}
-                className="border-2 border-ink text-xs font-bold uppercase tracking-wider hover:bg-cream cursor-pointer px-4 h-10"
-              >
-                Batal
-              </Button>
-              <Button
-                onClick={() => {
-                  const matched = activeProductForVariantSelection.variants.find((v) => {
-                    const matchColor = !dialogSelectedColor || v.color === dialogSelectedColor;
-                    const matchSize = !dialogSelectedSize || v.size === dialogSelectedSize;
-                    return matchColor && matchSize;
-                  });
-                  if (!matched) {
-                    toast.error("Varian tidak valid");
-                    return;
-                  }
-                  addToCart(activeProductForVariantSelection, matched);
-                  setActiveProductForVariantSelection(null);
-                }}
-                className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer px-5 h-10"
-              >
-                Pilih Varian
-              </Button>
-            </DialogFooter>
+              const currentDisplayImage =
+                (matchedVariant?.image_url && resolveImageUrl(matchedVariant.image_url)) ||
+                (activeProductForVariantSelection.image_url &&
+                  resolveImageUrl(activeProductForVariantSelection.image_url));
+
+              const currentPrice =
+                matchedVariant?.price_override && Number(matchedVariant.price_override) > 0
+                  ? Number(matchedVariant.price_override)
+                  : activeProductForVariantSelection.price;
+
+              const currentStock = matchedVariant ? matchedVariant.stock : 0;
+
+              return (
+                <>
+                  <div className="space-y-4 py-2">
+                    {/* Header Image & Info */}
+                    <div className="flex gap-3.5 sm:gap-4 items-center bg-cream/30 p-3 rounded-xl border border-border/80">
+                      {currentDisplayImage ? (
+                        <img
+                          src={currentDisplayImage}
+                          alt={activeProductForVariantSelection.name}
+                          className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border-2 border-ink shrink-0 shadow-xs transition-all duration-300 bg-white"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 sm:w-24 sm:h-24 bg-cream rounded-xl border-2 border-ink shrink-0 flex items-center justify-center text-xs text-muted-foreground">
+                          No Image
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-extrabold text-ink uppercase text-sm sm:text-base leading-snug">
+                          {activeProductForVariantSelection.name}
+                        </h3>
+                        <p className="text-brand-orange font-black text-base sm:text-lg mt-0.5">
+                          Rp {currentPrice.toLocaleString("id-ID")}
+                        </p>
+                        {matchedVariant?.color && (
+                          <p className="text-xs text-muted-foreground font-semibold mt-1 truncate">
+                            Varian Terpilih:{" "}
+                            <span className="text-ink font-bold">{matchedVariant.color}</span>
+                            {!isDummyOneSize(matchedVariant.size) && ` (${matchedVariant.size})`}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Color / Variant Selection (with Images & Stocks) */}
+                    {uniqueColors.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-black text-muted-foreground uppercase tracking-wider">
+                          Pilihan Varian / Warna
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {uniqueColors.map((color) => {
+                            const variantForColor =
+                              activeProductForVariantSelection.variants.find(
+                                (v) =>
+                                  v.color === color &&
+                                  (!dialogSelectedSize ||
+                                    v.size === dialogSelectedSize ||
+                                    isDummyOneSize(v.size)),
+                              ) ||
+                              activeProductForVariantSelection.variants.find(
+                                (v) => v.color === color,
+                              );
+
+                            const colorStock = activeProductForVariantSelection.variants
+                              .filter(
+                                (v) =>
+                                  v.color === color &&
+                                  (!dialogSelectedSize ||
+                                    v.size === dialogSelectedSize ||
+                                    isDummyOneSize(v.size)),
+                              )
+                              .reduce((sum, v) => sum + v.stock, 0);
+
+                            const colorImg = variantForColor?.image_url
+                              ? resolveImageUrl(variantForColor.image_url)
+                              : activeProductForVariantSelection.image_url
+                                ? resolveImageUrl(activeProductForVariantSelection.image_url)
+                                : null;
+
+                            const isSelected = dialogSelectedColor === color;
+
+                            return (
+                              <button
+                                key={color}
+                                type="button"
+                                onClick={() => setDialogSelectedColor(color)}
+                                className={`rounded-xl p-2 sm:p-2.5 border-2 transition-all cursor-pointer flex items-center gap-2.5 text-left shadow-xs ${
+                                  isSelected
+                                    ? "bg-ink text-white border-ink ring-2 ring-brand-orange/40 shadow-sm"
+                                    : colorStock <= 0
+                                      ? "bg-muted/30 text-muted-foreground border-dashed border-border opacity-60"
+                                      : "bg-background text-ink border-border hover:border-ink hover:bg-cream/40"
+                                }`}
+                              >
+                                {colorImg ? (
+                                  <img
+                                    src={colorImg}
+                                    alt={color}
+                                    className="w-12 h-12 rounded-lg object-cover border border-border/80 shrink-0 bg-white"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-lg bg-cream/80 border border-border flex items-center justify-center text-xs font-bold text-muted-foreground shrink-0">
+                                    {color.charAt(0)}
+                                  </div>
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-bold text-xs leading-snug line-clamp-2">
+                                    {color}
+                                  </p>
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <span
+                                      className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded ${
+                                        isSelected
+                                          ? colorStock <= 3
+                                            ? "bg-red-500 text-white"
+                                            : "bg-white/20 text-white"
+                                          : colorStock <= 3
+                                            ? "bg-red-100 text-red-700"
+                                            : "bg-emerald-100 text-emerald-800"
+                                      }`}
+                                    >
+                                      {colorStock <= 0 ? "Stok: 0 (Habis)" : `Stok: ${colorStock} pcs`}
+                                    </span>
+                                  </div>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sizes Selection (Hanya tampil jika ada ukuran selain One Size) */}
+                    {validSizes.length > 0 && (
+                      <div className="space-y-2">
+                        <p className="text-xs font-black text-muted-foreground uppercase tracking-wider">
+                          Ukuran
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {validSizes.map((size) => {
+                            const sizeVariant = activeProductForVariantSelection.variants.find(
+                              (v) =>
+                                v.size === size &&
+                                (!dialogSelectedColor || v.color === dialogSelectedColor),
+                            );
+                            const sizeStock = sizeVariant ? sizeVariant.stock : 0;
+                            const isSelected = dialogSelectedSize === size;
+
+                            return (
+                              <button
+                                key={size}
+                                type="button"
+                                onClick={() => setDialogSelectedSize(size)}
+                                className={`rounded-lg px-3.5 py-2 text-xs font-bold border-2 transition-all flex flex-col items-center justify-center cursor-pointer shadow-xs min-w-[70px] ${
+                                  isSelected
+                                    ? "bg-ink text-white border-ink shadow-md scale-[1.02]"
+                                    : sizeStock <= 0
+                                      ? "bg-muted/40 text-muted-foreground border-dashed border-border opacity-50"
+                                      : "bg-background text-ink border-border hover:border-ink hover:bg-cream/50"
+                                }`}
+                              >
+                                <span className="font-black text-xs sm:text-sm">{size}</span>
+                                <span
+                                  className={`text-[9px] font-extrabold mt-0.5 ${
+                                    isSelected
+                                      ? "text-white/90"
+                                      : sizeStock <= 3
+                                        ? "text-red-600"
+                                        : "text-emerald-700"
+                                  }`}
+                                >
+                                  {sizeStock <= 0 ? "Habis" : `${sizeStock} pcs`}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Stock Indicator */}
+                    <div className="flex items-center justify-between border-t border-dashed border-border pt-3">
+                      <span className="text-xs text-muted-foreground font-semibold">
+                        Ketersediaan Stok Varian Ini:
+                      </span>
+                      <span
+                        className={`text-sm font-black ${
+                          currentStock <= 3 ? "text-red-600" : "text-emerald-700"
+                        }`}
+                      >
+                        {currentStock} pcs
+                      </span>
+                    </div>
+                  </div>
+
+                  <DialogFooter className="mt-4 flex flex-row justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => setActiveProductForVariantSelection(null)}
+                      className="border-2 border-ink text-xs font-bold uppercase tracking-wider hover:bg-cream cursor-pointer px-4 h-10"
+                    >
+                      Batal
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (!matchedVariant) {
+                          toast.error("Varian tidak valid");
+                          return;
+                        }
+                        if (matchedVariant.stock <= 0) {
+                          toast.error("Stok varian ini habis!");
+                          return;
+                        }
+                        addToCart(activeProductForVariantSelection, matchedVariant);
+                        setActiveProductForVariantSelection(null);
+                      }}
+                      className="bg-ink hover:bg-brand-orange text-white text-xs font-bold uppercase tracking-widest shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer px-5 h-10"
+                    >
+                      Pilih Varian
+                    </Button>
+                  </DialogFooter>
+                </>
+              );
+            })()}
           </DialogContent>
         </Dialog>
       )}
@@ -1806,7 +1944,14 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     new Set(comp.variants.map((v) => v.color).filter(Boolean)),
                   ) as string[];
                   const compSizes = Array.from(
-                    new Set(comp.variants.map((v) => v.size).filter(Boolean)),
+                    new Set(
+                      comp.variants
+                        .map((v) => v.size)
+                        .filter(
+                          (s) =>
+                            s && !/^(one size|all size|onesize|allsize|-)$/i.test(s.trim()),
+                        ),
+                    ),
                   ) as string[];
 
                   // Find matched variant based on current selections for size/color
