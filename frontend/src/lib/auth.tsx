@@ -7,6 +7,7 @@ export interface AdminUser {
   type: "admin";
   role: AdminRole;
   username: string;
+  name?: string;
   email: string;
   id?: number;
   is_google?: boolean;

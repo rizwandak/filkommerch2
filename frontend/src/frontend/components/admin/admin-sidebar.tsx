@@ -83,7 +83,7 @@ export function AdminSidebar({ onNavigate, collapsed = false, onToggleCollapse }
   const visibleItems = adminNavItems.filter((item) => item.roles.includes(role));
   const canAccessPos = role === "admin" || role === "cashier";
 
-  const userInitial = (user.username || user.name || "A").charAt(0).toUpperCase();
+  const userInitial = (user.username || "A").charAt(0).toUpperCase();
 
   return (
     <aside
@@ -206,7 +206,7 @@ export function AdminSidebar({ onNavigate, collapsed = false, onToggleCollapse }
         {collapsed ? (
           <div
             className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-blue/15 text-brand-blue font-black text-xs mx-auto border border-brand-blue/30"
-            title={`${user.username || user.name}\n${user.email || ""}`}
+            title={`${user.username}\n${user.email || ""}`}
           >
             {userInitial}
           </div>
@@ -217,7 +217,7 @@ export function AdminSidebar({ onNavigate, collapsed = false, onToggleCollapse }
             </div>
             <div className="min-w-0 flex-1 leading-tight">
               <p className="text-xs font-bold text-ink truncate">
-                {user.username || user.name}
+                {user.username}
               </p>
               <p className="text-[10px] text-muted-foreground truncate font-mono">
                 {user.email}
