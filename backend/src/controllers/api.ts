@@ -2532,7 +2532,10 @@ export const createSale = async (req: Request, res: Response) => {
     }
 
     // 3. Create payments record
-    const paymentProvider = input.payment_method?.toLowerCase() === "debit" ? "debit" : "cash";
+    let paymentProvider = "cash";
+    const pmLower = (input.payment_method || "").toLowerCase();
+    if (pmLower.includes("qris")) paymentProvider = "qris";
+    else if (pmLower.includes("debit")) paymentProvider = "debit";
     await connection.execute(
       `INSERT INTO payments (
         order_id, provider, payment_method, amount, status, paid_at

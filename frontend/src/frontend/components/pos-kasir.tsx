@@ -639,7 +639,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       customer_nim: selectedUser ? (selectedUser.nim || undefined) : undefined,
       user_id: selectedUser ? selectedUser.id : undefined,
       is_filkom_verified: selectedUser ? Boolean(selectedUser.is_filkom_verified) : undefined,
-      order_id: !isCash ? `POS-${Date.now()}` : undefined,
+      order_id: undefined,
     };
 
     const result = await createSale({ data: saleInput });
