@@ -25,6 +25,8 @@ export interface ReceiptData {
   payment_method: string;
   cashier_name: string;
   customer_name?: string;
+  paid_amount?: number;
+  change_amount?: number;
 }
 
 // ESC/POS Commands untuk thermal printer
@@ -237,6 +239,13 @@ class BluetoothThermalPrinter {
       await this.setStyle("bold");
       await this.printLine(`TOTAL: ${this.formatCurrency(data.total)}`);
       await this.setStyle("normal");
+      if (data.payment_method) {
+        await this.printLine(`Metode: ${data.payment_method}`);
+      }
+      if (data.paid_amount !== undefined && data.paid_amount > 0) {
+        await this.printLine(`Bayar: ${this.formatCurrency(data.paid_amount)}`);
+        await this.printLine(`Kembali: ${this.formatCurrency(data.change_amount || 0)}`);
+      }
 
       await this.printSeparator();
 

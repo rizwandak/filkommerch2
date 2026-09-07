@@ -229,9 +229,14 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
   const [showReceiptDialog, setShowReceiptDialog] = useState(false);
   const [cashReceived, setCashReceived] = useState<number | string>("");
   const [showQrisModal, setShowQrisModal] = useState(false);
+  const [showCashModal, setShowCashModal] = useState(false);
+  const [showManualCustomerInput, setShowManualCustomerInput] = useState(false);
+  const [manualCustomerInput, setManualCustomerInput] = useState("");
 
   const handleCloseReceiptDialog = () => {
     setShowReceiptDialog(false);
+    setShowCashModal(false);
+    setShowQrisModal(false);
     setCurrentReceiptData(null);
     setCart([]);
     setCustomerName("");
@@ -240,6 +245,8 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     setNotes("");
     setCashReceived("");
     setSearchQuery("");
+    setShowManualCustomerInput(false);
+    setManualCustomerInput("");
   };
 
   const loadData = useCallback(async () => {
@@ -606,6 +613,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       setSelectedUser(null);
       setDiscount(0);
       setNotes("");
+      setCashReceived("");
+      setShowManualCustomerInput(false);
+      setManualCustomerInput("");
     }
   };
   const recordSaleInDatabase = async (actualPaymentMethod?: string) => {
@@ -637,6 +647,10 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       throw new Error(result.error);
     }
 
+    const cashNum = typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0;
+    const paidAmount = isCash ? (cashNum > 0 ? cashNum : total) : total;
+    const changeAmount = isCash && cashNum >= total ? cashNum - total : 0;
+
     const receiptData: ReceiptData = {
       store_name,
       sale_id: result.sale_id!,
@@ -661,6 +675,8 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       payment_method: paymentMethodLabel,
       cashier_name: admin_name,
       customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
+      paid_amount: paidAmount,
+      change_amount: changeAmount,
     };
 
     if (printerConnected) {
@@ -677,7 +693,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     await loadData();
   };
 
-  const handlePayment = async () => {
+  const handleInitiatePayment = () => {
     if (cart.length === 0) {
       toast.error("Keranjang kosong!");
       return;
@@ -688,16 +704,27 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       return;
     }
 
-    // Cash validation:
+    // Cash: prefill with total if empty
     const cashNum = typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0;
-    if (cashNum > 0 && cashNum < total) {
-      toast.error(`Uang diterima (Rp ${cashNum.toLocaleString("id-ID")}) kurang dari total tagihan (Rp ${total.toLocaleString("id-ID")})`);
+    if (cashNum === 0 || cashReceived === "") {
+      setCashReceived(total);
+    }
+    setShowCashModal(true);
+  };
+
+  const handleConfirmCashPayment = async () => {
+    const cashNum = typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0;
+    if (cashNum < total) {
+      toast.error(
+        `Uang diterima (Rp ${cashNum.toLocaleString("id-ID")}) kurang dari total tagihan (Rp ${total.toLocaleString("id-ID")})`
+      );
       return;
     }
 
     setIsProcessing(true);
     try {
       await recordSaleInDatabase("Tunai");
+      setShowCashModal(false);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Transaksi gagal");
     } finally {
@@ -827,15 +854,15 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 const stock = getTotalStock(product);
                 const sizes = product.variants.filter((v) => v.stock > 0).map((v) => v.size);
 
-                const hasPromo = product.promo_price && Number(product.promo_price) > 0;
-                const displayPrice = hasPromo ? Number(product.promo_price) : Number(product.price);
-                const strikePrice = hasPromo
-                  ? product.original_price
-                    ? Number(product.original_price)
-                    : Number(product.price)
-                  : product.original_price
-                    ? Number(product.original_price)
-                    : null;
+                const umumPrice = Number(product.price || 0);
+                const filkomPrice =
+                  product.filkom_price !== undefined &&
+                  product.filkom_price !== null &&
+                  Number(product.filkom_price) > 0
+                    ? Number(product.filkom_price)
+                    : umumPrice;
+                const hasPromo = Boolean(product.promo_price && Number(product.promo_price) > 0);
+                const promoPrice = hasPromo ? Number(product.promo_price) : null;
 
                 return (
                   <button
@@ -895,14 +922,30 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                         </p>
                       )}
 
-                      <div className="mt-auto pt-2 flex items-baseline gap-1.5 flex-wrap">
-                        <span className="text-xs sm:text-sm font-extrabold text-brand-orange">
-                          Rp {displayPrice.toLocaleString("id-ID")}
-                        </span>
-                        {strikePrice && strikePrice > displayPrice && (
-                          <span className="text-[9px] sm:text-[10px] text-muted-foreground line-through decoration-muted-foreground/60">
-                            Rp {strikePrice.toLocaleString("id-ID")}
+                      <div className="mt-auto pt-2 space-y-1">
+                        {/* Harga FILKOM */}
+                        <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] bg-emerald-50/90 border border-emerald-300/80 px-1.5 py-0.5 rounded">
+                          <span className="font-bold text-emerald-800 text-[9px] uppercase tracking-wide">
+                            FILKOM
                           </span>
+                          <span className="font-black text-emerald-700">
+                            Rp {filkomPrice.toLocaleString("id-ID")}
+                          </span>
+                        </div>
+                        {/* Harga Umum */}
+                        <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] px-0.5">
+                          <span className="text-muted-foreground text-[9px] uppercase font-semibold">
+                            Umum
+                          </span>
+                          <span className={`font-bold ${hasPromo ? "line-through text-muted-foreground/60 text-[9px]" : "text-ink"}`}>
+                            Rp {umumPrice.toLocaleString("id-ID")}
+                          </span>
+                        </div>
+                        {hasPromo && promoPrice && (
+                          <div className="flex items-center justify-between gap-1 text-[10px] text-brand-orange px-0.5">
+                            <span className="font-bold text-[9px] uppercase">Promo</span>
+                            <span className="font-black">Rp {promoPrice.toLocaleString("id-ID")}</span>
+                          </div>
                         )}
                       </div>
 
@@ -1013,222 +1056,166 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
             )}
           </ScrollArea>
 
-          <div className="shrink-0 space-y-3 border-t border-border p-3 sm:p-4 bg-cream/15">
+          <div className="shrink-0 space-y-2.5 border-t border-border p-3 sm:p-4 bg-cream/15">
             {/* Customer Selector & Details */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {selectedUser ? (
-                <div className="p-2.5 bg-background border-2 border-ink rounded-lg shadow-sm space-y-1.5">
-                  <div className="flex items-center justify-between gap-1">
+                <div className="p-2 bg-background border border-ink/40 rounded-lg shadow-2xs flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
                       <span className="font-extrabold text-xs text-ink truncate">
                         {selectedUser.name}
                       </span>
+                      {Boolean(selectedUser.is_filkom_verified) ? (
+                        <span className="font-bold text-[9px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded shrink-0">
+                          ✓ FILKOM
+                        </span>
+                      ) : (
+                        <span className="font-semibold text-[9px] bg-gray-100 text-gray-700 border border-gray-200 px-1.5 py-0.2 rounded shrink-0">
+                          Umum
+                        </span>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleSelectCustomer(null)}
-                      className="text-[10px] font-bold text-red-600 hover:underline shrink-0"
-                    >
-                      [Ganti]
-                    </button>
                   </div>
-                  
-                  <div className="flex flex-wrap items-center gap-1 text-[10px]">
-                    {Boolean(selectedUser.is_filkom_verified) ? (
-                      <span className="font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.5 rounded">
-                        ✓ Civitas FILKOM (Harga Khusus)
-                      </span>
-                    ) : (
-                      <span className="font-semibold bg-gray-100 text-gray-700 border border-gray-200 px-1.5 py-0.5 rounded">
-                        Pelanggan Umum (Harga Reguler)
-                      </span>
-                    )}
-                    {selectedUser.email && (
-                      <span className="text-muted-foreground truncate max-w-[150px]">
-                        • {selectedUser.email}
-                      </span>
-                    )}
+                  <button
+                    type="button"
+                    onClick={() => handleSelectCustomer(null)}
+                    className="text-[10px] font-bold text-red-600 hover:underline shrink-0"
+                  >
+                    [Ganti]
+                  </button>
+                </div>
+              ) : customerName ? (
+                <div className="p-2 bg-background border border-border rounded-lg shadow-2xs flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="font-bold text-xs text-ink truncate">
+                      {customerName}
+                    </span>
+                    <span className="text-[9px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded shrink-0">
+                      Umum / Non-Member
+                    </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomerName("");
+                      setShowManualCustomerInput(false);
+                    }}
+                    className="text-[10px] font-bold text-red-600 hover:underline shrink-0"
+                  >
+                    [Hapus]
+                  </button>
                 </div>
               ) : (
                 <div className="space-y-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowUserModal(true)}
-                    className="w-full h-9 text-xs font-bold border-2 border-ink bg-white hover:bg-cream/40 text-ink flex items-center justify-center gap-1.5 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-                  >
-                    <UserCheck className="w-4 h-4 text-brand-orange" />
-                    Pilih Pelanggan Terdaftar
-                  </Button>
-                  <p className="text-[10px] text-muted-foreground bg-amber-50/80 border border-amber-200 p-2 rounded-md leading-tight">
-                    💡 Pelanggan baru? Arahkan mendaftar/login di web <strong>filkommerch.com</strong> via Google Login (1-click) agar transaksi masuk ke akun mereka &amp; dapat Harga FILKOM.
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowUserModal(true)}
+                      className="flex-1 h-8 text-xs font-bold border border-ink/40 bg-white hover:bg-cream/40 text-ink flex items-center justify-center gap-1.5 cursor-pointer rounded-lg shadow-2xs"
+                    >
+                      <UserCheck className="w-3.5 h-3.5 text-brand-orange" />
+                      Pilih Pelanggan Terdaftar
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowManualCustomerInput(!showManualCustomerInput)}
+                      className="h-8 text-[11px] font-semibold text-muted-foreground hover:text-ink px-2 cursor-pointer border border-dashed border-border"
+                      title="Tulis nama pembeli non-member"
+                    >
+                      {showManualCustomerInput ? "Batal" : "+ Manual"}
+                    </Button>
+                  </div>
+                  {showManualCustomerInput && (
+                    <div className="flex items-center gap-1.5 pt-0.5">
+                      <Input
+                        placeholder="Ketik nama pembeli umum..."
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        className="h-8 text-xs bg-white border-border"
+                        autoFocus
+                      />
+                      {customerName && (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => setShowManualCustomerInput(false)}
+                          className="h-8 text-xs px-2.5 font-bold bg-ink text-white hover:bg-brand-orange"
+                        >
+                          OK
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div className="relative flex items-center">
-                <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">
-                  Pelanggan
-                </span>
-                <Input
-                  placeholder="Nama Pembeli (opsional)"
-                  value={customerName}
-                  onChange={(e) => {
-                    setCustomerName(e.target.value);
-                    if (selectedUser && e.target.value !== selectedUser.name) {
-                      setSelectedUser(null);
-                    }
-                  }}
-                  className="border-input bg-background text-xs sm:text-sm text-ink pl-24 focus-visible:ring-brand-blue h-9 rounded-md"
-                />
-              </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="relative flex items-center">
-                  <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">
-                    Diskon
+                  <span className="absolute left-2.5 text-[9px] font-bold text-muted-foreground uppercase pointer-events-none">
+                    Diskon Rp
                   </span>
                   <Input
                     type="number"
-                    placeholder="Rp"
+                    placeholder="0"
                     value={discount || ""}
                     onChange={(e) => setDiscount(parseInt(e.target.value) || 0)}
-                    className="border-input bg-background text-xs sm:text-sm text-ink pl-16 focus-visible:ring-brand-blue h-9 rounded-md"
+                    className="border-input bg-background text-xs text-ink pl-16 h-8 rounded-md"
                   />
                 </div>
                 <div className="relative flex items-center">
-                  <span className="absolute left-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wide pointer-events-none">
+                  <span className="absolute left-2.5 text-[9px] font-bold text-muted-foreground uppercase pointer-events-none">
                     Catatan
                   </span>
                   <Input
-                    placeholder="Keterangan..."
+                    placeholder="Opsional..."
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    className="border-input bg-background text-xs sm:text-sm text-ink pl-18 focus-visible:ring-brand-blue h-9 rounded-md"
+                    className="border-input bg-background text-xs text-ink pl-14 h-8 rounded-md"
                   />
                 </div>
               </div>
             </div>
 
             {/* Payment Method Selection */}
-            <div className="space-y-2">
-              <p className="text-[9px] sm:text-[10px] text-muted-foreground font-bold uppercase tracking-wider">
+            <div className="space-y-1.5">
+              <p className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider">
                 Metode Pembayaran
               </p>
               <div className="grid grid-cols-2 gap-2">
-                {(
-                  [
-                    { key: "cash" as const, label: "TUNAI (CASH)", icon: Banknote },
-                    { key: "qris" as const, label: "QRIS STATIS", icon: QrCode },
-                  ] as const
-                ).map(({ key, label, icon: Icon }) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setPaymentMethod(key)}
-                    className={`flex flex-col items-center justify-center gap-1.5 rounded-lg py-2.5 text-[10px] font-bold tracking-wider transition-all duration-300 border cursor-pointer ${
-                      paymentMethod === key
-                        ? key === "cash"
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm font-extrabold"
-                          : "bg-amber-50 text-amber-900 border-amber-500 ring-2 ring-amber-500/20 shadow-sm font-extrabold"
-                        : "bg-background text-muted-foreground border-border hover:bg-cream/40"
-                    }`}
-                  >
-                    <Icon className="h-5 w-5" />
-                    {label}
-                  </button>
-                ))}
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("cash")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all border cursor-pointer ${
+                    paymentMethod === "cash"
+                      ? "bg-emerald-600 text-white border-emerald-700 shadow-xs font-black"
+                      : "bg-background text-muted-foreground border-border hover:bg-cream/40"
+                  }`}
+                >
+                  <Banknote className="h-4 w-4" />
+                  Tunai (Cash)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethod("qris")}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all border cursor-pointer ${
+                    paymentMethod === "qris"
+                      ? "bg-amber-600 text-white border-amber-700 shadow-xs font-black"
+                      : "bg-background text-muted-foreground border-border hover:bg-cream/40"
+                  }`}
+                >
+                  <QrCode className="h-4 w-4" />
+                  QRIS Statis
+                </button>
               </div>
-
-              {/* Cash Calculator & Change Section */}
-              {paymentMethod === "cash" && (
-                <div className="space-y-2 rounded-xl bg-emerald-50/60 border border-emerald-200 p-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold text-emerald-900 flex items-center gap-1 uppercase">
-                      <Calculator className="w-3.5 h-3.5 text-emerald-700" /> Kalkulator Uang Tunai
-                    </span>
-                    {typeof cashReceived === "number" || (typeof cashReceived === "string" && cashReceived !== "") ? (
-                      <button
-                        type="button"
-                        onClick={() => setCashReceived("")}
-                        className="text-[9px] text-emerald-700 hover:text-emerald-950 font-bold underline cursor-pointer"
-                      >
-                        Reset
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <div className="relative flex items-center">
-                    <span className="absolute left-2.5 text-[10px] font-bold text-emerald-700 pointer-events-none">
-                      Rp
-                    </span>
-                    <Input
-                      type="number"
-                      placeholder="Masukkan Uang Diterima..."
-                      value={cashReceived}
-                      onChange={(e) => setCashReceived(e.target.value ? parseInt(e.target.value) || 0 : "")}
-                      className="border-emerald-300 bg-white text-xs sm:text-sm text-ink pl-8 font-bold focus-visible:ring-emerald-500 h-9 rounded-md"
-                    />
-                  </div>
-
-                  {/* Quick Cash Chips */}
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    <button
-                      type="button"
-                      onClick={() => setCashReceived(total)}
-                      className="text-[9px] px-2 py-1 bg-white border border-emerald-300 text-emerald-800 rounded font-bold hover:bg-emerald-100 transition cursor-pointer"
-                    >
-                      Uang Pas (Rp {total.toLocaleString("id-ID")})
-                    </button>
-                    {[20000, 50000, 100000, 200000, 500000]
-                      .filter((nom) => nom > total)
-                      .slice(0, 3)
-                      .map((nom) => (
-                        <button
-                          key={nom}
-                          type="button"
-                          onClick={() => setCashReceived(nom)}
-                          className="text-[9px] px-2 py-1 bg-white border border-emerald-300 text-emerald-800 rounded font-bold hover:bg-emerald-100 transition cursor-pointer"
-                        >
-                          Rp {nom.toLocaleString("id-ID")}
-                        </button>
-                      ))}
-                  </div>
-
-                  {/* Kembalian / Kekurangan Display */}
-                  {(typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0) >= total ? (
-                    <div className="p-2.5 bg-emerald-600 text-white rounded-lg flex justify-between items-center shadow-sm">
-                      <span className="text-[10px] font-bold tracking-wider uppercase">KEMBALIAN:</span>
-                      <span className="text-sm sm:text-base font-black">
-                        Rp {((typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0) - total).toLocaleString("id-ID")}
-                      </span>
-                    </div>
-                  ) : (typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0) > 0 ? (
-                    <div className="p-2 bg-red-100 text-red-800 border border-red-300 rounded-lg flex justify-between items-center text-[10px] font-bold">
-                      <span>UANG KURANG:</span>
-                      <span className="font-extrabold text-xs">
-                        -Rp {(total - (typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0)).toLocaleString("id-ID")}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-              )}
-
-              {/* QRIS Statis Info */}
-              {paymentMethod === "qris" && (
-                <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 space-y-1">
-                  <div className="font-bold flex items-center gap-1 text-[11px]">
-                    <QrCode className="w-3.5 h-3.5 text-amber-700" /> Pembayaran QRIS Statis
-                  </div>
-                  <p className="text-[10px] text-amber-800 leading-tight">
-                    Klik tombol di bawah untuk memunculkan QRIS toko dan konfirmasi jika pembeli sudah membayar.
-                  </p>
-                </div>
-              )}
             </div>
 
-            <div className="space-y-1 rounded-xl bg-background border border-border p-3">
+            <div className="space-y-1 rounded-xl bg-background border border-border p-2.5">
               <div className="flex justify-between text-xs text-muted-foreground font-medium">
                 <span>Subtotal</span>
                 <span>Rp {subtotal.toLocaleString("id-ID")}</span>
@@ -1239,23 +1226,23 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   <span>-Rp {discount.toLocaleString("id-ID")}</span>
                 </div>
               )}
-              <div className="flex justify-between text-sm sm:text-base font-extrabold text-ink pt-2 border-t border-dashed border-border mt-1.5">
+              <div className="flex justify-between text-sm sm:text-base font-extrabold text-ink pt-1.5 border-t border-dashed border-border mt-1">
                 <span className="display tracking-wider text-xs uppercase text-muted-foreground">
                   TOTAL AKHIR
                 </span>
-                <span className="text-brand-orange text-md sm:text-lg">
+                <span className="text-brand-orange text-base sm:text-lg">
                   Rp {total.toLocaleString("id-ID")}
                 </span>
               </div>
             </div>
 
             <Button
-              onClick={() => void handlePayment()}
+              onClick={() => void handleInitiatePayment()}
               disabled={cart.length === 0 || isProcessing}
-              className={`display h-12 sm:h-14 w-full text-white text-xs sm:text-sm font-bold tracking-widest uppercase transition-all duration-300 disabled:opacity-50 rounded-lg cursor-pointer active:scale-[0.98] ${
+              className={`display h-11 sm:h-12 w-full text-white text-xs sm:text-sm font-bold tracking-widest uppercase transition-all duration-300 disabled:opacity-50 rounded-lg cursor-pointer active:scale-[0.98] ${
                 paymentMethod === "qris"
                   ? "bg-amber-600 hover:bg-amber-700 shadow-md shadow-amber-600/20"
-                  : "bg-ink hover:bg-brand-orange shadow-md shadow-brand-orange/20"
+                  : "bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20"
               }`}
               size="lg"
             >
@@ -1265,7 +1252,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   MEMPROSES...
                 </span>
               ) : paymentMethod === "qris" ? (
-                "📱 BUKA QRIS & KONFIRMASI BAYAR"
+                "📱 PROSES BAYAR QRIS"
               ) : (
                 "💵 PROSES BAYAR TUNAI"
               )}
@@ -1424,6 +1411,147 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
         </Dialog>
       )}
 
+      {/* Dialog Pembayaran Tunai (Cash Modal) */}
+      <Dialog open={showCashModal} onOpenChange={setShowCashModal}>
+        <DialogContent className="sm:max-w-md w-[95vw] max-h-[90vh] flex flex-col bg-white text-ink border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] p-5 overflow-hidden">
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-base sm:text-lg font-extrabold uppercase flex items-center gap-2 text-ink">
+              <Banknote className="w-5 h-5 text-emerald-600" />
+              Pembayaran Tunai (Cash)
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 flex-1 overflow-y-auto">
+            {/* Total Tagihan Card */}
+            <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-3.5 text-center">
+              <div className="text-[11px] font-extrabold text-emerald-800 uppercase tracking-wider">
+                Total Tagihan
+              </div>
+              <div className="text-3xl sm:text-4xl font-black text-ink mt-1">
+                Rp {total.toLocaleString("id-ID")}
+              </div>
+              <div className="text-xs text-emerald-900/80 mt-1 font-medium">
+                Pelanggan: <span className="font-bold">{selectedUser ? selectedUser.name : (customerName || "Umum / Non-Member")}</span>
+              </div>
+            </div>
+
+            {/* Input Uang Diterima */}
+            <div className="space-y-1.5">
+              <div className="text-xs font-bold uppercase tracking-wider text-ink flex items-center justify-between">
+                <span>Uang Tunai Diterima:</span>
+                {(typeof cashReceived === "number" || (typeof cashReceived === "string" && cashReceived !== "")) && (
+                  <button
+                    type="button"
+                    onClick={() => setCashReceived("")}
+                    className="text-[10px] text-muted-foreground hover:text-ink font-semibold underline cursor-pointer"
+                  >
+                    Reset
+                  </button>
+                )}
+              </div>
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-base font-black text-emerald-700 pointer-events-none">
+                  Rp
+                </span>
+                <Input
+                  type="number"
+                  autoFocus
+                  placeholder="Masukkan nominal uang..."
+                  value={cashReceived}
+                  onChange={(e) => setCashReceived(e.target.value ? parseInt(e.target.value) || 0 : "")}
+                  className="pl-11 text-base sm:text-lg font-black h-11 border-2 border-ink rounded-lg focus-visible:ring-emerald-500 bg-white"
+                />
+              </div>
+
+              {/* Quick Cash Chips */}
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setCashReceived(total)}
+                  className="text-[10px] px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 border border-emerald-400 text-emerald-900 rounded-md font-bold transition cursor-pointer"
+                >
+                  Uang Pas (Rp {total.toLocaleString("id-ID")})
+                </button>
+                {[20000, 50000, 100000, 200000, 500000]
+                  .filter((nom) => nom > total)
+                  .slice(0, 4)
+                  .map((nom) => (
+                    <button
+                      key={nom}
+                      type="button"
+                      onClick={() => setCashReceived(nom)}
+                      className="text-[10px] px-2.5 py-1 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-ink rounded-md font-semibold transition cursor-pointer"
+                    >
+                      Rp {nom.toLocaleString("id-ID")}
+                    </button>
+                  ))}
+              </div>
+            </div>
+
+            {/* Kembalian / Kekurangan Realtime Display */}
+            {(() => {
+              const cashNum = typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0;
+              if (cashNum >= total) {
+                const change = cashNum - total;
+                return (
+                  <div className="p-3 bg-emerald-600 text-white rounded-xl flex justify-between items-center shadow-sm">
+                    <div>
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-100">
+                        UANG KEMBALIAN
+                      </div>
+                      <div className="text-xl sm:text-2xl font-black">
+                        Rp {change.toLocaleString("id-ID")}
+                      </div>
+                    </div>
+                    <CheckCircle2 className="w-8 h-8 text-emerald-200 shrink-0" />
+                  </div>
+                );
+              }
+              if (cashNum > 0 && cashNum < total) {
+                return (
+                  <div className="p-2.5 bg-red-50 text-red-800 border border-red-300 rounded-xl flex justify-between items-center text-xs font-bold">
+                    <span>UANG KURANG:</span>
+                    <span className="font-extrabold text-sm">
+                      -Rp {(total - cashNum).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-border shrink-0">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setShowCashModal(false)}
+              className="border-2 border-ink text-xs font-bold uppercase tracking-wider flex-1 h-11 hover:bg-cream cursor-pointer"
+            >
+              Batal
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleConfirmCashPayment()}
+              disabled={
+                isProcessing ||
+                (typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0) < total
+              }
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider flex-[1.4] h-11 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer disabled:opacity-50"
+            >
+              {isProcessing ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  MEMPROSES...
+                </span>
+              ) : (
+                "✓ KONFIRMASI & SELESAIKAN"
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Dialog QRIS Statis */}
       <Dialog open={showQrisModal} onOpenChange={setShowQrisModal}>
         <DialogContent className="sm:max-w-xl md:max-w-2xl w-[95vw] max-h-[95vh] overflow-y-auto bg-white border-2 border-ink shadow-[5px_5px_0px_0px_rgba(27,27,27,1)] p-5 sm:p-7">
@@ -1578,6 +1706,18 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                       <span>TOTAL:</span>
                       <span>Rp {currentReceiptData.total.toLocaleString("id-ID")}</span>
                     </div>
+                    {currentReceiptData.paid_amount !== undefined && currentReceiptData.paid_amount > 0 && (
+                      <div className="border-t border-dashed border-black pt-1 mt-1 space-y-0.5 text-[7px]">
+                        <div className="flex justify-between">
+                          <span>Bayar ({currentReceiptData.payment_method || "Tunai"}):</span>
+                          <span>Rp {currentReceiptData.paid_amount.toLocaleString("id-ID")}</span>
+                        </div>
+                        <div className="flex justify-between font-black">
+                          <span>Kembali:</span>
+                          <span>Rp {(currentReceiptData.change_amount || 0).toLocaleString("id-ID")}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   <div className="border-t border-dashed border-black"></div>
@@ -1815,10 +1955,15 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
           <DialogHeader className="shrink-0">
             <DialogTitle className="text-base font-extrabold uppercase flex items-center gap-2">
               <UserCheck className="w-5 h-5 text-brand-orange" />
-              Pilih Pelanggan Terdaftar
+              Pilih Pelanggan Transaksi
             </DialogTitle>
           </DialogHeader>
+
           <div className="space-y-3 py-2 flex-1 overflow-hidden flex flex-col">
+            <div className="bg-amber-50/90 border border-amber-300 rounded-lg p-2.5 text-xs text-amber-950 leading-relaxed shrink-0">
+              ⭐ <strong>Rekomendasi:</strong> Pilih pelanggan terdaftar agar otomatis mendapatkan potongan <strong>Harga Khusus Civitas FILKOM</strong> dan transaksi tersimpan ke akun mereka.
+            </div>
+
             <div className="relative shrink-0">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -1829,13 +1974,12 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
               />
             </div>
 
-            <div className="max-h-[300px] overflow-y-auto space-y-1.5 p-1 rounded-lg border border-border w-full">
+            <div className="max-h-[220px] overflow-y-auto space-y-1.5 p-1 rounded-lg border border-border w-full">
               {filteredRegisteredUsers.length === 0 ? (
-                <div className="text-center py-8 text-xs text-muted-foreground space-y-2">
-                  <p className="font-semibold">Pelanggan tidak ditemukan.</p>
-                  <p className="text-[11px] bg-amber-50 text-amber-900 border border-amber-200 p-2.5 rounded-lg inline-block text-left leading-relaxed">
-                    💡 <strong>Pelanggan Belum Terdaftar?</strong><br />
-                    Minta pelanggan mendaftar/login di web <strong>filkommerch.com</strong> via Google Login (1-click) terlebih dahulu agar transaksi ini tercatat di akun mereka &amp; otomatis mendapat Harga Civitas FILKOM.
+                <div className="text-center py-6 text-xs text-muted-foreground space-y-2">
+                  <p className="font-semibold">Pelanggan terdaftar tidak ditemukan.</p>
+                  <p className="text-[11px] bg-cream/70 text-ink border border-border p-2 rounded-lg inline-block text-left leading-relaxed">
+                    💡 Pembeli dapat mendaftar/login di web <strong>filkommerch.com</strong> via Google Login (1-click) untuk verifikasi NIM FILKOM.
                   </p>
                 </div>
               ) : (
@@ -1894,16 +2038,73 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 </div>
               )}
             </div>
+
+            {/* Input Manual Name Section */}
+            <div className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg shrink-0 space-y-1.5">
+              <div className="text-[11px] font-bold text-ink">
+                Atau Masukkan Nama Pembeli Manual (Non-Member / Umum):
+              </div>
+              <div className="flex gap-1.5">
+                <Input
+                  placeholder="Ketik nama pembeli..."
+                  value={manualCustomerInput}
+                  onChange={(e) => setManualCustomerInput(e.target.value)}
+                  className="h-8 text-xs bg-white border-gray-300"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && manualCustomerInput.trim()) {
+                      const name = manualCustomerInput.trim();
+                      handleSelectCustomer(null);
+                      setCustomerName(name);
+                      setShowUserModal(false);
+                      setManualCustomerInput("");
+                    }
+                  }}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!manualCustomerInput.trim()}
+                  onClick={() => {
+                    const name = manualCustomerInput.trim();
+                    handleSelectCustomer(null);
+                    setCustomerName(name);
+                    setShowUserModal(false);
+                    setManualCustomerInput("");
+                  }}
+                  className="h-8 text-xs font-bold px-3 bg-ink hover:bg-brand-orange text-white cursor-pointer"
+                >
+                  Gunakan
+                </Button>
+              </div>
+            </div>
           </div>
+
           <div className="flex flex-col sm:flex-row items-center justify-between gap-2 border-t border-border pt-3 w-full shrink-0">
-            <p className="text-[10px] text-muted-foreground">
-              * Transaksi akan otomatis terhubung ke akun pelanggan.
-            </p>
+            {(selectedUser || customerName) ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                onClick={() => {
+                  handleSelectCustomer(null);
+                  setCustomerName("");
+                  setShowUserModal(false);
+                }}
+                className="text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer h-8 px-2"
+              >
+                Reset ke Pelanggan Umum
+              </Button>
+            ) : (
+              <p className="text-[10px] text-muted-foreground">
+                * Transaksi non-member menggunakan Harga Umum.
+              </p>
+            )}
             <Button
               variant="outline"
               size="sm"
+              type="button"
               onClick={() => setShowUserModal(false)}
-              className="text-xs font-bold border-ink cursor-pointer"
+              className="text-xs font-bold border-ink cursor-pointer h-8"
             >
               Tutup
             </Button>

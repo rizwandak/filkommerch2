@@ -93,6 +93,9 @@ export function formatTransactionToReceiptData(
   else if (paymentMethod === "qris") paymentMethod = "QRIS";
   else if (paymentMethod === "bank_transfer") paymentMethod = "Transfer Bank";
 
+  const paid_amount = Number(transaction.paid_amount ?? transaction.cash_received ?? 0);
+  const change_amount = Number(transaction.change_amount ?? transaction.change ?? 0);
+
   return {
     store_name,
     sale_id,
@@ -106,6 +109,8 @@ export function formatTransactionToReceiptData(
     payment_method: paymentMethod,
     cashier_name: transaction.cashier_name || cashierName || "Admin",
     customer_name: transaction.customer_name || transaction.user_name || transaction.name || undefined,
+    paid_amount: paid_amount > 0 ? paid_amount : undefined,
+    change_amount: change_amount >= 0 && paid_amount > 0 ? change_amount : undefined,
   };
 }
 
@@ -143,6 +148,20 @@ export function printBrowserReceipt(data: ReceiptData) {
     <div style="display: flex; justify-content: space-between; font-size: 7.5px; margin-bottom: 2px;">
       <span>Diskon:</span>
       <span>-Rp ${data.discount.toLocaleString("id-ID")}</span>
+    </div>
+  `
+      : "";
+
+  const cashDetailsHtml =
+    data.paid_amount !== undefined && data.paid_amount > 0
+      ? `
+    <div style="display: flex; justify-content: space-between; font-size: 7.5px; margin-top: 3px; border-top: 1px dashed #000; padding-top: 2px;">
+      <span>Bayar (${data.payment_method || "Tunai"}):</span>
+      <span>Rp ${data.paid_amount.toLocaleString("id-ID")}</span>
+    </div>
+    <div style="display: flex; justify-content: space-between; font-size: 7.5px; margin-top: 1px;">
+      <span>Kembali:</span>
+      <span style="font-weight: 900;">Rp ${(data.change_amount || 0).toLocaleString("id-ID")}</span>
     </div>
   `
       : "";
@@ -300,6 +319,7 @@ export function printBrowserReceipt(data: ReceiptData) {
               <span>TOTAL:</span>
               <span>Rp ${data.total.toLocaleString("id-ID")}</span>
             </div>
+            ${cashDetailsHtml}
           </div>
           
           <div class="divider"></div>
