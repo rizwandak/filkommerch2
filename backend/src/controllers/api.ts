@@ -96,21 +96,27 @@ export const logStockMovement = async (
   referenceType: 'order' | 'stock_opname' | 'purchase' | 'return' | 'manual',
   referenceId?: string | null,
   createdBy?: number | null,
-  notes?: string | null
+  notes?: string | null,
+  stockBeforeOverride?: number,
+  stockAfterOverride?: number
 ) => {
-  // Get current variant stock to record before/after snapshot (locked FOR UPDATE)
-  const [rows] = await connection.execute(
-    "SELECT stock FROM product_variants WHERE id = ? FOR UPDATE",
-    [variantId]
-  );
-  const currentStock = (rows as any[])[0]?.stock || 0;
-  const stockBefore = currentStock;
+  let stockBefore = stockBeforeOverride;
+  let stockAfter = stockAfterOverride;
 
-  // Only actual stock changing movements change stock_after snapshot
-  let stockAfter = currentStock;
-  const isStockChanging = ['sale', 'restock', 'initial', 'adjustment_in', 'adjustment_out', 'return', 'refund'].includes(movementType);
-  if (isStockChanging) {
-    stockAfter = currentStock + quantityChange;
+  if (stockBefore === undefined || stockAfter === undefined) {
+    // Read current stock inside connection (no FOR UPDATE needed as caller already holds row lock if modified)
+    const [rows] = await connection.execute(
+      "SELECT stock FROM product_variants WHERE id = ?",
+      [variantId]
+    );
+    const currentStock = (rows as any[])[0]?.stock ?? 0;
+    const isStockChanging = ['sale', 'restock', 'initial', 'adjustment_in', 'adjustment_out', 'return', 'refund'].includes(movementType);
+    if (stockBefore === undefined) {
+      stockBefore = isStockChanging ? currentStock - quantityChange : currentStock;
+    }
+    if (stockAfter === undefined) {
+      stockAfter = currentStock;
+    }
   }
 
   console.log(`[Stock Movement] Var ${variantId}: type=${movementType}, change=${quantityChange}, before=${stockBefore}, after=${stockAfter}`);
@@ -2183,71 +2189,81 @@ export const deleteOrder = async (req: Request, res: Response) => {
 
 // Create Sale (POS sale transaction)
 export const createSale = async (req: Request, res: Response) => {
-  const connection = await getConnection();
-  try {
-    const input = req.body;
-    await connection.beginTransaction();
+  const MAX_RETRIES = 3;
+  let attempt = 0;
 
-    const PAYMENT_LABELS: Record<string, string> = {
-      cash: "Tunai",
-      qris: "QRIS",
-      debit: "Debit",
-    };
-    const paymentLabel = PAYMENT_LABELS[input.payment_method?.toLowerCase()] || input.payment_method || "Tunai";
+  while (attempt < MAX_RETRIES) {
+    attempt++;
+    const connection = await getConnection();
 
-    // CASE 1: If order already exists (meaning it was created via createOrderAndPayment for online POS payment)
-    if (input.order_id) {
-      console.log("ℹ️ Finalizing existing POS online order in database:", input.order_id);
+    try {
+      const input = req.body;
+      await connection.beginTransaction();
 
-      const [orderRows] = await connection.execute(
-        "SELECT id, order_id, payment_status FROM orders WHERE order_id = ? FOR UPDATE",
-        [input.order_id]
-      );
-      const order = (orderRows as any[])[0];
+      const PAYMENT_LABELS: Record<string, string> = {
+        cash: "Tunai",
+        qris: "QRIS",
+        debit: "Debit",
+      };
+      const paymentLabel = PAYMENT_LABELS[input.payment_method?.toLowerCase()] || input.payment_method || "Tunai";
 
-      if (!order) {
-        throw new Error(`Order ${input.order_id} tidak ditemukan`);
-      }
+      // CASE 1: If order already exists (meaning it was created via createOrderAndPayment for online POS payment)
+      if (input.order_id) {
+        console.log("ℹ️ Finalizing existing POS online order in database:", input.order_id);
 
-      // If it wasn't already marked as paid
-      if (order.payment_status !== "paid") {
-        // Update order status to paid, completed
-        await connection.execute(
-          `UPDATE orders SET 
-            payment_status = 'paid', order_status = 'completed', fulfillment_status = 'completed', 
-            payment_type = ?, transaction_status = 'settlement', updated_at = NOW() 
-           WHERE order_id = ?`,
-          [paymentLabel, input.order_id]
-        );
-
-        // Check if payment row exists
-        const [paymentRows] = await connection.execute(
-          "SELECT id FROM payments WHERE order_id = ? AND provider = 'midtrans' LIMIT 1 FOR UPDATE",
+        const [orderRows] = await connection.execute(
+          "SELECT id, order_id, payment_status FROM orders WHERE order_id = ? FOR UPDATE",
           [input.order_id]
         );
-        const existingPayment = (paymentRows as any[])[0];
+        const order = (orderRows as any[])[0];
 
-        if (existingPayment) {
-          await connection.execute(
-            "UPDATE payments SET status = 'paid', paid_at = NOW(), raw_callback_json = ? WHERE id = ?",
-            [JSON.stringify({ note: "Finalized via cashier screen" }), existingPayment.id]
-          );
-        } else {
-          await connection.execute(
-            `INSERT INTO payments (order_id, provider, payment_method, amount, status, paid_at, raw_callback_json) 
-             VALUES (?, 'midtrans', ?, ?, 'paid', NOW(), ?)`,
-            [input.order_id, paymentLabel, input.total, JSON.stringify({ note: "Finalized via cashier screen" })]
-          );
+        if (!order) {
+          throw new Error(`Order ${input.order_id} tidak ditemukan`);
         }
 
-        // Fetch order items to release reservations and deduct stock
-        const [items] = await connection.execute(
-          "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
-          [input.order_id]
-        );
+        // If it wasn't already marked as paid
+        if (order.payment_status !== "paid") {
+          // Update order status to paid, completed
+          await connection.execute(
+            `UPDATE orders SET 
+              payment_status = 'paid', order_status = 'completed', fulfillment_status = 'completed', 
+              payment_type = ?, transaction_status = 'settlement', updated_at = NOW() 
+             WHERE order_id = ?`,
+            [paymentLabel, input.order_id]
+          );
 
-        for (const item of items as any[]) {
-          if (item.variant_id) {
+          // Check if payment row exists
+          const [paymentRows] = await connection.execute(
+            "SELECT id FROM payments WHERE order_id = ? AND provider = 'midtrans' LIMIT 1 FOR UPDATE",
+            [input.order_id]
+          );
+          const existingPayment = (paymentRows as any[])[0];
+
+          if (existingPayment) {
+            await connection.execute(
+              "UPDATE payments SET status = 'paid', paid_at = NOW(), raw_callback_json = ? WHERE id = ?",
+              [JSON.stringify({ note: "Finalized via cashier screen" }), existingPayment.id]
+            );
+          } else {
+            await connection.execute(
+              `INSERT INTO payments (order_id, provider, payment_method, amount, status, paid_at, raw_callback_json) 
+               VALUES (?, 'midtrans', ?, ?, 'paid', NOW(), ?)`,
+              [input.order_id, paymentLabel, input.total, JSON.stringify({ note: "Finalized via cashier screen" })]
+            );
+          }
+
+          // Fetch order items to release reservations and deduct stock
+          const [items] = await connection.execute(
+            "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
+            [input.order_id]
+          );
+
+          // Sort items by variant_id ASC to prevent deadlock cycles
+          const sortedItems = (items as any[])
+            .filter((item) => item.variant_id)
+            .sort((a, b) => Number(a.variant_id) - Number(b.variant_id));
+
+          for (const item of sortedItems) {
             // Decrement physical stock
             await connection.execute(
               "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
@@ -2263,255 +2279,266 @@ export const createSale = async (req: Request, res: Response) => {
             await logStockMovement(connection, item.variant_id, 'sale', -item.quantity, 'order', input.order_id, input.admin_id, 'Penjualan POS online sukses');
           }
         }
+
+        await connection.commit();
+        connection.release();
+
+        return res.json({
+          success: true,
+          sale_id: input.order_id,
+          db_id: order.id,
+          message: "Sale finalized successfully",
+        });
       }
 
-      await connection.commit();
-      return res.json({
-        success: true,
-        sale_id: input.order_id,
-        db_id: order.id,
-        message: "Sale finalized successfully",
-      });
-    }
+      // CASE 2: Cash/Debit/QRIS Statis POS Sale (No existing order)
+      console.log("ℹ️ Creating new cash/debit/qris POS sale in database (attempt " + attempt + ")");
+      const saleId = `POS-${Date.now()}`;
+      const resolvedItems: any[] = [];
+      let calculatedSubtotal = 0;
+      const customerEmail = input.customer_email || "pos@filkommerch.com";
 
-    // CASE 2: Cash/Debit POS Sale (No existing order)
-    console.log("ℹ️ Creating new cash/debit POS sale in database");
-    const saleId = `POS-${Date.now()}`;
-    const resolvedItems: any[] = [];
-    let calculatedSubtotal = 0;
-    const customerEmail = input.customer_email || "pos@filkommerch.com";
+      let targetUserId: number | null = input.user_id ? Number(input.user_id) : null;
+      let customerNim: string | null = input.customer_nim || null;
+      let isUb = false;
 
-    let targetUserId: number | null = input.user_id ? Number(input.user_id) : null;
-    let customerNim: string | null = input.customer_nim || null;
-    let isUb = false;
-
-    if (input.is_filkom_verified) {
-      isUb = true;
-    }
-
-    if (targetUserId) {
-      const [uRows] = await connection.execute(
-        "SELECT id, is_filkom_verified, nim, email FROM users WHERE id = ?",
-        [targetUserId]
-      );
-      const uRow = (uRows as any[])[0];
-      if (uRow) {
-        if (uRow.is_filkom_verified === 1) isUb = true;
-        if (!customerNim && uRow.nim) customerNim = uRow.nim;
-      }
-    } else if (input.customer_email) {
-      const [userRows] = await connection.execute(
-        "SELECT id, is_filkom_verified, nim FROM users WHERE email = ?",
-        [input.customer_email]
-      );
-      const userRow = (userRows as any[])[0];
-      if (userRow) {
-        targetUserId = userRow.id;
-        if (userRow.is_filkom_verified === 1) isUb = true;
-        if (!customerNim && userRow.nim) customerNim = userRow.nim;
-      }
-    }
-    if (!isUb) {
-      isUb = isUbEmail(customerEmail);
-    }
-
-    for (const item of input.items) {
-      const variantId = item.variant_id;
-      if (!variantId) {
-        throw new Error(`Variant ID wajib diisi untuk item: ${item.product_name}`);
+      if (input.is_filkom_verified) {
+        isUb = true;
       }
 
-      // Query variant joined with product info
-      const [rows] = await connection.execute(
-        `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix,
-                p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price,
-                p.product_type AS product_type
-         FROM product_variants pv
-         JOIN products p ON p.id = pv.product_id
-         WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
-        [variantId]
-      );
-
-      const variant = (rows as any[])[0];
-      if (!variant) {
-        throw new Error(`Produk/Varian dengan ID ${variantId} tidak ditemukan atau tidak aktif`);
-      }
-
-      // Check stock availability (available stock = stock - stock_reserved)
-      if (variant.product_type !== 'bundle') {
-        const availableStock = variant.stock - variant.stock_reserved;
-        if (availableStock < item.quantity) {
-          throw new Error(`Stok tidak cukup untuk ${variant.product_name}. Tersedia: ${availableStock}`);
+      if (targetUserId) {
+        const [uRows] = await connection.execute(
+          "SELECT id, is_filkom_verified, nim, email FROM users WHERE id = ?",
+          [targetUserId]
+        );
+        const uRow = (uRows as any[])[0];
+        if (uRow) {
+          if (uRow.is_filkom_verified === 1) isUb = true;
+          if (!customerNim && uRow.nim) customerNim = uRow.nim;
+        }
+      } else if (input.customer_email) {
+        const [userRows] = await connection.execute(
+          "SELECT id, is_filkom_verified, nim FROM users WHERE email = ?",
+          [input.customer_email]
+        );
+        const userRow = (userRows as any[])[0];
+        if (userRow) {
+          targetUserId = userRow.id;
+          if (userRow.is_filkom_verified === 1) isUb = true;
+          if (!customerNim && userRow.nim) customerNim = userRow.nim;
         }
       }
+      if (!isUb) {
+        isUb = isUbEmail(customerEmail);
+      }
 
-      let price = determinePrice(variant, isUb);
-      if (variant.product_type === 'bundle') {
-        if (item.bundle_selections && Array.isArray(item.bundle_selections)) {
-          let bundleAddon = 0;
+      for (const item of input.items) {
+        const variantId = item.variant_id;
+        if (!variantId) {
+          throw new Error(`Variant ID wajib diisi untuk item: ${item.product_name}`);
+        }
+
+        // Query variant joined with product info (WITHOUT locking products table to prevent cross-table deadlocks)
+        const [rows] = await connection.execute(
+          `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix,
+                  p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price,
+                  p.product_type AS product_type
+           FROM product_variants pv
+           JOIN products p ON p.id = pv.product_id
+           WHERE pv.id = ? AND pv.is_active = TRUE`,
+          [variantId]
+        );
+
+        const variant = (rows as any[])[0];
+        if (!variant) {
+          throw new Error(`Produk/Varian dengan ID ${variantId} tidak ditemukan atau tidak aktif`);
+        }
+
+        let price = determinePrice(variant, isUb);
+        if (variant.product_type === 'bundle') {
+          if (item.bundle_selections && Array.isArray(item.bundle_selections)) {
+            let bundleAddon = 0;
+            for (const selection of item.bundle_selections) {
+              const [compRows] = await connection.execute(
+                `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix, p.product_type,
+                        p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price
+                 FROM product_variants pv
+                 JOIN products p ON p.id = pv.product_id
+                 WHERE pv.id = ? AND pv.is_active = TRUE`,
+                [selection.variant_id]
+              );
+              const compVar = (compRows as any[])[0];
+              if (compVar) {
+                const [allCompVarsRows] = await connection.execute(
+                  `SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE`,
+                  [compVar.product_id]
+                );
+                const allCompVars = allCompVarsRows as any[];
+
+                const hasLunas = allCompVars.some((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
+                let refVariant = null;
+                if (hasLunas) {
+                  refVariant = allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS" && v.size && v.size.toUpperCase() === "S")
+                    || allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
+                } else {
+                  refVariant = allCompVars.find((v: any) => v.size && v.size.toUpperCase() === "S")
+                    || allCompVars[0];
+                }
+
+                let refAddon = 0;
+                if (refVariant) {
+                  if (isUb && refVariant.filkom_price && Number(refVariant.filkom_price) > 0) {
+                    refAddon = Number(refVariant.filkom_price);
+                  } else if (refVariant.price_override && Number(refVariant.price_override) > 0) {
+                    refAddon = Number(refVariant.price_override);
+                  }
+                }
+
+                let selectedAddon = 0;
+                if (isUb && compVar.filkom_price && Number(compVar.filkom_price) > 0) {
+                  selectedAddon = Number(compVar.filkom_price);
+                } else if (compVar.price_override && Number(compVar.price_override) > 0) {
+                  selectedAddon = Number(compVar.price_override);
+                }
+
+                bundleAddon += (selectedAddon - refAddon);
+              }
+            }
+            price += bundleAddon;
+          }
+        }
+        price = Math.max(0, price);
+        const subtotalItem = price * item.quantity;
+        calculatedSubtotal += subtotalItem;
+
+        const skuSnapshot = variant.sku || (variant.sku_prefix ? `${variant.sku_prefix}-${variant.id}` : `VAR-${variant.id}`);
+
+        resolvedItems.push({
+          product_id: variant.product_id,
+          variant_id: variant.id,
+          product_name: variant.product_name,
+          size: variant.size,
+          color: variant.color || "Default",
+          quantity: item.quantity,
+          price: price,
+          subtotal: subtotalItem,
+          skuSnapshot: skuSnapshot,
+          bypassStockDeduction: variant.product_type === 'bundle'
+        });
+
+        // If it is a bundle, resolve component variants
+        if (variant.product_type === 'bundle') {
+          if (!item.bundle_selections || !Array.isArray(item.bundle_selections)) {
+            throw new Error(`Detail pilihan komponen wajib disertakan untuk bundel: ${variant.product_name}`);
+          }
+
           for (const selection of item.bundle_selections) {
             const [compRows] = await connection.execute(
-              `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix, p.product_type,
-                      p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price
+              `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix, p.product_type
                FROM product_variants pv
                JOIN products p ON p.id = pv.product_id
                WHERE pv.id = ? AND pv.is_active = TRUE`,
               [selection.variant_id]
             );
-            const compVar = (compRows as any[])[0];
-            if (compVar) {
-              const [allCompVarsRows] = await connection.execute(
-                `SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE`,
-                [compVar.product_id]
-              );
-              const allCompVars = allCompVarsRows as any[];
-
-              const hasLunas = allCompVars.some((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
-              let refVariant = null;
-              if (hasLunas) {
-                refVariant = allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS" && v.size && v.size.toUpperCase() === "S")
-                  || allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
-              } else {
-                refVariant = allCompVars.find((v: any) => v.size && v.size.toUpperCase() === "S")
-                  || allCompVars[0];
-              }
-
-              let refAddon = 0;
-              if (refVariant) {
-                if (isUb && refVariant.filkom_price && Number(refVariant.filkom_price) > 0) {
-                  refAddon = Number(refVariant.filkom_price);
-                } else if (refVariant.price_override && Number(refVariant.price_override) > 0) {
-                  refAddon = Number(refVariant.price_override);
-                }
-              }
-
-              let selectedAddon = 0;
-              if (isUb && compVar.filkom_price && Number(compVar.filkom_price) > 0) {
-                selectedAddon = Number(compVar.filkom_price);
-              } else if (compVar.price_override && Number(compVar.price_override) > 0) {
-                selectedAddon = Number(compVar.price_override);
-              }
-
-              bundleAddon += (selectedAddon - refAddon);
+            const compVariant = (compRows as any[])[0];
+            if (!compVariant) {
+              throw new Error(`Komponen varian ID ${selection.variant_id} tidak ditemukan`);
             }
+
+            const requiredQty = (selection.quantity || 1) * item.quantity;
+            const compSku = compVariant.sku || (compVariant.sku_prefix ? `${compVariant.sku_prefix}-${compVariant.id}` : `VAR-${compVariant.id}`);
+            resolvedItems.push({
+              product_id: compVariant.product_id,
+              variant_id: compVariant.id,
+              product_name: `[KOMPONEN BUNDLE] ${compVariant.product_name}`,
+              size: compVariant.size,
+              color: compVariant.color || "Default",
+              quantity: requiredQty,
+              price: 0,
+              subtotal: 0,
+              skuSnapshot: compSku,
+              bypassStockDeduction: false
+            });
           }
-          price += bundleAddon;
         }
       }
-      price = Math.max(0, price);
-      const subtotalItem = price * item.quantity;
-      calculatedSubtotal += subtotalItem;
 
-      const skuSnapshot = variant.sku || (variant.sku_prefix ? `${variant.sku_prefix}-${variant.id}` : `VAR-${variant.id}`);
+      // Collect items requiring physical stock deduction and sort strictly by variant_id ASC
+      // Locking in deterministic ascending order mathematically guarantees deadlock freedom!
+      const itemsToDeduct = resolvedItems
+        .filter((item) => !item.bypassStockDeduction)
+        .sort((a, b) => Number(a.variant_id) - Number(b.variant_id));
 
-      resolvedItems.push({
-        product_id: variant.product_id,
-        variant_id: variant.id,
-        product_name: variant.product_name,
-        size: variant.size,
-        color: variant.color || "Default",
-        quantity: item.quantity,
-        price: price,
-        subtotal: subtotalItem,
-        skuSnapshot: skuSnapshot,
-        bypassStockDeduction: variant.product_type === 'bundle'
-      });
-
-      // If it is a bundle, resolve and validate stock for component variants
-      if (variant.product_type === 'bundle') {
-        if (!item.bundle_selections || !Array.isArray(item.bundle_selections)) {
-          throw new Error(`Detail pilihan komponen wajib disertakan untuk bundel: ${variant.product_name}`);
+      // Validate & lock stock deterministically:
+      for (const item of itemsToDeduct) {
+        const [varRows] = await connection.execute(
+          "SELECT id, stock, stock_reserved FROM product_variants WHERE id = ? FOR UPDATE",
+          [item.variant_id]
+        );
+        const v = (varRows as any[])[0];
+        if (!v) {
+          throw new Error(`Varian ID ${item.variant_id} tidak ditemukan`);
         }
-
-        for (const selection of item.bundle_selections) {
-          const [compRows] = await connection.execute(
-            `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix, p.product_type
-             FROM product_variants pv
-             JOIN products p ON p.id = pv.product_id
-             WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
-            [selection.variant_id]
-          );
-          const compVariant = (compRows as any[])[0];
-          if (!compVariant) {
-            throw new Error(`Komponen varian ID ${selection.variant_id} tidak ditemukan`);
-          }
-
-          const compAvailableStock = compVariant.stock - compVariant.stock_reserved;
-          const requiredQty = (selection.quantity || 1) * item.quantity;
-          if (compAvailableStock < requiredQty) {
-            throw new Error(`Stok komponen ${compVariant.product_name} (${compVariant.size}${compVariant.color ? ` / ${compVariant.color}` : ""}) tidak cukup. Tersedia: ${compAvailableStock}`);
-          }
-
-          const compSku = compVariant.sku || (compVariant.sku_prefix ? `${compVariant.sku_prefix}-${compVariant.id}` : `VAR-${compVariant.id}`);
-          resolvedItems.push({
-            product_id: compVariant.product_id,
-            variant_id: compVariant.id,
-            product_name: `[KOMPONEN BUNDLE] ${compVariant.product_name}`,
-            size: compVariant.size,
-            color: compVariant.color || "Default",
-            quantity: requiredQty,
-            price: 0,
-            subtotal: 0,
-            skuSnapshot: compSku,
-            bypassStockDeduction: false
-          });
+        const available = v.stock - v.stock_reserved;
+        if (available < item.quantity) {
+          throw new Error(`Stok tidak cukup untuk ${item.product_name}. Tersedia: ${available}`);
         }
       }
-    }
 
-    const discountAmount = Number(input.discount) || 0;
-    const taxAmount = Number(input.tax) || 0;
-    const grossAmount = calculatedSubtotal - discountAmount + taxAmount;
+      const discountAmount = Number(input.discount) || 0;
+      const taxAmount = Number(input.tax) || 0;
+      const grossAmount = calculatedSubtotal - discountAmount + taxAmount;
 
-    // 1. Create order
-    const [orderResult] = await connection.execute(
-      `INSERT INTO orders (
-        order_id, channel, fulfillment_type, fulfillment_status, user_id, cashier_id, customer_name,
-        customer_email, customer_phone, customer_nim, subtotal, discount_amount, tax_amount, gross_amount,
-        payment_status, order_status, notes, transaction_status
-      ) VALUES (?, 'pos', 'walk_in', 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'completed', ?, 'settlement')`,
-      [
-        saleId,
-        targetUserId,
-        input.admin_id || null,
-        input.customer_name || "Pelanggan POS",
-        customerEmail,
-        input.customer_phone || "081234567890",
-        customerNim,
-        calculatedSubtotal,
-        discountAmount,
-        taxAmount,
-        grossAmount,
-        input.notes || null
-      ]
-    );
-
-    const insertedOrderId = (orderResult as any).insertId;
-
-    // 2. Insert items and decrement stock directly
-    for (const item of resolvedItems) {
-      await connection.execute(
-        `INSERT INTO order_items (
-          order_id, product_id, variant_id, product_name, size, color, quantity,
-          unit_price, discount_amount, subtotal, sku_snapshot
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      // 1. Create order
+      const [orderResult] = await connection.execute(
+        `INSERT INTO orders (
+          order_id, channel, fulfillment_type, fulfillment_status, user_id, cashier_id, customer_name,
+          customer_email, customer_phone, customer_nim, subtotal, discount_amount, tax_amount, gross_amount,
+          payment_status, order_status, notes, transaction_status
+        ) VALUES (?, 'pos', 'walk_in', 'completed', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'paid', 'completed', ?, 'settlement')`,
         [
           saleId,
-          item.product_id,
-          item.variant_id,
-          item.product_name,
-          item.size,
-          item.color,
-          item.quantity,
-          item.price,
-          0,
-          item.subtotal,
-          item.skuSnapshot
+          targetUserId,
+          input.admin_id || null,
+          input.customer_name || "Pelanggan POS",
+          customerEmail,
+          input.customer_phone || "081234567890",
+          customerNim,
+          calculatedSubtotal,
+          discountAmount,
+          taxAmount,
+          grossAmount,
+          input.notes || null
         ]
       );
 
-      if (!item.bypassStockDeduction) {
-        // Decrement physical stock (No reservation needed for instant cashier cash sale)
+      const insertedOrderId = (orderResult as any).insertId;
+
+      // 2. Insert items
+      for (const item of resolvedItems) {
+        await connection.execute(
+          `INSERT INTO order_items (
+            order_id, product_id, variant_id, product_name, size, color, quantity,
+            unit_price, discount_amount, subtotal, sku_snapshot
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            saleId,
+            item.product_id,
+            item.variant_id,
+            item.product_name,
+            item.size,
+            item.color,
+            item.quantity,
+            item.price,
+            0,
+            item.subtotal,
+            item.skuSnapshot
+          ]
+        );
+      }
+
+      // 3. Decrement stock directly (rows are already locked in sorted order)
+      for (const item of itemsToDeduct) {
         await connection.execute(
           "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
           [item.quantity, item.variant_id]
@@ -2529,56 +2556,69 @@ export const createSale = async (req: Request, res: Response) => {
           'Penjualan POS langsung selesai'
         );
       }
-    }
 
-    // 3. Create payments record
-    let paymentProvider = "cash";
-    const pmLower = (input.payment_method || "").toLowerCase();
-    if (pmLower.includes("qris")) paymentProvider = "qris";
-    else if (pmLower.includes("debit")) paymentProvider = "debit";
-    await connection.execute(
-      `INSERT INTO payments (
-        order_id, provider, payment_method, amount, status, paid_at
-      ) VALUES (?, ?, ?, ?, 'paid', NOW())`,
-      [
+      // 4. Create payments record
+      let paymentProvider = "cash";
+      const pmLower = (input.payment_method || "").toLowerCase();
+      if (pmLower.includes("qris")) paymentProvider = "qris";
+      else if (pmLower.includes("debit")) paymentProvider = "debit";
+      await connection.execute(
+        `INSERT INTO payments (
+          order_id, provider, payment_method, amount, status, paid_at
+        ) VALUES (?, ?, ?, ?, 'paid', NOW())`,
+        [
+          saleId,
+          paymentProvider,
+          paymentLabel,
+          grossAmount
+        ]
+      );
+
+      await connection.commit();
+      connection.release();
+
+      // Record activity log AFTER successful commit to avoid cross-connection lock contention
+      logActivity(
+        input.admin_id || null,
+        "Kasir POS",
+        "cashier",
+        "create_sale",
+        "order",
         saleId,
-        paymentProvider,
-        paymentLabel,
-        grossAmount
-      ]
-    );
+        `Transaksi POS langsung dibuat oleh Kasir (${saleId})`
+      ).catch((err) => console.error("Failed to log POS activity:", err));
 
-    // Record activity log for POS sale
-    await logActivity(
-      input.admin_id || null,
-      "Kasir POS",
-      "cashier",
-      "create_sale",
-      "order",
-      saleId,
-      `Transaksi POS langsung dibuat oleh Kasir (${saleId})`
-    );
+      return res.json({
+        success: true,
+        sale_id: saleId,
+        db_id: insertedOrderId,
+        message: "Sale created successfully",
+      });
 
-    await connection.commit();
+    } catch (err: any) {
+      try {
+        await connection.rollback();
+      } catch (rbErr) {
+        console.error("Rollback error:", rbErr);
+      } finally {
+        connection.release();
+      }
 
-    const inserted = await queryOne<{ id: number }>(
-      "SELECT id FROM orders WHERE order_id = ?",
-      [saleId]
-    );
+      const isDeadlock =
+        err.code === "ER_LOCK_DEADLOCK" ||
+        err.errno === 1213 ||
+        (err.message && err.message.toLowerCase().includes("deadlock"));
 
-    return res.json({
-      success: true,
-      sale_id: saleId,
-      db_id: inserted?.id ?? 0,
-      message: "Sale created successfully",
-    });
+      if (isDeadlock && attempt < MAX_RETRIES) {
+        const delay = 50 * attempt + Math.floor(Math.random() * 60);
+        console.warn(`[createSale] Deadlock encountered on attempt ${attempt}/${MAX_RETRIES}. Retrying in ${delay}ms...`);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
 
-  } catch (err: any) {
-    await connection.rollback();
-    console.error("Error creating POS sale:", err);
-    return res.status(500).json({ success: false, error: err.message || "Failed to create POS sale" });
-  } finally {
-    connection.release();
+      console.error("Error creating POS sale:", err);
+      return res.status(500).json({ success: false, error: err.message || "Failed to create POS sale" });
+    }
   }
 };
 

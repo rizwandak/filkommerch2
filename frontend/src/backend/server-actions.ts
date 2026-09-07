@@ -854,7 +854,14 @@ export const createSale = createServerFn({ method: "POST" })
       });
       if (!res.ok) {
         const errorText = await res.text();
-        throw new Error(errorText || `HTTP ${res.status}`);
+        let errMsg = errorText || `HTTP ${res.status}`;
+        try {
+          const parsed = JSON.parse(errorText);
+          if (parsed && parsed.error) errMsg = parsed.error;
+        } catch {
+          // not JSON, keep errorText
+        }
+        throw new Error(errMsg);
       }
       return res.json();
     } catch (error) {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Search,
   Plus,
@@ -125,6 +125,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
   const [notes, setNotes] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const isProcessingRef = useRef(false);
   const [printerConnected, setPrinterConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
@@ -713,6 +714,8 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
   };
 
   const handleConfirmCashPayment = async () => {
+    if (isProcessingRef.current || isProcessing) return;
+
     const cashNum = typeof cashReceived === "number" ? cashReceived : Number(cashReceived) || 0;
     if (cashNum < total) {
       toast.error(
@@ -721,6 +724,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       return;
     }
 
+    isProcessingRef.current = true;
     setIsProcessing(true);
     try {
       await recordSaleInDatabase("Tunai");
@@ -728,11 +732,15 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Transaksi gagal");
     } finally {
+      isProcessingRef.current = false;
       setIsProcessing(false);
     }
   };
 
   const handleConfirmQrisPayment = async () => {
+    if (isProcessingRef.current || isProcessing) return;
+
+    isProcessingRef.current = true;
     setIsProcessing(true);
     try {
       await recordSaleInDatabase("QRIS Statis");
@@ -740,6 +748,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Transaksi gagal");
     } finally {
+      isProcessingRef.current = false;
       setIsProcessing(false);
     }
   };
