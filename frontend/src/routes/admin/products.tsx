@@ -866,7 +866,7 @@ function AdminProductsPage() {
                     Kategori
                   </th>
                   <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
-                    Harga
+                    Harga (FILKOM / Umum)
                   </th>
                   <th className="p-3 text-right text-xs font-semibold tracking-wider text-ink uppercase">
                     Stok Total
@@ -926,8 +926,37 @@ function AdminProductsPage() {
                     <td className="p-3 text-muted-foreground text-xs">
                       {product.category_name || "-"}
                     </td>
-                    <td className="p-3 text-right font-bold text-ink">
-                      Rp {Number(product.price).toLocaleString("id-ID")}
+                    <td className="p-3 text-right whitespace-nowrap">
+                      <div className="flex flex-col items-end gap-1">
+                        {/* Harga Khusus Civitas FILKOM */}
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-brand-blue/10 border border-brand-blue/20">
+                          <span className="text-[9px] font-extrabold text-brand-blue uppercase tracking-wider">
+                            FILKOM:
+                          </span>
+                          <span className="text-xs font-black text-brand-blue">
+                            {product.filkom_price != null && Number(product.filkom_price) > 0
+                              ? `Rp ${Number(product.filkom_price).toLocaleString("id-ID")}`
+                              : `Rp ${Number(product.price).toLocaleString("id-ID")}`}
+                          </span>
+                        </div>
+
+                        {/* Harga Umum */}
+                        <div className="inline-flex items-center gap-1 px-1.5 text-right">
+                          <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">
+                            Umum:
+                          </span>
+                          <span className="text-xs font-bold text-ink">
+                            Rp {Number(product.price).toLocaleString("id-ID")}
+                          </span>
+                        </div>
+
+                        {/* Harga Promo Khusus jika ada */}
+                        {product.promo_price != null && Number(product.promo_price) > 0 && (
+                          <div className="inline-flex items-center gap-1 text-[9px] text-red-600 font-bold bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
+                            <span>Promo: Rp {Number(product.promo_price).toLocaleString("id-ID")}</span>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="p-3 text-right font-bold text-brand-blue">
                       {totalStock(product)}

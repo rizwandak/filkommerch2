@@ -350,6 +350,14 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
       dbUser = await queryOne<any>("SELECT * FROM users WHERE id = ?", [result.insertId]);
     }
 
+    // If account was previously merged into another account, resolve to the active account
+    if (dbUser && dbUser.merged_into_id) {
+      const mergedUser = await queryOne<any>("SELECT * FROM users WHERE id = ?", [dbUser.merged_into_id]);
+      if (mergedUser) {
+        dbUser = mergedUser;
+      }
+    }
+
     // Auto-link any past unassigned orders for this email
     if (dbUser && dbUser.id && dbUser.email) {
       try {

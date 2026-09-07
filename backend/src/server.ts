@@ -8,7 +8,7 @@ import * as apiControllers from "./controllers/api";
 import * as notificationControllers from "./controllers/notificationController";
 import { validateBody, createOrderSchema } from "./middleware/validation";
 import { checkRole } from "./middleware/auth";
-import { verifyFilkomUser } from "./controllers/verification";
+import { verifyFilkomUser, claimAlumniAccount } from "./controllers/verification";
 import { runMigration } from "./migrate";
 import { cacheMiddleware, clearCache } from "./middleware/cache";
 
@@ -318,6 +318,7 @@ app.post("/api/auth/register", registerLimiter, apiControllers.registerBuyer);
 app.post("/api/auth/login", authLimiter, apiControllers.loginUser);
 app.post("/api/auth/google", authLimiter, apiControllers.loginGoogleUser);
 app.post("/api/auth/verify-filkom", verifyLimiter, verifyFilkomUser);
+app.post("/api/auth/claim-alumni-account", verifyLimiter, claimAlumniAccount);
 
 // Catalog / General API Routes
 app.get("/api/products", cacheMiddleware(60), apiControllers.getProducts);

@@ -339,6 +339,10 @@ export async function runMigration() {
       {
         name: "orders.link_unassigned_by_email",
         sql: "UPDATE orders o JOIN users u ON LOWER(TRIM(o.customer_email)) = LOWER(TRIM(u.email)) SET o.user_id = u.id WHERE o.user_id IS NULL AND o.customer_email IS NOT NULL AND o.customer_email != ''"
+      },
+      {
+        name: "users.merged_into_id",
+        sql: "ALTER TABLE users ADD COLUMN merged_into_id INT DEFAULT NULL"
       }
     ];
 

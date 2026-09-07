@@ -99,7 +99,7 @@ function UserOrdersPage() {
   const [copiedOrderId, setCopiedOrderId] = useState<string | null>(null);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
-  
+
   // Claim state
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [claimSearchKeyword, setClaimSearchKeyword] = useState("");
@@ -621,8 +621,8 @@ function UserOrdersPage() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-t-2 border-x-2 border-transparent rounded-t-lg -mb-[2px] transition ${activeTab === tab.id
-                  ? "bg-white border-ink border-b-white text-brand-orange text-sm shadow-[0_2px_0_0_#FFF]"
-                  : "text-muted-foreground hover:text-ink hover:bg-cream/40"
+                ? "bg-white border-ink border-b-white text-brand-orange text-sm shadow-[0_2px_0_0_#FFF]"
+                : "text-muted-foreground hover:text-ink hover:bg-cream/40"
                 }`}
             >
               {tab.label}
@@ -666,7 +666,7 @@ function UserOrdersPage() {
               const pelunasanAmount = linkedLns
                 ? Number(linkedLns.gross_amount)
                 : order.items
-                ? order.items
+                  ? order.items
                     .filter((item: any) => {
                       const c = String(item.color || "").toUpperCase();
                       const s = String(item.size || "").toUpperCase();
@@ -677,7 +677,7 @@ function UserOrdersPage() {
                       const sizeAddon = getSizeSurcharge(item.size) * Number(item.quantity || 1);
                       return sum + baseSubtotal + sizeAddon;
                     }, 0)
-                : Number(order.gross_amount);
+                  : Number(order.gross_amount);
 
               return (
                 <div

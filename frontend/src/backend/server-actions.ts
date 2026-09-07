@@ -1083,6 +1083,27 @@ export const verifyFilkomUserAction = createServerFn({ method: "POST" })
     }
   });
 
+// Claim alumni account using NIM
+export const claimAlumniAccountAction = createServerFn({ method: "POST" })
+  .validator((d: { nim: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/auth/claim-alumni-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error claiming alumni account:", error);
+      return { success: false, error: error.message || "Gagal melakukan klaim akun alumni" };
+    }
+  });
+
 // ============ PRODUCT DETAILS ACTIONS ============
 
 // Get product by slug

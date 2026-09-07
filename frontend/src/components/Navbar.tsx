@@ -9,6 +9,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getStoreSettings, getActivePreOrderCampaignServerAction } from "@/backend/server-actions";
 import { isPreOrderOpen } from "@/lib/pre-order-utils";
 import { VerificationModal } from "@frontend/components/VerificationModal";
+import { AccountClaimModal } from "@frontend/components/AccountClaimModal";
 import { NotificationActivationModal } from "./NotificationActivationModal";
 import { toast } from "sonner";
 import {
@@ -25,6 +26,7 @@ import {
   MonitorSmartphone,
   ArrowRight,
   Bell,
+  GraduationCap,
 } from "lucide-react";
 
 import logo from "@/assets/logo-fm.jpg";
@@ -123,6 +125,7 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const [isVerifyOpen, setIsVerifyOpen] = useState(false);
+  const [isClaimOpen, setIsClaimOpen] = useState(false);
   const [isNotifModalOpen, setIsNotifModalOpen] = useState(false);
   const [localQuery, setLocalQuery] = useState("");
 
@@ -453,7 +456,18 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                                 >
                                   Verifikasi NIM
                                 </button>
-                              ) : null}
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setIsClaimOpen(true);
+                                    setUserMenuOpen(false);
+                                  }}
+                                  className="text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2 py-1 rounded w-full text-center transition-all cursor-pointer block mt-1"
+                                  title="Pernah punya akun student UB? Klaim akun alumni & gabungkan pesanan Anda"
+                                >
+                                  🎓 Klaim Akun Alumni
+                                </button>
+                              )}
                             </div>
                           )}
                         </div>
@@ -502,6 +516,46 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                             Kasir / POS
                           </Link>
                         )}
+                        {/* Verifikasi NIM untuk Mahasiswa Aktif UB */}
+                        {user && Number(user.is_filkom_verified) !== 1 && user.email?.toLowerCase().endsWith("@student.ub.ac.id") && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsVerifyOpen(true);
+                              setUserMenuOpen(false);
+                            }}
+                            className="w-full px-4 py-3 text-left text-sm text-brand-orange hover:bg-brand-orange/10 flex items-center justify-between border-b border-border font-bold transition-colors cursor-pointer"
+                          >
+                            <span className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-brand-orange" />
+                              Verifikasi NIM Mahasiswa
+                            </span>
+                            <span className="text-[9px] bg-brand-orange/15 text-brand-orange border border-brand-orange/30 px-1.5 py-0.5 rounded font-black">
+                              VERIFIKASI
+                            </span>
+                          </button>
+                        )}
+
+                        {/* Klaim Akun Alumni untuk Akun Non-UB */}
+                        {user && Number(user.is_filkom_verified) !== 1 && !user.email?.toLowerCase().endsWith("@student.ub.ac.id") && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsClaimOpen(true);
+                              setUserMenuOpen(false);
+                            }}
+                            className="w-full px-4 py-3 text-left text-sm text-amber-800 hover:bg-amber-50 flex items-center justify-between border-b border-border font-bold transition-colors cursor-pointer"
+                          >
+                            <span className="flex items-center gap-2">
+                              <GraduationCap className="w-4 h-4 text-amber-700" />
+                              Klaim Akun Alumni
+                            </span>
+                            <span className="text-[9px] bg-amber-100 text-amber-900 border border-amber-300 px-1.5 py-0.5 rounded font-black">
+                              KLAIM 🎓
+                            </span>
+                          </button>
+                        )}
+
                         {user && (
                           <Link
                             to="/orders"
@@ -634,21 +688,32 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                             <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold bg-blue-100 text-blue-900 rounded uppercase">
                               {user.type === "admin" ? "ADMIN" : "BUYER"}
                             </span>
-                            {user && (Number(user.is_filkom_verified) === 1 ? (
-                              <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold bg-emerald-100 text-emerald-800 rounded uppercase">
-                                ✓ VERIFIED
-                              </span>
-                            ) : user.email?.toLowerCase().endsWith("@student.ub.ac.id") ? (
-                              <button
-                                onClick={() => {
-                                  setIsVerifyOpen(true);
-                                  setMobileToolsOpen(false);
-                                }}
-                                className="text-[9px] font-extrabold text-brand-orange bg-brand-orange/10 border border-brand-orange/30 px-2 py-0.5 rounded cursor-pointer"
-                              >
-                                Verifikasi NIM
-                              </button>
-                            ) : null)}
+                            {user &&
+                              (Number(user.is_filkom_verified) === 1 ? (
+                                <span className="px-1.5 py-0.5 text-[8.5px] font-extrabold bg-emerald-100 text-emerald-800 rounded uppercase">
+                                  ✓ VERIFIED
+                                </span>
+                              ) : user.email?.toLowerCase().endsWith("@student.ub.ac.id") ? (
+                                <button
+                                  onClick={() => {
+                                    setIsVerifyOpen(true);
+                                    setMobileToolsOpen(false);
+                                  }}
+                                  className="text-[9px] font-extrabold text-brand-orange bg-brand-orange/10 border border-brand-orange/30 px-2 py-0.5 rounded cursor-pointer"
+                                >
+                                  Verifikasi NIM
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => {
+                                    setIsClaimOpen(true);
+                                    setMobileToolsOpen(false);
+                                  }}
+                                  className="text-[9px] font-extrabold text-amber-700 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded cursor-pointer"
+                                >
+                                  🎓 Klaim Alumni
+                                </button>
+                              ))}
                           </div>
                         </div>
 
@@ -669,6 +734,24 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                           >
                             Pesanan Saya
                           </Link>
+                          {user && Number(user.is_filkom_verified) !== 1 && !user.email?.toLowerCase().endsWith("@student.ub.ac.id") && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsClaimOpen(true);
+                                setMobileToolsOpen(false);
+                              }}
+                              className="w-full text-left px-3 py-2 text-xs font-bold text-amber-800 bg-amber-50 rounded-lg hover:bg-amber-100 border border-amber-300 flex items-center justify-between"
+                            >
+                              <span className="flex items-center gap-2">
+                                <GraduationCap className="w-3.5 h-3.5 text-amber-700" />
+                                Klaim Akun Alumni
+                              </span>
+                              <span className="text-[9px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-black">
+                                KLAIM 🎓
+                              </span>
+                            </button>
+                          )}
                           <button
                             type="button"
                             onClick={() => {
@@ -953,6 +1036,12 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
       <VerificationModal
         isOpen={isVerifyOpen}
         onClose={() => setIsVerifyOpen(false)}
+      />
+
+      {/* Alumni Account Claim Modal */}
+      <AccountClaimModal
+        isOpen={isClaimOpen}
+        onClose={() => setIsClaimOpen(false)}
       />
 
       {/* Web Push Notification Activation & Status Modal */}

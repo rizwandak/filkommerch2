@@ -23,6 +23,13 @@ backend/.env
 backend/src/.env
 frontend/.env
 
+# Database dumps and sensitive backups
+*.sql
+*.sqlite
+*.db
+
+
+
 # Wrangler / Cloudflare
 .wrangler/
 .dev.vars
