@@ -82,6 +82,10 @@ jobs:
           mkdir -p backend/tmp
           echo $(date) > backend/tmp/restart.txt
 
+      # ---- WAIT FOR CPANEL FTP CONNECTION TO CLEAR ----
+      - name: ⏳ Wait for FTP connection release
+        run: sleep 10
+
       # ---- DEPLOY BACKEND VIA FTP ----
       - name: 📂 Deploy Backend via FTP
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5

@@ -204,6 +204,12 @@ class BluetoothThermalPrinter {
       await this.printLine("Gedung A FILKOM UB Malang");
       await this.printLine(`No: ${data.sale_id}`);
       await this.printLine(`${data.date} ${data.time}`);
+      if (data.cashier_name) {
+        await this.printLine(`Kasir: ${data.cashier_name}`);
+      }
+      if (data.customer_name) {
+        await this.printLine(`Pelanggan: ${data.customer_name}`);
+      }
       await this.printSeparator();
 
       // Items

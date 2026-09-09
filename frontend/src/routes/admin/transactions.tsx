@@ -4119,9 +4119,9 @@ function AdminTransactionsPage() {
                     {receiptData.payment_method && (
                       <div><span className="font-bold">Metode:</span> {receiptData.payment_method}</div>
                     )}
-                    {receiptData.customer_name && (
-                      <div><span className="font-bold">Pelanggan:</span> {receiptData.customer_name}</div>
-                    )}
+                    <div>
+                      <span className="font-bold">Pelanggan:</span> {receiptData.customer_name || "Umum"}
+                    </div>
                   </div>
 
                   <div className="border-t border-dashed border-black"></div>

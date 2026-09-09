@@ -170,9 +170,7 @@ export function printBrowserReceipt(data: ReceiptData) {
     ? `<div><strong>Metode:</strong> ${data.payment_method}</div>`
     : "";
 
-  const customerHtml = data.customer_name
-    ? `<div><strong>Pelanggan:</strong> ${data.customer_name}</div>`
-    : "";
+  const customerHtml = `<div><strong>Pelanggan:</strong> ${data.customer_name || "Umum"}</div>`;
 
   const htmlContent = `
     <!DOCTYPE html>

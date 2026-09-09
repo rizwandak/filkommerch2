@@ -708,16 +708,15 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     const paymentMethodLabel =
       actualPaymentMethod || (paymentMethod === "cash" ? "Tunai" : "QRIS Statis");
 
-    let recordedCustomerName = selectedUser ? selectedUser.name : (customerName.trim() || undefined);
+    const effectiveManualName = (showManualCustomerInput && manualCustomerInput.trim())
+      ? manualCustomerInput.trim()
+      : customerName.trim();
+    let recordedCustomerName = selectedUser ? selectedUser.name : (effectiveManualName || undefined);
     if (!recordedCustomerName) {
       if (customerCategory === "internasional") {
         recordedCustomerName = "Mhs. Internasional";
       } else if (customerCategory === "filkom") {
-        recordedCustomerName = "Civitas FILKOM (Manual)";
-      }
-    } else if (customerCategory === "internasional" && !selectedUser) {
-      if (!recordedCustomerName.toLowerCase().includes("internasional") && !recordedCustomerName.toLowerCase().includes("asing")) {
-        recordedCustomerName = `${recordedCustomerName} (Mhs. Internasional)`;
+        recordedCustomerName = "Civitas FILKOM";
       }
     }
 
@@ -2063,9 +2062,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     {currentReceiptData.payment_method && (
                       <div><span className="font-bold">Metode:</span> {currentReceiptData.payment_method}</div>
                     )}
-                    {currentReceiptData.customer_name && (
-                      <div><span className="font-bold">Pelanggan:</span> {currentReceiptData.customer_name}</div>
-                    )}
+                    <div>
+                      <span className="font-bold">Pelanggan:</span> {currentReceiptData.customer_name || "Umum"}
+                    </div>
                   </div>
 
                   <div className="border-t border-dashed border-black"></div>
