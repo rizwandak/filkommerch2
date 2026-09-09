@@ -24,10 +24,17 @@ export const isUbEmail = (email?: string | null): boolean => {
  * Determines the correct dynamic price for a product/variant based on user context.
  * Priority: promo_price -> filkom_price (if UB email) -> fallback price (variant override or base product price).
  */
-export const determinePrice = (variant: any, isFilkomVerified: boolean): number => {
+export const determinePrice = (variant: any, isFilkomVerified: boolean, isInternational?: boolean): number => {
   // 1. Determine base price (harga asli)
   let basePrice = Number(variant.product_price);
-  if (variant.product_promo_price !== undefined && variant.product_promo_price !== null && Number(variant.product_promo_price) > 0) {
+  if (isInternational) {
+    // Harga Coret / Asli (original_price di database)
+    if (variant.product_original_price !== undefined && variant.product_original_price !== null && Number(variant.product_original_price) > 0) {
+      basePrice = Number(variant.product_original_price);
+    } else {
+      basePrice = Number(variant.product_price);
+    }
+  } else if (variant.product_promo_price !== undefined && variant.product_promo_price !== null && Number(variant.product_promo_price) > 0) {
     basePrice = Number(variant.product_promo_price);
   } else if (isFilkomVerified) {
     if (variant.product_filkom_price !== undefined && variant.product_filkom_price !== null && Number(variant.product_filkom_price) > 0) {
@@ -37,7 +44,7 @@ export const determinePrice = (variant: any, isFilkomVerified: boolean): number 
 
   // 2. Determine variant add-on price
   let addon = 0;
-  if (variant.filkom_price !== undefined && variant.filkom_price !== null && Number(variant.filkom_price) > 0) {
+  if (isFilkomVerified && !isInternational && variant.filkom_price !== undefined && variant.filkom_price !== null && Number(variant.filkom_price) > 0) {
     addon = Number(variant.filkom_price);
   } else if (variant.price_override !== undefined && variant.price_override !== null && Number(variant.price_override) > 0) {
     addon = Number(variant.price_override);
@@ -2300,9 +2307,10 @@ export const createSale = async (req: Request, res: Response) => {
 
       let targetUserId: number | null = input.user_id ? Number(input.user_id) : null;
       let customerNim: string | null = input.customer_nim || null;
+      const isInternational = input.customer_type === "internasional" || Boolean(input.is_international);
       let isUb = false;
 
-      if (input.is_filkom_verified) {
+      if (input.is_filkom_verified || input.customer_type === "filkom") {
         isUb = true;
       }
 
@@ -2342,6 +2350,7 @@ export const createSale = async (req: Request, res: Response) => {
         const [rows] = await connection.execute(
           `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix,
                   p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price,
+                  p.original_price AS product_original_price,
                   p.product_type AS product_type
            FROM product_variants pv
            JOIN products p ON p.id = pv.product_id
@@ -2354,14 +2363,15 @@ export const createSale = async (req: Request, res: Response) => {
           throw new Error(`Produk/Varian dengan ID ${variantId} tidak ditemukan atau tidak aktif`);
         }
 
-        let price = determinePrice(variant, isUb);
+        let price = determinePrice(variant, isUb, isInternational);
         if (variant.product_type === 'bundle') {
           if (item.bundle_selections && Array.isArray(item.bundle_selections)) {
             let bundleAddon = 0;
             for (const selection of item.bundle_selections) {
               const [compRows] = await connection.execute(
                 `SELECT pv.*, p.name AS product_name, p.price AS product_price, p.sku_prefix, p.product_type,
-                        p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price
+                        p.filkom_price AS product_filkom_price, p.promo_price AS product_promo_price,
+                        p.original_price AS product_original_price
                  FROM product_variants pv
                  JOIN products p ON p.id = pv.product_id
                  WHERE pv.id = ? AND pv.is_active = TRUE`,
@@ -2500,7 +2510,7 @@ export const createSale = async (req: Request, res: Response) => {
           saleId,
           targetUserId,
           input.admin_id || null,
-          input.customer_name || "Pelanggan POS",
+          input.customer_name || (isInternational ? "Mhs. Internasional" : "Pelanggan POS"),
           customerEmail,
           input.customer_phone || "081234567890",
           customerNim,

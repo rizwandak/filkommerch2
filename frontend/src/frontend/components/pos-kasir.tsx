@@ -130,7 +130,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
   const [loading, setLoading] = useState(true);
   const [storeSettings, setStoreSettings] = useState<StoreSettings | null>(null);
 
-  // States for registered user selection in POS
+  // States for registered user & customer category (Tarif Harga) in POS
+  type CustomerCategory = "umum" | "internasional" | "filkom";
+  const [customerCategory, setCustomerCategory] = useState<CustomerCategory>("umum");
   const [registeredUsers, setRegisteredUsers] = useState<DbUser[]>([]);
   const [selectedUser, setSelectedUser] = useState<DbUser | null>(null);
   const [userSearchQuery, setUserSearchQuery] = useState("");
@@ -139,16 +141,21 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
   const getItemUnitPrice = (
     product: ProductWithVariants,
     variant: ProductVariant,
-    isFilkom: boolean
+    category: CustomerCategory = customerCategory
   ): number => {
-    let basePrice = product.price;
-    if (
-      product.promo_price !== undefined &&
-      product.promo_price !== null &&
-      Number(product.promo_price) > 0
-    ) {
-      basePrice = Number(product.promo_price);
-    } else if (isFilkom) {
+    let basePrice = Number(product.price);
+    if (category === "internasional") {
+      // Kondisi khusus / Mhs. Internasional: Gunakan Harga Coret / Asli (original_price), BUKAN promo_price
+      if (
+        product.original_price !== undefined &&
+        product.original_price !== null &&
+        Number(product.original_price) > 0
+      ) {
+        basePrice = Number(product.original_price);
+      } else {
+        basePrice = Number(product.price);
+      }
+    } else if (category === "filkom") {
       if (
         product.filkom_price !== undefined &&
         product.filkom_price !== null &&
@@ -156,10 +163,14 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       ) {
         basePrice = Number(product.filkom_price);
       }
+    } else {
+      // "umum": Harga reguler normal
+      basePrice = Number(product.price);
     }
 
     let addon = 0;
     if (
+      category === "filkom" &&
       variant.filkom_price !== undefined &&
       variant.filkom_price !== null &&
       Number(variant.filkom_price) > 0
@@ -176,36 +187,96 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     return basePrice + addon;
   };
 
+  const handleCategoryChange = (newCat: CustomerCategory) => {
+    setCustomerCategory(newCat);
+    setCart((prevCart) =>
+      prevCart.map((item) => {
+        const prod = products.find((p) => p.id === item.product_id);
+        const variant = prod?.variants.find((v) => v.id === item.variant_id);
+        if (prod && variant && prod.product_type !== "bundle") {
+          const newUnitPrice = getItemUnitPrice(prod, variant, newCat);
+          return { ...item, unit_price: newUnitPrice };
+        }
+        if (prod && prod.product_type === "bundle") {
+          let bPrice = Number(prod.price);
+          if (newCat === "internasional") {
+            if (prod.original_price && Number(prod.original_price) > 0) {
+              bPrice = Number(prod.original_price);
+            }
+          } else if (newCat === "filkom") {
+            if (prod.filkom_price && Number(prod.filkom_price) > 0) {
+              bPrice = Number(prod.filkom_price);
+            }
+          }
+          return { ...item, unit_price: bPrice };
+        }
+        return item;
+      })
+    );
+
+    const labels: Record<CustomerCategory, string> = {
+      umum: "Pelanggan Umum (Harga Reguler)",
+      internasional: "Kondisi Khusus / Mhs. Asing (Harga Coret Aktif)",
+      filkom: "Civitas FILKOM (Harga Khusus FILKOM)",
+    };
+
+    toast.success(
+      `Tipe pembeli: ${
+        newCat === "internasional"
+          ? "Harga Coret (Kondisi Khusus)"
+          : newCat === "filkom"
+            ? "Civitas FILKOM"
+            : "Umum"
+      }`,
+      {
+        description: labels[newCat],
+      }
+    );
+  };
+
   const handleSelectCustomer = (user: DbUser | null) => {
     setSelectedUser(user);
     if (user) {
       setCustomerName(user.name);
       const isFilkom = Boolean(user.is_filkom_verified);
+      const newCat: CustomerCategory = isFilkom ? "filkom" : "umum";
+      setCustomerCategory(newCat);
       setCart((prevCart) =>
         prevCart.map((item) => {
           const prod = products.find((p) => p.id === item.product_id);
           const variant = prod?.variants.find((v) => v.id === item.variant_id);
           if (prod && variant && prod.product_type !== "bundle") {
-            const newUnitPrice = getItemUnitPrice(prod, variant, isFilkom);
+            const newUnitPrice = getItemUnitPrice(prod, variant, newCat);
             return { ...item, unit_price: newUnitPrice };
+          }
+          if (prod && prod.product_type === "bundle") {
+            let bPrice = Number(prod.price);
+            if (newCat === "filkom" && prod.filkom_price && Number(prod.filkom_price) > 0) {
+              bPrice = Number(prod.filkom_price);
+            }
+            return { ...item, unit_price: bPrice };
           }
           return item;
         })
       );
       toast.success(`Pelanggan dipilih: ${user.name}`, {
         description: isFilkom
-          ? "✓ Status: Civitas FILKOM (Harga Khusus FILKOM)"
+          ? "✓ Otomatis: Civitas FILKOM (Harga Khusus FILKOM)"
           : "Status: Pelanggan Umum (Harga Reguler)",
       });
     } else {
       setCustomerName("");
+      setCustomerCategory("umum");
       setCart((prevCart) =>
         prevCart.map((item) => {
           const prod = products.find((p) => p.id === item.product_id);
           const variant = prod?.variants.find((v) => v.id === item.variant_id);
           if (prod && variant && prod.product_type !== "bundle") {
-            const newUnitPrice = getItemUnitPrice(prod, variant, false);
+            const newUnitPrice = getItemUnitPrice(prod, variant, "umum");
             return { ...item, unit_price: newUnitPrice };
+          }
+          if (prod && prod.product_type === "bundle") {
+            return { ...item, unit_price: Number(prod.price) };
           }
           return item;
         })
@@ -248,6 +319,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     setSearchQuery("");
     setShowManualCustomerInput(false);
     setManualCustomerInput("");
+    setCustomerCategory("umum");
   };
 
   const loadData = useCallback(async () => {
@@ -422,7 +494,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       const unitPrice = getItemUnitPrice(
         product,
         variant,
-        Boolean(selectedUser?.is_filkom_verified)
+        customerCategory
       );
 
       setCart([
@@ -542,6 +614,17 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
         ),
       );
     } else {
+      let bundleUnitPrice = Number(product.price);
+      if (customerCategory === "internasional") {
+        if (product.original_price && Number(product.original_price) > 0) {
+          bundleUnitPrice = Number(product.original_price);
+        }
+      } else if (customerCategory === "filkom") {
+        if (product.filkom_price && Number(product.filkom_price) > 0) {
+          bundleUnitPrice = Number(product.filkom_price);
+        }
+      }
+
       setCart([
         ...cart,
         {
@@ -552,7 +635,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
           size: parentVariant.size,
           color: parentVariant.color || undefined,
           quantity: customQty,
-          unit_price: product.price,
+          unit_price: bundleUnitPrice,
           discount: 0,
           bundle_selections: selectionsPayload,
         },
@@ -617,12 +700,26 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       setCashReceived("");
       setShowManualCustomerInput(false);
       setManualCustomerInput("");
+      setCustomerCategory("umum");
     }
   };
   const recordSaleInDatabase = async (actualPaymentMethod?: string) => {
     const isCash = (actualPaymentMethod || paymentMethod) === "Tunai" || paymentMethod === "cash";
     const paymentMethodLabel =
       actualPaymentMethod || (paymentMethod === "cash" ? "Tunai" : "QRIS Statis");
+
+    let recordedCustomerName = selectedUser ? selectedUser.name : (customerName.trim() || undefined);
+    if (!recordedCustomerName) {
+      if (customerCategory === "internasional") {
+        recordedCustomerName = "Mhs. Internasional";
+      } else if (customerCategory === "filkom") {
+        recordedCustomerName = "Civitas FILKOM (Manual)";
+      }
+    } else if (customerCategory === "internasional" && !selectedUser) {
+      if (!recordedCustomerName.toLowerCase().includes("internasional") && !recordedCustomerName.toLowerCase().includes("asing")) {
+        recordedCustomerName = `${recordedCustomerName} (Mhs. Internasional)`;
+      }
+    }
 
     const saleInput: CreateSaleInput = {
       admin_id,
@@ -634,12 +731,14 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       tax: 0,
       total,
       notes: notes || undefined,
-      customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
+      customer_name: recordedCustomerName,
       customer_email: selectedUser ? selectedUser.email : undefined,
       customer_phone: selectedUser ? (selectedUser.phone || undefined) : undefined,
       customer_nim: selectedUser ? (selectedUser.nim || undefined) : undefined,
       user_id: selectedUser ? selectedUser.id : undefined,
-      is_filkom_verified: selectedUser ? Boolean(selectedUser.is_filkom_verified) : undefined,
+      is_filkom_verified: selectedUser ? Boolean(selectedUser.is_filkom_verified) : customerCategory === "filkom",
+      customer_type: customerCategory,
+      is_international: customerCategory === "internasional",
       order_id: undefined,
     };
 
@@ -675,7 +774,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       total,
       payment_method: paymentMethodLabel,
       cashier_name: admin_name,
-      customer_name: selectedUser ? selectedUser.name : (customerName || undefined),
+      customer_name: recordedCustomerName,
       paid_amount: paidAmount,
       change_amount: changeAmount,
     };
@@ -880,6 +979,8 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   Number(product.filkom_price) > 0
                     ? Number(product.filkom_price)
                     : umumPrice;
+                const hasCoret = Boolean(product.original_price && Number(product.original_price) > 0);
+                const coretPrice = hasCoret ? Number(product.original_price) : umumPrice;
                 const hasPromo = Boolean(product.promo_price && Number(product.promo_price) > 0);
                 const promoPrice = hasPromo ? Number(product.promo_price) : null;
 
@@ -942,8 +1043,23 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                       )}
 
                       <div className="mt-auto pt-2 space-y-1">
+                        {/* Harga Coret / Kondisi Khusus / Mhs. Internasional (Aktif) */}
+                        {customerCategory === "internasional" && (
+                          <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] bg-indigo-50 border border-indigo-300 px-1.5 py-0.5 rounded shadow-2xs">
+                            <span className="font-extrabold text-indigo-800 text-[9px] uppercase tracking-wide">
+                              Harga Coret
+                            </span>
+                            <span className="font-black text-indigo-700">
+                              Rp {coretPrice.toLocaleString("id-ID")}
+                            </span>
+                          </div>
+                        )}
                         {/* Harga FILKOM */}
-                        <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] bg-emerald-50/90 border border-emerald-300/80 px-1.5 py-0.5 rounded">
+                        <div className={`flex items-center justify-between gap-1 text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded ${
+                          customerCategory === "filkom"
+                            ? "bg-emerald-100 border border-emerald-400"
+                            : "bg-emerald-50/90 border border-emerald-300/80"
+                        }`}>
                           <span className="font-bold text-emerald-800 text-[9px] uppercase tracking-wide">
                             FILKOM
                           </span>
@@ -952,7 +1068,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                           </span>
                         </div>
                         {/* Harga Umum */}
-                        <div className="flex items-center justify-between gap-1 text-[10px] sm:text-[11px] px-0.5">
+                        <div className={`flex items-center justify-between gap-1 text-[10px] sm:text-[11px] px-0.5 ${
+                          customerCategory === "umum" ? "bg-cream/40 rounded px-1" : ""
+                        }`}>
                           <span className="text-muted-foreground text-[9px] uppercase font-semibold">
                             Umum
                           </span>
@@ -1077,7 +1195,76 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
 
           <div className="shrink-0 space-y-2.5 border-t border-border p-3 sm:p-4 bg-cream/15">
             {/* Customer Selector & Details */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
+              {/* Tipe Pembeli (Tarif Harga) */}
+              <div className="space-y-1 bg-background border border-border/80 p-2 rounded-lg shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                    Tipe Pembeli (Tarif)
+                  </span>
+                  {customerCategory === "internasional" && (
+                    <span className="text-[9px] font-black bg-indigo-100 text-indigo-800 border border-indigo-300 px-1.5 py-0.2 rounded animate-pulse">
+                      ✓ Harga Coret Aktif
+                    </span>
+                  )}
+                  {customerCategory === "filkom" && (
+                    <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded">
+                      ✓ Harga FILKOM Aktif
+                    </span>
+                  )}
+                  {customerCategory === "umum" && (
+                    <span className="text-[9px] font-semibold text-muted-foreground">
+                      Tarif Normal
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-3 gap-1 p-0.5 bg-muted/60 rounded-md border border-border">
+                  <button
+                    type="button"
+                    onClick={() => handleCategoryChange("umum")}
+                    className={`py-1 text-[11px] font-bold rounded transition-all cursor-pointer text-center ${
+                      customerCategory === "umum"
+                        ? "bg-white text-ink shadow-xs border border-border/80 font-black"
+                        : "text-muted-foreground hover:text-ink"
+                    }`}
+                  >
+                    Umum
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCategoryChange("internasional")}
+                    className={`py-1 text-[11px] font-bold rounded transition-all cursor-pointer text-center flex items-center justify-center gap-1 ${
+                      customerCategory === "internasional"
+                        ? "bg-indigo-600 text-white shadow-xs font-black ring-1 ring-indigo-400"
+                        : "text-muted-foreground hover:text-ink hover:bg-white/40"
+                    }`}
+                    title="Harga Coret / Asli (Khusus Kondisi Tertentu / Mahasiswa Internasional)"
+                  >
+                    <span>Harga Coret</span>
+                    <span
+                      className={`text-[8px] uppercase tracking-tighter font-extrabold px-1 py-0.2 rounded ${
+                        customerCategory === "internasional"
+                          ? "bg-white/25 text-white"
+                          : "bg-indigo-100 text-indigo-700"
+                      }`}
+                    >
+                      Khusus
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCategoryChange("filkom")}
+                    className={`py-1 text-[11px] font-bold rounded transition-all cursor-pointer text-center ${
+                      customerCategory === "filkom"
+                        ? "bg-emerald-600 text-white shadow-xs font-black"
+                        : "text-muted-foreground hover:text-ink hover:bg-white/40"
+                    }`}
+                  >
+                    FILKOM
+                  </button>
+                </div>
+              </div>
+
               {selectedUser ? (
                 <div className="p-2 bg-background border border-ink/40 rounded-lg shadow-2xs flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -1105,6 +1292,57 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     [Ganti]
                   </button>
                 </div>
+              ) : showManualCustomerInput ? (
+                <div className="space-y-1.5 p-2 bg-background border border-border rounded-lg shadow-2xs">
+                  <div className="flex items-center justify-between text-[11px] font-bold text-ink">
+                    <span>Nama Pembeli:</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowManualCustomerInput(false);
+                        setManualCustomerInput("");
+                      }}
+                      className="text-[10px] text-muted-foreground hover:text-ink underline cursor-pointer"
+                    >
+                      Batal
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <Input
+                      placeholder={
+                        customerCategory === "internasional"
+                          ? "Contoh: John / Jane (Mhs. Asing)..."
+                          : "Contoh: Budi Santoso..."
+                      }
+                      value={manualCustomerInput}
+                      onChange={(e) => setManualCustomerInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && manualCustomerInput.trim()) {
+                          setCustomerName(manualCustomerInput.trim());
+                          setShowManualCustomerInput(false);
+                          setManualCustomerInput("");
+                        }
+                      }}
+                      className="h-8 text-xs bg-white border-border flex-1"
+                      autoFocus
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!manualCustomerInput.trim()}
+                      onClick={() => {
+                        if (manualCustomerInput.trim()) {
+                          setCustomerName(manualCustomerInput.trim());
+                          setShowManualCustomerInput(false);
+                          setManualCustomerInput("");
+                        }
+                      }}
+                      className="h-8 text-xs px-2.5 font-bold bg-ink text-white hover:bg-brand-orange cursor-pointer"
+                    >
+                      Simpan
+                    </Button>
+                  </div>
+                </div>
               ) : customerName ? (
                 <div className="p-2 bg-background border border-border rounded-lg shadow-2xs flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1 flex items-center gap-1.5">
@@ -1112,20 +1350,43 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     <span className="font-bold text-xs text-ink truncate">
                       {customerName}
                     </span>
-                    <span className="text-[9px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded shrink-0">
-                      Umum / Non-Member
-                    </span>
+                    {customerCategory === "internasional" ? (
+                      <span className="text-[9px] font-black bg-indigo-100 text-indigo-800 border border-indigo-300 px-1.5 py-0.2 rounded shrink-0">
+                        🏷️ Harga Coret (Khusus)
+                      </span>
+                    ) : customerCategory === "filkom" ? (
+                      <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded shrink-0">
+                        🎓 Civitas FILKOM
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded shrink-0">
+                        Umum / Non-Member
+                      </span>
+                    )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomerName("");
-                      setShowManualCustomerInput(false);
-                    }}
-                    className="text-[10px] font-bold text-red-600 hover:underline shrink-0"
-                  >
-                    [Hapus]
-                  </button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManualCustomerInput(customerName);
+                        setShowManualCustomerInput(true);
+                      }}
+                      className="text-[10px] font-bold text-brand-blue hover:underline cursor-pointer"
+                    >
+                      [Ubah]
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerName("");
+                        setManualCustomerInput("");
+                        setShowManualCustomerInput(false);
+                      }}
+                      className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
+                    >
+                      [Hapus]
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-1.5">
@@ -1143,36 +1404,19 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => setShowManualCustomerInput(!showManualCustomerInput)}
+                      onClick={() => {
+                        setManualCustomerInput("");
+                        setShowManualCustomerInput(true);
+                      }}
                       className="h-8 text-[11px] font-semibold text-muted-foreground hover:text-ink px-2 cursor-pointer border border-dashed border-border"
                       title="Tulis nama pembeli non-member"
                     >
-                      {showManualCustomerInput ? "Batal" : "+ Manual"}
+                      + Manual
                     </Button>
                   </div>
-                  {showManualCustomerInput && (
-                    <div className="flex items-center gap-1.5 pt-0.5">
-                      <Input
-                        placeholder="Ketik nama pembeli umum..."
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        className="h-8 text-xs bg-white border-border"
-                        autoFocus
-                      />
-                      {customerName && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => setShowManualCustomerInput(false)}
-                          className="h-8 text-xs px-2.5 font-bold bg-ink text-white hover:bg-brand-orange"
-                        >
-                          OK
-                        </Button>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
+            </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="relative flex items-center">
@@ -1199,7 +1443,6 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   />
                 </div>
               </div>
-            </div>
 
             {/* Payment Method Selection */}
             <div className="space-y-1.5">
@@ -1331,10 +1574,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 (activeProductForVariantSelection.image_url &&
                   resolveImageUrl(activeProductForVariantSelection.image_url));
 
-              const currentPrice =
-                matchedVariant?.price_override && Number(matchedVariant.price_override) > 0
-                  ? Number(matchedVariant.price_override)
-                  : activeProductForVariantSelection.price;
+              const currentPrice = matchedVariant
+                ? getItemUnitPrice(activeProductForVariantSelection, matchedVariant, customerCategory)
+                : Number(activeProductForVariantSelection.price);
 
               const currentStock = matchedVariant ? matchedVariant.stock : 0;
 
@@ -1578,7 +1820,10 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 Rp {total.toLocaleString("id-ID")}
               </div>
               <div className="text-xs text-emerald-900/80 mt-1 font-medium">
-                Pelanggan: <span className="font-bold">{selectedUser ? selectedUser.name : (customerName || "Umum / Non-Member")}</span>
+                Pelanggan: <span className="font-bold">{selectedUser ? selectedUser.name : (customerName || "Umum")}</span>
+                <span className="ml-1 text-[10px] font-bold">
+                  ({customerCategory === "internasional" ? "Mhs. Internasional — Tarif Coret" : customerCategory === "filkom" ? "Civitas FILKOM" : "Umum"})
+                </span>
               </div>
             </div>
 
@@ -1736,7 +1981,10 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 Rp {total.toLocaleString("id-ID")}
               </div>
               <p className="text-xs text-amber-950 mt-1.5 font-medium">
-                Arahkan pembeli memindai QRIS di atas dan memasukkan nominal yang tertera.
+                Pelanggan: <span className="font-bold">{selectedUser ? selectedUser.name : (customerName || "Umum")}</span>
+                <span className="ml-1 text-[10px] font-bold">
+                  ({customerCategory === "internasional" ? "Mhs. Internasional — Tarif Coret" : customerCategory === "filkom" ? "Civitas FILKOM" : "Umum"})
+                </span>
               </p>
             </div>
           </div>

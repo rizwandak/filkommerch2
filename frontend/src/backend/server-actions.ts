@@ -408,6 +408,8 @@ export interface CreateSaleInput {
   customer_nim?: string;
   user_id?: number;
   is_filkom_verified?: boolean;
+  customer_type?: "umum" | "internasional" | "filkom";
+  is_international?: boolean;
   order_id?: string;
 }
 
