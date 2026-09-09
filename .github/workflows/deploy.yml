@@ -34,6 +34,7 @@ jobs:
       - name: ⏱️ Create Restart File & Entrypoint
         run: |
           echo "import('./server/index.mjs');" > frontend/.output/app.js
+          echo '{"type": "module"}' > frontend/.output/package.json
           mkdir -p frontend/.output/tmp
           echo $(date) > frontend/.output/tmp/restart.txt
 
