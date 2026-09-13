@@ -244,7 +244,7 @@ function AdminTransactionsPage() {
 
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "paid" | "verifying" | "dp" | "unpaid">("all");
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [campaignFilter, setCampaignFilter] = useState<string>("all");
   const [productFilter, setProductFilter] = useState<string[]>([]);
   const [productFilterMode, setProductFilterMode] = useState<"include" | "exclude">("include");
@@ -265,7 +265,7 @@ function AdminTransactionsPage() {
     if (campaignFilter !== "all") count++;
     if (productFilter.length > 0) count++;
     if (shippingFilter !== "all") count++;
-    if (statusFilter !== "all") count++;
+    if (statusFilter.length > 0) count++;
     return count;
   }, [campaignFilter, productFilter, shippingFilter, statusFilter]);
 
@@ -274,7 +274,7 @@ function AdminTransactionsPage() {
     setProductFilter([]);
     setProductFilterMode("include");
     setShippingFilter("all");
-    setStatusFilter("all");
+    setStatusFilter([]);
   };
 
   // Collapsible Row States
@@ -1147,28 +1147,32 @@ function AdminTransactionsPage() {
     });
   }, [onlineOrders, searchQuery, campaignFilter, productFilter, productFilterMode, shippingFilter, dpPelunasanMap]);
 
+  const isVerifyingOrder = (o: any) => {
+    if (!o) return false;
+    const oPaid = o.payment_status === "paid" || o.transaction_status === "settlement" || o.order_status === "completed";
+    if (oPaid) return false;
+
+    const hasProof = !!o.payment_proof_url;
+    const isRejected = (o.payment_status as string) === "rejected" || !!o.payment_proof_note;
+
+    return hasProof && !isRejected;
+  };
+
   const getOrderCategory = (order: Order): "paid" | "verifying" | "unpaid" => {
     const linkedLns = dpPelunasanMap[order.order_id];
     const isPaid =
       order.payment_status === "paid" ||
       order.transaction_status === "settlement" ||
       order.order_status === "completed";
-    const lnsIsPaid = linkedLns && (linkedLns.payment_status === "paid" || linkedLns.order_status === "completed");
+    const lnsIsPaid = linkedLns && (
+      linkedLns.payment_status === "paid" ||
+      linkedLns.transaction_status === "settlement" ||
+      linkedLns.order_status === "completed"
+    );
 
     if (isPaid && (!linkedLns || lnsIsPaid)) {
       return "paid";
     }
-
-    const isVerifyingOrder = (o: any) => {
-      if (!o) return false;
-      const oPaid = o.payment_status === "paid" || o.transaction_status === "settlement" || o.order_status === "completed";
-      if (oPaid) return false;
-
-      const hasProof = !!o.payment_proof_url;
-      const isRejected = (o.payment_status as string) === "rejected" || !!o.payment_proof_note;
-
-      return hasProof && !isRejected;
-    };
 
     if (isVerifyingOrder(order) || (linkedLns && isVerifyingOrder(linkedLns))) {
       return "verifying";
@@ -1180,51 +1184,67 @@ function AdminTransactionsPage() {
   // 2. Stats summary computed strictly from baseFilteredOrders (always matches active batch filter & search)
   const stats = useMemo(() => {
     const total = baseFilteredOrders.length;
-    let paidCount = 0;
+    let paidFullCount = 0;
+    let dpPaidCount = 0;
+    let dpUnpaidCount = 0;
     let verifyingBarisCount = 0;
     let totalVerifyingProofs = 0;
     let dpCount = 0;
     let unpaidCount = 0;
 
-    const isVerifyingOrder = (o: any) => {
-      if (!o) return false;
-      const oPaid = o.payment_status === "paid" || o.transaction_status === "settlement" || o.order_status === "completed";
-      if (oPaid) return false;
-
-      const hasProof = !!o.payment_proof_url;
-      const isRejected = (o.payment_status as string) === "rejected" || !!o.payment_proof_note;
-
-      return hasProof && !isRejected;
-    };
-
     baseFilteredOrders.forEach((o) => {
       if (!o) return;
 
-      const cat = getOrderCategory(o);
-      if (cat === "paid") paidCount++;
-      else if (cat === "verifying") {
-        verifyingBarisCount++;
-      } else if (cat === "unpaid") unpaidCount++;
+      const linkedLns = dpPelunasanMap[o.order_id];
+      const isPaid =
+        o.payment_status === "paid" ||
+        o.transaction_status === "settlement" ||
+        o.order_status === "completed";
+      const lnsPaid = linkedLns && (
+        linkedLns.payment_status === "paid" ||
+        linkedLns.transaction_status === "settlement" ||
+        linkedLns.order_status === "completed"
+      );
+      const isDp = isDpOrder(o);
+      const hasVerifyingProof = isVerifyingOrder(o) || (linkedLns && isVerifyingOrder(linkedLns));
 
       if (isVerifyingOrder(o)) {
         totalVerifyingProofs++;
       }
-
-      const linkedLns = dpPelunasanMap[o.order_id];
       if (linkedLns && isVerifyingOrder(linkedLns)) {
         totalVerifyingProofs++;
       }
 
-      if (isDpOrder(o)) {
+      if (hasVerifyingProof) {
+        verifyingBarisCount++;
+      }
+
+      if (isDp) {
         dpCount++;
+        if (isPaid && lnsPaid) {
+          dpPaidCount++;
+        } else if (isPaid && !lnsPaid) {
+          dpUnpaidCount++;
+        }
+      } else {
+        if (isPaid) {
+          paidFullCount++;
+        }
+      }
+
+      if (!isPaid && !isVerifyingOrder(o)) {
+        unpaidCount++;
       }
     });
 
     return {
       total,
-      paidCount,
-      verifyingCount: totalVerifyingProofs, // 10 Total Proofs needing ACC
-      verifyingBarisCount, // 8 Main Rows in Table
+      paidFullCount,
+      dpPaidCount,
+      dpUnpaidCount,
+      paidCount: paidFullCount + dpPaidCount,
+      verifyingCount: totalVerifyingProofs, // Total Proofs needing ACC
+      verifyingBarisCount, // Main Rows in Table needing ACC
       dpCount,
       unpaidCount,
     };
@@ -1232,11 +1252,47 @@ function AdminTransactionsPage() {
 
   // 3. Final filtered orders list applying status filter
   const filteredOnlineOrders = useMemo(() => {
-    if (statusFilter === "all") return baseFilteredOrders;
+    if (!statusFilter || statusFilter.length === 0) return baseFilteredOrders;
 
     return baseFilteredOrders.filter((order) => {
-      if (statusFilter === "dp") return isDpOrder(order);
-      return getOrderCategory(order) === statusFilter;
+      const linkedLns = dpPelunasanMap[order.order_id];
+      const isPaid =
+        order.payment_status === "paid" ||
+        order.transaction_status === "settlement" ||
+        order.order_status === "completed";
+      const lnsPaid = linkedLns && (
+        linkedLns.payment_status === "paid" ||
+        linkedLns.transaction_status === "settlement" ||
+        linkedLns.order_status === "completed"
+      );
+      const isDp = isDpOrder(order);
+      const isVerifying = isVerifyingOrder(order) || (linkedLns && isVerifyingOrder(linkedLns));
+
+      return statusFilter.some((key) => {
+        if (key === "paid_full") {
+          return !isDp && isPaid;
+        }
+        if (key === "dp_paid") {
+          return isDp && isPaid && lnsPaid;
+        }
+        if (key === "dp_unpaid") {
+          return isDp && isPaid && !lnsPaid;
+        }
+        if (key === "verifying") {
+          return isVerifying;
+        }
+        if (key === "unpaid") {
+          return !isPaid && !isVerifyingOrder(order);
+        }
+        // Fallbacks
+        if (key === "paid") {
+          return isPaid && (!linkedLns || lnsPaid);
+        }
+        if (key === "dp") {
+          return isDp;
+        }
+        return false;
+      });
     });
   }, [baseFilteredOrders, statusFilter, dpPelunasanMap]);
 
@@ -1249,14 +1305,15 @@ function AdminTransactionsPage() {
 
   const targetFilterSummary = useMemo(() => {
     const filters: string[] = [];
-    if (statusFilter !== "all") {
+    if (statusFilter.length > 0) {
       const statusLabels: Record<string, string> = {
-        paid: "Lunas",
+        paid_full: "Lunas (Penuh)",
+        dp_paid: "DP & Sudah Lunas",
+        dp_unpaid: "DP Belum Lunas",
         verifying: "Butuh ACC",
-        dp: "DP",
         unpaid: "Belum Bayar",
       };
-      filters.push(`Status: ${statusLabels[statusFilter] || statusFilter}`);
+      filters.push(`Status: ${statusFilter.map((k) => statusLabels[k] || k).join(", ")}`);
     }
     if (campaignFilter !== "all") {
       if (campaignFilter === "none") {
@@ -1582,8 +1639,8 @@ function AdminTransactionsPage() {
         {/* Total Semua */}
         <button
           type="button"
-          onClick={() => setStatusFilter("all")}
-          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "all"
+          onClick={() => setStatusFilter([])}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter.length === 0
             ? "bg-ink text-white border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] scale-[1.02]"
             : "bg-white text-ink border-ink/30 hover:border-ink hover:shadow-[3px_3px_0px_0px_rgba(27,27,27,0.8)]"
             }`}
@@ -1602,7 +1659,7 @@ function AdminTransactionsPage() {
               Semua Transaksi
             </span>
           </div>
-          {statusFilter === "all" && (
+          {statusFilter.length === 0 && (
             <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-brand-orange"></span>
           )}
         </button>
@@ -1610,8 +1667,8 @@ function AdminTransactionsPage() {
         {/* Menunggu Verifikasi */}
         <button
           type="button"
-          onClick={() => setStatusFilter(statusFilter === "verifying" ? "all" : "verifying")}
-          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "verifying"
+          onClick={() => setStatusFilter(statusFilter.length === 1 && statusFilter[0] === "verifying" ? [] : ["verifying"])}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter.length === 1 && statusFilter[0] === "verifying"
             ? "bg-blue-600 text-white border-blue-900 shadow-[4px_4px_0px_0px_rgba(30,58,138,1)] scale-[1.02]"
             : "bg-blue-50/70 text-blue-950 border-blue-200 hover:border-blue-500 hover:shadow-[3px_3px_0px_0px_rgba(59,130,246,0.3)]"
             }`}
@@ -1642,8 +1699,11 @@ function AdminTransactionsPage() {
         {/* Lunas / Selesai */}
         <button
           type="button"
-          onClick={() => setStatusFilter(statusFilter === "paid" ? "all" : "paid")}
-          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "paid"
+          onClick={() => {
+            const isAllPaid = statusFilter.length === 2 && statusFilter.includes("paid_full") && statusFilter.includes("dp_paid");
+            setStatusFilter(isAllPaid ? [] : ["paid_full", "dp_paid"]);
+          }}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter.length === 2 && statusFilter.includes("paid_full") && statusFilter.includes("dp_paid")
             ? "bg-emerald-700 text-white border-emerald-950 shadow-[4px_4px_0px_0px_rgba(6,78,59,1)] scale-[1.02]"
             : "bg-emerald-50/70 text-emerald-950 border-emerald-200 hover:border-emerald-500 hover:shadow-[3px_3px_0px_0px_rgba(16,185,129,0.3)]"
             }`}
@@ -1659,7 +1719,7 @@ function AdminTransactionsPage() {
               {stats.paidCount}
             </span>
             <span className="text-[10px] font-bold block mt-1 text-emerald-700">
-              Lunas / Selesai
+              {stats.paidFullCount} Penuh + {stats.dpPaidCount} DP
             </span>
           </div>
         </button>
@@ -1667,8 +1727,11 @@ function AdminTransactionsPage() {
         {/* Pesanan DP */}
         <button
           type="button"
-          onClick={() => setStatusFilter(statusFilter === "dp" ? "all" : "dp")}
-          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "dp"
+          onClick={() => {
+            const isAllDp = statusFilter.length === 2 && statusFilter.includes("dp_paid") && statusFilter.includes("dp_unpaid");
+            setStatusFilter(isAllDp ? [] : ["dp_paid", "dp_unpaid"]);
+          }}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter.length === 2 && statusFilter.includes("dp_paid") && statusFilter.includes("dp_unpaid")
             ? "bg-amber-600 text-white border-amber-950 shadow-[4px_4px_0px_0px_rgba(120,53,15,1)] scale-[1.02]"
             : "bg-amber-50/70 text-amber-950 border-amber-200 hover:border-amber-500 hover:shadow-[3px_3px_0px_0px_rgba(245,158,11,0.3)]"
             }`}
@@ -1684,7 +1747,7 @@ function AdminTransactionsPage() {
               {stats.dpCount}
             </span>
             <span className="text-[10px] font-bold block mt-1 text-amber-800">
-              Pesanan DP
+              {stats.dpPaidCount} Lunas / {stats.dpUnpaidCount} Sisa Tagihan
             </span>
           </div>
         </button>
@@ -1692,8 +1755,8 @@ function AdminTransactionsPage() {
         {/* Belum Dibayar */}
         <button
           type="button"
-          onClick={() => setStatusFilter(statusFilter === "unpaid" ? "all" : "unpaid")}
-          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter === "unpaid"
+          onClick={() => setStatusFilter(statusFilter.length === 1 && statusFilter[0] === "unpaid" ? [] : ["unpaid"])}
+          className={`p-4 rounded-xl border-2 transition-all cursor-pointer text-left flex flex-col justify-between relative overflow-hidden ${statusFilter.length === 1 && statusFilter[0] === "unpaid"
             ? "bg-rose-700 text-white border-rose-950 shadow-[4px_4px_0px_0px_rgba(136,19,55,1)] scale-[1.02]"
             : "bg-rose-50/70 text-rose-950 border-rose-200 hover:border-rose-500 hover:shadow-[3px_3px_0px_0px_rgba(244,63,94,0.3)]"
             }`}
@@ -1715,25 +1778,28 @@ function AdminTransactionsPage() {
         </button>
       </div>
 
-      {(statusFilter !== "all" || productFilter.length > 0) && (
+      {(statusFilter.length > 0 || productFilter.length > 0) && (
         <div className="flex flex-wrap items-center gap-2 bg-brand-orange/10 border border-brand-orange/30 px-3.5 py-2 rounded-xl text-xs text-brand-orange font-bold">
           <Filter className="w-4 h-4" />
           <div className="flex flex-wrap items-center gap-1.5">
-            {statusFilter !== "all" && (
+            {statusFilter.length > 0 && (
               <span>
                 Status:{" "}
                 <strong className="uppercase underline">
-                  {statusFilter === "verifying"
-                    ? "Menunggu Verifikasi"
-                    : statusFilter === "paid"
-                      ? "Lunas / Selesai"
-                      : statusFilter === "dp"
-                        ? "Pesanan DP"
-                        : "Belum Dibayar"}
+                  {statusFilter
+                    .map((k) => {
+                      if (k === "paid_full") return "Lunas Penuh";
+                      if (k === "dp_paid") return "DP Sudah Lunas";
+                      if (k === "dp_unpaid") return "DP Belum Lunas";
+                      if (k === "verifying") return "Menunggu Verifikasi";
+                      if (k === "unpaid") return "Belum Dibayar";
+                      return k;
+                    })
+                    .join(", ")}
                 </strong>
               </span>
             )}
-            {statusFilter !== "all" && productFilter.length > 0 && (
+            {statusFilter.length > 0 && productFilter.length > 0 && (
               <span className="text-brand-orange/50">•</span>
             )}
             {productFilter.length > 0 && (
@@ -1747,7 +1813,7 @@ function AdminTransactionsPage() {
             )}
           </div>
           <button
-            onClick={() => { setStatusFilter("all"); setProductFilter([]); setProductFilterMode("include"); }}
+            onClick={() => { setStatusFilter([]); setProductFilter([]); setProductFilterMode("include"); }}
             className="ml-auto text-[10px] uppercase bg-brand-orange text-white px-2.5 py-1 rounded hover:bg-brand-orange/90 font-black cursor-pointer"
           >
             Reset Semua Filter
@@ -1777,7 +1843,7 @@ function AdminTransactionsPage() {
                   Pesanan Online ({
                     groupByCustomer
                       ? `${groupedCustomerOrders.length} Pembeli`
-                      : statusFilter === "verifying" && stats.verifyingCount !== stats.verifyingBarisCount
+                      : statusFilter.includes("verifying") && stats.verifyingCount !== stats.verifyingBarisCount
                         ? `${filteredOnlineOrders.length} Pesanan (${stats.verifyingCount} Bukti ACC)`
                         : `${filteredOnlineOrders.length} Transaksi`
                   })
@@ -1858,12 +1924,25 @@ function AdminTransactionsPage() {
                       <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setShippingFilter("all")} />
                     </Badge>
                   )}
-                  {statusFilter !== "all" && (
-                    <Badge variant="outline" className="bg-purple-50 text-purple-900 border-purple-300 text-[10px] font-bold flex items-center gap-1">
-                      Status: {statusFilter === "paid" ? "Lunas" : statusFilter === "verifying" ? "ACC Admin" : statusFilter === "dp" ? "Pesanan DP" : "Belum Bayar"}
-                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setStatusFilter("all")} />
+                  {statusFilter.length > 0 && statusFilter.map((sf) => (
+                    <Badge
+                      key={sf}
+                      variant="outline"
+                      className="bg-purple-50 text-purple-900 border-purple-300 text-[10px] font-bold flex items-center gap-1"
+                    >
+                      Status: {
+                        sf === "paid_full" ? "Lunas Penuh" :
+                        sf === "dp_paid" ? "DP & Sudah Lunas" :
+                        sf === "dp_unpaid" ? "DP Belum Lunas" :
+                        sf === "verifying" ? "ACC Admin" :
+                        sf === "unpaid" ? "Belum Bayar" : sf
+                      }
+                      <X
+                        className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600"
+                        onClick={() => setStatusFilter((prev) => prev.filter((k) => k !== sf))}
+                      />
                     </Badge>
-                  )}
+                  ))}
                 </div>
               )}
             </CardHeader>
@@ -4361,23 +4440,189 @@ function AdminTransactionsPage() {
               </select>
             </div>
 
-            {/* 4. Payment Status Filter */}
-            <div className="space-y-1.5">
-              <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
-                <CreditCard className="w-3.5 h-3.5 text-brand-orange" />
-                Status Pembayaran
-              </label>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="w-full text-xs font-bold text-ink bg-cream/40 border-2 border-ink rounded-lg p-2.5 focus:outline-none cursor-pointer"
-              >
-                <option value="all">Semua Status Pembayaran</option>
-                <option value="paid">Lunas Terbayar</option>
-                <option value="verifying">Butuh ACC Admin (Bukti QRIS)</option>
-                <option value="dp">Pesanan DP</option>
-                <option value="unpaid">Belum Bayar / Ditolak</option>
-              </select>
+            {/* 4. Payment Status Filter (Multi-Select Checkboxes) */}
+            <div className="space-y-1.5 w-full">
+              <div className="flex items-center justify-between">
+                <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
+                  <CreditCard className="w-3.5 h-3.5 text-brand-orange" />
+                  Status Pembayaran (Pilih Lebih Dari 1)
+                </label>
+                {statusFilter.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter([])}
+                    className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
+                  >
+                    Reset Status ({statusFilter.length})
+                  </button>
+                )}
+              </div>
+
+              <div className="w-full bg-cream/30 border-2 border-ink rounded-lg p-2 max-h-60 overflow-y-auto overflow-x-hidden space-y-1 box-border">
+                {/* Semua Status Pembayaran (Tanpa Filter) */}
+                <label
+                  className={`w-full flex items-center justify-between gap-2.5 p-2 rounded-md cursor-pointer text-xs font-bold transition-colors select-none ${
+                    statusFilter.length === 0
+                      ? "bg-brand-orange/15 text-brand-orange border border-brand-orange/40"
+                      : "hover:bg-black/5 text-ink"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <input
+                      type="checkbox"
+                      checked={statusFilter.length === 0}
+                      onChange={() => setStatusFilter([])}
+                      className="w-4 h-4 accent-brand-orange cursor-pointer rounded shrink-0"
+                    />
+                    <span className="truncate font-black">Semua Status Pembayaran</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-muted-foreground bg-white/70 px-1.5 py-0.5 rounded border border-ink/10">
+                    {stats.total}
+                  </span>
+                </label>
+
+                <div className="border-t border-dashed border-ink/20 my-1"></div>
+
+                {/* 1. Lunas Penuh (Bayar Penuh / Non-DP) */}
+                <label
+                  className={`w-full flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${
+                    statusFilter.includes("paid_full")
+                      ? "bg-emerald-100/90 text-emerald-950 font-bold border border-emerald-300"
+                      : "hover:bg-black/5 text-ink font-semibold"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={statusFilter.includes("paid_full")}
+                      onChange={(e) => {
+                        if (e.target.checked) setStatusFilter((prev) => [...prev, "paid_full"]);
+                        else setStatusFilter((prev) => prev.filter((k) => k !== "paid_full"));
+                      }}
+                      className="w-4 h-4 accent-emerald-600 cursor-pointer rounded shrink-0"
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="truncate text-xs font-bold text-emerald-950">Lunas (Bayar Penuh)</span>
+                      <span className="text-[10px] text-muted-foreground font-medium">Pesanan reguler / non-DP yang sudah lunas</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black px-1.5 py-0.5 bg-emerald-200 text-emerald-900 rounded shrink-0 ml-1">
+                    {stats.paidFullCount}
+                  </span>
+                </label>
+
+                {/* 2. Bayar DP & Sudah Lunas */}
+                <label
+                  className={`w-full flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${
+                    statusFilter.includes("dp_paid")
+                      ? "bg-purple-100/90 text-purple-950 font-bold border border-purple-300"
+                      : "hover:bg-black/5 text-ink font-semibold"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={statusFilter.includes("dp_paid")}
+                      onChange={(e) => {
+                        if (e.target.checked) setStatusFilter((prev) => [...prev, "dp_paid"]);
+                        else setStatusFilter((prev) => prev.filter((k) => k !== "dp_paid"));
+                      }}
+                      className="w-4 h-4 accent-purple-600 cursor-pointer rounded shrink-0"
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="truncate text-xs font-bold text-purple-950">Bayar DP &amp; Sudah Lunas</span>
+                      <span className="text-[10px] text-muted-foreground font-medium">DP terbayar + pelunasan sisa sudah lunas</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black px-1.5 py-0.5 bg-purple-200 text-purple-900 rounded shrink-0 ml-1">
+                    {stats.dpPaidCount}
+                  </span>
+                </label>
+
+                {/* 3. Bayar DP Belum Lunas */}
+                <label
+                  className={`w-full flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${
+                    statusFilter.includes("dp_unpaid")
+                      ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300"
+                      : "hover:bg-black/5 text-ink font-semibold"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={statusFilter.includes("dp_unpaid")}
+                      onChange={(e) => {
+                        if (e.target.checked) setStatusFilter((prev) => [...prev, "dp_unpaid"]);
+                        else setStatusFilter((prev) => prev.filter((k) => k !== "dp_unpaid"));
+                      }}
+                      className="w-4 h-4 accent-amber-600 cursor-pointer rounded shrink-0"
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="truncate text-xs font-bold text-amber-950">Bayar DP Belum Lunas</span>
+                      <span className="text-[10px] text-muted-foreground font-medium">DP terbayar, sisa pelunasan belum lunas</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black px-1.5 py-0.5 bg-amber-200 text-amber-900 rounded shrink-0 ml-1">
+                    {stats.dpUnpaidCount}
+                  </span>
+                </label>
+
+                {/* 4. Butuh ACC Admin */}
+                <label
+                  className={`w-full flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${
+                    statusFilter.includes("verifying")
+                      ? "bg-blue-100/90 text-blue-950 font-bold border border-blue-300"
+                      : "hover:bg-black/5 text-ink font-semibold"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={statusFilter.includes("verifying")}
+                      onChange={(e) => {
+                        if (e.target.checked) setStatusFilter((prev) => [...prev, "verifying"]);
+                        else setStatusFilter((prev) => prev.filter((k) => k !== "verifying"));
+                      }}
+                      className="w-4 h-4 accent-blue-600 cursor-pointer rounded shrink-0"
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="truncate text-xs font-bold text-blue-950">Butuh ACC Admin (Bukti QRIS)</span>
+                      <span className="text-[10px] text-muted-foreground font-medium">Menunggu verifikasi bukti transfer / ACC</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black px-1.5 py-0.5 bg-blue-200 text-blue-900 rounded shrink-0 ml-1">
+                    {stats.verifyingBarisCount}
+                  </span>
+                </label>
+
+                {/* 5. Belum Bayar */}
+                <label
+                  className={`w-full flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${
+                    statusFilter.includes("unpaid")
+                      ? "bg-rose-100/90 text-rose-950 font-bold border border-rose-300"
+                      : "hover:bg-black/5 text-ink font-semibold"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <input
+                      type="checkbox"
+                      checked={statusFilter.includes("unpaid")}
+                      onChange={(e) => {
+                        if (e.target.checked) setStatusFilter((prev) => [...prev, "unpaid"]);
+                        else setStatusFilter((prev) => prev.filter((k) => k !== "unpaid"));
+                      }}
+                      className="w-4 h-4 accent-rose-600 cursor-pointer rounded shrink-0"
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="truncate text-xs font-bold text-rose-950">Belum Bayar / Menunggu Bukti</span>
+                      <span className="text-[10px] text-muted-foreground font-medium">Belum transfer atau bukti ditolak</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black px-1.5 py-0.5 bg-rose-200 text-rose-900 rounded shrink-0 ml-1">
+                    {stats.unpaidCount}
+                  </span>
+                </label>
+              </div>
             </div>
           </div>
 
