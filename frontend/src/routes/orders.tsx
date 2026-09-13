@@ -49,6 +49,10 @@ import {
 } from "@backend/server-actions";
 import { Navbar } from "@/components/Navbar";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import {
+  calculateOrderPelunasanAmount,
+  getJacketPriceBreakdown,
+} from "@/lib/pelunasan-utils";
 
 const scrollToId = (id: string) => {
   const el = document.getElementById(id);
@@ -662,22 +666,8 @@ function UserOrdersPage() {
               const linkedLns = getLinkedPelunasan(order.order_id);
               const isDp = isDpOrder(order);
 
-              // Calculate expected remaining balance for pelunasan (including size surcharges for sizes > XL)
-              const pelunasanAmount = linkedLns
-                ? Number(linkedLns.gross_amount)
-                : order.items
-                  ? order.items
-                    .filter((item: any) => {
-                      const c = String(item.color || "").toUpperCase();
-                      const s = String(item.size || "").toUpperCase();
-                      return (c.includes("DP") || s.includes("DP")) && !c.includes("LUNAS") && !s.includes("LUNAS");
-                    })
-                    .reduce((sum: number, item: any) => {
-                      const baseSubtotal = Number(item.subtotal || item.unit_price * item.quantity || 0);
-                      const sizeAddon = getSizeSurcharge(item.size) * Number(item.quantity || 1);
-                      return sum + baseSubtotal + sizeAddon;
-                    }, 0)
-                  : Number(order.gross_amount);
+              // Calculate expected remaining balance for pelunasan (jackets only, upsize paid once in DP)
+              const pelunasanAmount = calculateOrderPelunasanAmount(order, linkedLns);
 
               return (
                 <div
@@ -751,9 +741,28 @@ function UserOrdersPage() {
                                 </span>
                               )}
                             </div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {item.quantity} x Rp {item.unit_price.toLocaleString("id-ID")}
-                            </div>
+                            {(() => {
+                              const breakdown = getJacketPriceBreakdown(item);
+                              if (breakdown.isJacket && breakdown.isDp && breakdown.upsize > 0) {
+                                return (
+                                  <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                    <div>
+                                      {item.quantity} x Rp {breakdown.normalPrice.toLocaleString("id-ID")}{" "}
+                                      <span className="text-[11px] font-medium text-slate-500">(Harga Normal Jaket)</span>
+                                    </div>
+                                    <div className="text-[11px] text-amber-700 font-semibold flex items-center gap-1.5 flex-wrap">
+                                      <span>+ Biaya Upsize ({item.size}): Rp {(breakdown.upsize * Number(item.quantity || 1)).toLocaleString("id-ID")}</span>
+                                      <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-bold border border-amber-300">Dibayar di DP</span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                              return (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {item.quantity} x Rp {item.unit_price.toLocaleString("id-ID")}
+                                </div>
+                              );
+                            })()}
                           </div>
 
                           <div className="text-right font-bold text-sm text-ink shrink-0 self-center">

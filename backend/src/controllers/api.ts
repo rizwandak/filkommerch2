@@ -1836,6 +1836,11 @@ export const getOnlineOrders = async (req: Request, res: Response) => {
       console.error("Notice: auto-complete orders error", e);
     }
 
+    // Safe background self-healing for historical LNS discrepancies
+    try {
+      void repairHistoricalPelunasanOrders().catch(() => {});
+    } catch {}
+
     const orders = await query<any>(
       "SELECT * FROM orders WHERE channel = 'online' ORDER BY created_at DESC LIMIT 10000"
     );
@@ -1844,7 +1849,7 @@ export const getOnlineOrders = async (req: Request, res: Response) => {
       const orderIds = orders.map((o) => o.order_id);
       const placeholders = orderIds.map(() => "?").join(",");
       const allItems = await query<any>(
-        `SELECT order_id, product_name, size, color FROM order_items WHERE order_id IN (${placeholders})`,
+        `SELECT id, order_id, product_id, product_name, size, color, unit_price, quantity, subtotal FROM order_items WHERE order_id IN (${placeholders})`,
         orderIds
       );
 
@@ -4234,6 +4239,112 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
   }
 };
 
+// Jacket Pelunasan Helpers
+const isJacketProduct = (productName?: string | null): boolean => {
+  if (!productName) return false;
+  const n = String(productName).toLowerCase();
+  return (
+    n.includes("varsity") ||
+    n.includes("work jacket") ||
+    n.includes("half zip") ||
+    n.includes("halfzip") ||
+    n.includes("half-zip")
+  );
+};
+
+const getJacketUpsizeSurcharge = (productName?: string | null, sizeStr?: string | null): number => {
+  const s = String(sizeStr || "").toUpperCase().trim();
+  const n = String(productName || "").toLowerCase();
+
+  if (s === "XXL" || s === "2XL") {
+    return 10000;
+  }
+  if (s === "XXXL" || s === "3XL") {
+    if (n.includes("varsity")) return 20000;
+    return 15000;
+  }
+  if (s === "XXXXL" || s === "4XL") {
+    return 30000;
+  }
+  if (s === "XXXXXL" || s === "5XL") {
+    return 40000;
+  }
+  return 0;
+};
+
+const getJacketDefaultNormalDpPrice = (productName?: string | null): number => {
+  const n = String(productName || "").toLowerCase();
+  if (n.includes("work jacket")) return 124500;
+  if (n.includes("half")) return 89500;
+  if (n.includes("varsity")) return 164500;
+  return 0;
+};
+
+export const repairHistoricalPelunasanOrders = async () => {
+  try {
+    const lnsOrders = await query<any>(
+      "SELECT * FROM orders WHERE order_id LIKE 'LNS-%' OR notes LIKE '%Pelunasan untuk Order:%'"
+    );
+    for (const lns of lnsOrders) {
+      let origId = "";
+      const match = String(lns.notes || "").match(/Pelunasan untuk Order:\s*([A-Za-z0-9-]+)/);
+      if (match && match[1]) {
+        origId = match[1].trim();
+      } else if (lns.order_id.startsWith("LNS-FILKOM-")) {
+        const parts = lns.order_id.replace(/^LNS-/, "").split("-");
+        if (parts.length >= 2) origId = `${parts[0]}-${parts[1]}`;
+      }
+      if (!origId) continue;
+
+      const origItems = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [origId]);
+      if (!origItems || origItems.length === 0) continue;
+
+      let correctSisa = 0;
+      for (const item of origItems) {
+        if (!isJacketProduct(item.product_name)) continue;
+        const c = String(item.color || "").toUpperCase();
+        const s = String(item.size || "").toUpperCase();
+        const n = String(item.product_name || "").toUpperCase();
+        const isDp = c.includes("DP") || s.includes("DP") || n.includes("DP");
+        const isLunas = c.includes("LUNAS") || s.includes("LUNAS");
+        if (isDp && !isLunas) {
+          const upsize = getJacketUpsizeSurcharge(item.product_name, item.size);
+          let unitPrice = Number(item.unit_price || 0);
+          if (unitPrice <= 0) {
+            unitPrice = getJacketDefaultNormalDpPrice(item.product_name) + upsize;
+          }
+          const normalPrice = Math.max(0, unitPrice - upsize);
+          correctSisa += normalPrice * Number(item.quantity || 1);
+        }
+      }
+
+      if (correctSisa > 0 && Number(lns.gross_amount) !== correctSisa) {
+        console.log(`[Self-Healing] Updating LNS order ${lns.order_id} from ${lns.gross_amount} to ${correctSisa}`);
+        await execute(
+          "UPDATE orders SET subtotal = ?, gross_amount = ? WHERE order_id = ?",
+          [correctSisa, correctSisa, lns.order_id]
+        );
+        const lnsItems = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [lns.order_id]);
+        for (const li of lnsItems) {
+          if (isJacketProduct(li.product_name)) {
+            await execute(
+              "UPDATE order_items SET unit_price = ?, subtotal = ? WHERE id = ?",
+              [correctSisa, correctSisa, li.id]
+            );
+          } else {
+            await execute(
+              "UPDATE order_items SET unit_price = 0, subtotal = 0 WHERE id = ?",
+              [li.id]
+            );
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error("Error in repairHistoricalPelunasanOrders:", e);
+  }
+};
+
 // Create Pelunasan (balance payment) order automatically linked to a DP order (Zero DB Schema change)
 export const createPelunasanOrder = async (req: Request, res: Response) => {
   try {
@@ -4272,7 +4383,7 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
     let calculatedSubtotal = 0;
     const resolvedItems: any[] = [];
 
-    // 3. Process each item to find Lunas counterpart and calculate sisa
+    // 3. Process each item: only jackets with DP qualify for pelunasan
     for (const item of originalItems) {
       const product = await queryOne<any>("SELECT * FROM products WHERE id = ?", [item.product_id]);
       if (!product) {
@@ -4307,66 +4418,17 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       // Check if it is the main Bundle product item
       if (product.product_type === "bundle") {
         let bundleSisa = 0;
-
-        // Find all component items of this bundle from the originalItems list
         const componentItems = originalItems.filter((oi: any) => oi.product_name && oi.product_name.includes("[KOMPONEN BUNDLE]"));
 
         for (const comp of componentItems) {
-          // We only calculate pelunasan for components that were paid via DP
-          if (comp.color && comp.color.toUpperCase().includes("DP")) {
-            const compProduct = await queryOne<any>("SELECT * FROM products WHERE id = ?", [comp.product_id]);
-            if (compProduct) {
-              const compLunasColor = comp.color.replace(/\bDP\b/i, "Lunas");
-
-              // Find matching Lunas variant
-              let compLunasVar = await queryOne<any>(
-                "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
-                [comp.product_id, comp.size, compLunasColor]
-              );
-              if (!compLunasVar) {
-                compLunasVar = await queryOne<any>(
-                  "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
-                  [comp.product_id, comp.size]
-                );
-              }
-
-              // Find matching DP variant
-              const compDpVar = await queryOne<any>(
-                "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
-                [comp.product_id, comp.size, comp.color]
-              );
-
-              if (compLunasVar && compDpVar) {
-                const isUb = isUbEmail(originalOrder.customer_email);
-                let compBasePrice = Number(compProduct.price);
-                if (compProduct.promo_price && Number(compProduct.promo_price) > 0) {
-                  compBasePrice = Number(compProduct.promo_price);
-                } else if (isUb && compProduct.filkom_price && Number(compProduct.filkom_price) > 0) {
-                  compBasePrice = Number(compProduct.filkom_price);
-                }
-
-                // Full price for Lunas variant
-                let lunasAddon = 0;
-                if (compLunasVar.filkom_price !== undefined && compLunasVar.filkom_price !== null && Number(compLunasVar.filkom_price) > 0) {
-                  lunasAddon = Number(compLunasVar.filkom_price);
-                } else if (compLunasVar.price_override !== undefined && compLunasVar.price_override !== null && Number(compLunasVar.price_override) > 0) {
-                  lunasAddon = Number(compLunasVar.price_override);
-                }
-                const fullLunasPrice = compBasePrice + lunasAddon;
-
-                // Full price for DP variant
-                let dpAddon = 0;
-                if (compDpVar.filkom_price !== undefined && compDpVar.filkom_price !== null && Number(compDpVar.filkom_price) > 0) {
-                  dpAddon = Number(compDpVar.filkom_price);
-                } else if (compDpVar.price_override !== undefined && compDpVar.price_override !== null && Number(compDpVar.price_override) > 0) {
-                  dpAddon = Number(compDpVar.price_override);
-                }
-                const fullDpPrice = compBasePrice + dpAddon;
-
-                const compDiff = Math.max(0, fullLunasPrice - fullDpPrice);
-                bundleSisa += compDiff;
-              }
-            }
+          // Only jacket components paid via DP qualify for pelunasan
+          if (isJacketProduct(comp.product_name) && (comp.color || "").toUpperCase().includes("DP")) {
+            let compBase = 0;
+            const cn = String(comp.product_name || "").toLowerCase();
+            if (cn.includes("work jacket")) compBase = 124500;
+            else if (cn.includes("half")) compBase = 89500;
+            else if (cn.includes("varsity")) compBase = 164500;
+            bundleSisa += compBase;
           }
         }
 
@@ -4386,10 +4448,12 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       // Handling for regular single items
       const itemColor = String(item.color || "").toUpperCase();
       const itemSize = String(item.size || "").toUpperCase();
-      const isItemDp = itemColor.includes("DP") || itemSize.includes("DP");
+      const itemName = String(item.product_name || "").toUpperCase();
+      const isItemDp = itemColor.includes("DP") || itemSize.includes("DP") || itemName.includes("DP");
+      const isItemJacket = isJacketProduct(item.product_name);
 
-      // If item is NOT a DP product, sisa = 0 (already fully paid)
-      if (!isItemDp) {
+      // Only jacket DP items have pelunasan. Non-jacket items or non-DP items have sisa = 0.
+      if (!isItemDp || !isItemJacket) {
         resolvedItems.push({
           item,
           sisa: 0,
@@ -4408,33 +4472,19 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
 
       if (!lunasVariant) {
         lunasVariant = await queryOne<any>(
-          "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
+          "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND is_active = 1 LIMIT 1",
           [item.product_id, item.size]
         );
       }
 
-      let lunasUnitPrice = product.price;
-      if (lunasVariant) {
-        const isUb = isUbEmail(originalOrder.customer_email);
-        let basePrice = Number(product.price);
-        if (product.promo_price && Number(product.promo_price) > 0) {
-          basePrice = Number(product.promo_price);
-        } else if (isUb && product.filkom_price && Number(product.filkom_price) > 0) {
-          basePrice = Number(product.filkom_price);
-        }
-
-        let addon = 0;
-        if (lunasVariant.filkom_price !== undefined && lunasVariant.filkom_price !== null && Number(lunasVariant.filkom_price) > 0) {
-          addon = Number(lunasVariant.filkom_price);
-        } else if (lunasVariant.price_override !== undefined && lunasVariant.price_override !== null && Number(lunasVariant.price_override) > 0) {
-          addon = Number(lunasVariant.price_override);
-        }
-
-        lunasUnitPrice = basePrice + addon;
+      // Upsize surcharge is only paid once during DP. Pelunasan only pays normal price!
+      const upsize = getJacketUpsizeSurcharge(item.product_name, item.size);
+      let unitPrice = Number(item.unit_price || 0);
+      if (unitPrice <= 0) {
+        unitPrice = getJacketDefaultNormalDpPrice(item.product_name) + upsize;
       }
-
-      const sisa = Math.max(0, lunasUnitPrice - item.unit_price);
-      const finalSisa = sisa;
+      const normalDpPrice = Math.max(0, unitPrice - upsize);
+      const finalSisa = normalDpPrice;
 
       const subtotal = finalSisa * item.quantity;
       calculatedSubtotal += subtotal;
@@ -4451,7 +4501,7 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
     if (calculatedSubtotal <= 0) {
       return res.status(400).json({
         success: false,
-        error: "Pesanan ini tidak memiliki sisa pembayaran pelunasan (sudah LUNAS)",
+        error: "Pesanan ini tidak memiliki sisa pembayaran pelunasan jaket (sudah LUNAS)",
       });
     }
 
@@ -4545,7 +4595,7 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
     let calculatedSubtotal = 0;
     const previewItems: any[] = [];
 
-    // 3. Process each item to find Lunas counterpart and calculate sisa
+    // 3. Process each item: only jackets with DP qualify for pelunasan
     for (const item of originalItems) {
       const product = await queryOne<any>("SELECT * FROM products WHERE id = ?", [item.product_id]);
       if (!product) continue;
@@ -4582,35 +4632,13 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
         let bundleSisa = 0;
         const componentItems = originalItems.filter((oi: any) => oi.product_name && oi.product_name.includes("[KOMPONEN BUNDLE]"));
         for (const comp of componentItems) {
-          if (comp.color && comp.color.toUpperCase().includes("DP")) {
-            const compProduct = await queryOne<any>("SELECT * FROM products WHERE id = ?", [comp.product_id]);
-            if (compProduct) {
-              const compLunasColor = comp.color.replace(/\bDP\b/i, "Lunas");
-              let compLunasVar = await queryOne<any>(
-                "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
-                [comp.product_id, comp.size, compLunasColor]
-              );
-              if (!compLunasVar) {
-                compLunasVar = await queryOne<any>(
-                  "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
-                  [comp.product_id, comp.size]
-                );
-              }
-              const compDpVar = await queryOne<any>(
-                "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
-                [comp.product_id, comp.size, comp.color]
-              );
-              if (compLunasVar && compDpVar) {
-                const isUb = isUbEmail(originalOrder.customer_email);
-                let compBasePrice = Number(compProduct.price);
-                if (compProduct.promo_price && Number(compProduct.promo_price) > 0) compBasePrice = Number(compProduct.promo_price);
-                else if (isUb && compProduct.filkom_price && Number(compProduct.filkom_price) > 0) compBasePrice = Number(compProduct.filkom_price);
-
-                let lunasAddon = Number(compLunasVar.filkom_price || compLunasVar.price_override || 0);
-                let dpAddon = Number(compDpVar.filkom_price || compDpVar.price_override || 0);
-                bundleSisa += Math.max(0, (compBasePrice + lunasAddon) - (compBasePrice + dpAddon));
-              }
-            }
+          if (isJacketProduct(comp.product_name) && (comp.color || "").toUpperCase().includes("DP")) {
+            let compBase = 0;
+            const cn = String(comp.product_name || "").toLowerCase();
+            if (cn.includes("work jacket")) compBase = 124500;
+            else if (cn.includes("half")) compBase = 89500;
+            else if (cn.includes("varsity")) compBase = 164500;
+            bundleSisa += compBase;
           }
         }
         const subtotal = bundleSisa * item.quantity;
@@ -4631,10 +4659,12 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
       // Regular items
       const itemColor = String(item.color || "").toUpperCase();
       const itemSize = String(item.size || "").toUpperCase();
-      const isItemDp = itemColor.includes("DP") || itemSize.includes("DP");
+      const itemName = String(item.product_name || "").toUpperCase();
+      const isItemDp = itemColor.includes("DP") || itemSize.includes("DP") || itemName.includes("DP");
+      const isItemJacket = isJacketProduct(item.product_name);
 
-      // If item is NOT a DP product, sisa = 0 (already fully paid)
-      if (!isItemDp) {
+      // Only jacket DP items have pelunasan
+      if (!isItemDp || !isItemJacket) {
         previewItems.push({
           id: item.id,
           product_id: item.product_id,
@@ -4655,20 +4685,19 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
       );
       if (!lunasVariant) {
         lunasVariant = await queryOne<any>(
-          "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
+          "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND is_active = 1 LIMIT 1",
           [item.product_id, item.size]
         );
       }
-      let lunasUnitPrice = Number(product.price);
-      if (lunasVariant) {
-        const isUb = isUbEmail(originalOrder.customer_email);
-        let basePrice = Number(product.price);
-        if (product.promo_price && Number(product.promo_price) > 0) basePrice = Number(product.promo_price);
-        else if (isUb && product.filkom_price && Number(product.filkom_price) > 0) basePrice = Number(product.filkom_price);
-        let addon = Number(lunasVariant.filkom_price || lunasVariant.price_override || 0);
-        lunasUnitPrice = basePrice + addon;
+
+      // Upsize surcharge is only paid once during DP. Pelunasan only pays normal price!
+      const upsize = getJacketUpsizeSurcharge(item.product_name, item.size);
+      let unitPrice = Number(item.unit_price || 0);
+      if (unitPrice <= 0) {
+        unitPrice = getJacketDefaultNormalDpPrice(item.product_name) + upsize;
       }
-      const sisa = Math.max(0, lunasUnitPrice - Number(item.unit_price));
+      const normalDpPrice = Math.max(0, unitPrice - upsize);
+      const sisa = normalDpPrice;
       const subtotal = sisa * item.quantity;
       calculatedSubtotal += subtotal;
 

@@ -74,6 +74,12 @@ import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import {
+  isJacketProduct,
+  getJacketUpsizeSurcharge,
+  getJacketPriceBreakdown,
+  calculateOrderPelunasanAmount,
+} from "@/lib/pelunasan-utils";
+import {
   getOnlineOrders,
   getOfflineSales,
   getOrderById,
@@ -1600,9 +1606,7 @@ function AdminTransactionsPage() {
         case "pelunasan": {
           const getPelunasanVal = (ord: any) => {
             if (!isDpOrder(ord)) return 0;
-            const lns = dpPelunasanMap[ord.order_id];
-            if (lns) return Number(lns.gross_amount || 0);
-            return Number(ord.gross_amount || 0);
+            return calculateOrderPelunasanAmount(ord, dpPelunasanMap[ord.order_id]);
           };
           valA = getPelunasanVal(a);
           valB = getPelunasanVal(b);
@@ -1654,8 +1658,7 @@ function AdminTransactionsPage() {
           const getGroupPelunasan = (grp: any) => {
             return (grp.orders || []).reduce((acc: number, ord: any) => {
               if (!isDpOrder(ord)) return acc;
-              const lns = dpPelunasanMap[ord.order_id];
-              return acc + (lns ? Number(lns.gross_amount || 0) : Number(ord.gross_amount || 0));
+              return acc + calculateOrderPelunasanAmount(ord, dpPelunasanMap[ord.order_id]);
             }, 0);
           };
           valA = getGroupPelunasan(a);
@@ -2671,7 +2674,7 @@ function AdminTransactionsPage() {
                                                 </span>
                                                 {isDpOrder(subOrder) && (
                                                   <span className="text-[10px] text-purple-900 font-bold block">
-                                                    Pelunasan: Rp {Number(dpPelunasanMap[subOrder.order_id]?.gross_amount || subOrder.gross_amount).toLocaleString("id-ID")}
+                                                    Pelunasan: Rp {Number(dpPelunasanMap[subOrder.order_id]?.gross_amount || calculateOrderPelunasanAmount(subOrder)).toLocaleString("id-ID")}
                                                   </span>
                                                 )}
                                               </div>
@@ -2837,10 +2840,14 @@ function AdminTransactionsPage() {
                                       </div>
                                     );
                                   }
+                                  const estimatedPelunasan = calculateOrderPelunasanAmount(order);
+                                  if (estimatedPelunasan <= 0) {
+                                    return <span className="text-muted-foreground text-xs font-semibold">-</span>;
+                                  }
                                   return (
                                     <div className="flex flex-col items-end">
                                       <span className="font-mono font-bold text-xs text-amber-900/80">
-                                        ~Rp {Number(order.gross_amount).toLocaleString("id-ID")}
+                                        ~Rp {estimatedPelunasan.toLocaleString("id-ID")}
                                       </span>
                                       <span className="text-[9px] font-extrabold text-amber-800/80 bg-amber-50/80 px-1.5 py-0.2 rounded border border-amber-200 mt-0.5">
                                         Belum Ada Tagihan
@@ -3016,21 +3023,46 @@ function AdminTransactionsPage() {
                                           </tr>
                                         </thead>
                                         <tbody>
-                                          {(rowItems[order.order_id] || []).map((item: any, idx_item: number) => (
-                                            <tr key={idx_item} className="border-b border-dashed border-border/40 last:border-0">
-                                              <td className="py-2 font-bold text-ink uppercase">{item.product_name}</td>
-                                              <td className="py-2 text-center text-muted-foreground">
-                                                {[item.size, item.color].filter((s: string) => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(' / ') || '-'}
-                                              </td>
-                                              <td className="py-2 text-right">
-                                                Rp {Number(item.price || item.unit_price).toLocaleString("id-ID")}
-                                              </td>
-                                              <td className="py-2 text-center font-bold">{item.quantity}</td>
-                                              <td className="py-2 text-right font-bold text-brand-blue">
-                                                Rp {Number(item.subtotal).toLocaleString("id-ID")}
-                                              </td>
-                                            </tr>
-                                          ))}
+                                          {(rowItems[order.order_id] || []).map((item: any, idx_item: number) => {
+                                            const breakdown = getJacketPriceBreakdown(item);
+                                            return (
+                                              <tr key={idx_item} className="border-b border-dashed border-border/40 last:border-0">
+                                                <td className="py-2 font-bold text-ink uppercase">
+                                                  <div>{item.product_name}</div>
+                                                  {breakdown.isJacket && breakdown.upsize > 0 && (
+                                                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5 font-normal normal-case text-[10px]">
+                                                      <span className="text-gray-600">
+                                                        Normal: <strong className="font-semibold text-ink">Rp {breakdown.normalPrice.toLocaleString("id-ID")}</strong>
+                                                      </span>
+                                                      <span className="text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-300 font-bold text-[9px]">
+                                                        + Upsize ({item.size}): Rp {breakdown.upsize.toLocaleString("id-ID")}
+                                                      </span>
+                                                      {breakdown.isDp && (
+                                                        <span className="text-purple-800 bg-purple-50 px-1 py-0.2 rounded border border-purple-200 text-[9px] font-medium">
+                                                          (Dibayar di DP)
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                  )}
+                                                </td>
+                                                <td className="py-2 text-center text-muted-foreground">
+                                                  {[item.size, item.color].filter((s: string) => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(' / ') || '-'}
+                                                </td>
+                                                <td className="py-2 text-right">
+                                                  <div>Rp {breakdown.unitPrice.toLocaleString("id-ID")}</div>
+                                                  {breakdown.isJacket && breakdown.upsize > 0 && (
+                                                    <div className="text-[9px] text-muted-foreground font-normal">
+                                                      Normal: Rp {breakdown.normalPrice.toLocaleString("id-ID")}
+                                                    </div>
+                                                  )}
+                                                </td>
+                                                <td className="py-2 text-center font-bold">{item.quantity}</td>
+                                                <td className="py-2 text-right font-bold text-brand-blue">
+                                                  Rp {breakdown.subtotal.toLocaleString("id-ID")}
+                                                </td>
+                                              </tr>
+                                            );
+                                          })}
                                         </tbody>
                                       </table>
                                     </div>
@@ -3885,19 +3917,43 @@ function AdminTransactionsPage() {
                           </tr>
                         </thead>
                         <tbody>
-                          {managedItems.map((item, idx) => (
-                            <tr key={idx} className="border-t border-border">
-                              <td className="p-2 font-bold text-ink uppercase">{item.product_name}</td>
-                              <td className="p-2 text-center text-muted-foreground">
-                                {[item.size, item.color].filter((s: string) => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(' / ') || '-'}
-                              </td>
-                              <td className="p-2 text-right">
-                                Rp {Number(item.price || item.unit_price).toLocaleString("id-ID")}
-                              </td>
-                              <td className="p-2 text-center font-bold">{item.quantity}</td>
-                              <td className="p-2 text-right font-bold text-brand-blue">
-                                Rp {Number(item.subtotal).toLocaleString("id-ID")}
-                              </td>
+                          {managedItems.map((item, idx) => {
+                            const breakdown = getJacketPriceBreakdown(item);
+                            return (
+                              <tr key={idx} className="border-t border-border">
+                                <td className="p-2 font-bold text-ink uppercase">
+                                  <div>{item.product_name}</div>
+                                  {breakdown.isJacket && breakdown.upsize > 0 && (
+                                    <div className="mt-1 flex flex-wrap items-center gap-1.5 font-normal normal-case text-[10px]">
+                                      <span className="text-gray-600">
+                                        Harga Normal: <strong className="font-semibold text-ink">Rp {breakdown.normalPrice.toLocaleString("id-ID")}</strong>
+                                      </span>
+                                      <span className="text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-300 font-bold text-[9px]">
+                                        + Biaya Upsize ({item.size}): Rp {breakdown.upsize.toLocaleString("id-ID")}
+                                      </span>
+                                      {breakdown.isDp && (
+                                        <span className="text-purple-800 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 text-[9px] font-semibold">
+                                          (Dibayar 1x di DP)
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-2 text-center text-muted-foreground">
+                                  {[item.size, item.color].filter((s: string) => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(' / ') || '-'}
+                                </td>
+                                <td className="p-2 text-right">
+                                  <div>Rp {breakdown.unitPrice.toLocaleString("id-ID")}</div>
+                                  {breakdown.isJacket && breakdown.upsize > 0 && (
+                                    <div className="text-[10px] text-muted-foreground font-normal">
+                                      Normal: Rp {breakdown.normalPrice.toLocaleString("id-ID")}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-2 text-center font-bold">{item.quantity}</td>
+                                <td className="p-2 text-right font-bold text-brand-blue">
+                                  Rp {breakdown.subtotal.toLocaleString("id-ID")}
+                                </td>
                               {managedType === "online" && (
                                 <td className="p-2 text-center">
                                   {item.pickup_status === "picked_up" ? (
@@ -3915,8 +3971,9 @@ function AdminTransactionsPage() {
                                   )}
                                 </td>
                               )}
-                            </tr>
-                          ))}
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

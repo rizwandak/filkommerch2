@@ -40,6 +40,10 @@ import { resolveImageUrl } from "@/lib/image-resolver";
 import { getApiBaseUrl } from "@/lib/api-config";
 import { uploadImageHelper } from "@/lib/upload-helper";
 import { useAuth } from "@/lib/auth";
+import {
+  calculateOrderPelunasanAmount,
+  getJacketPriceBreakdown,
+} from "@/lib/pelunasan-utils";
 
 export const Route = createFileRoute("/orders_/$orderId")({
   loader: async ({ params }) => {
@@ -724,23 +728,11 @@ function OrderDetailComponent() {
   const fullOrder = { ...order, items };
   const isDp = isDpOrder(fullOrder, linkedPelunasan);
 
-  const pelunasanAmount = linkedPelunasan
-    ? Number(linkedPelunasan.gross_amount)
-    : items
-      ? items
-        .filter((item: any) => {
-          const c = String(item.color || "").toUpperCase();
-          const s = String(item.size || "").toUpperCase();
-          return (c.includes("DP") || s.includes("DP")) && !c.includes("LUNAS") && !s.includes("LUNAS");
-        })
-        .reduce((sum: number, item: any) => {
-          const baseSubtotal = Number(item.subtotal || item.unit_price * item.quantity || 0);
-          const sizeAddon = getSizeSurcharge(item.size) * Number(item.quantity || 1);
-          return sum + baseSubtotal + sizeAddon;
-        }, 0)
-      : Number(order.gross_amount);
-
-  const totalSizeSurcharge = items?.reduce((sum: number, i: any) => sum + getSizeSurcharge(i.size) * Number(i.quantity || 1), 0) || 0;
+  const pelunasanAmount = calculateOrderPelunasanAmount(fullOrder, linkedPelunasan);
+  const totalSizeSurcharge = items?.reduce((sum: number, i: any) => {
+    const bd = getJacketPriceBreakdown(i);
+    return sum + (bd.upsize * Number(i.quantity || 1));
+  }, 0) || 0;
   const grandTotalProduct = Number(order.gross_amount) + (isDp ? pelunasanAmount : 0);
 
   return (
@@ -1078,9 +1070,28 @@ function OrderDetailComponent() {
                             {item.size && item.size !== 'One Size' && item.size !== 'All Size' && item.size !== 'Standard' && item.size !== 'Default' && item.size !== '-' && <span>Ukuran: {item.size}</span>}
                             {item.color && item.color !== "Default" && <span>Warna: {item.color}</span>}
                           </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {item.quantity} x Rp {item.unit_price.toLocaleString("id-ID")}
-                          </p>
+                          {(() => {
+                            const breakdown = getJacketPriceBreakdown(item);
+                            if (breakdown.isJacket && breakdown.isDp && breakdown.upsize > 0) {
+                              return (
+                                <div className="mt-1 space-y-0.5">
+                                  <p className="text-xs text-muted-foreground">
+                                    {item.quantity} x Rp {breakdown.normalPrice.toLocaleString("id-ID")}{" "}
+                                    <span className="text-[11px] font-medium text-slate-500">(Harga Normal Jaket)</span>
+                                  </p>
+                                  <p className="text-[11px] text-amber-700 font-semibold flex items-center gap-1.5 flex-wrap">
+                                    <span>+ Biaya Upsize ({item.size}): Rp {(breakdown.upsize * Number(item.quantity || 1)).toLocaleString("id-ID")}</span>
+                                    <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-bold border border-amber-300">Dibayar di DP</span>
+                                  </p>
+                                </div>
+                              );
+                            }
+                            return (
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {item.quantity} x Rp {item.unit_price.toLocaleString("id-ID")}
+                              </p>
+                            );
+                          })()}
 
                           {/* Item-level Pickup Status */}
                           {order.payment_status === "paid" && (
@@ -1353,7 +1364,7 @@ function OrderDetailComponent() {
 
                 {totalSizeSurcharge > 0 && (
                   <div className="flex justify-between text-muted-foreground">
-                    <span>Tambahan Ukuran di atas XL:</span>
+                    <span>Termasuk Biaya Upsize (1x di DP):</span>
                     <span className="font-bold text-ink">+Rp {totalSizeSurcharge.toLocaleString("id-ID")}</span>
                   </div>
                 )}
