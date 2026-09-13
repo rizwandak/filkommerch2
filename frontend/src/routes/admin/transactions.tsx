@@ -15,6 +15,11 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@frontend/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@frontend/components/ui/popover";
 import { SendNotificationModal } from "@/components/SendNotificationModal";
 import { PartialPickupModal } from "@/components/PartialPickupModal";
 import {
@@ -53,6 +58,7 @@ import {
   FileText,
   Printer,
   PackageCheck,
+  Columns3,
 } from "lucide-react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logoFM from "@/assets/logo-fm.jpg";
@@ -183,8 +189,41 @@ const formatCompactDateTime = (dateStr: string | Date | null | undefined) => {
   }
 };
 
-type SortField = "no" | "order_id" | "customer_name" | "gross_amount" | "payment_status" | "fulfillment_status" | "created_at";
+type SortField = "no" | "order_id" | "customer_name" | "gross_amount" | "pelunasan" | "payment_status" | "fulfillment_status" | "created_at";
 type SortDirection = "asc" | "desc";
+
+interface VisibleColumns {
+  no: boolean;
+  order_id: boolean;
+  customer_name: boolean;
+  gross_amount: boolean;
+  pelunasan: boolean;
+  payment_status: boolean;
+  created_at: boolean;
+  actions: boolean;
+}
+
+const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = {
+  no: true,
+  order_id: true,
+  customer_name: true,
+  gross_amount: true,
+  pelunasan: true,
+  payment_status: true,
+  created_at: true,
+  actions: true,
+};
+
+const COLUMN_DEFINITIONS = [
+  { id: "no", label: "No" },
+  { id: "order_id", label: "Order ID & Tipe" },
+  { id: "customer_name", label: "Pelanggan" },
+  { id: "gross_amount", label: "Total Pesanan" },
+  { id: "pelunasan", label: "Nominal Pelunasan" },
+  { id: "payment_status", label: "Status & Fulfillment" },
+  { id: "created_at", label: "Tanggal & Jam" },
+  { id: "actions", label: "Tombol Aksi" },
+] as const;
 
 const SortHeaderColumn = ({
   label,
@@ -250,6 +289,81 @@ function AdminTransactionsPage() {
   const [productFilterMode, setProductFilterMode] = useState<"include" | "exclude">("include");
   const [shippingFilter, setShippingFilter] = useState<"all" | "pickup" | "delivery">("all");
   const [groupByCustomer, setGroupByCustomer] = useState<boolean>(false);
+
+  // Table Column Visibility State
+  const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("filkom_admin_transactions_columns");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          return { ...DEFAULT_VISIBLE_COLUMNS, ...parsed };
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    return DEFAULT_VISIBLE_COLUMNS;
+  });
+
+  const toggleColumn = (key: keyof VisibleColumns) => {
+    setVisibleColumns((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("filkom_admin_transactions_columns", JSON.stringify(next));
+        } catch (e) {
+          // ignore
+        }
+      }
+      return next;
+    });
+  };
+
+  const resetDefaultColumns = () => {
+    setVisibleColumns(DEFAULT_VISIBLE_COLUMNS);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem("filkom_admin_transactions_columns");
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
+  const setAllColumns = (enabled: boolean) => {
+    const next: VisibleColumns = {
+      no: enabled,
+      order_id: true,
+      customer_name: enabled,
+      gross_amount: enabled,
+      pelunasan: enabled,
+      payment_status: enabled,
+      created_at: enabled,
+      actions: true,
+    };
+    setVisibleColumns(next);
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("filkom_admin_transactions_columns", JSON.stringify(next));
+      } catch (e) {
+        // ignore
+      }
+    }
+  };
+
+  const visibleColumnCount = useMemo(() => {
+    let count = 1; // chevron expand button
+    if (visibleColumns.no) count++;
+    if (visibleColumns.order_id) count++;
+    if (visibleColumns.customer_name) count++;
+    if (visibleColumns.gross_amount) count++;
+    if (visibleColumns.pelunasan) count++;
+    if (visibleColumns.payment_status) count++;
+    if (visibleColumns.created_at) count++;
+    if (visibleColumns.actions) count++;
+    return count;
+  }, [visibleColumns]);
 
   // Filter Modal state
   const [filterModalOpen, setFilterModalOpen] = useState(false);
@@ -1483,6 +1597,17 @@ function AdminTransactionsPage() {
           valA = Number(a.gross_amount || 0);
           valB = Number(b.gross_amount || 0);
           break;
+        case "pelunasan": {
+          const getPelunasanVal = (ord: any) => {
+            if (!isDpOrder(ord)) return 0;
+            const lns = dpPelunasanMap[ord.order_id];
+            if (lns) return Number(lns.gross_amount || 0);
+            return Number(ord.gross_amount || 0);
+          };
+          valA = getPelunasanVal(a);
+          valB = getPelunasanVal(b);
+          break;
+        }
         case "payment_status":
           valA = getPaymentStatusBadge(a, dpPelunasanMap[a.order_id]).text;
           valB = getPaymentStatusBadge(b, dpPelunasanMap[b.order_id]).text;
@@ -1525,6 +1650,18 @@ function AdminTransactionsPage() {
           valA = Number(a.total_amount || 0);
           valB = Number(b.total_amount || 0);
           break;
+        case "pelunasan": {
+          const getGroupPelunasan = (grp: any) => {
+            return (grp.orders || []).reduce((acc: number, ord: any) => {
+              if (!isDpOrder(ord)) return acc;
+              const lns = dpPelunasanMap[ord.order_id];
+              return acc + (lns ? Number(lns.gross_amount || 0) : Number(ord.gross_amount || 0));
+            }, 0);
+          };
+          valA = getGroupPelunasan(a);
+          valB = getGroupPelunasan(b);
+          break;
+        }
         case "payment_status":
           valA = a.paid_count;
           valB = b.paid_count;
@@ -1869,6 +2006,89 @@ function AdminTransactionsPage() {
                       </span>
                     )}
                   </Button>
+
+                  {/* Popover Pengaturan Kolom Tabel */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 text-xs font-black border-2 border-ink bg-white text-ink hover:bg-cream transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5"
+                        title="Atur Kolom Tabel Yang Ingin Ditampilkan"
+                      >
+                        <Columns3 className="w-3.5 h-3.5 text-brand-orange" />
+                        <span>Atur Kolom</span>
+                        {Object.values(visibleColumns).filter(Boolean).length < Object.keys(visibleColumns).length && (
+                          <span className="bg-brand-orange text-white text-[9px] font-black px-1.5 py-0.2 rounded-full min-w-[16px] text-center">
+                            {Object.values(visibleColumns).filter(Boolean).length}/8
+                          </span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="end"
+                      className="w-72 p-3 bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-2.5 z-50"
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b border-dashed border-ink/20">
+                        <div className="flex items-center gap-1.5">
+                          <Columns3 className="w-4 h-4 text-brand-orange" />
+                          <span className="text-xs font-black uppercase text-ink tracking-wider">
+                            Pengaturan Kolom
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={resetDefaultColumns}
+                          className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer"
+                        >
+                          Reset Default
+                        </button>
+                      </div>
+
+                      <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+                        {COLUMN_DEFINITIONS.map((col) => {
+                          const isChecked = visibleColumns[col.id as keyof VisibleColumns];
+                          return (
+                            <label
+                              key={col.id}
+                              className={`flex items-center justify-between gap-2 p-1.5 rounded-lg text-xs cursor-pointer select-none transition-colors ${
+                                isChecked
+                                  ? "bg-cream/50 font-bold text-ink hover:bg-cream/80"
+                                  : "text-muted-foreground hover:bg-black/5"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleColumn(col.id as keyof VisibleColumns)}
+                                  className="w-3.5 h-3.5 accent-brand-orange cursor-pointer rounded"
+                                />
+                                <span>{col.label}</span>
+                              </div>
+                              {col.id === "pelunasan" && (
+                                <span className="text-[9px] font-black px-1 rounded bg-purple-100 text-purple-900 border border-purple-300">
+                                  Baru
+                                </span>
+                              )}
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      <div className="pt-2 border-t border-dashed border-ink/10 flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
+                        <span>{Object.values(visibleColumns).filter(Boolean).length} dari {Object.keys(visibleColumns).length} aktif</span>
+                        <button
+                          type="button"
+                          onClick={() => setAllColumns(true)}
+                          className="text-blue-700 hover:underline cursor-pointer font-bold"
+                        >
+                          Tampilkan Semua
+                        </button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
 
                   {activeFilterCount > 0 && (
                     <Button
@@ -2262,26 +2482,43 @@ function AdminTransactionsPage() {
 
               {/* Compact Desktop Table View (lg+ screens) */}
               <div className="hidden lg:block border rounded-lg overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-left border-collapse text-xs">
                   <thead className="bg-cream">
                     <tr>
                       <th className="w-9 p-2.5"></th>
-                      <SortHeaderColumn label="NO" field="no" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
-                      <SortHeaderColumn label="ORDER ID" field="order_id" currentField={sortField} direction={sortDirection} onSort={handleSort} />
-                      <SortHeaderColumn label="PELANGGAN" field="customer_name" currentField={sortField} direction={sortDirection} onSort={handleSort} />
-                      <SortHeaderColumn label="TOTAL" field="gross_amount" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
-                      <SortHeaderColumn label="STATUS" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
-                      <SortHeaderColumn label="TANGGAL" field="created_at" currentField={sortField} direction={sortDirection} onSort={handleSort} />
-                      <th className="p-2.5 text-right text-xs font-semibold tracking-wider text-ink uppercase pr-4">
-                        Aksi
-                      </th>
+                      {visibleColumns.no && (
+                        <SortHeaderColumn label="NO" field="no" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                      )}
+                      {visibleColumns.order_id && (
+                        <SortHeaderColumn label="ORDER ID" field="order_id" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      )}
+                      {visibleColumns.customer_name && (
+                        <SortHeaderColumn label="PELANGGAN" field="customer_name" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      )}
+                      {visibleColumns.gross_amount && (
+                        <SortHeaderColumn label="TOTAL" field="gross_amount" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
+                      )}
+                      {visibleColumns.pelunasan && (
+                        <SortHeaderColumn label="PELUNASAN" field="pelunasan" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
+                      )}
+                      {visibleColumns.payment_status && (
+                        <SortHeaderColumn label="STATUS" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                      )}
+                      {visibleColumns.created_at && (
+                        <SortHeaderColumn label="TANGGAL" field="created_at" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      )}
+                      {visibleColumns.actions && (
+                        <th className="p-2.5 text-right text-xs font-semibold tracking-wider text-ink uppercase pr-4">
+                          Aksi
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
                     {groupByCustomer ? (
                       sortedGroupedCustomerOrders.length === 0 ? (
                         <tr>
-                          <td colSpan={8} className="p-8 text-center text-muted-foreground font-bold">
+                          <td colSpan={visibleColumnCount} className="p-8 text-center text-muted-foreground font-bold">
                             Tidak ada data pembeli yang cocok dengan filter
                           </td>
                         </tr>
@@ -2307,64 +2544,102 @@ function AdminTransactionsPage() {
                                     )}
                                   </Button>
                                 </td>
-                                <td className="p-2.5 font-semibold text-xs text-ink text-center">{idx + 1}</td>
-                                <td className="p-2.5 font-mono text-xs">
-                                  <Badge className="bg-blue-100 text-blue-900 border-blue-300 font-bold text-[10px] uppercase">
-                                    {group.orders.length} Transaksi
-                                  </Badge>
-                                  <div className="text-[10px] text-muted-foreground mt-0.5 max-w-[180px] truncate font-mono">
-                                    {group.orders.map((o) => o.order_id).join(", ")}
-                                  </div>
-                                </td>
-                                <td className="p-2.5">
-                                  <p className="font-bold text-ink uppercase text-xs tracking-wide truncate max-w-[180px]">
-                                    {group.customer_name}
-                                  </p>
-                                </td>
-                                <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
-                                  Rp {Number(group.total_amount).toLocaleString("id-ID")}
-                                </td>
-                                <td className="p-2.5 text-center whitespace-nowrap">
-                                  <div className="inline-flex flex-col items-center gap-1">
-                                    {group.pending_count === 0 ? (
-                                      <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold text-[10px]">
-                                        {group.paid_count} Lunas
-                                      </Badge>
-                                    ) : (
-                                      <Badge className="bg-amber-100 text-amber-950 border-amber-300 font-bold text-[10px]">
-                                        {group.paid_count} Lunas • {group.pending_count} Pending
-                                      </Badge>
-                                    )}
-                                    <span className="text-[10px] text-muted-foreground font-semibold">
-                                      {group.orders.length} Pesanan
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="p-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                                  <div className="font-medium text-ink text-[11px] leading-tight">
-                                    {formatCompactDateTime(group.latest_created_at).date}
-                                  </div>
-                                  <div className="text-[10px] text-muted-foreground font-mono">
-                                    {formatCompactDateTime(group.latest_created_at).time}
-                                  </div>
-                                </td>
-                                <td className="p-2.5 text-right whitespace-nowrap pr-4">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-7 border-2 border-ink text-xs font-bold"
-                                    onClick={() => {
-                                      setExpandedRows((prev) => ({ ...prev, [`group-${group.key}`]: !isExpanded }));
-                                    }}
-                                  >
-                                    {isExpanded ? "Tutup" : "Rincian"}
-                                  </Button>
-                                </td>
+                                {visibleColumns.no && (
+                                  <td className="p-2.5 font-semibold text-xs text-ink text-center">{idx + 1}</td>
+                                )}
+                                {visibleColumns.order_id && (
+                                  <td className="p-2.5 font-mono text-xs">
+                                    <Badge className="bg-blue-100 text-blue-900 border-blue-300 font-bold text-[10px] uppercase">
+                                      {group.orders.length} Transaksi
+                                    </Badge>
+                                    <div className="text-[10px] text-muted-foreground mt-0.5 max-w-[180px] truncate font-mono">
+                                      {group.orders.map((o) => o.order_id).join(", ")}
+                                    </div>
+                                  </td>
+                                )}
+                                {visibleColumns.customer_name && (
+                                  <td className="p-2.5">
+                                    <p className="font-bold text-ink uppercase text-xs tracking-wide truncate max-w-[180px]">
+                                      {group.customer_name}
+                                    </p>
+                                  </td>
+                                )}
+                                {visibleColumns.gross_amount && (
+                                  <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
+                                    Rp {Number(group.total_amount).toLocaleString("id-ID")}
+                                  </td>
+                                )}
+                                {visibleColumns.pelunasan && (
+                                  <td className="p-2.5 text-right whitespace-nowrap">
+                                    {(() => {
+                                      const dpOrders = group.orders.filter((o: any) => isDpOrder(o));
+                                      if (dpOrders.length === 0) {
+                                        return <span className="text-muted-foreground text-xs font-semibold">-</span>;
+                                      }
+                                      const totalPelunasan = dpOrders.reduce((sum: number, o: any) => {
+                                        const lns = dpPelunasanMap[o.order_id];
+                                        return sum + (lns ? Number(lns.gross_amount || 0) : Number(o.gross_amount || 0));
+                                      }, 0);
+                                      return (
+                                        <div className="flex flex-col items-end">
+                                          <span className="font-mono font-black text-xs text-purple-950">
+                                            Rp {totalPelunasan.toLocaleString("id-ID")}
+                                          </span>
+                                          <span className="text-[9px] font-bold text-purple-700 bg-purple-50 px-1 py-0.2 rounded border border-purple-200">
+                                            {dpOrders.length} Pesanan DP
+                                          </span>
+                                        </div>
+                                      );
+                                    })()}
+                                  </td>
+                                )}
+                                {visibleColumns.payment_status && (
+                                  <td className="p-2.5 text-center whitespace-nowrap">
+                                    <div className="inline-flex flex-col items-center gap-1">
+                                      {group.pending_count === 0 ? (
+                                        <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold text-[10px]">
+                                          {group.paid_count} Lunas
+                                        </Badge>
+                                      ) : (
+                                        <Badge className="bg-amber-100 text-amber-950 border-amber-300 font-bold text-[10px]">
+                                          {group.paid_count} Lunas • {group.pending_count} Pending
+                                        </Badge>
+                                      )}
+                                      <span className="text-[10px] text-muted-foreground font-semibold">
+                                        {group.orders.length} Pesanan
+                                      </span>
+                                    </div>
+                                  </td>
+                                )}
+                                {visibleColumns.created_at && (
+                                  <td className="p-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                                    <div className="font-medium text-ink text-[11px] leading-tight">
+                                      {formatCompactDateTime(group.latest_created_at).date}
+                                    </div>
+                                    <div className="text-[10px] text-muted-foreground font-mono">
+                                      {formatCompactDateTime(group.latest_created_at).time}
+                                    </div>
+                                  </td>
+                                )}
+                                {visibleColumns.actions && (
+                                  <td className="p-2.5 text-right whitespace-nowrap pr-4">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 border-2 border-ink text-xs font-bold"
+                                      onClick={() => {
+                                        setExpandedRows((prev) => ({ ...prev, [`group-${group.key}`]: !isExpanded }));
+                                      }}
+                                    >
+                                      {isExpanded ? "Tutup" : "Rincian"}
+                                    </Button>
+                                  </td>
+                                )}
                               </tr>
 
                               {isExpanded && (
                                 <tr>
-                                  <td colSpan={8} className="p-4 bg-amber-50/40 border-t border-b border-border">
+                                  <td colSpan={visibleColumnCount} className="p-4 bg-amber-50/40 border-t border-b border-border">
                                     <div className="space-y-3 pl-2 sm:pl-4">
                                       <p className="text-xs font-black uppercase text-ink tracking-wider flex items-center gap-2">
                                         <Users className="w-4 h-4 text-brand-orange" />
@@ -2390,9 +2665,16 @@ function AdminTransactionsPage() {
                                               </div>
                                             </div>
                                             <div className="flex items-center gap-3">
-                                              <span className="font-black text-ink">
-                                                Rp {Number(subOrder.gross_amount).toLocaleString("id-ID")}
-                                              </span>
+                                              <div className="text-right">
+                                                <span className="font-black text-ink block">
+                                                  Rp {Number(subOrder.gross_amount).toLocaleString("id-ID")}
+                                                </span>
+                                                {isDpOrder(subOrder) && (
+                                                  <span className="text-[10px] text-purple-900 font-bold block">
+                                                    Pelunasan: Rp {Number(dpPelunasanMap[subOrder.order_id]?.gross_amount || subOrder.gross_amount).toLocaleString("id-ID")}
+                                                  </span>
+                                                )}
+                                              </div>
                                               {(() => {
                                                 const payBadge = getPaymentStatusBadge(subOrder, dpPelunasanMap[subOrder.order_id]);
                                                 return (
@@ -2446,7 +2728,7 @@ function AdminTransactionsPage() {
                       )
                     ) : sortedOnlineOrders.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="p-8 text-center text-muted-foreground">
+                        <td colSpan={visibleColumnCount} className="p-8 text-center text-muted-foreground">
                           Tidak ada pesanan online yang cocok
                         </td>
                       </tr>
@@ -2474,132 +2756,193 @@ function AdminTransactionsPage() {
                                 )}
                               </Button>
                             </td>
-                            <td className="p-2.5 font-semibold text-xs text-ink text-center">
-                              {idx + 1}
-                            </td>
-                            <td className="p-2.5 font-mono text-xs text-brand-blue font-bold whitespace-nowrap">
-                              <div>{order.order_id}</div>
-                              <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                {(() => {
-                                  const addr = String((order as any).shipping_address || "").toLowerCase();
-                                  const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
-                                  return isPickup ? (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-950 border border-emerald-300">
-                                      <Store className="w-2.5 h-2.5 text-emerald-700" /> Ambil
+                            {visibleColumns.no && (
+                              <td className="p-2.5 font-semibold text-xs text-ink text-center">
+                                {idx + 1}
+                              </td>
+                            )}
+                            {visibleColumns.order_id && (
+                              <td className="p-2.5 font-mono text-xs text-brand-blue font-bold whitespace-nowrap">
+                                <div>{order.order_id}</div>
+                                <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                  {(() => {
+                                    const addr = String((order as any).shipping_address || "").toLowerCase();
+                                    const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
+                                    return isPickup ? (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-950 border border-emerald-300">
+                                        <Store className="w-2.5 h-2.5 text-emerald-700" /> Ambil
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 text-blue-950 border border-blue-300">
+                                        <Truck className="w-2.5 h-2.5 text-blue-700" /> Antar
+                                      </span>
+                                    );
+                                  })()}
+                                  {isDpOrder(order) && (
+                                    <span className="px-1 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                                      DP
                                     </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 text-blue-950 border border-blue-300">
-                                      <Truck className="w-2.5 h-2.5 text-blue-700" /> Antar
+                                  )}
+                                  {dpPelunasanMap[order.order_id] && (
+                                    <span className="px-1 py-0.2 rounded text-[9px] font-black bg-purple-100 text-purple-900 border border-purple-300">
+                                      +Lunas
                                     </span>
-                                  );
-                                })()}
-                                {isDpOrder(order) && (
-                                  <span className="px-1 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                                    DP
-                                  </span>
-                                )}
-                                {dpPelunasanMap[order.order_id] && (
-                                  <span className="px-1 py-0.2 rounded text-[9px] font-black bg-purple-100 text-purple-900 border border-purple-300">
-                                    +Lunas
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                            <td className="p-2.5">
-                              <p className="font-bold text-ink uppercase text-xs truncate max-w-[150px] xl:max-w-[190px]" title={order.customer_name}>
-                                {order.customer_name}
-                              </p>
-                            </td>
-                            <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
-                              Rp {Number(order.gross_amount).toLocaleString("id-ID")}
-                            </td>
-                            <td className="p-2.5 text-center whitespace-nowrap">
-                              <div className="inline-flex flex-col items-center gap-1">
+                                  )}
+                                </div>
+                              </td>
+                            )}
+                            {visibleColumns.customer_name && (
+                              <td className="p-2.5">
+                                <p className="font-bold text-ink uppercase text-xs truncate max-w-[150px] xl:max-w-[190px]" title={order.customer_name}>
+                                  {order.customer_name}
+                                </p>
+                              </td>
+                            )}
+                            {visibleColumns.gross_amount && (
+                              <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
+                                Rp {Number(order.gross_amount).toLocaleString("id-ID")}
+                              </td>
+                            )}
+                            {visibleColumns.pelunasan && (
+                              <td className="p-2.5 text-right whitespace-nowrap">
                                 {(() => {
-                                  const payBadge = getPaymentStatusBadge(order, dpPelunasanMap[order.order_id]);
+                                  if (!isDpOrder(order)) {
+                                    return <span className="text-muted-foreground text-xs font-semibold">-</span>;
+                                  }
+                                  const linkedLns = dpPelunasanMap[order.order_id];
+                                  if (linkedLns) {
+                                    const isLnsPaid =
+                                      linkedLns.payment_status === "paid" ||
+                                      linkedLns.order_status === "completed" ||
+                                      linkedLns.transaction_status === "settlement";
+                                    const isLnsVerifying = isVerifyingOrder(linkedLns);
+                                    return (
+                                      <div className="flex flex-col items-end">
+                                        <span className="font-mono font-black text-xs text-purple-950">
+                                          Rp {Number(linkedLns.gross_amount).toLocaleString("id-ID")}
+                                        </span>
+                                        {isLnsPaid ? (
+                                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-300 mt-0.5">
+                                            <CheckCircle2 className="w-2.5 h-2.5" /> Lunas
+                                          </span>
+                                        ) : isLnsVerifying ? (
+                                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-300 mt-0.5">
+                                            <Clock className="w-2.5 h-2.5" /> Verifikasi
+                                          </span>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-0.5 text-[9px] font-black text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-300 mt-0.5">
+                                            Belum Lunas
+                                          </span>
+                                        )}
+                                      </div>
+                                    );
+                                  }
                                   return (
-                                    <Badge
-                                      className={`px-2 py-0.2 rounded-full text-[9px] font-black uppercase tracking-wider ${payBadge.color}`}
-                                    >
-                                      {payBadge.text}
-                                    </Badge>
+                                    <div className="flex flex-col items-end">
+                                      <span className="font-mono font-bold text-xs text-amber-900/80">
+                                        ~Rp {Number(order.gross_amount).toLocaleString("id-ID")}
+                                      </span>
+                                      <span className="text-[9px] font-extrabold text-amber-800/80 bg-amber-50/80 px-1.5 py-0.2 rounded border border-amber-200 mt-0.5">
+                                        Belum Ada Tagihan
+                                      </span>
+                                    </div>
                                   );
                                 })()}
+                              </td>
+                            )}
+                            {visibleColumns.payment_status && (
+                              <td className="p-2.5 text-center whitespace-nowrap">
+                                <div className="inline-flex flex-col items-center gap-1">
+                                  {(() => {
+                                    const payBadge = getPaymentStatusBadge(order, dpPelunasanMap[order.order_id]);
+                                    return (
+                                      <Badge
+                                        className={`px-2 py-0.2 rounded-full text-[9px] font-black uppercase tracking-wider ${payBadge.color}`}
+                                      >
+                                        {payBadge.text}
+                                      </Badge>
+                                    );
+                                  })()}
+                                  {(() => {
+                                    const fulBadge = getFulfillmentStatusBadge(order);
+                                    return (
+                                      <Badge
+                                        className={`px-2 py-0.2 rounded-full text-[9px] font-bold uppercase tracking-wider ${fulBadge.color}`}
+                                      >
+                                        {fulBadge.text}
+                                      </Badge>
+                                    );
+                                  })()}
+                                </div>
+                              </td>
+                            )}
+                            {visibleColumns.created_at && (
+                              <td className="p-2.5 text-xs text-muted-foreground whitespace-nowrap">
                                 {(() => {
-                                  const fulBadge = getFulfillmentStatusBadge(order);
+                                  const dt = formatCompactDateTime(order.created_at);
                                   return (
-                                    <Badge
-                                      className={`px-2 py-0.2 rounded-full text-[9px] font-bold uppercase tracking-wider ${fulBadge.color}`}
-                                    >
-                                      {fulBadge.text}
-                                    </Badge>
+                                    <>
+                                      <div className="font-medium text-ink text-[11px] leading-tight">{dt.date}</div>
+                                      <div className="text-[10px] text-muted-foreground font-mono">{dt.time}</div>
+                                    </>
                                   );
                                 })()}
-                              </div>
-                            </td>
-                            <td className="p-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                              {(() => {
-                                const dt = formatCompactDateTime(order.created_at);
-                                return (
-                                  <>
-                                    <div className="font-medium text-ink text-[11px] leading-tight">{dt.date}</div>
-                                    <div className="text-[10px] text-muted-foreground font-mono">{dt.time}</div>
-                                  </>
-                                );
-                              })()}
-                            </td>
-                            <td className="p-2.5 text-right whitespace-nowrap pr-4">
-                              <div className="flex justify-end gap-1 items-center">
-                                {order.order_status !== "completed" &&
-                                  order.order_status !== "cancelled" &&
-                                  !isCashier && (
+                              </td>
+                            )}
+                            {visibleColumns.actions && (
+                              <td className="p-2.5 text-right whitespace-nowrap pr-4">
+                                <div className="flex justify-end gap-1 items-center">
+                                  {order.order_status !== "completed" &&
+                                    order.order_status !== "cancelled" &&
+                                    !isCashier && (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => void handleOpenPartialPickup(order)}
+                                        className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer transition-colors"
+                                        title="Pengambilan / Serah Terima Pesanan (Penuh atau Parsial)"
+                                      >
+                                        <PackageCheck className="w-3.5 h-3.5" />
+                                        <span>{order.fulfillment_type === "shipping" ? "Selesai" : "Pengambilan"}</span>
+                                      </Button>
+                                    )}
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => void handleOpenManagement(order.order_id, "online")}
+                                    className="h-7 px-2.5 border border-ink hover:bg-cream text-ink font-bold text-xs uppercase shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]"
+                                  >
+                                    Kelola
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => void handleDirectPrintReceipt(order.order_id, "online")}
+                                    className="h-7 w-7 p-0 border border-ink hover:bg-cream text-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center justify-center cursor-pointer"
+                                    title="Cetak Struk Transaksi"
+                                  >
+                                    <Printer className="w-3.5 h-3.5 text-brand-orange" />
+                                  </Button>
+                                  {!isCashier && (
                                     <Button
-                                      size="sm"
-                                      onClick={() => void handleOpenPartialPickup(order)}
-                                      className="h-7 px-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer transition-colors"
-                                      title="Pengambilan / Serah Terima Pesanan (Penuh atau Parsial)"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 text-destructive hover:bg-red-50"
+                                      onClick={() => void handleDeleteOrder(order.order_id)}
+                                      title="Hapus Pesanan"
                                     >
-                                      <PackageCheck className="w-3.5 h-3.5" />
-                                      <span>{order.fulfillment_type === "shipping" ? "Selesai" : "Pengambilan"}</span>
+                                      <Trash2 className="h-3.5 w-3.5" />
                                     </Button>
                                   )}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => void handleOpenManagement(order.order_id, "online")}
-                                  className="h-7 px-2.5 border border-ink hover:bg-cream text-ink font-bold text-xs uppercase shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]"
-                                >
-                                  Kelola
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => void handleDirectPrintReceipt(order.order_id, "online")}
-                                  className="h-7 w-7 p-0 border border-ink hover:bg-cream text-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center justify-center cursor-pointer"
-                                  title="Cetak Struk Transaksi"
-                                >
-                                  <Printer className="w-3.5 h-3.5 text-brand-orange" />
-                                </Button>
-                                {!isCashier && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-destructive hover:bg-red-50"
-                                    onClick={() => void handleDeleteOrder(order.order_id)}
-                                    title="Hapus Pesanan"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                )}
-                              </div>
-                            </td>
+                                </div>
+                              </td>
+                            )}
                           </tr>
                           {dpPelunasanMap[order.order_id] && (() => {
                             const linkedLns = dpPelunasanMap[order.order_id];
                             const lnsBadge = getStatusBadgeTextAndColor(linkedLns);
                             return (
                               <tr className="bg-purple-50/80 border-b-2 border-purple-300">
-                                <td colSpan={8} className="p-2 px-4">
+                                <td colSpan={visibleColumnCount} className="p-2 px-4">
                                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                                     <div className="flex items-center gap-2">
                                       <span className="px-1.5 py-0.2 bg-purple-700 text-white rounded font-black text-[9px] uppercase tracking-wider">
@@ -2650,7 +2993,7 @@ function AdminTransactionsPage() {
                           })()}
                           {expandedRows[order.order_id] && (
                             <tr className="bg-[#FCFAF7] border-b border-border">
-                              <td colSpan={8} className="p-3 pl-8 sm:pl-12">
+                              <td colSpan={visibleColumnCount} className="p-3 pl-8 sm:pl-12">
                                 {rowItemsLoading[order.order_id] ? (
                                   <p className="text-xs text-muted-foreground animate-pulse">Memuat item...</p>
                                 ) : (
