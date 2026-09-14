@@ -295,6 +295,12 @@ export interface Order {
   snap_token: string | null;
   payment_proof_url: string | null;
   payment_proof_note: string | null;
+  payment_proof_verified_amount?: number | null;
+  payment_proof_bank?: string | null;
+  payment_proof_sender?: string | null;
+  payment_proof_match_status?: "MATCH" | "UNDERPAID" | "OVERPAID" | "UNREADABLE" | null;
+  payment_proof_difference?: number | null;
+  payment_proof_ai_details?: string | null;
   voucher_code?: string | null;
   fulfillment_proof_url?: string | null;
   is_complained?: number;
@@ -1280,6 +1286,27 @@ export const analyzePaymentProofAction = createServerFn({ method: "POST" })
     } catch (error: any) {
       console.error("Error analyzing payment proof with AI:", error);
       return { success: false, error: error.message || "Gagal menganalisis bukti transfer" };
+    }
+  });
+
+// Batch scan payment proofs with Gemini AI Vision
+export const scanAllPaymentProofsAction = createServerFn({ method: "POST" })
+  .validator((d: { limit?: number; forceAll?: boolean } | undefined) => d || {})
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/admin/orders/scan-all-proofs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input || {}),
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error batch scanning payment proofs with AI:", error);
+      return { success: false, error: error.message || "Gagal memindai bukti transfer secara massal" };
     }
   });
 

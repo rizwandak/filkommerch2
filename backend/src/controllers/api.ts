@@ -1843,6 +1843,11 @@ export const getOnlineOrders = async (req: Request, res: Response) => {
       void repairHistoricalPelunasanOrders().catch(() => {});
     } catch {}
 
+    // Safe background auto-scanner for uninspected payment proofs
+    try {
+      void triggerBackgroundProofScanning().catch(() => {});
+    } catch {}
+
     const orders = await query<any>(
       "SELECT * FROM orders WHERE channel = 'online' ORDER BY created_at DESC LIMIT 10000"
     );
@@ -2137,21 +2142,34 @@ export const verifyPaymentProof = async (req: Request, res: Response) => {
   }
 };
 
-// Analyze payment proof with Gemini AI Vision (Admin)
-export const analyzePaymentProof = async (req: Request, res: Response) => {
-  const { id } = req.params;
+export interface ProofInspectionResult {
+  detected_nominal: number | null;
+  expected_amount: number;
+  match_status: "MATCH" | "UNDERPAID" | "OVERPAID" | "UNREADABLE";
+  difference: number;
+  bank_atau_metode: string;
+  nama_pengirim: string | null;
+  nama_penerima: string | null;
+  status_transaksi: string;
+  tanggal_waktu: string | null;
+  nomor_referensi: string | null;
+  catatan: string | null;
+}
+
+// Reusable inspector: runs Gemini AI Vision on payment proof and immediately updates the orders database table
+export const inspectAndSavePaymentProof = async (orderId: string): Promise<{ success: boolean; data?: ProofInspectionResult; error?: string }> => {
   try {
     const order = await queryOne<any>(
       "SELECT id, order_id, customer_name, gross_amount, payment_proof_url, payment_type FROM orders WHERE order_id = ? OR id = ? LIMIT 1",
-      [id, id]
+      [orderId, orderId]
     );
 
     if (!order) {
-      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+      return { success: false, error: "Pesanan tidak ditemukan" };
     }
 
     if (!order.payment_proof_url) {
-      return res.status(400).json({ success: false, error: "Pesanan ini belum memiliki bukti transfer yang diunggah" });
+      return { success: false, error: "Pesanan ini belum memiliki bukti transfer yang diunggah" };
     }
 
     let imgBuffer: Buffer | null = null;
@@ -2181,15 +2199,15 @@ export const analyzePaymentProof = async (req: Request, res: Response) => {
         imgBuffer = Buffer.from(arrayBuf);
       } catch (err: any) {
         console.error("Gagal fetch bukti pembayaran dari URL:", fetchUrl, err);
-        return res.status(400).json({
+        return {
           success: false,
           error: "Gagal memuat gambar bukti transfer. Pastikan file gambar dapat diakses.",
-        });
+        };
       }
     }
 
     if (!imgBuffer || imgBuffer.length === 0) {
-      return res.status(400).json({ success: false, error: "File bukti transfer kosong atau tidak valid" });
+      return { success: false, error: "File bukti transfer kosong atau tidak valid" };
     }
 
     const ext = path.extname(filename).toLowerCase();
@@ -2284,10 +2302,15 @@ PENTING:
     }
 
     if (!aiJson) {
-      return res.status(500).json({
+      // Mark as UNREADABLE in database so we know it has been scanned but needs manual inspection
+      await execute(
+        "UPDATE orders SET payment_proof_match_status = 'UNREADABLE' WHERE order_id = ?",
+        [order.order_id]
+      );
+      return {
         success: false,
         error: "AI tidak dapat membaca bukti transfer ini saat ini. Silakan verifikasi secara manual.",
-      });
+      };
     }
 
     const expectedAmount = Number(order.gross_amount || 0);
@@ -2308,28 +2331,144 @@ PENTING:
       }
     }
 
+    const inspectionData: ProofInspectionResult = {
+      detected_nominal: isNaN(detectedNominal) ? null : detectedNominal,
+      expected_amount: expectedAmount,
+      match_status: matchStatus,
+      difference,
+      bank_atau_metode: aiJson.bank_atau_metode || "Tidak Terdeteksi",
+      nama_pengirim: aiJson.nama_pengirim || null,
+      nama_penerima: aiJson.nama_penerima || null,
+      status_transaksi: aiJson.status_transaksi || "TIDAK_JELAS",
+      tanggal_waktu: aiJson.tanggal_waktu || null,
+      nomor_referensi: aiJson.nomor_referensi || null,
+      catatan: aiJson.catatan || null,
+    };
+
+    // Update orders table with complete AI verification data
+    await execute(
+      `UPDATE orders SET
+        payment_proof_verified_amount = ?,
+        payment_proof_bank = ?,
+        payment_proof_sender = ?,
+        payment_proof_match_status = ?,
+        payment_proof_difference = ?,
+        payment_proof_ai_details = ?
+      WHERE order_id = ?`,
+      [
+        inspectionData.detected_nominal,
+        inspectionData.bank_atau_metode,
+        inspectionData.nama_pengirim,
+        inspectionData.match_status,
+        inspectionData.difference,
+        JSON.stringify(inspectionData),
+        order.order_id,
+      ]
+    );
+
+    return {
+      success: true,
+      data: inspectionData,
+    };
+  } catch (error: any) {
+    console.error(`Error in inspectAndSavePaymentProof for ${orderId}:`, error);
+    return {
+      success: false,
+      error: error.message || "Terjadi kesalahan saat memeriksa bukti transfer",
+    };
+  }
+};
+
+// Analyze single payment proof with Gemini AI Vision (Admin)
+export const analyzePaymentProof = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await inspectAndSavePaymentProof(id);
+  if (!result.success) {
+    return res.status(400).json(result);
+  }
+  return res.json(result);
+};
+
+// Batch scan payment proofs for historical or unscanned orders
+export const scanAllPaymentProofs = async (req: Request, res: Response) => {
+  try {
+    const limit = Math.min(Math.max(parseInt(String(req.body?.limit || "10"), 10) || 10, 1), 30);
+    const forceAll = Boolean(req.body?.forceAll);
+
+    let whereClause = "WHERE payment_proof_url IS NOT NULL AND payment_proof_url != ''";
+    if (!forceAll) {
+      whereClause += " AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '')";
+    }
+
+    const ordersToScan = await query<any>(
+      `SELECT order_id FROM orders ${whereClause} ORDER BY created_at DESC LIMIT ?`,
+      [limit]
+    );
+
+    const totalRemainingRow = await queryOne<any>(
+      `SELECT COUNT(*) as count FROM orders WHERE payment_proof_url IS NOT NULL AND payment_proof_url != '' AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '')`
+    );
+    const totalRemainingBefore = Number(totalRemainingRow?.count || 0);
+
+    const scannedResults: any[] = [];
+
+    for (const row of (ordersToScan || [])) {
+      try {
+        const result = await inspectAndSavePaymentProof(row.order_id);
+        scannedResults.push({
+          order_id: row.order_id,
+          success: result.success,
+          match_status: result.data?.match_status,
+          verified_amount: result.data?.detected_nominal,
+          difference: result.data?.difference,
+        });
+        // Throttle to respect Gemini rate limits
+        await new Promise((r) => setTimeout(r, 600));
+      } catch (err: any) {
+        scannedResults.push({ order_id: row.order_id, success: false, error: err.message });
+      }
+    }
+
+    const totalRemainingRowAfter = await queryOne<any>(
+      `SELECT COUNT(*) as count FROM orders WHERE payment_proof_url IS NOT NULL AND payment_proof_url != '' AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '')`
+    );
+    const totalRemainingAfter = Number(totalRemainingRowAfter?.count || 0);
+
     return res.json({
       success: true,
-      data: {
-        detected_nominal: isNaN(detectedNominal) ? null : detectedNominal,
-        expected_amount: expectedAmount,
-        match_status: matchStatus,
-        difference,
-        bank_atau_metode: aiJson.bank_atau_metode || "Tidak Terdeteksi",
-        nama_pengirim: aiJson.nama_pengirim || null,
-        nama_penerima: aiJson.nama_penerima || null,
-        status_transaksi: aiJson.status_transaksi || "TIDAK_JELAS",
-        tanggal_waktu: aiJson.tanggal_waktu || null,
-        nomor_referensi: aiJson.nomor_referensi || null,
-        catatan: aiJson.catatan || null,
-      },
+      processed: scannedResults.length,
+      total_remaining: totalRemainingAfter,
+      results: scannedResults,
     });
   } catch (error: any) {
-    console.error("Error in analyzePaymentProof:", error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || "Terjadi kesalahan saat menganalisis bukti transfer",
-    });
+    console.error("Error in scanAllPaymentProofs:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Automatic background worker for unscanned proofs
+let isAutoProofScanningRunning = false;
+export const triggerBackgroundProofScanning = async () => {
+  if (isAutoProofScanningRunning) return;
+  isAutoProofScanningRunning = true;
+  try {
+    const unscanned = await query<any>(
+      "SELECT order_id FROM orders WHERE payment_proof_url IS NOT NULL AND payment_proof_url != '' AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '') ORDER BY created_at DESC LIMIT 3"
+    );
+    if (unscanned && unscanned.length > 0) {
+      for (const row of unscanned) {
+        try {
+          await inspectAndSavePaymentProof(row.order_id);
+          await new Promise((r) => setTimeout(r, 800));
+        } catch (e) {
+          console.warn(`[Background Proof Scan] Failed for ${row.order_id}:`, e);
+        }
+      }
+    }
+  } catch (err) {
+    console.error("[Background Proof Scan] Error:", err);
+  } finally {
+    isAutoProofScanningRunning = false;
   }
 };
 
@@ -3284,9 +3423,14 @@ export const submitPaymentProof = async (req: Request, res: Response) => {
     }
 
     await execute(
-      "UPDATE orders SET payment_proof_url = ?, transaction_status = 'pending', payment_status = 'pending', payment_type = 'manual_qris', payment_proof_note = NULL, payment_proof_history = ? WHERE order_id = ?",
+      "UPDATE orders SET payment_proof_url = ?, transaction_status = 'pending', payment_status = 'pending', payment_type = 'manual_qris', payment_proof_note = NULL, payment_proof_history = ?, payment_proof_match_status = NULL, payment_proof_difference = NULL, payment_proof_verified_amount = NULL WHERE order_id = ?",
       [paymentProofUrl, JSON.stringify(history), id]
     );
+
+    // Auto-scan payment proof immediately with Gemini AI in background
+    void inspectAndSavePaymentProof(id).catch((aiErr) => {
+      console.error(`[AI Auto-Scan] Failed for ${id}:`, aiErr);
+    });
 
     return res.json({ success: true });
   } catch (error: any) {

@@ -359,6 +359,7 @@ app.post("/api/admin/products", checkRole(["admin"]), (req, res, next) => { clea
 app.put("/api/admin/products", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.updateProduct);
 app.delete("/api/admin/products/:id", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.deleteProduct);
 app.get("/api/admin/orders", checkRole(["admin", "cashier"]), apiControllers.getOnlineOrders);
+app.post("/api/admin/orders/scan-all-proofs", checkRole(["admin", "cashier"]), apiControllers.scanAllPaymentProofs);
 app.put("/api/admin/orders/:id/status", checkRole(["admin", "cashier"]), apiControllers.updateOrderStatus);
 app.put("/api/admin/orders/:id/verify-payment", checkRole(["admin", "cashier"]), apiControllers.verifyPaymentProof);
 app.post("/api/admin/orders/:id/analyze-proof", checkRole(["admin", "cashier"]), apiControllers.analyzePaymentProof);

@@ -343,6 +343,30 @@ export async function runMigration() {
       {
         name: "users.merged_into_id",
         sql: "ALTER TABLE users ADD COLUMN merged_into_id INT DEFAULT NULL"
+      },
+      {
+        name: "orders.payment_proof_verified_amount",
+        sql: "ALTER TABLE orders ADD COLUMN payment_proof_verified_amount INT DEFAULT NULL"
+      },
+      {
+        name: "orders.payment_proof_bank",
+        sql: "ALTER TABLE orders ADD COLUMN payment_proof_bank VARCHAR(100) DEFAULT NULL"
+      },
+      {
+        name: "orders.payment_proof_sender",
+        sql: "ALTER TABLE orders ADD COLUMN payment_proof_sender VARCHAR(255) DEFAULT NULL"
+      },
+      {
+        name: "orders.payment_proof_match_status",
+        sql: "ALTER TABLE orders ADD COLUMN payment_proof_match_status VARCHAR(50) DEFAULT NULL"
+      },
+      {
+        name: "orders.payment_proof_difference",
+        sql: "ALTER TABLE orders ADD COLUMN payment_proof_difference INT DEFAULT 0"
+      },
+      {
+        name: "orders.payment_proof_ai_details",
+        sql: "ALTER TABLE orders ADD COLUMN payment_proof_ai_details LONGTEXT DEFAULT NULL"
       }
     ];
 

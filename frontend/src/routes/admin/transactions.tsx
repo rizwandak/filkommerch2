@@ -91,6 +91,7 @@ import {
   deleteOfflineSale,
   verifyPaymentProof,
   analyzePaymentProofAction,
+  scanAllPaymentProofsAction,
   getAllClaimsServerAction,
   approveClaimServerAction,
   rejectClaimServerAction,
@@ -185,6 +186,99 @@ const getFulfillmentStatusBadge = (order: any) => {
 
 const getStatusBadgeTextAndColor = getPaymentStatusBadge;
 
+// Component to render AI proof status badge directly in table rows
+const renderAiProofBadge = (order: any, linkedLns?: any) => {
+  if (!order) return null;
+  const badges: any[] = [];
+
+  const getBadgeForSingleOrder = (o: any, labelPrefix = "") => {
+    if (!o.payment_proof_url) return null;
+    const match = o.payment_proof_match_status;
+    const amount = o.payment_proof_verified_amount ? Number(o.payment_proof_verified_amount) : null;
+    const diff = o.payment_proof_difference ? Number(o.payment_proof_difference) : 0;
+    const bank = o.payment_proof_bank || "";
+
+    if (match === "MATCH") {
+      return (
+        <span
+          key={`${o.order_id}-ai-match`}
+          className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 shadow-xs"
+          title={`${labelPrefix}Bukti transfer sesuai 100%: Rp ${(amount || o.gross_amount).toLocaleString("id-ID")} via ${bank || "QRIS"}`}
+        >
+          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+          <span>{labelPrefix}AI: Pas Rp {(amount || o.gross_amount).toLocaleString("id-ID")}</span>
+        </span>
+      );
+    }
+
+    if (match === "UNDERPAID") {
+      return (
+        <span
+          key={`${o.order_id}-ai-under`}
+          className="inline-flex items-center gap-1 text-[9px] font-black text-rose-900 bg-rose-50 px-2 py-0.5 rounded border-2 border-rose-400 shadow-xs animate-pulse"
+          title={`${labelPrefix}PERHATIAN KURANG BAYAR! Tagihan: Rp ${Number(o.gross_amount).toLocaleString("id-ID")}, Struk AI: Rp ${amount ? amount.toLocaleString("id-ID") : "0"}`}
+        >
+          <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
+          <span>{labelPrefix}AI: Kurang -Rp {diff.toLocaleString("id-ID")}</span>
+        </span>
+      );
+    }
+
+    if (match === "OVERPAID") {
+      return (
+        <span
+          key={`${o.order_id}-ai-over`}
+          className="inline-flex items-center gap-1 text-[9px] font-black text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-300 shadow-xs"
+          title={`${labelPrefix}LEBIH BAYAR: Tagihan: Rp ${Number(o.gross_amount).toLocaleString("id-ID")}, Struk AI: Rp ${amount ? amount.toLocaleString("id-ID") : "0"}`}
+        >
+          <Sparkles className="w-3 h-3 text-blue-600 shrink-0" />
+          <span>{labelPrefix}AI: Lebih +Rp {diff.toLocaleString("id-ID")}</span>
+        </span>
+      );
+    }
+
+    if (match === "UNREADABLE") {
+      return (
+        <span
+          key={`${o.order_id}-ai-unreadable`}
+          className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300"
+          title="Struk buram atau nominal tidak terbaca jelas oleh AI. Perlu dicek manual oleh admin."
+        >
+          <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
+          <span>{labelPrefix}AI: Cek Manual</span>
+        </span>
+      );
+    }
+
+    return (
+      <span
+        key={`${o.order_id}-ai-pending`}
+        className="inline-flex items-center gap-1 text-[9px] text-muted-foreground bg-slate-50 px-1.5 py-0.5 rounded border border-dashed border-slate-300"
+        title="Struk ada di sistem, sedang antre pemeriksaan AI"
+      >
+        <Clock className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+        <span>{labelPrefix}AI: Menunggu Scan</span>
+      </span>
+    );
+  };
+
+  const mainBadge = getBadgeForSingleOrder(order);
+  if (mainBadge) badges.push(mainBadge);
+
+  if (linkedLns && linkedLns.payment_proof_url) {
+    const lnsBadge = getBadgeForSingleOrder(linkedLns, "LNS: ");
+    if (lnsBadge) badges.push(lnsBadge);
+  }
+
+  if (badges.length === 0) return null;
+
+  return (
+    <div className="flex flex-col items-center gap-1 mt-1">
+      {badges}
+    </div>
+  );
+};
+
 const formatCompactDateTime = (dateStr: string | Date | null | undefined) => {
   if (!dateStr) return { date: "-", time: "" };
   try {
@@ -229,7 +323,7 @@ const COLUMN_DEFINITIONS = [
   { id: "customer_name", label: "Pelanggan" },
   { id: "gross_amount", label: "Total Pesanan" },
   { id: "pelunasan", label: "Nominal Pelunasan" },
-  { id: "payment_status", label: "Status & Fulfillment" },
+  { id: "payment_status", label: "Status & AI Struk" },
   { id: "created_at", label: "Tanggal & Jam" },
   { id: "actions", label: "Tombol Aksi" },
 ] as const;
@@ -298,6 +392,9 @@ function AdminTransactionsPage() {
   const [productFilterMode, setProductFilterMode] = useState<"include" | "exclude">("include");
   const [shippingFilter, setShippingFilter] = useState<"all" | "pickup" | "delivery">("all");
   const [groupByCustomer, setGroupByCustomer] = useState<boolean>(false);
+  const [aiStatusFilter, setAiStatusFilter] = useState<"all" | "UNDERPAID" | "OVERPAID" | "MATCH" | "UNREADABLE" | "UNSCANNED">("all");
+  const [isBatchScanning, setIsBatchScanning] = useState(false);
+  const [batchScanProgress, setBatchScanProgress] = useState<{ processed: number; remaining: number } | null>(null);
 
   // Table Column Visibility State
   const [visibleColumns, setVisibleColumns] = useState<VisibleColumns>(() => {
@@ -389,8 +486,9 @@ function AdminTransactionsPage() {
     if (productFilter.length > 0) count++;
     if (shippingFilter !== "all") count++;
     if (statusFilter.length > 0) count++;
+    if (aiStatusFilter !== "all") count++;
     return count;
-  }, [campaignFilter, productFilter, shippingFilter, statusFilter]);
+  }, [campaignFilter, productFilter, shippingFilter, statusFilter, aiStatusFilter]);
 
   const handleResetAllFilters = () => {
     setCampaignFilter("all");
@@ -398,6 +496,7 @@ function AdminTransactionsPage() {
     setProductFilterMode("include");
     setShippingFilter("all");
     setStatusFilter([]);
+    setAiStatusFilter("all");
   };
 
   // Collapsible Row States
@@ -819,6 +918,32 @@ function AdminTransactionsPage() {
 
           setManagedNotes(result.order.notes || "");
           setManagedFulfillmentProof(result.order.fulfillment_proof_url || "");
+
+          // Preload existing AI verification results if already scanned
+          if (result.order.payment_proof_match_status) {
+            let aiDetails: any = {};
+            try {
+              aiDetails = typeof result.order.payment_proof_ai_details === "string"
+                ? JSON.parse(result.order.payment_proof_ai_details)
+                : (result.order.payment_proof_ai_details || {});
+            } catch {}
+            setProofAnalysisResult({
+              detected_nominal: result.order.payment_proof_verified_amount ?? null,
+              expected_amount: Number(result.order.gross_amount || 0),
+              match_status: result.order.payment_proof_match_status,
+              difference: Number(result.order.payment_proof_difference || 0),
+              bank_atau_metode: result.order.payment_proof_bank || aiDetails.bank_atau_metode || "Tidak Terdeteksi",
+              nama_pengirim: result.order.payment_proof_sender || aiDetails.nama_pengirim || null,
+              nama_penerima: aiDetails.nama_penerima || null,
+              status_transaksi: aiDetails.status_transaksi || "BERHASIL",
+              tanggal_waktu: aiDetails.tanggal_waktu || null,
+              nomor_referensi: aiDetails.nomor_referensi || null,
+              catatan: aiDetails.catatan || null,
+            });
+          } else if (result.order.payment_proof_url) {
+            // Auto-trigger inspection right away if not scanned yet
+            void handleRunAiAnalysis(result.order.order_id);
+          }
         } else {
           toast.error("Gagal mengambil detail pesanan");
           setManagementOpen(false);
@@ -1012,6 +1137,8 @@ function AdminTransactionsPage() {
         } else if (res.data.match_status === "OVERPAID") {
           toast.info(`Perhatian: Pembeli lebih bayar Rp ${res.data.difference.toLocaleString("id-ID")}`);
         }
+        // Reload transactions so row badges reflect latest AI analysis immediately
+        await loadTransactions();
       } else {
         toast.error(res.error || "Gagal menganalisis bukti transfer");
       }
@@ -1019,6 +1146,35 @@ function AdminTransactionsPage() {
       toast.error(err.message || "Terjadi kesalahan saat memanggil AI");
     } finally {
       setIsAnalyzingProof(false);
+    }
+  };
+
+  const handleBatchScanAiProofs = async () => {
+    setIsBatchScanning(true);
+    let totalScanned = 0;
+    try {
+      toast.info("Memulai pemindaian AI untuk seluruh bukti transfer...");
+      while (true) {
+        const res = await scanAllPaymentProofsAction({ data: { limit: 10 } });
+        if (!res.success) {
+          toast.error(res.error || "Gagal memindai beberapa bukti transfer");
+          break;
+        }
+        totalScanned += res.processed || 0;
+        setBatchScanProgress({ processed: totalScanned, remaining: res.total_remaining || 0 });
+        await loadTransactions();
+        if (!res.total_remaining || res.total_remaining <= 0 || res.processed === 0) {
+          toast.success(`Selesai! Berhasil memindai ${totalScanned} bukti transfer.`);
+          break;
+        }
+        await new Promise((r) => setTimeout(r, 600));
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat pemindaian massal");
+    } finally {
+      setIsBatchScanning(false);
+      setBatchScanProgress(null);
+      await loadTransactions();
     }
   };
 
@@ -1346,6 +1502,12 @@ function AdminTransactionsPage() {
     let dpCount = 0;
     let unpaidCount = 0;
 
+    let aiUnderpaidCount = 0;
+    let aiOverpaidCount = 0;
+    let aiMatchCount = 0;
+    let aiUnreadableCount = 0;
+    let aiUnscannedCount = 0;
+
     baseFilteredOrders.forEach((o) => {
       if (!o) return;
 
@@ -1389,6 +1551,23 @@ function AdminTransactionsPage() {
       if (!isPaid && !isVerifyingOrder(o)) {
         unpaidCount++;
       }
+
+      // Check AI inspection metrics
+      if (o.payment_proof_url) {
+        if (o.payment_proof_match_status === "UNDERPAID") aiUnderpaidCount++;
+        else if (o.payment_proof_match_status === "OVERPAID") aiOverpaidCount++;
+        else if (o.payment_proof_match_status === "MATCH") aiMatchCount++;
+        else if (o.payment_proof_match_status === "UNREADABLE") aiUnreadableCount++;
+        else aiUnscannedCount++;
+      }
+
+      if (linkedLns && linkedLns.payment_proof_url) {
+        if (linkedLns.payment_proof_match_status === "UNDERPAID") aiUnderpaidCount++;
+        else if (linkedLns.payment_proof_match_status === "OVERPAID") aiOverpaidCount++;
+        else if (linkedLns.payment_proof_match_status === "MATCH") aiMatchCount++;
+        else if (linkedLns.payment_proof_match_status === "UNREADABLE") aiUnreadableCount++;
+        else aiUnscannedCount++;
+      }
     });
 
     return {
@@ -1401,54 +1580,85 @@ function AdminTransactionsPage() {
       verifyingBarisCount, // Main Rows in Table needing ACC
       dpCount,
       unpaidCount,
+      aiUnderpaidCount,
+      aiOverpaidCount,
+      aiMatchCount,
+      aiUnreadableCount,
+      aiUnscannedCount,
     };
   }, [baseFilteredOrders, dpPelunasanMap]);
 
-  // 3. Final filtered orders list applying status filter
+  // 3. Final filtered orders list applying status & AI filters
   const filteredOnlineOrders = useMemo(() => {
-    if (!statusFilter || statusFilter.length === 0) return baseFilteredOrders;
+    let result = baseFilteredOrders;
 
-    return baseFilteredOrders.filter((order) => {
-      const linkedLns = dpPelunasanMap[order.order_id];
-      const isPaid =
-        order.payment_status === "paid" ||
-        order.transaction_status === "settlement" ||
-        order.order_status === "completed";
-      const lnsPaid = linkedLns && (
-        linkedLns.payment_status === "paid" ||
-        linkedLns.transaction_status === "settlement" ||
-        linkedLns.order_status === "completed"
-      );
-      const isDp = isDpOrder(order);
-      const isVerifying = isVerifyingOrder(order) || (linkedLns && isVerifyingOrder(linkedLns));
+    if (statusFilter && statusFilter.length > 0) {
+      result = result.filter((order) => {
+        const linkedLns = dpPelunasanMap[order.order_id];
+        const isPaid =
+          order.payment_status === "paid" ||
+          order.transaction_status === "settlement" ||
+          order.order_status === "completed";
+        const lnsPaid = linkedLns && (
+          linkedLns.payment_status === "paid" ||
+          linkedLns.transaction_status === "settlement" ||
+          linkedLns.order_status === "completed"
+        );
+        const isDp = isDpOrder(order);
+        const isVerifying = isVerifyingOrder(order) || (linkedLns && isVerifyingOrder(linkedLns));
 
-      return statusFilter.some((key) => {
-        if (key === "paid_full") {
-          return !isDp && isPaid;
-        }
-        if (key === "dp_paid") {
-          return isDp && isPaid && lnsPaid;
-        }
-        if (key === "dp_unpaid") {
-          return isDp && isPaid && !lnsPaid;
-        }
-        if (key === "verifying") {
-          return isVerifying;
-        }
-        if (key === "unpaid") {
-          return !isPaid && !isVerifyingOrder(order);
-        }
-        // Fallbacks
-        if (key === "paid") {
-          return isPaid && (!linkedLns || lnsPaid);
-        }
-        if (key === "dp") {
-          return isDp;
-        }
-        return false;
+        return statusFilter.some((key) => {
+          if (key === "paid_full") {
+            return !isDp && isPaid;
+          }
+          if (key === "dp_paid") {
+            return isDp && isPaid && lnsPaid;
+          }
+          if (key === "dp_unpaid") {
+            return isDp && isPaid && !lnsPaid;
+          }
+          if (key === "verifying") {
+            return isVerifying;
+          }
+          if (key === "unpaid") {
+            return !isPaid && !isVerifyingOrder(order);
+          }
+          // Fallbacks
+          if (key === "paid") {
+            return isPaid && (!linkedLns || lnsPaid);
+          }
+          if (key === "dp") {
+            return isDp;
+          }
+          return false;
+        });
       });
-    });
-  }, [baseFilteredOrders, statusFilter, dpPelunasanMap]);
+    }
+
+    if (aiStatusFilter !== "all") {
+      result = result.filter((order) => {
+        const linkedLns = dpPelunasanMap[order.order_id];
+        if (aiStatusFilter === "UNDERPAID") {
+          return order.payment_proof_match_status === "UNDERPAID" || linkedLns?.payment_proof_match_status === "UNDERPAID";
+        }
+        if (aiStatusFilter === "OVERPAID") {
+          return order.payment_proof_match_status === "OVERPAID" || linkedLns?.payment_proof_match_status === "OVERPAID";
+        }
+        if (aiStatusFilter === "MATCH") {
+          return order.payment_proof_match_status === "MATCH" || linkedLns?.payment_proof_match_status === "MATCH";
+        }
+        if (aiStatusFilter === "UNREADABLE") {
+          return order.payment_proof_match_status === "UNREADABLE" || linkedLns?.payment_proof_match_status === "UNREADABLE";
+        }
+        if (aiStatusFilter === "UNSCANNED") {
+          return (order.payment_proof_url && !order.payment_proof_match_status) || (linkedLns?.payment_proof_url && !linkedLns?.payment_proof_match_status);
+        }
+        return true;
+      });
+    }
+
+    return result;
+  }, [baseFilteredOrders, statusFilter, aiStatusFilter, dpPelunasanMap]);
 
   const targetUserIds = useMemo(() => {
     const ids = filteredOnlineOrders
@@ -2152,7 +2362,126 @@ function AdminTransactionsPage() {
                     <Users className="w-3.5 h-3.5 mr-1.5" />
                     {groupByCustomer ? "Gabung Pembeli (Aktif)" : "Gabungkan Nama Pembeli Sama"}
                   </Button>
+
+                  {/* Tombol Pindai Semua Bukti AI */}
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleBatchScanAiProofs()}
+                    disabled={isBatchScanning}
+                    className="h-9 px-3 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5 cursor-pointer transition-all hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                    title="Pindai dan periksa seluruh bukti transfer yang belum dicek secara otomatis dengan Gemini AI"
+                  >
+                    {isBatchScanning ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Memindai AI ({batchScanProgress ? `${batchScanProgress.processed} / Sisa ${batchScanProgress.remaining}` : "..."})</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>⚡ Pindai Semua Bukti AI {stats.aiUnscannedCount > 0 ? `(${stats.aiUnscannedCount})` : ""}</span>
+                      </>
+                    )}
+                  </Button>
                 </div>
+              </div>
+
+              {/* Quick AI Struk Filter Chips */}
+              <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-dashed border-border mt-3 bg-purple-50/40 p-2.5 rounded-xl border-purple-200">
+                <div className="flex items-center gap-1.5 mr-1">
+                  <Sparkles className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <span className="text-[11px] font-black uppercase tracking-wider text-purple-950">
+                    Filter AI Struk:
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiStatusFilter("all")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    aiStatusFilter === "all"
+                      ? "bg-purple-700 text-white shadow-xs"
+                      : "bg-white text-ink border border-border hover:bg-cream"
+                  }`}
+                >
+                  Semua ({stats.total})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiStatusFilter(aiStatusFilter === "UNDERPAID" ? "all" : "UNDERPAID")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                    aiStatusFilter === "UNDERPAID"
+                      ? "bg-rose-700 text-white shadow-sm ring-2 ring-rose-400"
+                      : stats.aiUnderpaidCount > 0
+                        ? "bg-rose-50 text-rose-800 border-2 border-rose-300 font-extrabold hover:bg-rose-100 animate-pulse"
+                        : "bg-white text-muted-foreground border border-border hover:bg-cream"
+                  }`}
+                >
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                  <span>Kurang Bayar</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${aiStatusFilter === "UNDERPAID" ? "bg-white text-rose-800" : "bg-rose-200 text-rose-900"}`}>
+                    {stats.aiUnderpaidCount}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiStatusFilter(aiStatusFilter === "OVERPAID" ? "all" : "OVERPAID")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    aiStatusFilter === "OVERPAID"
+                      ? "bg-blue-700 text-white shadow-sm ring-2 ring-blue-400"
+                      : "bg-white text-ink border border-border hover:bg-blue-50"
+                  }`}
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Lebih Bayar</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${aiStatusFilter === "OVERPAID" ? "bg-white text-blue-800" : "bg-blue-100 text-blue-900 font-bold"}`}>
+                    {stats.aiOverpaidCount}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiStatusFilter(aiStatusFilter === "MATCH" ? "all" : "MATCH")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    aiStatusFilter === "MATCH"
+                      ? "bg-emerald-700 text-white shadow-sm ring-2 ring-emerald-400"
+                      : "bg-white text-ink border border-border hover:bg-emerald-50"
+                  }`}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Pas Sesuai</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${aiStatusFilter === "MATCH" ? "bg-white text-emerald-800" : "bg-emerald-100 text-emerald-900 font-bold"}`}>
+                    {stats.aiMatchCount}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiStatusFilter(aiStatusFilter === "UNREADABLE" ? "all" : "UNREADABLE")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    aiStatusFilter === "UNREADABLE"
+                      ? "bg-amber-700 text-white shadow-sm ring-2 ring-amber-400"
+                      : "bg-white text-ink border border-border hover:bg-amber-50"
+                  }`}
+                >
+                  <span>Cek Manual</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${aiStatusFilter === "UNREADABLE" ? "bg-white text-amber-800" : "bg-amber-100 text-amber-900 font-bold"}`}>
+                    {stats.aiUnreadableCount}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAiStatusFilter(aiStatusFilter === "UNSCANNED" ? "all" : "UNSCANNED")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    aiStatusFilter === "UNSCANNED"
+                      ? "bg-slate-700 text-white shadow-sm"
+                      : "bg-white text-ink border border-border hover:bg-slate-100"
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Belum Diperiksa</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${aiStatusFilter === "UNSCANNED" ? "bg-white text-slate-800" : "bg-slate-200 text-slate-900 font-bold"}`}>
+                    {stats.aiUnscannedCount}
+                  </span>
+                </button>
               </div>
 
               {/* Active Filter Chips Summary */}
@@ -2395,6 +2724,7 @@ function AdminTransactionsPage() {
                           <Badge className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${fulBadge.color}`}>
                             {fulBadge.text}
                           </Badge>
+                          {renderAiProofBadge(order, dpPelunasanMap[order.order_id])}
                         </div>
 
                         {/* Connected Pelunasan Banner in Mobile Card */}
@@ -2539,7 +2869,7 @@ function AdminTransactionsPage() {
                         <SortHeaderColumn label="PELUNASAN" field="pelunasan" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
                       )}
                       {visibleColumns.payment_status && (
-                        <SortHeaderColumn label="STATUS" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                        <SortHeaderColumn label="STATUS & AI STRUK" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
                       )}
                       {visibleColumns.created_at && (
                         <SortHeaderColumn label="TANGGAL" field="created_at" currentField={sortField} direction={sortDirection} onSort={handleSort} />
@@ -2712,16 +3042,19 @@ function AdminTransactionsPage() {
                                                   </span>
                                                 )}
                                               </div>
-                                              {(() => {
-                                                const payBadge = getPaymentStatusBadge(subOrder, dpPelunasanMap[subOrder.order_id]);
-                                                return (
-                                                  <span
-                                                    className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold border ${payBadge.color}`}
-                                                  >
-                                                    {payBadge.text}
-                                                  </span>
-                                                );
-                                              })()}
+                                              <div className="flex flex-col items-end gap-1">
+                                                {(() => {
+                                                  const payBadge = getPaymentStatusBadge(subOrder, dpPelunasanMap[subOrder.order_id]);
+                                                  return (
+                                                    <span
+                                                      className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold border ${payBadge.color}`}
+                                                    >
+                                                      {payBadge.text}
+                                                    </span>
+                                                  );
+                                                })()}
+                                                {renderAiProofBadge(subOrder, dpPelunasanMap[subOrder.order_id])}
+                                              </div>
                                               <div className="flex items-center gap-1.5">
                                                  <Button
                                                    size="sm"
@@ -2837,7 +3170,12 @@ function AdminTransactionsPage() {
                             )}
                             {visibleColumns.gross_amount && (
                               <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
-                                Rp {Number(order.gross_amount).toLocaleString("id-ID")}
+                                <div>Rp {Number(order.gross_amount).toLocaleString("id-ID")}</div>
+                                {order.payment_proof_match_status === "UNDERPAID" && (
+                                  <div className="text-[10px] font-black text-rose-600 tracking-tight">
+                                    Struk: Rp {Number(order.payment_proof_verified_amount || 0).toLocaleString("id-ID")}
+                                  </div>
+                                )}
                               </td>
                             )}
                             {visibleColumns.pelunasan && (
@@ -2914,6 +3252,7 @@ function AdminTransactionsPage() {
                                       </Badge>
                                     );
                                   })()}
+                                  {renderAiProofBadge(order, dpPelunasanMap[order.order_id])}
                                 </div>
                               </td>
                             )}
@@ -3754,7 +4093,7 @@ function AdminTransactionsPage() {
                                   ) : (
                                     <>
                                       <Sparkles className="w-3 h-3" />
-                                      <span>Pindai Bukti</span>
+                                      <span>{proofAnalysisResult ? "Pindai Ulang AI" : "Pindai Bukti AI"}</span>
                                     </>
                                   )}
                                 </Button>
