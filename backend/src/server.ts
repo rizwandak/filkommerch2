@@ -361,6 +361,7 @@ app.delete("/api/admin/products/:id", checkRole(["admin"]), (req, res, next) => 
 app.get("/api/admin/orders", checkRole(["admin", "cashier"]), apiControllers.getOnlineOrders);
 app.put("/api/admin/orders/:id/status", checkRole(["admin", "cashier"]), apiControllers.updateOrderStatus);
 app.put("/api/admin/orders/:id/verify-payment", checkRole(["admin", "cashier"]), apiControllers.verifyPaymentProof);
+app.post("/api/admin/orders/:id/analyze-proof", checkRole(["admin", "cashier"]), apiControllers.analyzePaymentProof);
 app.delete("/api/admin/orders/:id", checkRole(["admin"]), apiControllers.deleteOrder);
 app.put("/api/admin/orders/:orderId/items/pickup-status", checkRole(["admin", "cashier"]), apiControllers.updateOrderItemPickupStatus);
 app.get("/api/admin/orders/:orderId/pickup-logs", checkRole(["admin", "cashier"]), apiControllers.getOrderItemPickupLogs);

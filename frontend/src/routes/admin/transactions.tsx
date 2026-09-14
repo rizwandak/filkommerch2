@@ -59,6 +59,8 @@ import {
   Printer,
   PackageCheck,
   Columns3,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logoFM from "@/assets/logo-fm.jpg";
@@ -88,6 +90,7 @@ import {
   deleteOrder,
   deleteOfflineSale,
   verifyPaymentProof,
+  analyzePaymentProofAction,
   getAllClaimsServerAction,
   approveClaimServerAction,
   rejectClaimServerAction,
@@ -445,6 +448,10 @@ function AdminTransactionsPage() {
   const [submittingVerification, setSubmittingVerification] = useState(false);
   const [showRejectReason, setShowRejectReason] = useState(false);
 
+  // Gemini AI Payment Proof Analysis States
+  const [isAnalyzingProof, setIsAnalyzingProof] = useState(false);
+  const [proofAnalysisResult, setProofAnalysisResult] = useState<any>(null);
+
   // Notification Modal States
   const [notifModalOpen, setNotifModalOpen] = useState(false);
   const [notifTargetUser, setNotifTargetUser] = useState<{ id: number; name: string; trxId: string }>({
@@ -762,6 +769,8 @@ function AdminTransactionsPage() {
     setManagedType(type);
     setVerificationNote("");
     setShowRejectReason(false);
+    setIsAnalyzingProof(false);
+    setProofAnalysisResult(null);
     setManagementOpen(true);
 
     try {
@@ -985,6 +994,31 @@ function AdminTransactionsPage() {
       toast.error(error.message || "Gagal memproses verifikasi");
     } finally {
       setSubmittingVerification(false);
+    }
+  };
+
+  const handleRunAiAnalysis = async (orderId: string) => {
+    if (!orderId) return;
+    setIsAnalyzingProof(true);
+    setProofAnalysisResult(null);
+    try {
+      const res = await analyzePaymentProofAction({ data: orderId });
+      if (res.success && res.data) {
+        setProofAnalysisResult(res.data);
+        if (res.data.match_status === "MATCH") {
+          toast.success("Nominal transfer sesuai 100%!");
+        } else if (res.data.match_status === "UNDERPAID") {
+          toast.error(`Perhatian: Pembeli kurang bayar Rp ${res.data.difference.toLocaleString("id-ID")}!`);
+        } else if (res.data.match_status === "OVERPAID") {
+          toast.info(`Perhatian: Pembeli lebih bayar Rp ${res.data.difference.toLocaleString("id-ID")}`);
+        }
+      } else {
+        toast.error(res.error || "Gagal menganalisis bukti transfer");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan saat memanggil AI");
+    } finally {
+      setIsAnalyzingProof(false);
     }
   };
 
@@ -3695,6 +3729,191 @@ function AdminTransactionsPage() {
                             >
                               Buka Bukti Pembayaran Terbaru di Tab Baru ↗
                             </a>
+
+                            {/* Gemini AI OCR Inspector Card */}
+                            <div className="mt-3 p-3 rounded-xl border-2 border-purple-200 bg-purple-50/50 space-y-2.5">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                  <Sparkles className="w-4 h-4 text-purple-600" />
+                                  <span className="text-[11px] font-black uppercase tracking-wider text-purple-950">
+                                    AI Smart Inspector (Gemini)
+                                  </span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  onClick={() => void handleRunAiAnalysis(managedTransaction.order_id)}
+                                  disabled={isAnalyzingProof}
+                                  className="h-7 px-2.5 bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-[10px] uppercase tracking-wider shadow-sm flex items-center gap-1.5 cursor-pointer"
+                                >
+                                  {isAnalyzingProof ? (
+                                    <>
+                                      <Loader2 className="w-3 h-3 animate-spin" />
+                                      <span>Menganalisis...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Sparkles className="w-3 h-3" />
+                                      <span>Pindai Bukti</span>
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+
+                              {isAnalyzingProof && (
+                                <div className="p-3 bg-white/80 border border-purple-200 rounded-lg text-center space-y-1.5">
+                                  <Loader2 className="w-5 h-5 animate-spin text-purple-600 mx-auto" />
+                                  <p className="text-[11px] font-bold text-purple-900">
+                                    Gemini AI sedang membaca nominal dan rincian transaksi...
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Memeriksa nominal, bank pengirim, nama pengirim, dan status transfer.
+                                  </p>
+                                </div>
+                              )}
+
+                              {proofAnalysisResult && !isAnalyzingProof && (
+                                <div className="space-y-2 text-xs">
+                                  {/* Result Match Banner */}
+                                  {proofAnalysisResult.match_status === "MATCH" && (
+                                    <div className="p-2.5 bg-emerald-50 border-2 border-emerald-300 rounded-lg text-emerald-900 space-y-1">
+                                      <div className="flex items-center justify-between font-extrabold text-[11px]">
+                                        <span className="flex items-center gap-1">
+                                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> NOMINAL SESUAI (100% COCOK)
+                                        </span>
+                                        <Badge className="bg-emerald-600 text-white text-[9px]">VALID</Badge>
+                                      </div>
+                                      <p className="text-[11px] font-bold">
+                                        Terbaca di Bukti: Rp {Number(proofAnalysisResult.detected_nominal).toLocaleString("id-ID")}
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {proofAnalysisResult.match_status === "UNDERPAID" && (
+                                    <div className="p-2.5 bg-red-50 border-2 border-red-300 rounded-lg text-red-900 space-y-2">
+                                      <div className="flex items-center justify-between font-extrabold text-[11px]">
+                                        <span className="flex items-center gap-1">
+                                          <AlertCircle className="w-3.5 h-3.5 text-red-600" /> PERINGATAN: KURANG BAYAR!
+                                        </span>
+                                        <Badge className="bg-red-600 text-white text-[9px]">KURANG</Badge>
+                                      </div>
+                                      <div className="text-[11px] space-y-0.5 font-semibold">
+                                        <div className="flex justify-between">
+                                          <span className="text-red-700">Terbaca di Bukti:</span>
+                                          <span className="font-bold">Rp {Number(proofAnalysisResult.detected_nominal).toLocaleString("id-ID")}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-red-700">Tagihan Sistem:</span>
+                                          <span className="font-bold">Rp {Number(proofAnalysisResult.expected_amount).toLocaleString("id-ID")}</span>
+                                        </div>
+                                        <div className="flex justify-between border-t border-red-200 pt-1 font-black text-red-700">
+                                          <span>Kekurangan:</span>
+                                          <span>-Rp {Number(proofAnalysisResult.difference).toLocaleString("id-ID")}</span>
+                                        </div>
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                          setShowRejectReason(true);
+                                          setVerificationNote(
+                                            `Nominal pada bukti transfer terdeteksi Rp ${Number(proofAnalysisResult.detected_nominal).toLocaleString("id-ID")}, kurang Rp ${Number(proofAnalysisResult.difference).toLocaleString("id-ID")} dari total tagihan Rp ${Number(proofAnalysisResult.expected_amount).toLocaleString("id-ID")}. Mohon transfer kekurangannya atau unggah bukti transfer yang sesuai.`
+                                          );
+                                        }}
+                                        className="w-full bg-white hover:bg-red-100 text-red-700 border-red-300 font-extrabold text-[10px] h-7"
+                                      >
+                                        📋 Salin ke Alasan Tolak
+                                      </Button>
+                                    </div>
+                                  )}
+
+                                  {proofAnalysisResult.match_status === "OVERPAID" && (
+                                    <div className="p-2.5 bg-blue-50 border-2 border-blue-300 rounded-lg text-blue-900 space-y-1.5">
+                                      <div className="flex items-center justify-between font-extrabold text-[11px]">
+                                        <span className="flex items-center gap-1">
+                                          <AlertCircle className="w-3.5 h-3.5 text-blue-600" /> PERHATIAN: LEBIH BAYAR
+                                        </span>
+                                        <Badge className="bg-blue-600 text-white text-[9px]">LEBIH</Badge>
+                                      </div>
+                                      <div className="text-[11px] space-y-0.5 font-semibold">
+                                        <div className="flex justify-between">
+                                          <span className="text-blue-700">Terbaca di Bukti:</span>
+                                          <span className="font-bold">Rp {Number(proofAnalysisResult.detected_nominal).toLocaleString("id-ID")}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-blue-700">Tagihan Sistem:</span>
+                                          <span className="font-bold">Rp {Number(proofAnalysisResult.expected_amount).toLocaleString("id-ID")}</span>
+                                        </div>
+                                        <div className="flex justify-between border-t border-blue-200 pt-1 font-black text-blue-700">
+                                          <span>Kelebihan:</span>
+                                          <span>+Rp {Number(proofAnalysisResult.difference).toLocaleString("id-ID")}</span>
+                                        </div>
+                                      </div>
+                                      <p className="text-[10px] text-blue-800 italic">
+                                        * Catatan: Siapkan kembalian atau konfirmasi ke pembeli saat pengambilan barang.
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {proofAnalysisResult.match_status === "UNREADABLE" && (
+                                    <div className="p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-[11px]">
+                                      <p className="font-bold flex items-center gap-1">
+                                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" /> Nominal Tidak Terbaca Jelas
+                                      </p>
+                                      <p className="text-[10px] text-amber-800 mt-0.5">
+                                        AI mendeteksi bukti, tetapi nominal transfer tidak dapat dipastikan. Silakan verifikasi manual.
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  {/* Additional Details Table */}
+                                  <div className="bg-white p-2.5 rounded-lg border border-purple-200 text-[10px] space-y-1">
+                                    <div className="flex justify-between">
+                                      <span className="text-muted-foreground">Bank/Metode:</span>
+                                      <span className="font-bold text-ink">{proofAnalysisResult.bank_atau_metode || "-"}</span>
+                                    </div>
+                                    {proofAnalysisResult.nama_pengirim && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Pengirim:</span>
+                                        <span className="font-bold text-ink">{proofAnalysisResult.nama_pengirim}</span>
+                                      </div>
+                                    )}
+                                    {proofAnalysisResult.nama_penerima && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Penerima:</span>
+                                        <span className="font-bold text-ink">{proofAnalysisResult.nama_penerima}</span>
+                                      </div>
+                                    )}
+                                    {proofAnalysisResult.status_transaksi && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Status di Bukti:</span>
+                                        <span className={`font-black ${proofAnalysisResult.status_transaksi === "BERHASIL" ? "text-emerald-600" : "text-amber-600"}`}>
+                                          {proofAnalysisResult.status_transaksi}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {proofAnalysisResult.tanggal_waktu && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">Waktu Bukti:</span>
+                                        <span className="font-medium text-ink">{proofAnalysisResult.tanggal_waktu}</span>
+                                      </div>
+                                    )}
+                                    {proofAnalysisResult.nomor_referensi && (
+                                      <div className="flex justify-between">
+                                        <span className="text-muted-foreground">No. Referensi:</span>
+                                        <span className="font-mono text-ink">{proofAnalysisResult.nomor_referensi}</span>
+                                      </div>
+                                    )}
+                                    {proofAnalysisResult.catatan && (
+                                      <div className="pt-1 border-t border-dashed text-slate-500 italic">
+                                        {proofAnalysisResult.catatan}
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         ) : (
                           <p className="text-xs text-muted-foreground italic text-center p-4 border border-dashed rounded">

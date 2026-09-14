@@ -1263,6 +1263,26 @@ export const verifyPaymentProof = createServerFn({ method: "POST" })
     }
   });
 
+// Analyze payment proof with Gemini AI Vision
+export const analyzePaymentProofAction = createServerFn({ method: "POST" })
+  .validator((id: string) => id)
+  .handler(async ({ data: id }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/admin/orders/${id}/analyze-proof`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error analyzing payment proof with AI:", error);
+      return { success: false, error: error.message || "Gagal menganalisis bukti transfer" };
+    }
+  });
+
 // Delete order
 export const deleteOrder = createServerFn({ method: "POST" })
   .validator((id: string) => id)

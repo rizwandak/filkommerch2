@@ -23,6 +23,11 @@ export const config = {
   api: {
     url: process.env.VITE_API_URL || "http://localhost:5173/api",
   },
+
+  // Gemini AI OCR
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY || "",
+  },
 };
 
 // Validate required env vars

@@ -1,4 +1,6 @@
 import { Request, Response } from "express";
+import fs from "fs";
+import path from "path";
 import { query, queryOne, execute, getConnection } from "../config/database";
 import { config } from "../config/config";
 import bcrypt from "bcryptjs";
@@ -2132,6 +2134,184 @@ export const verifyPaymentProof = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, error: error.message || "Failed to verify payment proof" });
   } finally {
     connection.release();
+  }
+};
+
+// Analyze payment proof with Gemini AI Vision (Admin)
+export const analyzePaymentProof = async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const order = await queryOne<any>(
+      "SELECT id, order_id, customer_name, gross_amount, payment_proof_url, payment_type FROM orders WHERE order_id = ? OR id = ? LIMIT 1",
+      [id, id]
+    );
+
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+    }
+
+    if (!order.payment_proof_url) {
+      return res.status(400).json({ success: false, error: "Pesanan ini belum memiliki bukti transfer yang diunggah" });
+    }
+
+    let imgBuffer: Buffer | null = null;
+    let mimeType = "image/jpeg";
+
+    // 1. Try resolving from local uploads directory first
+    const filename = path.basename(order.payment_proof_url);
+    const localPath = path.join(__dirname, "../../uploads", filename);
+    const altLocalPath = path.join(process.cwd(), "uploads", filename);
+
+    if (fs.existsSync(localPath)) {
+      imgBuffer = fs.readFileSync(localPath);
+    } else if (fs.existsSync(altLocalPath)) {
+      imgBuffer = fs.readFileSync(altLocalPath);
+    } else {
+      // 2. Fetch from URL (e.g. production filkommerch.com or absolute URL)
+      let fetchUrl = order.payment_proof_url;
+      if (!fetchUrl.startsWith("http://") && !fetchUrl.startsWith("https://")) {
+        fetchUrl = `https://filkommerch.com/uploads/${filename}`;
+      }
+      try {
+        const response = await fetch(fetchUrl);
+        if (!response.ok) {
+          throw new Error(`Gagal mengunduh gambar bukti (${response.status})`);
+        }
+        const arrayBuf = await response.arrayBuffer();
+        imgBuffer = Buffer.from(arrayBuf);
+      } catch (err: any) {
+        console.error("Gagal fetch bukti pembayaran dari URL:", fetchUrl, err);
+        return res.status(400).json({
+          success: false,
+          error: "Gagal memuat gambar bukti transfer. Pastikan file gambar dapat diakses.",
+        });
+      }
+    }
+
+    if (!imgBuffer || imgBuffer.length === 0) {
+      return res.status(400).json({ success: false, error: "File bukti transfer kosong atau tidak valid" });
+    }
+
+    const ext = path.extname(filename).toLowerCase();
+    if (ext === ".png") mimeType = "image/png";
+    else if (ext === ".webp") mimeType = "image/webp";
+
+    const base64Data = imgBuffer.toString("base64");
+    const apiKey = config.gemini?.apiKey || process.env.GEMINI_API_KEY || "";
+
+    const prompt = `Kamu adalah sistem AI pemeriksa bukti transfer perbankan & QRIS di Indonesia.
+Analisis gambar struk / bukti transfer berikut ini secara seksama.
+Ekstrak informasi pembayaran ke dalam format JSON murni:
+{
+  "nominal": <angka integer rupiah murni yang BERHASIL dibayar/ditransfer, contoh: 124500, atau null jika tidak terbaca>,
+  "bank_atau_metode": "<nama bank / dompet digital, misal: Mandiri Livin, BCA Mobile, BRImo, Seabank, BNI, Dana, GoPay, ShopeePay, QRIS, dll>",
+  "nama_pengirim": "<nama pemilik rekening asal / pengirim jika tertera, atau null>",
+  "nama_penerima": "<nama penerima / merchant tujuan jika tertera, atau null>",
+  "status_transaksi": "<BERHASIL / PENDING / GAGAL / TIDAK_JELAS>",
+  "tanggal_waktu": "<tanggal dan jam transaksi jika tertera, atau null>",
+  "nomor_referensi": "<no referensi transaksi jika ada, atau null>",
+  "catatan": "<keterangan singkat jika ada catatan penting, misal apakah gambar buram atau tampak terpotong>"
+}
+PENTING:
+1. Pastikan mengambil 'nominal pembayaran/transfer', BUKAN saldo rekening pengirim, dan BUKAN biaya admin.
+2. Keluarkan hanya JSON valid tanpa markdown/backticks.`;
+
+    const payload = {
+      contents: [
+        {
+          parts: [
+            { text: prompt },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: base64Data,
+              },
+            },
+          ],
+        },
+      ],
+      generationConfig: {
+        response_mime_type: "application/json",
+        temperature: 0.1,
+      },
+    };
+
+    // Priority models
+    const modelsToTry = ["gemini-3.6-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"];
+    let aiJson: any = null;
+    let rawText = "";
+
+    for (const modelName of modelsToTry) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+        const aiRes = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (aiRes.ok) {
+          const aiData = (await aiRes.json()) as any;
+          rawText = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
+          if (rawText) {
+            aiJson = JSON.parse(rawText);
+            break;
+          }
+        } else {
+          console.warn(`Gemini model ${modelName} returned status ${aiRes.status}`);
+        }
+      } catch (mErr) {
+        console.warn(`Error trying Gemini model ${modelName}:`, mErr);
+      }
+    }
+
+    if (!aiJson) {
+      return res.status(500).json({
+        success: false,
+        error: "AI tidak dapat menganalisis bukti pembayaran ini saat ini. Silakan verifikasi secara manual.",
+      });
+    }
+
+    const expectedAmount = Number(order.gross_amount || 0);
+    const detectedNominal = typeof aiJson.nominal === "number" ? aiJson.nominal : parseInt(String(aiJson.nominal || "").replace(/\D/g, ""), 10);
+
+    let matchStatus: "MATCH" | "UNDERPAID" | "OVERPAID" | "UNREADABLE" = "UNREADABLE";
+    let difference = 0;
+
+    if (!isNaN(detectedNominal) && detectedNominal > 0) {
+      if (detectedNominal === expectedAmount) {
+        matchStatus = "MATCH";
+      } else if (detectedNominal < expectedAmount) {
+        matchStatus = "UNDERPAID";
+        difference = expectedAmount - detectedNominal;
+      } else {
+        matchStatus = "OVERPAID";
+        difference = detectedNominal - expectedAmount;
+      }
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        detected_nominal: isNaN(detectedNominal) ? null : detectedNominal,
+        expected_amount: expectedAmount,
+        match_status: matchStatus,
+        difference,
+        bank_atau_metode: aiJson.bank_atau_metode || "Tidak Terdeteksi",
+        nama_pengirim: aiJson.nama_pengirim || null,
+        nama_penerima: aiJson.nama_penerima || null,
+        status_transaksi: aiJson.status_transaksi || "TIDAK_JELAS",
+        tanggal_waktu: aiJson.tanggal_waktu || null,
+        nomor_referensi: aiJson.nomor_referensi || null,
+        catatan: aiJson.catatan || null,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error in analyzePaymentProof:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Terjadi kesalahan saat menganalisis bukti transfer",
+    });
   }
 };
 
