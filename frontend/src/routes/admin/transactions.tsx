@@ -188,99 +188,6 @@ const getFulfillmentStatusBadge = (order: any) => {
 
 const getStatusBadgeTextAndColor = getPaymentStatusBadge;
 
-// Component to render AI proof status badge directly in table rows
-const renderAiProofBadge = (order: any, linkedLns?: any) => {
-  if (!order) return null;
-  const badges: any[] = [];
-
-  const getBadgeForSingleOrder = (o: any, labelPrefix = "") => {
-    if (!o.payment_proof_url) return null;
-    const match = o.payment_proof_match_status;
-    const amount = o.payment_proof_verified_amount ? Number(o.payment_proof_verified_amount) : null;
-    const diff = o.payment_proof_difference ? Number(o.payment_proof_difference) : 0;
-    const bank = o.payment_proof_bank || "";
-
-    if (match === "MATCH") {
-      return (
-        <span
-          key={`${o.order_id}-ai-match`}
-          className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300 shadow-xs"
-          title={`${labelPrefix}Bukti transfer sesuai 100%: Rp ${(amount || o.gross_amount).toLocaleString("id-ID")} via ${bank || "QRIS"}`}
-        >
-          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-          <span>{labelPrefix}AI: Pas Rp {(amount || o.gross_amount).toLocaleString("id-ID")}</span>
-        </span>
-      );
-    }
-
-    if (match === "UNDERPAID") {
-      return (
-        <span
-          key={`${o.order_id}-ai-under`}
-          className="inline-flex items-center gap-1 text-[9px] font-black text-rose-900 bg-rose-50 px-2 py-0.5 rounded border-2 border-rose-400 shadow-xs animate-pulse"
-          title={`${labelPrefix}PERHATIAN KURANG BAYAR! Tagihan: Rp ${Number(o.gross_amount).toLocaleString("id-ID")}, Struk AI: Rp ${amount ? amount.toLocaleString("id-ID") : "0"}`}
-        >
-          <AlertCircle className="w-3 h-3 text-rose-600 shrink-0" />
-          <span>{labelPrefix}AI: Kurang -Rp {diff.toLocaleString("id-ID")}</span>
-        </span>
-      );
-    }
-
-    if (match === "OVERPAID") {
-      return (
-        <span
-          key={`${o.order_id}-ai-over`}
-          className="inline-flex items-center gap-1 text-[9px] font-black text-blue-900 bg-blue-50 px-2 py-0.5 rounded border border-blue-300 shadow-xs"
-          title={`${labelPrefix}LEBIH BAYAR: Tagihan: Rp ${Number(o.gross_amount).toLocaleString("id-ID")}, Struk AI: Rp ${amount ? amount.toLocaleString("id-ID") : "0"}`}
-        >
-          <Sparkles className="w-3 h-3 text-blue-600 shrink-0" />
-          <span>{labelPrefix}AI: Lebih +Rp {diff.toLocaleString("id-ID")}</span>
-        </span>
-      );
-    }
-
-    if (match === "UNREADABLE") {
-      return (
-        <span
-          key={`${o.order_id}-ai-unreadable`}
-          className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300"
-          title="Struk buram atau nominal tidak terbaca jelas oleh AI. Perlu dicek manual oleh admin."
-        >
-          <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
-          <span>{labelPrefix}AI: Cek Manual</span>
-        </span>
-      );
-    }
-
-    return (
-      <span
-        key={`${o.order_id}-ai-pending`}
-        className="inline-flex items-center gap-1 text-[9px] text-muted-foreground bg-slate-50 px-1.5 py-0.5 rounded border border-dashed border-slate-300"
-        title="Struk ada di sistem, sedang antre pemeriksaan AI"
-      >
-        <Clock className="w-2.5 h-2.5 text-slate-400 shrink-0" />
-        <span>{labelPrefix}AI: Menunggu Scan</span>
-      </span>
-    );
-  };
-
-  const mainBadge = getBadgeForSingleOrder(order);
-  if (mainBadge) badges.push(mainBadge);
-
-  if (linkedLns && linkedLns.payment_proof_url) {
-    const lnsBadge = getBadgeForSingleOrder(linkedLns, "LNS: ");
-    if (lnsBadge) badges.push(lnsBadge);
-  }
-
-  if (badges.length === 0) return null;
-
-  return (
-    <div className="flex flex-col items-center gap-1 mt-1">
-      {badges}
-    </div>
-  );
-};
-
 // Component to render payment proof difference badge (blue for overpaid, red for underpaid)
 const renderDifferenceCell = (order: any, linkedLns?: any) => {
   if (!order) return <span className="text-muted-foreground text-xs font-semibold">-</span>;
@@ -408,7 +315,7 @@ const COLUMN_DEFINITIONS = [
   { id: "customer_name", label: "Pelanggan" },
   { id: "gross_amount", label: "Total Pesanan" },
   { id: "pelunasan", label: "Nominal Pelunasan" },
-  { id: "payment_status", label: "Status & AI Struk" },
+  { id: "payment_status", label: "Status" },
   { id: "difference", label: "Selisih Bayar" },
   { id: "created_at", label: "Tanggal & Jam" },
   { id: "actions", label: "Tombol Aksi" },
@@ -2969,7 +2876,6 @@ function AdminTransactionsPage() {
                               Lebih: +Rp {Number(order.payment_proof_difference || 0).toLocaleString("id-ID")}
                             </span>
                           )}
-                          {renderAiProofBadge(order, dpPelunasanMap[order.order_id])}
                         </div>
 
                         {/* Connected Pelunasan Banner in Mobile Card */}
@@ -3114,7 +3020,7 @@ function AdminTransactionsPage() {
                         <SortHeaderColumn label="PELUNASAN" field="pelunasan" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
                       )}
                       {visibleColumns.payment_status && (
-                        <SortHeaderColumn label="STATUS & AI STRUK" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                        <SortHeaderColumn label="STATUS" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
                       )}
                       {visibleColumns.difference && (
                         <SortHeaderColumn label="SELISIH" field="difference" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
@@ -3333,7 +3239,6 @@ function AdminTransactionsPage() {
                                                     </span>
                                                   );
                                                 })()}
-                                                {renderAiProofBadge(subOrder, dpPelunasanMap[subOrder.order_id])}
                                               </div>
                                               <div className="flex items-center gap-1.5">
                                                  <Button
@@ -3532,7 +3437,6 @@ function AdminTransactionsPage() {
                                       </Badge>
                                     );
                                   })()}
-                                  {renderAiProofBadge(order, dpPelunasanMap[order.order_id])}
                                 </div>
                               </td>
                             )}
