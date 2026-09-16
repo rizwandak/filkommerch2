@@ -341,6 +341,8 @@ app.get("/api/orders/:id/pelunasan-info", apiControllers.getPelunasanInfo);
 app.post("/api/orders/:id/create-pelunasan", apiControllers.createPelunasanOrder);
 app.post("/api/orders/:id/confirm-completion", apiControllers.confirmOrderCompletion);
 app.post("/api/orders/:id/complaint", apiControllers.submitOrderComplaint);
+app.post("/api/orders/:id/refund-account", apiControllers.submitRefundAccount);
+app.post("/api/orders/:id/shortage-proof", apiControllers.submitShortageProof);
 app.post("/api/vouchers/validate", apiControllers.validateVoucher);
 
 // Product Reviews API Routes
@@ -362,6 +364,8 @@ app.get("/api/admin/orders", checkRole(["admin", "cashier"]), apiControllers.get
 app.post("/api/admin/orders/scan-all-proofs", checkRole(["admin", "cashier"]), apiControllers.scanAllPaymentProofs);
 app.put("/api/admin/orders/:id/status", checkRole(["admin", "cashier"]), apiControllers.updateOrderStatus);
 app.put("/api/admin/orders/:id/verify-payment", checkRole(["admin", "cashier"]), apiControllers.verifyPaymentProof);
+app.post("/api/admin/orders/:id/complete-refund", checkRole(["admin", "cashier"]), apiControllers.adminCompleteRefund);
+app.post("/api/admin/orders/:id/verify-shortage", checkRole(["admin", "cashier"]), apiControllers.adminVerifyShortage);
 app.post("/api/admin/orders/:id/analyze-proof", checkRole(["admin", "cashier"]), apiControllers.analyzePaymentProof);
 app.delete("/api/admin/orders/:id", checkRole(["admin"]), apiControllers.deleteOrder);
 app.put("/api/admin/orders/:orderId/items/pickup-status", checkRole(["admin", "cashier"]), apiControllers.updateOrderItemPickupStatus);

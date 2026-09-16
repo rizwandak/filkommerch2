@@ -3,11 +3,14 @@ import { useState, useEffect } from "react";
 import {
   getOrderById,
   getUserOrders,
+  getStoreSettings,
   createPelunasanOrderServerAction,
   confirmOrderCompletionServerAction,
   createProductReviewServerAction,
   submitOrderComplaintServerAction,
   submitPaymentProof,
+  submitRefundAccountAction,
+  submitShortageProofAction,
 } from "@/backend/server-actions";
 import { Navbar } from "@/components/Navbar";
 import {
@@ -24,6 +27,7 @@ import {
   CheckCheck,
   Upload,
   AlertTriangle,
+  AlertCircle,
   CreditCard,
   Copy,
   Check,
@@ -34,6 +38,8 @@ import {
   User as UserIcon,
   History,
   Camera,
+  QrCode,
+  ExternalLink,
 } from "lucide-react";
 import { toast } from "sonner";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -47,7 +53,10 @@ import {
 
 export const Route = createFileRoute("/orders_/$orderId")({
   loader: async ({ params }) => {
-    const result = await getOrderById({ data: params.orderId });
+    const [result, settingsRes] = await Promise.all([
+      getOrderById({ data: params.orderId }),
+      getStoreSettings().catch(() => null),
+    ]);
     if (!result.success || !result.order) {
       throw new Error(result.error || "Order not found");
     }
@@ -55,6 +64,7 @@ export const Route = createFileRoute("/orders_/$orderId")({
       order: result.order,
       items: result.items || [],
       reviews: result.reviews || [],
+      storeSettings: (settingsRes as any)?.settings || null,
     };
   },
   component: OrderDetailComponent,
@@ -262,7 +272,7 @@ function getFulfillmentLabel(type: string, batchSource?: string) {
 }
 
 function OrderDetailComponent() {
-  const { order: initialOrder, items, reviews: initialReviews } = Route.useLoaderData();
+  const { order: initialOrder, items, reviews: initialReviews, storeSettings } = Route.useLoaderData();
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -272,6 +282,93 @@ function OrderDetailComponent() {
   const [completingOrderId, setCompletingOrderId] = useState<string | null>(null);
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [uploadingPaymentProof, setUploadingPaymentProof] = useState(false);
+
+  // Refund / Overpaid state
+  const [refundAccountInfo, setRefundAccountInfo] = useState("");
+  const [submittingRefund, setSubmittingRefund] = useState(false);
+
+  // Shortage / Underpaid state
+  const [shortageProofFile, setShortageProofFile] = useState<File | null>(null);
+  const [uploadingShortageProof, setUploadingShortageProof] = useState(false);
+
+  const handleSubmitRefundAccount = async () => {
+    if (!refundAccountInfo.trim()) {
+      toast.error("Harap isi rincian rekening atau e-wallet untuk pengembalian dana");
+      return;
+    }
+    setSubmittingRefund(true);
+    try {
+      const res = await submitRefundAccountAction({
+        data: {
+          orderId: order.order_id,
+          refund_account_info: refundAccountInfo.trim(),
+        },
+      });
+      if (res.success) {
+        toast.success("Informasi rekening berhasil dikirim!");
+        const updated = await getOrderById({ data: order.order_id });
+        if (updated.success && updated.order) {
+          setOrder(updated.order);
+        }
+      } else {
+        toast.error(res.error || "Gagal menyimpan info rekening");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Terjadi kesalahan sistem");
+    } finally {
+      setSubmittingRefund(false);
+    }
+  };
+
+  const handleShortageProofFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("Ukuran file terlalu besar (maksimal 20MB)");
+      return;
+    }
+    if (file.type.startsWith("image/")) {
+      const compressed = await compressImage(file);
+      setShortageProofFile(compressed);
+    } else {
+      setShortageProofFile(file);
+    }
+  };
+
+  const handleUploadShortageProof = async () => {
+    if (!shortageProofFile) {
+      toast.error("Pilih file bukti transfer kekurangan terlebih dahulu");
+      return;
+    }
+    setUploadingShortageProof(true);
+    try {
+      const uploadRes = await uploadImageHelper(shortageProofFile);
+      if (!uploadRes.success || !uploadRes.url) {
+        throw new Error(uploadRes.error || "Gagal mengunggah bukti kekurangan");
+      }
+      const res = await submitShortageProofAction({
+        data: {
+          orderId: order.order_id,
+          shortage_proof_url: uploadRes.url,
+        },
+      });
+      if (res.success) {
+        toast.success("Bukti transfer kekurangan berhasil dikirim! Menunggu verifikasi admin.");
+        setShortageProofFile(null);
+        const updated = await getOrderById({ data: order.order_id });
+        if (updated.success && updated.order) {
+          setOrder(updated.order);
+        }
+      } else {
+        toast.error(res.error || "Gagal menyimpan bukti transfer kekurangan");
+      }
+    } catch (err: any) {
+      console.error("Shortage proof error:", err);
+      toast.error(err.message || "Terjadi kesalahan sistem saat unggah bukti");
+    } finally {
+      setUploadingShortageProof(false);
+    }
+  };
 
   const [linkedPelunasan, setLinkedPelunasan] = useState<any>(null);
   const [creatingPelunasan, setCreatingPelunasan] = useState(false);
@@ -794,7 +891,21 @@ function OrderDetailComponent() {
               </p>
             </div>
           </div>
-          <div>{getStatusBadge(fullOrder, linkedPelunasan)}</div>
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {order.payment_proof_match_status === "OVERPAID" && (
+              <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full border border-blue-300">
+                <CreditCard className="w-3 h-3 text-blue-600" />
+                Lebih Bayar Rp {Math.abs(order.payment_proof_difference || 0).toLocaleString("id-ID")}
+              </span>
+            )}
+            {order.payment_proof_match_status === "UNDERPAID" && (
+              <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-bold bg-red-100 text-red-800 px-2.5 py-1 rounded-full border border-red-300 animate-pulse">
+                <AlertTriangle className="w-3 h-3 text-red-600" />
+                Kurang Bayar Rp {Math.abs(order.payment_proof_difference || 0).toLocaleString("id-ID")}
+              </span>
+            )}
+            {getStatusBadge(fullOrder, linkedPelunasan)}
+          </div>
         </div>
 
         {/* Status & Rincian Pelunasan Box for DP Orders */}
@@ -1163,6 +1274,349 @@ function OrderDetailComponent() {
                 })}
               </div>
             </div>
+
+            {/* OVERPAID / Kelebihan Bayar Resolution Card */}
+            {order.order_status !== "cancelled" && (order.payment_proof_match_status === "OVERPAID" || order.refund_account_info) && (
+              <div className="bg-blue-50/70 border-2 border-ink rounded-xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-ink/20 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-blue-600 text-white rounded-lg border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]">
+                      <CreditCard className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sm text-blue-950 uppercase tracking-wide">
+                        Kelebihan Pembayaran Terdeteksi
+                      </h3>
+                      <p className="text-[11px] text-blue-800">
+                        Nominal yang Anda transfer melebihi total tagihan pesanan ini
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    {order.refund_status === "completed" ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full border border-emerald-300">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Refund Selesai Ditransfer
+                      </span>
+                    ) : order.refund_account_info ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold bg-amber-100 text-amber-900 px-3 py-1 rounded-full border border-amber-300">
+                        <Clock className="w-3.5 h-3.5 animate-pulse text-amber-600" /> Menunggu Pengembalian Dana Admin
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold bg-blue-200 text-blue-900 px-3 py-1 rounded-full border border-blue-400">
+                        <AlertCircle className="w-3.5 h-3.5 text-blue-700" /> Perlu Info Rekening Pengembalian
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Financial Comparison Box */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-white border border-ink/20 rounded-lg p-2.5">
+                    <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Total Tagihan:</span>
+                    <span className="font-extrabold text-ink text-sm">
+                      Rp {Number(order.gross_amount).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="bg-white border border-ink/20 rounded-lg p-2.5">
+                    <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Nominal Terdeteksi di Bukti:</span>
+                    <span className="font-extrabold text-ink text-sm">
+                      Rp {Number(order.payment_proof_verified_amount || order.gross_amount).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="bg-blue-100 border-2 border-blue-300 rounded-lg p-2.5">
+                    <span className="text-[10px] text-blue-900 uppercase font-extrabold block">Kelebihan Dana (Refund):</span>
+                    <span className="font-black text-blue-700 text-base">
+                      + Rp {Math.abs(order.payment_proof_difference || 0).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Refund Settlement Status & Actions */}
+                {order.refund_status === "completed" ? (
+                  <div className="bg-white border-2 border-emerald-300 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-xs uppercase">
+                      <CheckCircle className="w-4 h-4 text-emerald-600" />
+                      <span>Pengembalian Dana Berhasil Diselesaikan</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Kelebihan dana sebesar <strong className="text-emerald-800">Rp {Math.abs(order.payment_proof_difference || 0).toLocaleString("id-ID")}</strong> telah ditransfer kembali oleh admin ke rekening tujuan Anda.
+                    </p>
+                    {order.refund_account_info && (
+                      <div className="bg-cream/40 border border-ink/20 rounded-lg p-3 text-xs">
+                        <span className="text-[10px] text-muted-foreground font-bold uppercase block mb-1">Rekening Tujuan:</span>
+                        <p className="whitespace-pre-wrap font-mono text-ink font-semibold">{order.refund_account_info}</p>
+                      </div>
+                    )}
+                    {order.refund_proof_url && (
+                      <div className="pt-2 border-t border-ink/10 flex items-center gap-3">
+                        <a
+                          href={resolveImageUrl(order.refund_proof_url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="w-16 h-16 border border-ink/30 rounded-lg overflow-hidden bg-white shrink-0 group relative cursor-pointer"
+                        >
+                          <img
+                            src={resolveImageUrl(order.refund_proof_url)}
+                            alt="Bukti Pengembalian Dana"
+                            className="w-full h-full object-cover group-hover:scale-105 transition"
+                          />
+                        </a>
+                        <div className="text-xs space-y-1">
+                          <span className="font-bold text-ink block">Bukti Transfer Pengembalian dari Admin</span>
+                          <a
+                            href={resolveImageUrl(order.refund_proof_url)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-orange hover:underline cursor-pointer"
+                          >
+                            <Eye className="w-3.5 h-3.5" /> Lihat Bukti Transfer Lengkap
+                          </a>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : order.refund_account_info ? (
+                  <div className="bg-white border-2 border-blue-200 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-blue-950 uppercase tracking-wide">
+                        Informasi Rekening / E-Wallet yang Terkirim
+                      </span>
+                    </div>
+                    <div className="bg-blue-50/50 border border-blue-200 rounded-lg p-3 text-xs">
+                      <p className="whitespace-pre-wrap font-mono text-ink font-semibold">{order.refund_account_info}</p>
+                    </div>
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-xs text-amber-900">
+                      <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-extrabold text-[11px] uppercase tracking-wide">Estimasi Proses Pengembalian:</p>
+                        <p className="text-[11px] font-medium leading-relaxed">
+                          Pengembalian dana akan diproses admin maksimal 2x24 jam setelah informasi rekening dikirim.
+                        </p>
+                        <p className="text-[10px] text-amber-700 italic mt-1">
+                          * Apabila terdapat kesalahan nomor rekening, silakan langsung konfirmasi ke admin via kontak WhatsApp.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white border-2 border-ink rounded-xl p-4 space-y-3">
+                    <div>
+                      <label className="block text-xs font-black text-ink uppercase tracking-wide mb-1">
+                        Formulir Rekening / E-Wallet Pengembalian Dana
+                      </label>
+                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                        Mohon cantumkan nama bank / e-wallet, nomor rekening / nomor telepon, dan nama lengkap pemilik rekening:
+                      </p>
+                    </div>
+
+                    <textarea
+                      rows={3}
+                      value={refundAccountInfo}
+                      onChange={(e) => setRefundAccountInfo(e.target.value)}
+                      placeholder="Contoh:&#10;Bank BCA / No. Rek: 1234567890&#10;a.n. Ahmad Rizwan&#10;(atau: GoPay / ShopeePay / OVO: 08123456789 a.n. Ahmad)"
+                      className="w-full text-xs p-3 bg-cream/30 border-2 border-ink rounded-lg font-mono outline-none focus:bg-white focus:ring-2 focus:ring-brand-orange/30 transition"
+                    />
+
+                    <div className="p-3 bg-blue-100/60 border border-blue-300 rounded-lg flex items-start gap-2 text-xs text-blue-950">
+                      <Clock className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                      <p className="text-[11px] font-semibold leading-relaxed">
+                        Pengembalian dana akan diproses admin maksimal 2x24 jam setelah informasi rekening dikirim.
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={handleSubmitRefundAccount}
+                      disabled={submittingRefund || !refundAccountInfo.trim()}
+                      className="px-5 py-2.5 bg-brand-orange text-white border-2 border-ink font-black text-xs uppercase rounded-lg shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 active:translate-y-0.5 active:shadow-none transition cursor-pointer disabled:opacity-50"
+                    >
+                      {submittingRefund ? "Mengirim..." : "Kirim Informasi Rekening"}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* UNDERPAID / Kekurangan Bayar Resolution Card */}
+            {order.order_status !== "cancelled" && (order.payment_proof_match_status === "UNDERPAID" || order.shortage_proof_url || order.shortage_status === "rejected") && (
+              <div className="bg-red-50/70 border-2 border-ink rounded-xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] p-5 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b-2 border-ink/20 pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-red-600 text-white rounded-lg border border-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]">
+                      <AlertTriangle className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="font-extrabold text-sm text-red-950 uppercase tracking-wide">
+                        Kekurangan Pembayaran Terdeteksi
+                      </h3>
+                      <p className="text-[11px] text-red-800">
+                        Nominal transfer pertama kurang dari total tagihan pesanan
+                      </p>
+                    </div>
+                  </div>
+                  <div>
+                    {order.shortage_status === "verified" ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full border border-emerald-300">
+                        <CheckCircle className="w-3.5 h-3.5 text-emerald-600" /> Kekurangan Terverifikasi (Lunas)
+                      </span>
+                    ) : order.shortage_status === "rejected" ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold bg-red-100 text-red-800 px-3 py-1 rounded-full border border-red-300 animate-pulse">
+                        <AlertCircle className="w-3.5 h-3.5 text-red-600" /> Bukti Kekurangan Ditolak
+                      </span>
+                    ) : order.shortage_proof_url ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold bg-blue-100 text-blue-900 px-3 py-1 rounded-full border border-blue-300">
+                        <Clock className="w-3.5 h-3.5 animate-pulse text-blue-600" /> Bukti Sedang Diverifikasi Admin
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-extrabold bg-red-200 text-red-950 px-3 py-1 rounded-full border border-red-400">
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-700" /> Perlu Transfer Kekurangan
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Financial Comparison Box */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                  <div className="bg-white border border-ink/20 rounded-lg p-2.5">
+                    <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Total Tagihan:</span>
+                    <span className="font-extrabold text-ink text-sm">
+                      Rp {Number(order.gross_amount).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="bg-white border border-ink/20 rounded-lg p-2.5">
+                    <span className="text-[10px] text-muted-foreground uppercase font-semibold block">Nominal Terdeteksi di Bukti #1:</span>
+                    <span className="font-extrabold text-ink text-sm">
+                      Rp {Number(order.payment_proof_verified_amount || 0).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                  <div className="bg-red-100 border-2 border-red-400 rounded-lg p-2.5">
+                    <span className="text-[10px] text-red-900 uppercase font-extrabold block">Sisa Kekurangan yang Wajib Dibayar:</span>
+                    <span className="font-black text-red-700 text-base">
+                      Rp {Math.abs(order.payment_proof_difference || 0).toLocaleString("id-ID")}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Rejection Note Warning if any */}
+                {order.shortage_status === "rejected" && order.shortage_proof_note && (
+                  <div className="p-3.5 bg-red-100 border-2 border-red-400 rounded-xl text-xs space-y-1">
+                    <div className="flex items-center gap-1.5 text-red-900 font-extrabold uppercase text-[11px]">
+                      <AlertCircle className="w-4 h-4 text-red-700" />
+                      <span>Catatan Admin (Bukti Kekurangan Ditolak):</span>
+                    </div>
+                    <p className="italic text-red-900 font-medium">"{order.shortage_proof_note}"</p>
+                    <p className="text-[10px] text-red-700 font-semibold pt-1">
+                      * Silakan lakukan transfer kekurangan ulang dengan nominal yang sesuai dan upload bukti transfer baru di bawah.
+                    </p>
+                  </div>
+                )}
+
+                {/* Static QRIS Payment Guide */}
+                {order.shortage_status !== "verified" && (
+                  <div className="bg-white border-2 border-ink rounded-xl p-4 flex flex-col sm:flex-row items-center gap-4">
+                    {storeSettings?.qris_static_url ? (
+                      <div className="w-36 h-36 bg-cream border-2 border-ink rounded-lg p-1.5 flex items-center justify-center shrink-0">
+                        <img
+                          src={resolveImageUrl(storeSettings.qris_static_url)}
+                          alt="QRIS FILKOM Merch"
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-32 h-32 bg-cream border-2 border-ink rounded-lg flex flex-col items-center justify-center text-muted-foreground shrink-0 p-2 text-center">
+                        <QrCode className="w-8 h-8 mb-1" />
+                        <span className="text-[9px] font-bold uppercase">QRIS FILKOM Merch</span>
+                      </div>
+                    )}
+                    <div className="text-xs space-y-1.5 flex-1">
+                      <p className="font-extrabold text-ink text-sm">Scan QRIS FILKOM Merch</p>
+                      <p className="text-muted-foreground text-[11px] leading-relaxed">
+                        Silakan scan kode QRIS di samping menggunakan aplikasi m-Banking atau E-Wallet pilihan Anda (BCA, Mandiri, BRI, GoPay, OVO, DANA, dll).
+                      </p>
+                      <div className="p-2 bg-cream border border-ink/20 rounded text-ink text-[11px] font-semibold">
+                        Nominal Transfer Kekurangan: <strong className="text-red-700">Rp {Math.abs(order.payment_proof_difference || 0).toLocaleString("id-ID")}</strong>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload Form for Shortage Transfer Proof */}
+                <div className="bg-white border-2 border-ink rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between border-b border-ink/10 pb-2">
+                    <h4 className="font-extrabold text-xs text-ink uppercase tracking-wide">
+                      {order.shortage_proof_url ? "Bukti Transfer Kekurangan" : "Unggah Bukti Transfer Kekurangan"}
+                    </h4>
+                    {order.shortage_status === "verified" ? (
+                      <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded border border-emerald-300">
+                        Diverifikasi
+                      </span>
+                    ) : order.shortage_proof_url ? (
+                      <span className="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded border border-blue-300">
+                        Menunggu Cek Admin
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {order.shortage_proof_url && (
+                    <div className="flex items-center gap-4 bg-cream/30 border border-ink/20 rounded-lg p-3">
+                      <a
+                        href={resolveImageUrl(order.shortage_proof_url)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="w-20 h-20 border border-ink/40 rounded-lg overflow-hidden bg-white shrink-0 group relative cursor-pointer"
+                      >
+                        <img
+                          src={resolveImageUrl(order.shortage_proof_url)}
+                          alt="Bukti Transfer Kekurangan"
+                          className="w-full h-full object-cover group-hover:scale-105 transition"
+                        />
+                      </a>
+                      <div className="text-xs space-y-1 flex-1">
+                        <p className="font-extrabold text-ink">Bukti Transfer Kekurangan Terunggah</p>
+                        {order.shortage_proof_submitted_at && (
+                          <p className="text-[10px] text-muted-foreground">
+                            Dikirim: {new Date(order.shortage_proof_submitted_at).toLocaleString("id-ID")}
+                          </p>
+                        )}
+                        <a
+                          href={resolveImageUrl(order.shortage_proof_url)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-brand-orange hover:underline cursor-pointer"
+                        >
+                          <Eye className="w-3 h-3" /> Buka Foto Bukti
+                        </a>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Allow uploading or replacing if not verified */}
+                  {order.shortage_status !== "verified" && (
+                    <div className="pt-2">
+                      <label className="block text-[11px] font-bold text-ink uppercase mb-1.5">
+                        {order.shortage_proof_url ? "Ingin Mengganti / Unggah Ulang Bukti Kekurangan?" : "Pilih Foto / Screenshot Bukti Transfer Kekurangan:"}
+                      </label>
+                      <div className="flex flex-col sm:flex-row items-center gap-3">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleShortageProofFileChange}
+                          className="text-xs w-full sm:w-auto text-muted-foreground file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-2 file:border-ink file:text-xs file:font-bold file:bg-cream file:text-ink hover:file:bg-brand-orange hover:file:text-cream cursor-pointer"
+                        />
+                        {shortageProofFile && (
+                          <button
+                            onClick={handleUploadShortageProof}
+                            disabled={uploadingShortageProof}
+                            className="w-full sm:w-auto px-4 py-2 bg-brand-orange text-white border-2 border-ink font-bold text-xs uppercase rounded shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-brand-orange/90 transition cursor-pointer disabled:opacity-50"
+                          >
+                            {uploadingShortageProof ? "Mengunggah..." : "Kirim Bukti Kekurangan"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Payment Proof Upload & Status Box (for Unpaid / Pending verification orders) */}
             {order.order_status !== "cancelled" && order.payment_status !== "paid" && (

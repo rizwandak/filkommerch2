@@ -367,6 +367,46 @@ export async function runMigration() {
       {
         name: "orders.payment_proof_ai_details",
         sql: "ALTER TABLE orders ADD COLUMN payment_proof_ai_details LONGTEXT DEFAULT NULL"
+      },
+      {
+        name: "orders.refund_account_info",
+        sql: "ALTER TABLE orders ADD COLUMN refund_account_info TEXT DEFAULT NULL"
+      },
+      {
+        name: "orders.refund_account_submitted_at",
+        sql: "ALTER TABLE orders ADD COLUMN refund_account_submitted_at DATETIME DEFAULT NULL"
+      },
+      {
+        name: "orders.refund_proof_url",
+        sql: "ALTER TABLE orders ADD COLUMN refund_proof_url VARCHAR(255) DEFAULT NULL"
+      },
+      {
+        name: "orders.refund_completed_at",
+        sql: "ALTER TABLE orders ADD COLUMN refund_completed_at DATETIME DEFAULT NULL"
+      },
+      {
+        name: "orders.refund_status",
+        sql: "ALTER TABLE orders ADD COLUMN refund_status VARCHAR(50) DEFAULT NULL"
+      },
+      {
+        name: "orders.shortage_proof_url",
+        sql: "ALTER TABLE orders ADD COLUMN shortage_proof_url VARCHAR(255) DEFAULT NULL"
+      },
+      {
+        name: "orders.shortage_proof_submitted_at",
+        sql: "ALTER TABLE orders ADD COLUMN shortage_proof_submitted_at DATETIME DEFAULT NULL"
+      },
+      {
+        name: "orders.shortage_verified_at",
+        sql: "ALTER TABLE orders ADD COLUMN shortage_verified_at DATETIME DEFAULT NULL"
+      },
+      {
+        name: "orders.shortage_status",
+        sql: "ALTER TABLE orders ADD COLUMN shortage_status VARCHAR(50) DEFAULT NULL"
+      },
+      {
+        name: "orders.shortage_proof_note",
+        sql: "ALTER TABLE orders ADD COLUMN shortage_proof_note VARCHAR(255) DEFAULT NULL"
       }
     ];
 

@@ -301,6 +301,16 @@ export interface Order {
   payment_proof_match_status?: "MATCH" | "UNDERPAID" | "OVERPAID" | "UNREADABLE" | null;
   payment_proof_difference?: number | null;
   payment_proof_ai_details?: string | null;
+  refund_account_info?: string | null;
+  refund_account_submitted_at?: string | null;
+  refund_proof_url?: string | null;
+  refund_completed_at?: string | null;
+  refund_status?: "pending" | "completed" | null;
+  shortage_proof_url?: string | null;
+  shortage_proof_submitted_at?: string | null;
+  shortage_verified_at?: string | null;
+  shortage_status?: "submitted" | "verified" | "rejected" | null;
+  shortage_proof_note?: string | null;
   voucher_code?: string | null;
   fulfillment_proof_url?: string | null;
   is_complained?: number;
@@ -1291,7 +1301,7 @@ export const analyzePaymentProofAction = createServerFn({ method: "POST" })
 
 // Batch scan payment proofs with Gemini AI Vision
 export const scanAllPaymentProofsAction = createServerFn({ method: "POST" })
-  .validator((d: { limit?: number; forceAll?: boolean } | undefined) => d || {})
+  .validator((d: { limit?: number; forceAll?: boolean; excludeOrderIds?: string[] } | undefined) => d || {})
   .handler(async ({ data: input }) => {
     try {
       const res = await serverFetch(`${API_URL}/api/admin/orders/scan-all-proofs`, {
@@ -1307,6 +1317,90 @@ export const scanAllPaymentProofsAction = createServerFn({ method: "POST" })
     } catch (error: any) {
       console.error("Error batch scanning payment proofs with AI:", error);
       return { success: false, error: error.message || "Gagal memindai bukti transfer secara massal" };
+    }
+  });
+
+// Submit refund account information by buyer
+export const submitRefundAccountAction = createServerFn({ method: "POST" })
+  .validator((d: { orderId: string; refund_account_info: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/orders/${input.orderId}/refund-account`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refund_account_info: input.refund_account_info }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error submitting refund account info:", error);
+      return { success: false, error: error.message || "Gagal menyimpan info rekening pengembalian" };
+    }
+  });
+
+// Submit shortage payment proof by buyer
+export const submitShortageProofAction = createServerFn({ method: "POST" })
+  .validator((d: { orderId: string; shortage_proof_url: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/orders/${input.orderId}/shortage-proof`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shortage_proof_url: input.shortage_proof_url }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error submitting shortage payment proof:", error);
+      return { success: false, error: error.message || "Gagal mengunggah bukti pembayaran kekurangan" };
+    }
+  });
+
+// Admin complete refund for overpaid order
+export const adminCompleteRefundAction = createServerFn({ method: "POST" })
+  .validator((d: { orderId: string; refund_proof_url: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/admin/orders/${input.orderId}/complete-refund`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refund_proof_url: input.refund_proof_url }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error completing refund:", error);
+      return { success: false, error: error.message || "Gagal menyelesaikan pengembalian dana" };
+    }
+  });
+
+// Admin verify shortage proof
+export const adminVerifyShortageAction = createServerFn({ method: "POST" })
+  .validator((d: { orderId: string; isAccepted: boolean; note?: string }) => d)
+  .handler(async ({ data: input }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/admin/orders/${input.orderId}/verify-shortage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isAccepted: input.isAccepted, note: input.note }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error verifying shortage proof:", error);
+      return { success: false, error: error.message || "Gagal memverifikasi bukti kekurangan bayar" };
     }
   });
 

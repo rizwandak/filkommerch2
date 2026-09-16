@@ -92,6 +92,8 @@ import {
   verifyPaymentProof,
   analyzePaymentProofAction,
   scanAllPaymentProofsAction,
+  adminCompleteRefundAction,
+  adminVerifyShortageAction,
   getAllClaimsServerAction,
   approveClaimServerAction,
   rejectClaimServerAction,
@@ -279,6 +281,87 @@ const renderAiProofBadge = (order: any, linkedLns?: any) => {
   );
 };
 
+// Component to render payment proof difference badge (blue for overpaid, red for underpaid)
+const renderDifferenceCell = (order: any, linkedLns?: any) => {
+  if (!order) return <span className="text-muted-foreground text-xs font-semibold">-</span>;
+
+  const renderBadgeForSingle = (o: any, label = "") => {
+    if (!o.payment_proof_url) return null;
+    const match = o.payment_proof_match_status;
+    const diff = Number(o.payment_proof_difference || 0);
+
+    if (match === "OVERPAID") {
+      return (
+        <div key={`${o.order_id}-diff-over`} className="flex flex-col items-center">
+          <span
+            className="inline-flex items-center gap-0.5 font-mono font-black text-xs text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-300 shadow-xs"
+            title={`${label}Lebih Bayar: +Rp ${diff.toLocaleString("id-ID")}`}
+          >
+            <span>{label}+Rp {diff.toLocaleString("id-ID")}</span>
+          </span>
+          <span className="text-[9px] font-black uppercase text-blue-700 mt-0.5 tracking-tight">Lebih</span>
+        </div>
+      );
+    }
+
+    if (match === "UNDERPAID") {
+      return (
+        <div key={`${o.order_id}-diff-under`} className="flex flex-col items-center">
+          <span
+            className="inline-flex items-center gap-0.5 font-mono font-black text-xs text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border-2 border-rose-300 shadow-xs animate-pulse"
+            title={`${label}Kurang Bayar: -Rp ${diff.toLocaleString("id-ID")}`}
+          >
+            <span>{label}-Rp {diff.toLocaleString("id-ID")}</span>
+          </span>
+          <span className="text-[9px] font-black uppercase text-rose-700 mt-0.5 tracking-tight">Kurang</span>
+        </div>
+      );
+    }
+
+    if (match === "MATCH") {
+      return (
+        <div key={`${o.order_id}-diff-match`} className="flex flex-col items-center">
+          <span
+            className="inline-flex items-center font-mono font-bold text-xs text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200"
+            title={`${label}Nominal Sesuai: Rp 0`}
+          >
+            <span>{label}Rp 0</span>
+          </span>
+          <span className="text-[9px] font-bold text-emerald-700 mt-0.5">Pas</span>
+        </div>
+      );
+    }
+
+    if (match === "UNREADABLE") {
+      return (
+        <span
+          key={`${o.order_id}-diff-unreadable`}
+          className="text-[9px] font-bold text-amber-900 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-300"
+          title={`${label}Nominal tidak terbaca jelas oleh AI`}
+        >
+          {label}Cek Manual
+        </span>
+      );
+    }
+
+    return null;
+  };
+
+  const mainBadge = renderBadgeForSingle(order);
+  const lnsBadge = linkedLns && linkedLns.payment_proof_url ? renderBadgeForSingle(linkedLns, "LNS: ") : null;
+
+  if (!mainBadge && !lnsBadge) {
+    return <span className="text-muted-foreground text-xs font-semibold">-</span>;
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      {mainBadge}
+      {lnsBadge}
+    </div>
+  );
+};
+
 const formatCompactDateTime = (dateStr: string | Date | null | undefined) => {
   if (!dateStr) return { date: "-", time: "" };
   try {
@@ -292,7 +375,7 @@ const formatCompactDateTime = (dateStr: string | Date | null | undefined) => {
   }
 };
 
-type SortField = "no" | "order_id" | "customer_name" | "gross_amount" | "pelunasan" | "payment_status" | "fulfillment_status" | "created_at";
+type SortField = "no" | "order_id" | "customer_name" | "gross_amount" | "pelunasan" | "payment_status" | "difference" | "fulfillment_status" | "created_at";
 type SortDirection = "asc" | "desc";
 
 interface VisibleColumns {
@@ -302,6 +385,7 @@ interface VisibleColumns {
   gross_amount: boolean;
   pelunasan: boolean;
   payment_status: boolean;
+  difference: boolean;
   created_at: boolean;
   actions: boolean;
 }
@@ -313,6 +397,7 @@ const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = {
   gross_amount: true,
   pelunasan: true,
   payment_status: true,
+  difference: true,
   created_at: true,
   actions: true,
 };
@@ -324,6 +409,7 @@ const COLUMN_DEFINITIONS = [
   { id: "gross_amount", label: "Total Pesanan" },
   { id: "pelunasan", label: "Nominal Pelunasan" },
   { id: "payment_status", label: "Status & AI Struk" },
+  { id: "difference", label: "Selisih Bayar" },
   { id: "created_at", label: "Tanggal & Jam" },
   { id: "actions", label: "Tombol Aksi" },
 ] as const;
@@ -445,6 +531,7 @@ function AdminTransactionsPage() {
       gross_amount: enabled,
       pelunasan: enabled,
       payment_status: enabled,
+      difference: enabled,
       created_at: enabled,
       actions: true,
     };
@@ -466,6 +553,7 @@ function AdminTransactionsPage() {
     if (visibleColumns.gross_amount) count++;
     if (visibleColumns.pelunasan) count++;
     if (visibleColumns.payment_status) count++;
+    if (visibleColumns.difference) count++;
     if (visibleColumns.created_at) count++;
     if (visibleColumns.actions) count++;
     return count;
@@ -550,6 +638,16 @@ function AdminTransactionsPage() {
   // Gemini AI Payment Proof Analysis States
   const [isAnalyzingProof, setIsAnalyzingProof] = useState(false);
   const [proofAnalysisResult, setProofAnalysisResult] = useState<any>(null);
+
+  // Overpaid / Refund management in modal
+  const [adminRefundProofFile, setAdminRefundProofFile] = useState<File | null>(null);
+  const [adminUploadingRefundProof, setAdminUploadingRefundProof] = useState(false);
+  const [adminCompletingRefund, setAdminCompletingRefund] = useState(false);
+
+  // Underpaid / Shortage verification in modal
+  const [shortageRejectionReason, setShortageRejectionReason] = useState("");
+  const [showShortageRejectInput, setShowShortageRejectInput] = useState(false);
+  const [adminVerifyingShortage, setAdminVerifyingShortage] = useState(false);
 
   // Notification Modal States
   const [notifModalOpen, setNotifModalOpen] = useState(false);
@@ -870,6 +968,9 @@ function AdminTransactionsPage() {
     setShowRejectReason(false);
     setIsAnalyzingProof(false);
     setProofAnalysisResult(null);
+    setAdminRefundProofFile(null);
+    setShortageRejectionReason("");
+    setShowShortageRejectInput(false);
     setManagementOpen(true);
 
     try {
@@ -1149,17 +1250,116 @@ function AdminTransactionsPage() {
     }
   };
 
+  const handleAdminCompleteRefund = async () => {
+    if (!managedTransaction) return;
+    if (!adminRefundProofFile) {
+      toast.error("Pilih file foto bukti transfer pengembalian dana terlebih dahulu.");
+      return;
+    }
+    setAdminCompletingRefund(true);
+    try {
+      setAdminUploadingRefundProof(true);
+      const formData = new FormData();
+      formData.append("file", adminRefundProofFile);
+      const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      setAdminUploadingRefundProof(false);
+
+      const refundProofUrl = uploadData.url || uploadData.path;
+      if (!refundProofUrl) {
+        throw new Error(uploadData.error || "Gagal mengunggah file bukti pengembalian dana");
+      }
+
+      const res = await adminCompleteRefundAction({
+        data: {
+          orderId: managedTransaction.order_id,
+          refund_proof_url: refundProofUrl,
+        },
+      });
+
+      if (res.success) {
+        toast.success("Pengembalian dana berhasil dicatat selesai!");
+        setAdminRefundProofFile(null);
+        await loadTransactions();
+        const detailRes = await getOrderById({ data: managedTransaction.order_id });
+        if (detailRes.success && detailRes.order) {
+          setManagedTransaction(detailRes.order);
+        }
+      } else {
+        toast.error(res.error || "Gagal menyelesaikan pengembalian dana");
+      }
+    } catch (err: any) {
+      console.error("Complete refund error:", err);
+      toast.error(err.message || "Terjadi kesalahan saat menyelesaikan refund");
+    } finally {
+      setAdminUploadingRefundProof(false);
+      setAdminCompletingRefund(false);
+    }
+  };
+
+  const handleAdminVerifyShortage = async (isAccepted: boolean) => {
+    if (!managedTransaction) return;
+    if (!isAccepted && !shortageRejectionReason.trim()) {
+      toast.error("Alasan penolakan bukti kekurangan wajib diisi.");
+      return;
+    }
+    setAdminVerifyingShortage(true);
+    try {
+      const res = await adminVerifyShortageAction({
+        data: {
+          orderId: managedTransaction.order_id,
+          isAccepted,
+          note: isAccepted ? undefined : shortageRejectionReason.trim(),
+        },
+      });
+      if (res.success) {
+        toast.success(
+          isAccepted
+            ? "Bukti kekurangan disetujui! Status pesanan otomatis LUNAS (Paid) & Match AI."
+            : "Bukti kekurangan ditolak & catatan terkirim ke pembeli."
+        );
+        setShowShortageRejectInput(false);
+        setShortageRejectionReason("");
+        await loadTransactions();
+        const detailRes = await getOrderById({ data: managedTransaction.order_id });
+        if (detailRes.success && detailRes.order) {
+          setManagedTransaction(detailRes.order);
+          setManagedStatus(detailRes.order.transaction_status);
+        }
+      } else {
+        toast.error(res.error || "Gagal memverifikasi kekurangan");
+      }
+    } catch (err: any) {
+      console.error("Verify shortage error:", err);
+      toast.error(err.message || "Terjadi kesalahan saat verifikasi kekurangan");
+    } finally {
+      setAdminVerifyingShortage(false);
+    }
+  };
+
   const handleBatchScanAiProofs = async () => {
     setIsBatchScanning(true);
     let totalScanned = 0;
+    const scannedOrderIds: string[] = [];
     try {
-      toast.info("Memulai pemindaian AI untuk seluruh bukti transfer...");
+      toast.info("Memulai pemindaian AI untuk seluruh bukti transfer (termasuk cek manual)...");
       while (true) {
-        const res = await scanAllPaymentProofsAction({ data: { limit: 10 } });
+        const res = await scanAllPaymentProofsAction({
+          data: {
+            limit: 10,
+            excludeOrderIds: scannedOrderIds,
+          },
+        });
         if (!res.success) {
           toast.error(res.error || "Gagal memindai beberapa bukti transfer");
           break;
         }
+        (res.results || []).forEach((r: any) => {
+          if (r.order_id) scannedOrderIds.push(r.order_id);
+        });
         totalScanned += res.processed || 0;
         setBatchScanProgress({ processed: totalScanned, remaining: res.total_remaining || 0 });
         await loadTransactions();
@@ -1167,7 +1367,7 @@ function AdminTransactionsPage() {
           toast.success(`Selesai! Berhasil memindai ${totalScanned} bukti transfer.`);
           break;
         }
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 800));
       }
     } catch (err: any) {
       toast.error(err.message || "Terjadi kesalahan saat pemindaian massal");
@@ -1860,6 +2060,20 @@ function AdminTransactionsPage() {
           valA = getPaymentStatusBadge(a, dpPelunasanMap[a.order_id]).text;
           valB = getPaymentStatusBadge(b, dpPelunasanMap[b.order_id]).text;
           break;
+        case "difference": {
+          const getDiff = (ord: any) => {
+            if (ord.payment_proof_match_status === "UNDERPAID") {
+              return -Number(ord.payment_proof_difference || 0);
+            }
+            if (ord.payment_proof_match_status === "OVERPAID") {
+              return Number(ord.payment_proof_difference || 0);
+            }
+            return 0;
+          };
+          valA = getDiff(a);
+          valB = getDiff(b);
+          break;
+        }
         case "fulfillment_status":
           valA = getFulfillmentStatusBadge(a).text;
           valB = getFulfillmentStatusBadge(b).text;
@@ -1913,6 +2127,22 @@ function AdminTransactionsPage() {
           valA = a.paid_count;
           valB = b.paid_count;
           break;
+        case "difference": {
+          const getGroupDiff = (grp: any) => {
+            return (grp.orders || []).reduce((acc: number, ord: any) => {
+              if (ord.payment_proof_match_status === "UNDERPAID") {
+                return acc - Number(ord.payment_proof_difference || 0);
+              }
+              if (ord.payment_proof_match_status === "OVERPAID") {
+                return acc + Number(ord.payment_proof_difference || 0);
+              }
+              return acc;
+            }, 0);
+          };
+          valA = getGroupDiff(a);
+          valB = getGroupDiff(b);
+          break;
+        }
         case "created_at":
         case "no":
         default:
@@ -2364,26 +2594,31 @@ function AdminTransactionsPage() {
                   </Button>
 
                   {/* Tombol Pindai Semua Bukti AI */}
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void handleBatchScanAiProofs()}
-                    disabled={isBatchScanning}
-                    className="h-9 px-3 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5 cursor-pointer transition-all hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
-                    title="Pindai dan periksa seluruh bukti transfer yang belum dicek secara otomatis dengan Gemini AI"
-                  >
-                    {isBatchScanning ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                        <span>Memindai AI ({batchScanProgress ? `${batchScanProgress.processed} / Sisa ${batchScanProgress.remaining}` : "..."})</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5" />
-                        <span>⚡ Pindai Semua Bukti AI {stats.aiUnscannedCount > 0 ? `(${stats.aiUnscannedCount})` : ""}</span>
-                      </>
-                    )}
-                  </Button>
+                  {(() => {
+                    const pendingAiScanCount = stats.aiUnscannedCount + stats.aiUnreadableCount;
+                    return (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => void handleBatchScanAiProofs()}
+                        disabled={isBatchScanning}
+                        className="h-9 px-3 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs uppercase tracking-wider border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5 cursor-pointer transition-all hover:translate-x-[0.5px] hover:translate-y-[0.5px]"
+                        title="Pindai dan periksa bukti transfer yang belum dicek atau gagal terbaca (cek manual) secara otomatis dengan Gemini AI"
+                      >
+                        {isBatchScanning ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Memindai AI ({batchScanProgress ? `${batchScanProgress.processed} / Sisa ${batchScanProgress.remaining}` : "..."})</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="w-3.5 h-3.5" />
+                            <span>⚡ Pindai Semua Bukti AI {pendingAiScanCount > 0 ? `(${pendingAiScanCount})` : ""}</span>
+                          </>
+                        )}
+                      </Button>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -2724,6 +2959,16 @@ function AdminTransactionsPage() {
                           <Badge className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${fulBadge.color}`}>
                             {fulBadge.text}
                           </Badge>
+                          {order.payment_proof_match_status === "UNDERPAID" && (
+                            <span className="inline-flex items-center font-mono font-black text-[10px] text-rose-800 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-300 animate-pulse">
+                              Kurang: -Rp {Number(order.payment_proof_difference || 0).toLocaleString("id-ID")}
+                            </span>
+                          )}
+                          {order.payment_proof_match_status === "OVERPAID" && (
+                            <span className="inline-flex items-center font-mono font-black text-[10px] text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-300">
+                              Lebih: +Rp {Number(order.payment_proof_difference || 0).toLocaleString("id-ID")}
+                            </span>
+                          )}
                           {renderAiProofBadge(order, dpPelunasanMap[order.order_id])}
                         </div>
 
@@ -2871,6 +3116,9 @@ function AdminTransactionsPage() {
                       {visibleColumns.payment_status && (
                         <SortHeaderColumn label="STATUS & AI STRUK" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
                       )}
+                      {visibleColumns.difference && (
+                        <SortHeaderColumn label="SELISIH" field="difference" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                      )}
                       {visibleColumns.created_at && (
                         <SortHeaderColumn label="TANGGAL" field="created_at" currentField={sortField} direction={sortDirection} onSort={handleSort} />
                       )}
@@ -2976,6 +3224,38 @@ function AdminTransactionsPage() {
                                         {group.orders.length} Pesanan
                                       </span>
                                     </div>
+                                  </td>
+                                )}
+                                {visibleColumns.difference && (
+                                  <td className="p-2.5 text-center whitespace-nowrap">
+                                    {(() => {
+                                      const diffSum = group.orders.reduce((acc: number, o: any) => {
+                                        if (o.payment_proof_match_status === "UNDERPAID") return acc - Number(o.payment_proof_difference || 0);
+                                        if (o.payment_proof_match_status === "OVERPAID") return acc + Number(o.payment_proof_difference || 0);
+                                        return acc;
+                                      }, 0);
+                                      if (diffSum < 0) {
+                                        return (
+                                          <div className="flex flex-col items-center">
+                                            <span className="inline-flex items-center font-mono font-black text-xs text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-300 animate-pulse">
+                                              -Rp {Math.abs(diffSum).toLocaleString("id-ID")}
+                                            </span>
+                                            <span className="text-[9px] font-black uppercase text-rose-700 mt-0.5">Kurang</span>
+                                          </div>
+                                        );
+                                      }
+                                      if (diffSum > 0) {
+                                        return (
+                                          <div className="flex flex-col items-center">
+                                            <span className="inline-flex items-center font-mono font-black text-xs text-blue-800 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-300">
+                                              +Rp {diffSum.toLocaleString("id-ID")}
+                                            </span>
+                                            <span className="text-[9px] font-black uppercase text-blue-700 mt-0.5">Lebih</span>
+                                          </div>
+                                        );
+                                      }
+                                      return <span className="text-muted-foreground text-xs font-semibold">-</span>;
+                                    })()}
                                   </td>
                                 )}
                                 {visibleColumns.created_at && (
@@ -3256,6 +3536,11 @@ function AdminTransactionsPage() {
                                 </div>
                               </td>
                             )}
+                            {visibleColumns.difference && (
+                              <td className="p-2.5 text-center whitespace-nowrap">
+                                {renderDifferenceCell(order, dpPelunasanMap[order.order_id])}
+                              </td>
+                            )}
                             {visibleColumns.created_at && (
                               <td className="p-2.5 text-xs text-muted-foreground whitespace-nowrap">
                                 {(() => {
@@ -3345,6 +3630,22 @@ function AdminTransactionsPage() {
                                       <Badge className={`px-2 py-0.2 rounded-full text-[9px] font-bold uppercase tracking-wider ${lnsBadge.color}`}>
                                         {lnsBadge.text}
                                       </Badge>
+
+                                      {linkedLns.payment_proof_match_status === "UNDERPAID" && (
+                                        <span className="font-mono font-black text-[10px] text-rose-800 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-300 animate-pulse">
+                                          Kurang: -Rp {Number(linkedLns.payment_proof_difference || 0).toLocaleString("id-ID")}
+                                        </span>
+                                      )}
+                                      {linkedLns.payment_proof_match_status === "OVERPAID" && (
+                                        <span className="font-mono font-black text-[10px] text-blue-800 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-300">
+                                          Lebih: +Rp {Number(linkedLns.payment_proof_difference || 0).toLocaleString("id-ID")}
+                                        </span>
+                                      )}
+                                      {linkedLns.payment_proof_match_status === "MATCH" && (
+                                        <span className="font-mono font-bold text-[10px] text-emerald-800 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                          Pas (Rp 0)
+                                        </span>
+                                      )}
 
                                       <Button
                                         variant="outline"
@@ -4325,6 +4626,253 @@ function AdminTransactionsPage() {
                             </div>
                           );
                         })()}
+
+                        {/* Admin Overpaid / Refund Resolution Box */}
+                        {(managedTransaction.payment_proof_match_status === "OVERPAID" || managedTransaction.refund_account_info) && (
+                          <div className="mt-4 pt-4 border-t-2 border-blue-200 bg-blue-50/70 p-3.5 rounded-xl border space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <CreditCard className="w-4 h-4 text-blue-600" />
+                                <h5 className="text-xs font-black uppercase tracking-wider text-blue-950">
+                                  Penyelesaian Kelebihan Bayar (Refund)
+                                </h5>
+                              </div>
+                              {managedTransaction.refund_status === "completed" ? (
+                                <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                                  ✓ Selesai Direfund
+                                </span>
+                              ) : managedTransaction.refund_account_info ? (
+                                <span className="text-[10px] font-extrabold bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300 animate-pulse">
+                                  Menunggu Admin Transfer
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold bg-blue-200 text-blue-900 px-2 py-0.5 rounded border border-blue-300">
+                                  Menunggu Info Pembeli
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex justify-between items-center text-xs bg-white border border-blue-200 rounded-lg p-2 font-semibold">
+                              <span className="text-blue-900">Nominal Kelebihan:</span>
+                              <span className="font-mono font-black text-blue-700 text-sm">
+                                + Rp {Math.abs(managedTransaction.payment_proof_difference || 0).toLocaleString("id-ID")}
+                              </span>
+                            </div>
+
+                            {/* Buyer's submitted refund account info (simple clear display, no copy button as per user instruction) */}
+                            <div className="space-y-1">
+                              <span className="text-[10px] font-extrabold uppercase text-blue-950 block">
+                                Info Rekening / E-Wallet dari Pembeli:
+                              </span>
+                              <div className="bg-white border border-blue-300 rounded-lg p-2.5 text-xs font-mono font-medium whitespace-pre-wrap text-ink leading-relaxed">
+                                {managedTransaction.refund_account_info || (
+                                  <span className="italic text-muted-foreground">Pembeli belum mengirimkan informasi rekening/e-wallet.</span>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Completed state view */}
+                            {managedTransaction.refund_status === "completed" ? (
+                              <div className="bg-white border border-emerald-300 rounded-lg p-2.5 space-y-2 text-xs">
+                                <div className="flex items-center gap-1.5 text-emerald-800 font-extrabold text-[11px]">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span>Pengembalian Dana Telah Diselesaikan</span>
+                                </div>
+                                {managedTransaction.refund_completed_at && (
+                                  <p className="text-[10px] text-muted-foreground">
+                                    Waktu Selesai: {new Date(managedTransaction.refund_completed_at).toLocaleString("id-ID")}
+                                  </p>
+                                )}
+                                {managedTransaction.refund_proof_url && (
+                                  <div className="pt-1 flex items-center gap-2.5">
+                                    <a
+                                      href={resolveImageUrl(managedTransaction.refund_proof_url)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="w-14 h-14 border border-ink/30 rounded overflow-hidden bg-cream shrink-0 group relative cursor-pointer"
+                                    >
+                                      <img
+                                        src={resolveImageUrl(managedTransaction.refund_proof_url)}
+                                        alt="Bukti Transfer Refund"
+                                        className="w-full h-full object-cover group-hover:scale-105 transition"
+                                      />
+                                    </a>
+                                    <div className="text-[11px] space-y-0.5">
+                                      <span className="font-bold text-ink block">Bukti Transfer Refund</span>
+                                      <a
+                                        href={resolveImageUrl(managedTransaction.refund_proof_url)}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="text-brand-orange hover:underline text-[10px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                      >
+                                        <Eye className="w-3 h-3" /> Lihat Gambar Penuh
+                                      </a>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ) : !isCashier && (
+                              /* Form to upload admin transfer proof and complete refund */
+                              <div className="bg-white border-2 border-blue-300 rounded-lg p-3 space-y-2.5">
+                                <Label className="text-[11px] font-extrabold uppercase text-ink block">
+                                  Unggah Bukti Transfer Refund (Admin):
+                                </Label>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => setAdminRefundProofFile(e.target.files?.[0] || null)}
+                                  className="text-xs w-full text-muted-foreground file:mr-2.5 file:py-1.5 file:px-3 file:rounded-lg file:border-2 file:border-ink file:text-xs file:font-bold file:bg-cream file:text-ink cursor-pointer"
+                                />
+                                <Button
+                                  onClick={() => void handleAdminCompleteRefund()}
+                                  disabled={adminCompletingRefund || adminUploadingRefundProof || !adminRefundProofFile}
+                                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase h-9 shadow-xs"
+                                >
+                                  {adminCompletingRefund ? "Menyelesaikan Refund..." : "Upload Bukti & Tandai Refund Selesai"}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Admin Underpaid / Shortage Resolution Box */}
+                        {(managedTransaction.payment_proof_match_status === "UNDERPAID" || managedTransaction.shortage_proof_url || managedTransaction.shortage_status) && (
+                          <div className="mt-4 pt-4 border-t-2 border-rose-200 bg-rose-50/70 p-3.5 rounded-xl border space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <AlertCircle className="w-4 h-4 text-rose-600" />
+                                <h5 className="text-xs font-black uppercase tracking-wider text-rose-950">
+                                  Penyelesaian Kurang Bayar
+                                </h5>
+                              </div>
+                              {managedTransaction.shortage_status === "verified" ? (
+                                <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full border border-emerald-300">
+                                  ✓ Kekurangan Terverifikasi (Lunas)
+                                </span>
+                              ) : managedTransaction.shortage_status === "rejected" ? (
+                                <span className="text-[10px] font-extrabold bg-red-100 text-red-800 px-2.5 py-0.5 rounded-full border border-red-300 animate-pulse">
+                                  Bukti Kekurangan Ditolak
+                                </span>
+                              ) : managedTransaction.shortage_proof_url ? (
+                                <span className="text-[10px] font-extrabold bg-blue-100 text-blue-900 px-2.5 py-0.5 rounded-full border border-blue-300 animate-pulse">
+                                  Bukti Masuk (Perlu Dicek)
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-bold bg-rose-200 text-rose-900 px-2 py-0.5 rounded border border-rose-300">
+                                  Menunggu Transfer Pembeli
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex justify-between items-center text-xs bg-white border border-rose-200 rounded-lg p-2 font-semibold">
+                              <span className="text-rose-900">Sisa Kekurangan:</span>
+                              <span className="font-mono font-black text-rose-700 text-sm">
+                                Rp {Math.abs(managedTransaction.payment_proof_difference || 0).toLocaleString("id-ID")}
+                              </span>
+                            </div>
+
+                            {/* Buyer's submitted shortage proof */}
+                            {managedTransaction.shortage_proof_url ? (
+                              <div className="bg-white border-2 border-rose-200 rounded-lg p-3 space-y-2.5">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-extrabold uppercase text-ink">
+                                    Bukti Transfer Kekurangan dari Pembeli:
+                                  </span>
+                                  {managedTransaction.shortage_proof_submitted_at && (
+                                    <span className="text-[9px] text-muted-foreground">
+                                      {new Date(managedTransaction.shortage_proof_submitted_at).toLocaleString("id-ID")}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <a
+                                    href={resolveImageUrl(managedTransaction.shortage_proof_url)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="w-20 h-20 border-2 border-ink rounded-lg overflow-hidden bg-cream shrink-0 group relative cursor-pointer"
+                                  >
+                                    <img
+                                      src={resolveImageUrl(managedTransaction.shortage_proof_url)}
+                                      alt="Bukti Kekurangan Pembeli"
+                                      className="w-full h-full object-cover group-hover:scale-105 transition"
+                                    />
+                                  </a>
+                                  <div className="text-xs space-y-1">
+                                    <span className="font-bold text-ink block">Foto Bukti Transfer Kekurangan</span>
+                                    <a
+                                      href={resolveImageUrl(managedTransaction.shortage_proof_url)}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="text-brand-orange hover:underline text-[11px] font-bold inline-flex items-center gap-1 cursor-pointer"
+                                    >
+                                      <Eye className="w-3.5 h-3.5" /> Buka Foto Ukuran Penuh
+                                    </a>
+                                  </div>
+                                </div>
+
+                                {managedTransaction.shortage_status === "rejected" && managedTransaction.shortage_proof_note && (
+                                  <div className="p-2 bg-red-50 border border-red-200 rounded text-[10px] text-red-800">
+                                    <strong>Catatan Penolakan Terakhir:</strong> "{managedTransaction.shortage_proof_note}"
+                                  </div>
+                                )}
+
+                                {/* Approve or Reject buttons for Shortage Proof */}
+                                {managedTransaction.shortage_status !== "verified" && !isCashier && (
+                                  <div className="pt-2 border-t space-y-2">
+                                    {!showShortageRejectInput ? (
+                                      <div className="flex gap-2">
+                                        <Button
+                                          onClick={() => void handleAdminVerifyShortage(true)}
+                                          disabled={adminVerifyingShortage}
+                                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs h-9 uppercase shadow-xs cursor-pointer"
+                                        >
+                                          {adminVerifyingShortage ? "Memproses..." : "✓ ACC Kekurangan (Sahkan Lunas)"}
+                                        </Button>
+                                        <Button
+                                          onClick={() => setShowShortageRejectInput(true)}
+                                          disabled={adminVerifyingShortage}
+                                          className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs h-9 uppercase shadow-xs cursor-pointer"
+                                        >
+                                          Tolak
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-2 bg-red-50 p-2.5 rounded-lg border border-red-200">
+                                        <Label className="text-[10px] font-bold uppercase text-red-900 block">
+                                          Alasan Penolakan Bukti Kekurangan:
+                                        </Label>
+                                        <Textarea
+                                          value={shortageRejectionReason}
+                                          onChange={(e) => setShortageRejectionReason(e.target.value)}
+                                          placeholder="Contoh: Nominal transfer kurang atau bukti tidak terbaca jelas."
+                                          rows={2}
+                                          className="text-xs bg-white"
+                                        />
+                                        <div className="flex justify-end gap-2">
+                                          <Button size="sm" variant="outline" onClick={() => setShowShortageRejectInput(false)}>
+                                            Batal
+                                          </Button>
+                                          <Button
+                                            size="sm"
+                                            disabled={adminVerifyingShortage}
+                                            onClick={() => void handleAdminVerifyShortage(false)}
+                                            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
+                                          >
+                                            Kirim Penolakan
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="bg-white border border-rose-200 rounded-lg p-2.5 text-xs text-rose-800 italic text-center">
+                                Pembeli belum mengunggah foto bukti pembayaran kekurangan.
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Display current status and annul option */}
                         {(managedTransaction.payment_status === "paid" || managedTransaction.transaction_status === "settlement") ? (

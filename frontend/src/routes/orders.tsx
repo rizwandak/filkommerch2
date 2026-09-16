@@ -32,6 +32,7 @@ import {
   FileText,
   ShieldAlert,
   CheckCheck,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
@@ -709,7 +710,21 @@ function UserOrdersPage() {
                         </span>
                       )}
                     </div>
-                    <div>{getStatusBadge(order)}</div>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                      {order.payment_proof_match_status === "OVERPAID" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full border border-blue-300">
+                          <CreditCard className="w-3 h-3 text-blue-600" />
+                          Lebih Bayar Rp {Math.abs(order.payment_proof_difference || 0).toLocaleString("id-ID")}
+                        </span>
+                      )}
+                      {order.payment_proof_match_status === "UNDERPAID" && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-red-100 text-red-800 px-2 py-0.5 rounded-full border border-red-300 animate-pulse">
+                          <AlertTriangle className="w-3 h-3 text-red-600" />
+                          Kurang Bayar Rp {Math.abs(order.payment_proof_difference || 0).toLocaleString("id-ID")}
+                        </span>
+                      )}
+                      {getStatusBadge(order)}
+                    </div>
                   </div>
 
                   {/* Items Section */}
@@ -905,6 +920,68 @@ function UserOrdersPage() {
                       <p className="text-[10px] text-red-600 font-bold leading-normal">
                         * Silakan periksa kembali nominal/bukti transfer Anda, lalu klik tombol "Upload Bukti Pembayaran" di bawah untuk mengunggah ulang bukti transfer yang benar.
                       </p>
+                    </div>
+                  )}
+
+                  {/* Overpaid Notice Banner */}
+                  {order.payment_proof_match_status === "OVERPAID" && (
+                    <div className="mx-5 my-3 p-3.5 bg-blue-50/90 border-2 border-blue-300 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-blue-600 text-white rounded-lg shrink-0">
+                          <CreditCard className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-blue-950 block text-[11px] uppercase">
+                            Kelebihan Pembayaran: + Rp {Math.abs(order.payment_proof_difference || 0).toLocaleString("id-ID")}
+                          </span>
+                          <p className="text-[11px] text-blue-800">
+                            {order.refund_status === "completed"
+                              ? "Dana telah berhasil ditransfer kembali oleh admin."
+                              : order.refund_account_info
+                              ? "Informasi rekening telah terkirim. Pengembalian dana diproses maks 2x24 jam."
+                              : "Silakan kirimkan informasi rekening/e-wallet untuk pengembalian dana."}
+                          </p>
+                        </div>
+                      </div>
+                      <Link
+                        to="/orders/$orderId"
+                        params={{ orderId: order.order_id }}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-[11px] uppercase rounded-lg border border-ink shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition shrink-0 cursor-pointer"
+                      >
+                        {order.refund_status === "completed" ? "Lihat Bukti Refund →" : order.refund_account_info ? "Cek Status Refund →" : "Isi Rekening Refund →"}
+                      </Link>
+                    </div>
+                  )}
+
+                  {/* Underpaid Notice Banner */}
+                  {order.payment_proof_match_status === "UNDERPAID" && (
+                    <div className="mx-5 my-3 p-3.5 bg-red-50/90 border-2 border-red-300 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-red-600 text-white rounded-lg shrink-0">
+                          <AlertTriangle className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-extrabold text-red-950 block text-[11px] uppercase">
+                            Kekurangan Pembayaran: Rp {Math.abs(order.payment_proof_difference || 0).toLocaleString("id-ID")}
+                          </span>
+                          <p className="text-[11px] text-red-800">
+                            {order.shortage_status === "verified"
+                              ? "Bukti kekurangan telah diverifikasi lunas oleh admin."
+                              : order.shortage_status === "submitted"
+                              ? "Bukti kekurangan telah diunggah & sedang diverifikasi admin."
+                              : order.shortage_status === "rejected"
+                              ? `Bukti kekurangan ditolak: "${order.shortage_proof_note || 'Tidak sesuai'}". Harap upload bukti baru.`
+                              : "Silakan scan QRIS dan unggah bukti kekurangan bayar untuk melanjutkan pesanan."}
+                          </p>
+                        </div>
+                      </div>
+                      <Link
+                        to="/orders/$orderId"
+                        params={{ orderId: order.order_id }}
+                        className="px-3 py-1.5 bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold text-[11px] uppercase rounded-lg border border-ink shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] transition shrink-0 cursor-pointer"
+                      >
+                        {order.shortage_status === "verified" ? "Lihat Detail →" : "Bayar Kekurangan →"}
+                      </Link>
                     </div>
                   )}
 

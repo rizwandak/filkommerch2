@@ -2295,6 +2295,9 @@ PENTING:
         } else {
           const errBody = await aiRes.text().catch(() => "");
           console.warn(`Gemini model ${modelName} returned status ${aiRes.status}:`, errBody);
+          if (aiRes.status === 429) {
+            await new Promise((r) => setTimeout(r, 1500));
+          }
         }
       } catch (mErr) {
         console.warn(`Error trying Gemini model ${modelName}:`, mErr);
@@ -2389,26 +2392,32 @@ export const analyzePaymentProof = async (req: Request, res: Response) => {
   return res.json(result);
 };
 
-// Batch scan payment proofs for historical or unscanned orders
+// Batch scan payment proofs for historical, unscanned, or UNREADABLE orders
 export const scanAllPaymentProofs = async (req: Request, res: Response) => {
   try {
     const limit = Math.min(Math.max(parseInt(String(req.body?.limit || "10"), 10) || 10, 1), 30);
     const forceAll = Boolean(req.body?.forceAll);
+    const excludeOrderIds: string[] = Array.isArray(req.body?.excludeOrderIds)
+      ? req.body.excludeOrderIds.filter((id: any) => typeof id === "string" && id.trim().length > 0)
+      : [];
 
     let whereClause = "WHERE payment_proof_url IS NOT NULL AND payment_proof_url != ''";
     if (!forceAll) {
-      whereClause += " AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '')";
+      whereClause += " AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '' OR payment_proof_match_status = 'UNREADABLE')";
+    }
+
+    let excludeClause = "";
+    const queryParams: any[] = [];
+    if (excludeOrderIds.length > 0) {
+      const placeholders = excludeOrderIds.map(() => "?").join(",");
+      excludeClause = ` AND order_id NOT IN (${placeholders})`;
+      queryParams.push(...excludeOrderIds);
     }
 
     const ordersToScan = await query<any>(
-      `SELECT order_id FROM orders ${whereClause} ORDER BY created_at DESC LIMIT ?`,
-      [limit]
+      `SELECT order_id FROM orders ${whereClause}${excludeClause} ORDER BY created_at DESC LIMIT ?`,
+      [...queryParams, limit]
     );
-
-    const totalRemainingRow = await queryOne<any>(
-      `SELECT COUNT(*) as count FROM orders WHERE payment_proof_url IS NOT NULL AND payment_proof_url != '' AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '')`
-    );
-    const totalRemainingBefore = Number(totalRemainingRow?.count || 0);
 
     const scannedResults: any[] = [];
 
@@ -2423,14 +2432,25 @@ export const scanAllPaymentProofs = async (req: Request, res: Response) => {
           difference: result.data?.difference,
         });
         // Throttle to respect Gemini rate limits
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 1000));
       } catch (err: any) {
         scannedResults.push({ order_id: row.order_id, success: false, error: err.message });
       }
     }
 
+    // Recalculate remaining orders excluding previously excluded and scanned in this batch
+    const allExcluded = [...excludeOrderIds, ...scannedResults.map((r) => r.order_id)];
+    let remainingExcludeClause = "";
+    const remainingParams: any[] = [];
+    if (allExcluded.length > 0) {
+      const placeholders = allExcluded.map(() => "?").join(",");
+      remainingExcludeClause = ` AND order_id NOT IN (${placeholders})`;
+      remainingParams.push(...allExcluded);
+    }
+
     const totalRemainingRowAfter = await queryOne<any>(
-      `SELECT COUNT(*) as count FROM orders WHERE payment_proof_url IS NOT NULL AND payment_proof_url != '' AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '')`
+      `SELECT COUNT(*) as count FROM orders ${whereClause}${remainingExcludeClause}`,
+      remainingParams
     );
     const totalRemainingAfter = Number(totalRemainingRowAfter?.count || 0);
 
@@ -2443,6 +2463,258 @@ export const scanAllPaymentProofs = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error in scanAllPaymentProofs:", error);
     return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// Submit buyer refund account details (for OVERPAID orders)
+export const submitRefundAccount = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { refund_account_info } = req.body;
+
+    if (!refund_account_info || typeof refund_account_info !== "string" || !refund_account_info.trim()) {
+      return res.status(400).json({ success: false, error: "Informasi rekening pengembalian dana tidak boleh kosong" });
+    }
+
+    const order = await queryOne<any>("SELECT order_id, payment_proof_match_status FROM orders WHERE order_id = ?", [id]);
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+    }
+
+    await execute(
+      `UPDATE orders SET
+        refund_account_info = ?,
+        refund_account_submitted_at = NOW(),
+        refund_status = 'pending'
+      WHERE order_id = ?`,
+      [refund_account_info.trim(), id]
+    );
+
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
+
+    await logActivity(
+      userId,
+      userName,
+      userRole,
+      "submit_refund_account",
+      "order",
+      id,
+      `Pembeli mengirim info rekening pengembalian dana untuk Order ID ${id}`
+    );
+
+    return res.json({ success: true, message: "Informasi rekening berhasil disimpan" });
+  } catch (error: any) {
+    console.error("Error in submitRefundAccount:", error);
+    return res.status(500).json({ success: false, error: error.message || "Gagal menyimpan info rekening" });
+  }
+};
+
+// Submit buyer shortage payment proof (for UNDERPAID orders)
+export const submitShortageProof = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { shortage_proof_url } = req.body;
+
+    if (!shortage_proof_url || typeof shortage_proof_url !== "string" || !shortage_proof_url.trim()) {
+      return res.status(400).json({ success: false, error: "Bukti transfer kekurangan harus diunggah" });
+    }
+
+    const order = await queryOne<any>("SELECT order_id FROM orders WHERE order_id = ?", [id]);
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+    }
+
+    await execute(
+      `UPDATE orders SET
+        shortage_proof_url = ?,
+        shortage_proof_submitted_at = NOW(),
+        shortage_status = 'submitted',
+        shortage_proof_note = NULL
+      WHERE order_id = ?`,
+      [shortage_proof_url.trim(), id]
+    );
+
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
+
+    await logActivity(
+      userId,
+      userName,
+      userRole,
+      "submit_shortage_proof",
+      "order",
+      id,
+      `Pembeli mengunggah bukti pembayaran kekurangan untuk Order ID ${id}`
+    );
+
+    return res.json({ success: true, message: "Bukti kekurangan pembayaran berhasil dikirim" });
+  } catch (error: any) {
+    console.error("Error in submitShortageProof:", error);
+    return res.status(500).json({ success: false, error: error.message || "Gagal mengunggah bukti kekurangan" });
+  }
+};
+
+// Admin complete refund for overpaid order
+export const adminCompleteRefund = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { refund_proof_url } = req.body;
+
+    if (!refund_proof_url || typeof refund_proof_url !== "string" || !refund_proof_url.trim()) {
+      return res.status(400).json({ success: false, error: "Bukti transfer pengembalian dana harus diunggah" });
+    }
+
+    const order = await queryOne<any>("SELECT order_id FROM orders WHERE order_id = ?", [id]);
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+    }
+
+    await execute(
+      `UPDATE orders SET
+        refund_proof_url = ?,
+        refund_status = 'completed',
+        refund_completed_at = NOW()
+      WHERE order_id = ?`,
+      [refund_proof_url.trim(), id]
+    );
+
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
+
+    await logActivity(
+      userId,
+      userName,
+      userRole,
+      "complete_refund",
+      "order",
+      id,
+      `Admin ${userName || 'Petugas'} menyelesaikan pengembalian lebih bayar untuk Order ID ${id}`
+    );
+
+    return res.json({ success: true, message: "Pengembalian dana berhasil dicatat selesai" });
+  } catch (error: any) {
+    console.error("Error in adminCompleteRefund:", error);
+    return res.status(500).json({ success: false, error: error.message || "Gagal menyelesaikan pengembalian dana" });
+  }
+};
+
+// Admin verify shortage proof (accept or reject)
+export const adminVerifyShortage = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const { id } = req.params;
+    const { isAccepted, note } = req.body;
+    const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const userName = req.header("x-user-name") || null;
+    const userRole = req.header("x-user-role") || null;
+
+    await connection.beginTransaction();
+
+    const [orderRows] = await connection.execute(
+      "SELECT payment_status, order_status, fulfillment_status FROM orders WHERE order_id = ? FOR UPDATE",
+      [id]
+    );
+    const order = (orderRows as any[])[0];
+
+    if (!order) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+    }
+
+    if (isAccepted) {
+      const wasUnpaid = order.payment_status !== "paid";
+
+      await connection.execute(
+        `UPDATE orders SET
+          shortage_status = 'verified',
+          shortage_verified_at = NOW(),
+          shortage_proof_note = NULL,
+          payment_status = 'paid',
+          transaction_status = 'settlement',
+          order_status = CASE WHEN order_status = 'pending_payment' THEN 'processing' ELSE order_status END,
+          fulfillment_status = CASE WHEN fulfillment_status = 'pending' THEN 'processing' ELSE fulfillment_status END,
+          payment_proof_match_status = 'MATCH',
+          payment_proof_difference = 0
+        WHERE order_id = ?`,
+        [id]
+      );
+
+      // Deduct stock if was unpaid
+      if (wasUnpaid) {
+        const [items] = await connection.execute(
+          "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
+          [id]
+        );
+        for (const item of items as any[]) {
+          if (item.variant_id) {
+            await connection.execute(
+              "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
+              [item.quantity, item.variant_id]
+            );
+            await connection.execute(
+              "UPDATE product_variants SET stock_reserved = GREATEST(0, CAST(stock_reserved AS SIGNED) - ?) WHERE id = ?",
+              [item.quantity, item.variant_id]
+            );
+            const [vRows] = await connection.execute(
+              "SELECT stock FROM product_variants WHERE id = ? FOR UPDATE",
+              [item.variant_id]
+            );
+            const curStock = (vRows as any)[0]?.stock || 0;
+            await connection.execute(
+              `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
+               VALUES (?, 'reservation_release', ?, ?, ?, 'order', ?, 'Pelepasan reservasi stok (verifikasi kekurangan bayar)')`,
+              [item.variant_id, -item.quantity, curStock, curStock, id]
+            );
+            await connection.execute(
+              `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
+               VALUES (?, 'sale', ?, ?, ?, 'order', ?, 'Penjualan selesai (verifikasi kekurangan bayar)')`,
+              [item.variant_id, -item.quantity, curStock + item.quantity, curStock, id]
+            );
+          }
+        }
+      }
+
+      await logActivity(
+        userId,
+        userName,
+        userRole,
+        "verify_shortage_accept",
+        "order",
+        id,
+        `Bukti transfer kekurangan Order ID ${id} disetujui, pesanan disahkan lunas oleh ${userName || 'Sistem'}`
+      );
+    } else {
+      await connection.execute(
+        `UPDATE orders SET
+          shortage_status = 'rejected',
+          shortage_proof_note = ?
+        WHERE order_id = ?`,
+        [note || "Bukti transfer kekurangan tidak valid atau nominal tidak sesuai", id]
+      );
+
+      await logActivity(
+        userId,
+        userName,
+        userRole,
+        "verify_shortage_reject",
+        "order",
+        id,
+        `Bukti transfer kekurangan Order ID ${id} ditolak dengan catatan: "${note || 'Bukti transfer tidak valid'}" oleh ${userName || 'Sistem'}`
+      );
+    }
+
+    await connection.commit();
+    return res.json({ success: true });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error verifying shortage proof:", error);
+    return res.status(500).json({ success: false, error: error.message || "Gagal memverifikasi bukti kekurangan bayar" });
+  } finally {
+    connection.release();
   }
 };
 
