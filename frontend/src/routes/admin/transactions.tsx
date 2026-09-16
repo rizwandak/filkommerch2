@@ -1253,17 +1253,24 @@ function AdminTransactionsPage() {
     const scannedOrderIds: string[] = [];
     try {
       toast.info("Memulai pemindaian AI untuk seluruh bukti transfer (termasuk cek manual)...");
+      let consecutiveErrors = 0;
       while (true) {
         const res = await scanAllPaymentProofsAction({
           data: {
-            limit: 10,
+            limit: 2,
             excludeOrderIds: scannedOrderIds,
           },
         });
         if (!res.success) {
-          toast.error(res.error || "Gagal memindai beberapa bukti transfer");
-          break;
+          consecutiveErrors++;
+          if (consecutiveErrors >= 3) {
+            toast.error(res.error || "Gagal memindai beberapa bukti transfer");
+            break;
+          }
+          await new Promise((r) => setTimeout(r, 1500));
+          continue;
         }
+        consecutiveErrors = 0;
         (res.results || []).forEach((r: any) => {
           if (r.order_id) scannedOrderIds.push(r.order_id);
         });
@@ -1274,7 +1281,7 @@ function AdminTransactionsPage() {
           toast.success(`Selesai! Berhasil memindai ${totalScanned} bukti transfer.`);
           break;
         }
-        await new Promise((r) => setTimeout(r, 800));
+        await new Promise((r) => setTimeout(r, 600));
       }
     } catch (err: any) {
       toast.error(err.message || "Terjadi kesalahan saat pemindaian massal");

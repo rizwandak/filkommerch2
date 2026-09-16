@@ -2395,7 +2395,7 @@ export const analyzePaymentProof = async (req: Request, res: Response) => {
 // Batch scan payment proofs for historical, unscanned, or UNREADABLE orders
 export const scanAllPaymentProofs = async (req: Request, res: Response) => {
   try {
-    const limit = Math.min(Math.max(parseInt(String(req.body?.limit || "10"), 10) || 10, 1), 30);
+    const limit = Math.min(Math.max(parseInt(String(req.body?.limit || "2"), 10) || 2, 1), 5);
     const forceAll = Boolean(req.body?.forceAll);
     const excludeOrderIds: string[] = Array.isArray(req.body?.excludeOrderIds)
       ? req.body.excludeOrderIds.filter((id: any) => typeof id === "string" && id.trim().length > 0)
@@ -2432,7 +2432,7 @@ export const scanAllPaymentProofs = async (req: Request, res: Response) => {
           difference: result.data?.difference,
         });
         // Throttle to respect Gemini rate limits
-        await new Promise((r) => setTimeout(r, 1000));
+        await new Promise((r) => setTimeout(r, 300));
       } catch (err: any) {
         scannedResults.push({ order_id: row.order_id, success: false, error: err.message });
       }

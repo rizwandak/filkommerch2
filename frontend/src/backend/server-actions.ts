@@ -1310,13 +1310,25 @@ export const scanAllPaymentProofsAction = createServerFn({ method: "POST" })
         body: JSON.stringify(input || {}),
       });
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${res.status}`);
+        const text = await res.text().catch(() => "");
+        let errorMsg = `Server error (HTTP ${res.status})`;
+        try {
+          const parsed = JSON.parse(text);
+          if (parsed?.error) errorMsg = parsed.error;
+        } catch {
+          if (text.includes("Request Timeout") || text.includes("Connection Timeout") || res.status === 504 || res.status === 500) {
+            errorMsg = "Koneksi ke server timeout saat membaca gambar. Silakan coba kembali.";
+          }
+        }
+        throw new Error(errorMsg);
       }
       return res.json();
     } catch (error: any) {
       console.error("Error batch scanning payment proofs with AI:", error);
-      return { success: false, error: error.message || "Gagal memindai bukti transfer secara massal" };
+      const cleanMsg = (error.message && !error.message.includes("<html") && !error.message.includes("<body"))
+        ? error.message
+        : "Koneksi ke server timeout saat memindai bukti transfer.";
+      return { success: false, error: cleanMsg };
     }
   });
 
