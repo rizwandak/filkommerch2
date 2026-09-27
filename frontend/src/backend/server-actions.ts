@@ -2477,3 +2477,96 @@ export const trackVisitServerAction = createServerFn({ method: "POST" })
       return { success: false }; // Fail silently
     }
   });
+
+// ==========================================
+// FINANCE & OPERATIONAL EXPENSES ACTIONS
+// ==========================================
+
+export const getFinancialBalanceSheetServerAction = createServerFn({ method: "POST" })
+  .validator((data?: { batch?: string; startDate?: string; endDate?: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const params = new URLSearchParams();
+      if (data?.batch) params.set("batch", data.batch);
+      if (data?.startDate) params.set("startDate", data.startDate);
+      if (data?.endDate) params.set("endDate", data.endDate);
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      const res = await serverFetch(`${baseUrl}/api/admin/finance/overview${qs}`);
+      if (!res.ok) return { success: false, error: "Failed to fetch financial balance sheet" };
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getFinancialBalanceSheetServerAction error:", e);
+      return { success: false, error: e.message || "Failed to fetch financial balance sheet" };
+    }
+  });
+
+export const getOperationalExpensesServerAction = createServerFn({ method: "POST" })
+  .validator((data?: { category?: string; batch_id?: string; search?: string; startDate?: string; endDate?: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const params = new URLSearchParams();
+      if (data?.category) params.set("category", data.category);
+      if (data?.batch_id) params.set("batch_id", data.batch_id);
+      if (data?.search) params.set("search", data.search);
+      if (data?.startDate) params.set("startDate", data.startDate);
+      if (data?.endDate) params.set("endDate", data.endDate);
+      const qs = params.toString() ? `?${params.toString()}` : "";
+      const res = await serverFetch(`${baseUrl}/api/admin/finance/expenses${qs}`);
+      if (!res.ok) return { success: false, error: "Failed to fetch operational expenses" };
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getOperationalExpensesServerAction error:", e);
+      return { success: false, error: e.message || "Failed to fetch operational expenses" };
+    }
+  });
+
+export const createOperationalExpenseServerAction = createServerFn({ method: "POST" })
+  .validator((data: { title: string; category: string; amount: number; expense_date: string; batch_id?: number | null; notes?: string; receipt_url?: string; created_by?: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/finance/expenses`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("createOperationalExpenseServerAction error:", e);
+      return { success: false, error: e.message || "Failed to create operational expense" };
+    }
+  });
+
+export const updateOperationalExpenseServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number; title: string; category: string; amount: number; expense_date: string; batch_id?: number | null; notes?: string; receipt_url?: string }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/finance/expenses/${data.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("updateOperationalExpenseServerAction error:", e);
+      return { success: false, error: e.message || "Failed to update operational expense" };
+    }
+  });
+
+export const deleteOperationalExpenseServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/finance/expenses/${data.id}`, {
+        method: "DELETE",
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("deleteOperationalExpenseServerAction error:", e);
+      return { success: false, error: e.message || "Failed to delete operational expense" };
+    }
+  });

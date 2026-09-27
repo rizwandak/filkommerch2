@@ -7811,3 +7811,535 @@ export const notifyPartialPickup = async (req: Request, res: Response) => {
     connection.release();
   }
 };
+
+// ==========================================
+// NERACA KEUANGAN & OPERATIONAL EXPENSES
+// ==========================================
+
+const isJacketName = (name?: string | null): boolean => {
+  if (!name) return false;
+  const n = String(name).toLowerCase();
+  return n.includes("varsity") || n.includes("work jacket") || n.includes("half zip") || n.includes("halfzip") || n.includes("half-zip");
+};
+
+const getJacketUpsize = (productName?: string | null, sizeStr?: string | null): number => {
+  const s = String(sizeStr || "").toUpperCase().trim();
+  const n = String(productName || "").toLowerCase();
+  if (s === "XXL" || s === "2XL") return 10000;
+  if (s === "XXXL" || s === "3XL") return n.includes("varsity") ? 20000 : 15000;
+  if (s === "XXXXL" || s === "4XL") return 30000;
+  if (s === "XXXXXL" || s === "5XL") return 40000;
+  return 0;
+};
+
+const getJacketDefaultNormalDp = (productName?: string | null): number => {
+  const n = String(productName || "").toLowerCase();
+  if (n.includes("work jacket")) return 124500;
+  if (n.includes("half")) return 89500;
+  if (n.includes("varsity")) return 164500;
+  return 0;
+};
+
+const calculateBackendPelunasan = (order: any, items: any[], linkedLns?: any): number => {
+  if (linkedLns && Number(linkedLns.gross_amount) > 0) {
+    return Number(linkedLns.gross_amount);
+  }
+  if (!items || items.length === 0) {
+    const notes = String(order?.notes || "").toLowerCase();
+    if (notes.includes("work jacket")) return 124500;
+    if (notes.includes("half zip") || notes.includes("halfzip")) return 89500;
+    if (notes.includes("varsity")) return 164500;
+    return 0;
+  }
+  let total = 0;
+  for (const it of items) {
+    if (!isJacketName(it.product_name)) continue;
+    const c = String(it.color || "").toUpperCase();
+    const s = String(it.size || "").toUpperCase();
+    const n = String(it.product_name || "").toUpperCase();
+    const isExplicitLunas = c.includes("LUNAS") || s.includes("LUNAS") || c.includes("FULL") || s.includes("FULL");
+    if (isExplicitLunas) continue;
+    const isDp = c.includes("DP") || s.includes("DP") || n.includes("DP");
+    if (!isDp) continue;
+
+    const unitPrice = Number(it.unit_price || it.price || 0);
+    const upsize = getJacketUpsize(it.product_name, it.size);
+    let normalPrice = unitPrice;
+    if (upsize > 0) {
+      normalPrice = Math.max(0, unitPrice - upsize);
+    } else if (normalPrice <= 0) {
+      normalPrice = getJacketDefaultNormalDp(it.product_name);
+    }
+    total += normalPrice * Number(it.quantity || 1);
+  }
+  return total;
+};
+
+export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
+  try {
+    const { batch, startDate, endDate } = req.query;
+
+    // 1. Fetch campaigns
+    const campaigns = await query<any>(
+      "SELECT id, batch_name, start_date, end_date, extended_end_date, is_active FROM pre_order_campaigns ORDER BY id ASC"
+    );
+
+    // 2. Fetch all valid orders
+    let orderQuery = `
+      SELECT o.id, o.order_id, o.user_id, o.customer_name, o.customer_email, o.customer_phone,
+             o.gross_amount, o.subtotal, o.shipping_cost, o.discount_amount,
+             o.payment_status, o.order_status, o.transaction_status,
+             o.channel, o.batch_source, o.pre_order_campaign_id, o.notes,
+             o.created_at
+      FROM orders o
+      WHERE o.order_status NOT IN ('cancelled', 'cancel')
+    `;
+    const orderParams: any[] = [];
+    if (startDate) {
+      orderQuery += " AND o.created_at >= ?";
+      orderParams.push(`${startDate} 00:00:00`);
+    }
+    if (endDate) {
+      orderQuery += " AND o.created_at <= ?";
+      orderParams.push(`${endDate} 23:59:59`);
+    }
+    orderQuery += " ORDER BY o.created_at DESC";
+
+    const allOrders = await query<any>(orderQuery, orderParams);
+
+    // 3. Fetch order items for all orders to accurately calculate DP/Pelunasan
+    const orderIds = allOrders.map((o) => o.order_id);
+    let orderItemsMap: Record<string, any[]> = {};
+    if (orderIds.length > 0) {
+      // Chunk order IDs to prevent SQL placeholder limit if very large
+      const chunkSize = 500;
+      for (let i = 0; i < orderIds.length; i += chunkSize) {
+        const slice = orderIds.slice(i, i + chunkSize);
+        const placeholders = slice.map(() => "?").join(",");
+        const itemsRows = await query<any>(
+          `SELECT order_id, product_name, size, color, quantity, unit_price, subtotal FROM order_items WHERE order_id IN (${placeholders})`,
+          slice
+        );
+        for (const row of itemsRows) {
+          if (!orderItemsMap[row.order_id]) orderItemsMap[row.order_id] = [];
+          orderItemsMap[row.order_id].push(row);
+        }
+      }
+    }
+
+    // 4. Build map of LNS pelunasan orders
+    const dpPelunasanMap: Record<string, any> = {};
+    for (const o of allOrders) {
+      if (String(o.order_id || "").startsWith("LNS") || (o.notes && o.notes.includes("Pelunasan untuk Order:"))) {
+        const match = o.notes && o.notes.match(/Pelunasan untuk Order:\s*([A-Za-z0-9-]+)/);
+        if (match && match[1]) {
+          dpPelunasanMap[match[1]] = o;
+        } else {
+          const parts = (o.order_id || "").split("-");
+          if (parts.length >= 3) {
+            const parentId = parts.slice(1, -1).join("-");
+            dpPelunasanMap[parentId] = o;
+          }
+        }
+      }
+    }
+
+    // 5. Structure breakdown containers for Batches & Ready Stock
+    type BatchSummary = {
+      id: string | number;
+      name: string;
+      is_campaign: boolean;
+      is_active?: boolean;
+      total_orders: number;
+      paid_full_orders: number;
+      dp_unpaid_orders: number;
+      unpaid_orders: number;
+      potential_revenue: number;
+      realized_revenue: number;
+      unpaid_remaining: number;
+      settlement_rate: number;
+    };
+
+    const batchSummaries: Record<string, BatchSummary> = {};
+
+    for (const c of campaigns) {
+      batchSummaries[String(c.id)] = {
+        id: c.id,
+        name: c.batch_name || `Batch #${c.id}`,
+        is_campaign: true,
+        is_active: !!c.is_active,
+        total_orders: 0,
+        paid_full_orders: 0,
+        dp_unpaid_orders: 0,
+        unpaid_orders: 0,
+        potential_revenue: 0,
+        realized_revenue: 0,
+        unpaid_remaining: 0,
+        settlement_rate: 0,
+      };
+    }
+
+    batchSummaries["ready_stock"] = {
+      id: "ready_stock",
+      name: "Penjualan Ready Stock / Non-PO",
+      is_campaign: false,
+      total_orders: 0,
+      paid_full_orders: 0,
+      dp_unpaid_orders: 0,
+      unpaid_orders: 0,
+      potential_revenue: 0,
+      realized_revenue: 0,
+      unpaid_remaining: 0,
+      settlement_rate: 0,
+    };
+
+    // Helper to identify DP
+    const checkIsDp = (o: any, items: any[]) => {
+      if (o.is_dp !== undefined && o.is_dp !== null) return !!o.is_dp;
+      const notes = String(o.notes || "").toUpperCase();
+      if (notes.includes("PELUNASAN") || notes.includes("LUNAS")) return false;
+      if (items && items.length > 0) {
+        const hasLunasVariant = items.some((i: any) => {
+          const c = String(i?.color || "").toUpperCase();
+          const s = String(i?.size || "").toUpperCase();
+          return c.includes("LUNAS") || s.includes("LUNAS") || c.includes("FULL") || s.includes("FULL");
+        });
+        if (hasLunasVariant) return false;
+        const hasDp = items.some((i: any) => {
+          const c = String(i?.color || "").toUpperCase();
+          const s = String(i?.size || "").toUpperCase();
+          return c.includes("DP") || s.includes("DP");
+        });
+        if (hasDp) return true;
+      }
+      return notes.includes("DP");
+    };
+
+    // Process non-LNS orders
+    for (const o of allOrders) {
+      const isLns = String(o.order_id || "").startsWith("LNS") || (o.notes && o.notes.includes("Pelunasan untuk Order:"));
+      if (isLns) continue; // Will be accounted for through parent DP order
+
+      const items = orderItemsMap[o.order_id] || [];
+
+      // Determine batch / campaign
+      let matchedKey = "ready_stock";
+      if (o.pre_order_campaign_id && batchSummaries[String(o.pre_order_campaign_id)]) {
+        matchedKey = String(o.pre_order_campaign_id);
+      } else {
+        const ordTime = new Date(o.created_at).getTime();
+        for (const c of campaigns) {
+          const sTime = new Date(c.start_date).getTime();
+          const endStr = c.extended_end_date || c.end_date;
+          const eTime = new Date(endStr).getTime();
+          if (ordTime >= sTime && ordTime <= eTime) {
+            matchedKey = String(c.id);
+            break;
+          }
+        }
+      }
+
+      const summary = batchSummaries[matchedKey];
+      if (!summary) continue;
+
+      const isPaid =
+        o.payment_status === "paid" ||
+        o.transaction_status === "settlement" ||
+        o.order_status === "completed" ||
+        o.order_status === "settlement" ||
+        o.order_status === "capture" ||
+        o.order_status === "processing";
+
+      const linkedLns = dpPelunasanMap[o.order_id];
+      const isLnsPaid = linkedLns && (
+        linkedLns.payment_status === "paid" ||
+        linkedLns.transaction_status === "settlement" ||
+        linkedLns.order_status === "completed"
+      );
+
+      const isDp = checkIsDp(o, items);
+      const grossAmount = Number(o.gross_amount || o.subtotal || 0);
+
+      summary.total_orders += 1;
+
+      if (isDp) {
+        const pelunasanAmount = calculateBackendPelunasan(o, items, linkedLns);
+        const potentialOrderTotal = grossAmount + pelunasanAmount;
+        summary.potential_revenue += potentialOrderTotal;
+
+        if (isPaid) {
+          if (isLnsPaid) {
+            summary.realized_revenue += potentialOrderTotal;
+            summary.paid_full_orders += 1;
+          } else {
+            summary.realized_revenue += grossAmount;
+            summary.unpaid_remaining += pelunasanAmount;
+            summary.dp_unpaid_orders += 1;
+          }
+        } else {
+          // DP itself is unpaid
+          summary.unpaid_remaining += potentialOrderTotal;
+          summary.unpaid_orders += 1;
+        }
+      } else {
+        // Regular full-paid or ready-stock order
+        summary.potential_revenue += grossAmount;
+        if (isPaid) {
+          summary.realized_revenue += grossAmount;
+          summary.paid_full_orders += 1;
+        } else {
+          summary.unpaid_remaining += grossAmount;
+          summary.unpaid_orders += 1;
+        }
+      }
+    }
+
+    // Compute settlement rates
+    for (const key of Object.keys(batchSummaries)) {
+      const s = batchSummaries[key];
+      s.settlement_rate = s.potential_revenue > 0 ? Number(((s.realized_revenue / s.potential_revenue) * 100).toFixed(1)) : 0;
+    }
+
+    // 6. Fetch Vendor Orders & Payments (COGS)
+    const vendorOrders = await query<any>(`
+      SELECT vo.id, vo.po_number, vo.status, vo.total_cost, vo.notes, vo.deadline, vo.created_at,
+             v.name as vendor_name, v.phone as vendor_phone,
+             (SELECT COALESCE(SUM(amount), 0) FROM vendor_order_payments WHERE vendor_order_id = vo.id) as paid_cost
+      FROM vendor_orders vo
+      LEFT JOIN vendors v ON vo.vendor_id = v.id
+      WHERE vo.status != 'cancelled'
+      ORDER BY vo.created_at DESC
+    `);
+
+    let totalVendorContract = 0;
+    let totalVendorPaid = 0;
+    for (const vo of vendorOrders) {
+      vo.total_cost = Number(vo.total_cost || 0);
+      vo.paid_cost = Number(vo.paid_cost || 0);
+      vo.unpaid_cost = Math.max(0, vo.total_cost - vo.paid_cost);
+      totalVendorContract += vo.total_cost;
+      totalVendorPaid += vo.paid_cost;
+    }
+    const totalVendorUnpaid = Math.max(0, totalVendorContract - totalVendorPaid);
+
+    // 7. Fetch Operational Expenses
+    let expQuery = `
+      SELECT oe.*, poc.batch_name
+      FROM operational_expenses oe
+      LEFT JOIN pre_order_campaigns poc ON oe.batch_id = poc.id
+      WHERE 1=1
+    `;
+    const expParams: any[] = [];
+    if (startDate) {
+      expQuery += " AND oe.expense_date >= ?";
+      expParams.push(startDate);
+    }
+    if (endDate) {
+      expQuery += " AND oe.expense_date <= ?";
+      expParams.push(endDate);
+    }
+    expQuery += " ORDER BY oe.expense_date DESC, oe.id DESC";
+
+    const operationalExpenses = await query<any>(expQuery, expParams);
+
+    let totalOperationalExpenses = 0;
+    const expenseCategoriesMap: Record<string, number> = {};
+    for (const exp of operationalExpenses) {
+      const amt = Number(exp.amount || 0);
+      totalOperationalExpenses += amt;
+      const cat = exp.category || "Lain-lain";
+      expenseCategoriesMap[cat] = (expenseCategoriesMap[cat] || 0) + amt;
+    }
+
+    // Category breakdown list
+    const expenseCategories = Object.entries(expenseCategoriesMap).map(([name, amount]) => ({
+      category: name,
+      amount,
+      percentage: totalOperationalExpenses > 0 ? Number(((amount / totalOperationalExpenses) * 100).toFixed(1)) : 0,
+    }));
+    expenseCategories.sort((a, b) => b.amount - a.amount);
+
+    // 8. Overall Grand Totals
+    const batchList = Object.values(batchSummaries);
+    const grandPotentialRevenue = batchList.reduce((acc, b) => acc + b.potential_revenue, 0);
+    const grandRealizedRevenue = batchList.reduce((acc, b) => acc + b.realized_revenue, 0);
+    const grandUnpaidRemaining = batchList.reduce((acc, b) => acc + b.unpaid_remaining, 0);
+    const grandTotalOrders = batchList.reduce((acc, b) => acc + b.total_orders, 0);
+    const grandPaidFullOrders = batchList.reduce((acc, b) => acc + b.paid_full_orders, 0);
+    const grandDpUnpaidOrders = batchList.reduce((acc, b) => acc + b.dp_unpaid_orders, 0);
+    const grandUnpaidOrders = batchList.reduce((acc, b) => acc + b.unpaid_orders, 0);
+
+    // Total expenses
+    const totalRealizedExpense = totalVendorPaid + totalOperationalExpenses;
+    const totalCommittedExpense = totalVendorContract + totalOperationalExpenses;
+
+    // Net balance
+    const currentNetCash = grandRealizedRevenue - totalRealizedExpense;
+    const projectedNetProfit = grandPotentialRevenue - totalCommittedExpense;
+    const projectedProfitMargin = grandPotentialRevenue > 0 ? Number(((projectedNetProfit / grandPotentialRevenue) * 100).toFixed(1)) : 0;
+    const currentCashMargin = grandRealizedRevenue > 0 ? Number(((currentNetCash / grandRealizedRevenue) * 100).toFixed(1)) : 0;
+
+    return res.json({
+      success: true,
+      data: {
+        inflow: {
+          potential_revenue: grandPotentialRevenue,
+          realized_revenue: grandRealizedRevenue,
+          unpaid_remaining: grandUnpaidRemaining,
+          settlement_rate: grandPotentialRevenue > 0 ? Number(((grandRealizedRevenue / grandPotentialRevenue) * 100).toFixed(1)) : 0,
+          total_orders: grandTotalOrders,
+          paid_full_orders: grandPaidFullOrders,
+          dp_unpaid_orders: grandDpUnpaidOrders,
+          unpaid_orders: grandUnpaidOrders,
+          batches: batchList,
+        },
+        outflow: {
+          total_realized_expense: totalRealizedExpense,
+          total_committed_expense: totalCommittedExpense,
+          vendoring: {
+            total_contract: totalVendorContract,
+            total_paid: totalVendorPaid,
+            total_unpaid: totalVendorUnpaid,
+            orders_count: vendorOrders.length,
+            orders: vendorOrders,
+          },
+          operational: {
+            total_amount: totalOperationalExpenses,
+            count: operationalExpenses.length,
+            categories: expenseCategories,
+            items: operationalExpenses,
+          },
+        },
+        balance: {
+          current_net_cash: currentNetCash,
+          projected_net_profit: projectedNetProfit,
+          projected_profit_margin: projectedProfitMargin,
+          current_cash_margin: currentCashMargin,
+          customer_receivables: grandUnpaidRemaining,
+          vendor_payables: totalVendorUnpaid,
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error("Error fetching financial balance sheet:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// CRUD Operational Expenses
+export const getOperationalExpenses = async (req: Request, res: Response) => {
+  try {
+    const { category, batch_id, search, startDate, endDate } = req.query;
+    let sql = `
+      SELECT oe.*, poc.batch_name
+      FROM operational_expenses oe
+      LEFT JOIN pre_order_campaigns poc ON oe.batch_id = poc.id
+      WHERE 1=1
+    `;
+    const params: any[] = [];
+
+    if (category && category !== "all") {
+      sql += " AND oe.category = ?";
+      params.push(category);
+    }
+    if (batch_id && batch_id !== "all") {
+      sql += " AND oe.batch_id = ?";
+      params.push(batch_id);
+    }
+    if (search) {
+      sql += " AND (oe.title LIKE ? OR oe.notes LIKE ?)";
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    if (startDate) {
+      sql += " AND oe.expense_date >= ?";
+      params.push(startDate);
+    }
+    if (endDate) {
+      sql += " AND oe.expense_date <= ?";
+      params.push(endDate);
+    }
+
+    sql += " ORDER BY oe.expense_date DESC, oe.id DESC";
+
+    const rows = await query<any>(sql, params);
+    return res.json({ success: true, data: rows });
+  } catch (error: any) {
+    console.error("Error getting operational expenses:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const createOperationalExpense = async (req: Request, res: Response) => {
+  try {
+    const { title, category, amount, expense_date, batch_id, notes, receipt_url, created_by } = req.body;
+    if (!title || !category || !amount || !expense_date) {
+      return res.status(400).json({ success: false, error: "Judul, kategori, nominal, dan tanggal wajib diisi" });
+    }
+
+    const result = await execute(
+      `INSERT INTO operational_expenses (title, category, amount, expense_date, batch_id, notes, receipt_url, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        title,
+        category,
+        Number(amount) || 0,
+        expense_date,
+        batch_id ? Number(batch_id) : null,
+        notes || null,
+        receipt_url || null,
+        created_by || "Admin",
+      ]
+    );
+
+    return res.json({
+      success: true,
+      message: "Pengeluaran operasional berhasil disimpan",
+      id: (result as any).insertId,
+    });
+  } catch (error: any) {
+    console.error("Error creating operational expense:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const updateOperationalExpense = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { title, category, amount, expense_date, batch_id, notes, receipt_url } = req.body;
+    if (!title || !category || !amount || !expense_date) {
+      return res.status(400).json({ success: false, error: "Judul, kategori, nominal, dan tanggal wajib diisi" });
+    }
+
+    await execute(
+      `UPDATE operational_expenses
+       SET title = ?, category = ?, amount = ?, expense_date = ?, batch_id = ?, notes = ?, receipt_url = ?
+       WHERE id = ?`,
+      [
+        title,
+        category,
+        Number(amount) || 0,
+        expense_date,
+        batch_id ? Number(batch_id) : null,
+        notes || null,
+        receipt_url || null,
+        id,
+      ]
+    );
+
+    return res.json({ success: true, message: "Pengeluaran operasional berhasil diperbarui" });
+  } catch (error: any) {
+    console.error("Error updating operational expense:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+export const deleteOperationalExpense = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    await execute("DELETE FROM operational_expenses WHERE id = ?", [id]);
+    return res.json({ success: true, message: "Pengeluaran operasional berhasil dihapus" });
+  } catch (error: any) {
+    console.error("Error deleting operational expense:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};

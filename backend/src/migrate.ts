@@ -246,6 +246,23 @@ export async function runMigration() {
         )`
       },
       {
+        name: "operational_expenses",
+        sql: `CREATE TABLE IF NOT EXISTS operational_expenses (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          title VARCHAR(255) NOT NULL,
+          category VARCHAR(100) NOT NULL,
+          amount INT NOT NULL DEFAULT 0,
+          expense_date DATE NOT NULL,
+          batch_id INT DEFAULT NULL,
+          notes TEXT DEFAULT NULL,
+          receipt_url VARCHAR(500) DEFAULT NULL,
+          created_by VARCHAR(100) DEFAULT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          FOREIGN KEY (batch_id) REFERENCES pre_order_campaigns(id) ON DELETE SET NULL
+        )`
+      },
+      {
         name: "batch_product_prices",
         sql: `CREATE TABLE IF NOT EXISTS batch_product_prices (
           id INT AUTO_INCREMENT PRIMARY KEY,

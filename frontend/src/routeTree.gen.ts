@@ -35,6 +35,7 @@ import { Route as AdminProductsRouteImport } from './routes/admin/products'
 import { Route as AdminPreOrderRouteImport } from './routes/admin/pre-order'
 import { Route as AdminKasirRouteImport } from './routes/admin/kasir'
 import { Route as AdminHomepageRouteImport } from './routes/admin/homepage'
+import { Route as AdminFinanceRouteImport } from './routes/admin/finance'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminActivityLogsRouteImport } from './routes/admin/activity-logs'
 
@@ -168,6 +169,11 @@ const AdminHomepageRoute = AdminHomepageRouteImport.update({
   path: '/homepage',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminFinanceRoute = AdminFinanceRouteImport.update({
+  id: '/finance',
+  path: '/finance',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminDashboardRoute = AdminDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/products': typeof ProductsRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/kasir': typeof AdminKasirRoute
   '/admin/pre-order': typeof AdminPreOrderRoute
@@ -222,6 +229,7 @@ export interface FileRoutesByTo {
   '/products': typeof ProductsRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/kasir': typeof AdminKasirRoute
   '/admin/pre-order': typeof AdminPreOrderRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/products': typeof ProductsRoute
   '/admin/activity-logs': typeof AdminActivityLogsRoute
   '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/finance': typeof AdminFinanceRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/kasir': typeof AdminKasirRoute
   '/admin/pre-order': typeof AdminPreOrderRoute
@@ -285,6 +294,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/admin/activity-logs'
     | '/admin/dashboard'
+    | '/admin/finance'
     | '/admin/homepage'
     | '/admin/kasir'
     | '/admin/pre-order'
@@ -313,6 +323,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/admin/activity-logs'
     | '/admin/dashboard'
+    | '/admin/finance'
     | '/admin/homepage'
     | '/admin/kasir'
     | '/admin/pre-order'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/products'
     | '/admin/activity-logs'
     | '/admin/dashboard'
+    | '/admin/finance'
     | '/admin/homepage'
     | '/admin/kasir'
     | '/admin/pre-order'
@@ -561,6 +573,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminHomepageRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/finance': {
+      id: '/admin/finance'
+      path: '/finance'
+      fullPath: '/admin/finance'
+      preLoaderRoute: typeof AdminFinanceRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/dashboard': {
       id: '/admin/dashboard'
       path: '/dashboard'
@@ -581,6 +600,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteRouteChildren {
   AdminActivityLogsRoute: typeof AdminActivityLogsRoute
   AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminFinanceRoute: typeof AdminFinanceRoute
   AdminHomepageRoute: typeof AdminHomepageRoute
   AdminKasirRoute: typeof AdminKasirRoute
   AdminPreOrderRoute: typeof AdminPreOrderRoute
@@ -596,6 +616,7 @@ interface AdminRouteRouteChildren {
 const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminActivityLogsRoute: AdminActivityLogsRoute,
   AdminDashboardRoute: AdminDashboardRoute,
+  AdminFinanceRoute: AdminFinanceRoute,
   AdminHomepageRoute: AdminHomepageRoute,
   AdminKasirRoute: AdminKasirRoute,
   AdminPreOrderRoute: AdminPreOrderRoute,

@@ -434,6 +434,13 @@ app.post("/api/admin/vendoring/orders/:id/payments", checkRole(["admin"]), apiCo
 app.delete("/api/admin/vendoring/orders/:id/payments/:paymentId", checkRole(["admin"]), apiControllers.deleteVendorOrderPayment);
 app.get("/api/admin/vendoring/financials", checkRole(["admin"]), apiControllers.getFinancialOverview);
 
+// Financial Balance Sheet & Operational Expenses
+app.get("/api/admin/finance/overview", checkRole(["admin"]), apiControllers.getFinancialBalanceSheet);
+app.get("/api/admin/finance/expenses", checkRole(["admin"]), apiControllers.getOperationalExpenses);
+app.post("/api/admin/finance/expenses", checkRole(["admin"]), apiControllers.createOperationalExpense);
+app.put("/api/admin/finance/expenses/:id", checkRole(["admin"]), apiControllers.updateOperationalExpense);
+app.delete("/api/admin/finance/expenses/:id", checkRole(["admin"]), apiControllers.deleteOperationalExpense);
+
 // CSV Import API Route
 app.post("/api/admin/import/orders", checkRole(["admin"]), apiControllers.importOrders);
 app.delete("/api/admin/import/orders/:campaignId", checkRole(["admin"]), apiControllers.deleteImportedOrders);
