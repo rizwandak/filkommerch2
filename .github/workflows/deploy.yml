@@ -33,11 +33,9 @@ jobs:
       # ---- CREATE RESTART TRIGGER & ENTRYPOINT ----
       - name: ⏱️ Create Restart File & Entrypoint
         run: |
+          node frontend/scripts/inline-tslib.mjs || true
           echo "import('./server/index.mjs');" > frontend/.output/app.js
-          echo '{"name": "filkommerch-frontend", "type": "module", "dependencies": {"tslib": "^2.8.1"}}' > frontend/.output/package.json
-          if [ -d "frontend/.output/server/node_modules" ]; then
-            cp -r frontend/.output/server/node_modules frontend/.output/
-          fi
+          echo '{"name": "filkommerch-frontend", "type": "module"}' > frontend/.output/package.json
           mkdir -p frontend/.output/tmp
           echo $(date) > frontend/.output/tmp/restart.txt
 
