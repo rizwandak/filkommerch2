@@ -16,6 +16,9 @@ export default defineConfig({
   },
   nitro: {
     preset: "node-server",
+    externals: {
+      inline: ["tslib"],
+    },
   },
   vite: {
     server: {

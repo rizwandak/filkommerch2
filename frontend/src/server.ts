@@ -36,7 +36,7 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
     const fs = await import('fs');
     fs.writeFileSync('catastrophic-error.log', String((err as any).stack || (err as any).message || err));
   } catch (e) {}
-  return new Response(renderErrorPage(), {
+  return new Response(renderErrorPage(err), {
     status: 500,
     headers: { "content-type": "text/html; charset=utf-8" },
   });
@@ -45,6 +45,14 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      const url = new URL(request.url);
+      if (url.pathname === "/__health") {
+        return new Response(JSON.stringify({ status: "ok", timestamp: new Date().toISOString() }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
       return await normalizeCatastrophicSsrResponse(response);
@@ -54,7 +62,7 @@ export default {
         const fs = await import('fs');
         fs.writeFileSync('catastrophic-error.log', String((error as any).stack || (error as any).message || error));
       } catch (e) {}
-      return new Response(renderErrorPage(), {
+      return new Response(renderErrorPage(error), {
         status: 500,
         headers: { "content-type": "text/html; charset=utf-8" },
       });
