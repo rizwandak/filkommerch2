@@ -353,6 +353,7 @@ app.post("/api/reviews", apiControllers.createProductReview);
 app.post("/api/sales", (req, res, next) => { clearCache("/api/products"); next(); }, apiControllers.createSale);
 app.get("/api/sales", apiControllers.getOfflineSales);
 app.get("/api/sales/:id", apiControllers.getOfflineSaleById);
+app.put("/api/sales/:id", checkRole(["admin", "cashier"]), apiControllers.updateOfflineSale);
 app.delete("/api/sales/:id", checkRole(["admin"]), apiControllers.deleteOfflineSale);
 
 // Admin Specific API Routes

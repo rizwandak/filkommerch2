@@ -61,6 +61,7 @@ import {
   Columns3,
   Sparkles,
   Loader2,
+  Pencil,
 } from "lucide-react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logoFM from "@/assets/logo-fm.jpg";
@@ -89,6 +90,7 @@ import {
   updateOrderStatus,
   deleteOrder,
   deleteOfflineSale,
+  updateOfflineSale,
   verifyPaymentProof,
   analyzePaymentProofAction,
   scanAllPaymentProofsAction,
@@ -288,8 +290,10 @@ type SortDirection = "asc" | "desc";
 interface VisibleColumns {
   no: boolean;
   order_id: boolean;
+  cashier: boolean;
   customer_name: boolean;
   gross_amount: boolean;
+  payment_method: boolean;
   pelunasan: boolean;
   payment_status: boolean;
   difference: boolean;
@@ -300,8 +304,10 @@ interface VisibleColumns {
 const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = {
   no: true,
   order_id: true,
+  cashier: true,
   customer_name: true,
   gross_amount: true,
+  payment_method: true,
   pelunasan: true,
   payment_status: true,
   difference: true,
@@ -311,12 +317,14 @@ const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = {
 
 const COLUMN_DEFINITIONS = [
   { id: "no", label: "No" },
-  { id: "order_id", label: "Order ID & Tipe" },
+  { id: "order_id", label: "Order ID / Sale ID" },
+  { id: "cashier", label: "Kasir (POS)" },
   { id: "customer_name", label: "Pelanggan" },
-  { id: "gross_amount", label: "Total Pesanan" },
-  { id: "pelunasan", label: "Nominal Pelunasan" },
+  { id: "gross_amount", label: "Total Transaksi" },
+  { id: "payment_method", label: "Pembayaran (POS)" },
+  { id: "pelunasan", label: "Nominal Pelunasan (Online)" },
   { id: "payment_status", label: "Status" },
-  { id: "difference", label: "Selisih Bayar" },
+  { id: "difference", label: "Selisih Bayar (Online)" },
   { id: "created_at", label: "Tanggal & Jam" },
   { id: "actions", label: "Tombol Aksi" },
 ] as const;
@@ -434,8 +442,10 @@ function AdminTransactionsPage() {
     const next: VisibleColumns = {
       no: enabled,
       order_id: true,
+      cashier: enabled,
       customer_name: enabled,
       gross_amount: enabled,
+      payment_method: enabled,
       pelunasan: enabled,
       payment_status: enabled,
       difference: enabled,
@@ -456,8 +466,10 @@ function AdminTransactionsPage() {
     let count = 1; // chevron expand button
     if (visibleColumns.no) count++;
     if (visibleColumns.order_id) count++;
+    if (visibleColumns.cashier) count++;
     if (visibleColumns.customer_name) count++;
     if (visibleColumns.gross_amount) count++;
+    if (visibleColumns.payment_method) count++;
     if (visibleColumns.pelunasan) count++;
     if (visibleColumns.payment_status) count++;
     if (visibleColumns.difference) count++;
@@ -468,6 +480,19 @@ function AdminTransactionsPage() {
 
   // Filter Modal state
   const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [filterModalTab, setFilterModalTab] = useState<"online" | "offline">("online");
+  const [mainTab, setMainTab] = useState<"online" | "offline" | "claims">("online");
+
+  // POS-specific Filter states
+  const [posPaymentMethodFilter, setPosPaymentMethodFilter] = useState<"all" | "cash" | "qris">("all");
+  const [posCashierFilter, setPosCashierFilter] = useState<string>("all");
+  const [posDateFilter, setPosDateFilter] = useState<"all" | "today" | "yesterday" | "last7days" | "last30days" | "thisMonth">("all");
+  const [posStatusFilter, setPosStatusFilter] = useState<string>("all");
+
+  // POS Customer Name Edit State
+  const [editingCustomerName, setEditingCustomerName] = useState("");
+  const [isEditingCustomerName, setIsEditingCustomerName] = useState(false);
+  const [isUpdatingOfflineSale, setIsUpdatingOfflineSale] = useState(false);
 
   // Claim Detail Modal state
   const [detailClaimModalOpen, setDetailClaimModalOpen] = useState(false);
@@ -485,6 +510,27 @@ function AdminTransactionsPage() {
     return count;
   }, [campaignFilter, productFilter, shippingFilter, statusFilter, aiStatusFilter]);
 
+  const activeOfflineFilterCount = useMemo(() => {
+    let count = 0;
+    if (productFilter.length > 0) count++;
+    if (posPaymentMethodFilter !== "all") count++;
+    if (posCashierFilter !== "all") count++;
+    if (posDateFilter !== "all") count++;
+    if (posStatusFilter !== "all") count++;
+    return count;
+  }, [productFilter, posPaymentMethodFilter, posCashierFilter, posDateFilter, posStatusFilter]);
+
+  const uniqueCashiers = useMemo(() => {
+    const list = Array.isArray(offlineSales) ? offlineSales : [];
+    const set = new Set<string>();
+    list.forEach((s) => {
+      if (s.cashier_name && s.cashier_name.trim()) {
+        set.add(s.cashier_name.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [offlineSales]);
+
   const handleResetAllFilters = () => {
     setCampaignFilter("all");
     setProductFilter([]);
@@ -492,6 +538,11 @@ function AdminTransactionsPage() {
     setShippingFilter("all");
     setStatusFilter([]);
     setAiStatusFilter("all");
+    setPosPaymentMethodFilter("all");
+    setPosCashierFilter("all");
+    setPosDateFilter("all");
+    setPosStatusFilter("all");
+    setSearchQuery("");
   };
 
   // Collapsible Row States
@@ -2076,15 +2127,89 @@ function AdminTransactionsPage() {
     const salesList = Array.isArray(offlineSales) ? offlineSales : [];
     const filtered = salesList.filter((sale) => {
       if (!sale) return false;
+
+      // 1. Search Query
       const query = (searchQuery || "").toLowerCase();
-      return (
+      const matchesQuery =
         !query ||
         String(sale.sale_id || "").toLowerCase().includes(query) ||
         String(sale.customer_name || "").toLowerCase().includes(query) ||
+        String(sale.customer_email || "").toLowerCase().includes(query) ||
+        String(sale.customer_phone || "").toLowerCase().includes(query) ||
+        String(sale.customer_nim || "").toLowerCase().includes(query) ||
         String(sale.cashier_name || "").toLowerCase().includes(query) ||
         String(sale.payment_method || "").toLowerCase().includes(query) ||
-        String(sale.status || "").toLowerCase().includes(query)
-      );
+        String(sale.status || "").toLowerCase().includes(query);
+      if (!matchesQuery) return false;
+
+      // 2. Product Filter (Include / Exclude)
+      if (productFilter.length > 0) {
+        const saleItems = (sale as any).items || rowItems[sale.sale_id] || [];
+        const selectedProductNames = products
+          .filter((p) => productFilter.includes(String(p.id)))
+          .map((p) => String(p.name).trim().toLowerCase());
+
+        const hasMatchingProduct = saleItems.some((item: any) => {
+          const itemName = String(item.product_name || "").trim().toLowerCase();
+          return selectedProductNames.some(
+            (filterName) => itemName.includes(filterName) || filterName.includes(itemName)
+          );
+        });
+
+        if (productFilterMode === "exclude") {
+          if (hasMatchingProduct) return false;
+        } else {
+          if (!hasMatchingProduct) return false;
+        }
+      }
+
+      // 3. Payment Method Filter (Tunai / QRIS)
+      if (posPaymentMethodFilter !== "all") {
+        const pm = String(sale.payment_method || "").toLowerCase();
+        if (posPaymentMethodFilter === "cash") {
+          if (!pm.includes("tunai") && !pm.includes("cash")) return false;
+        } else if (posPaymentMethodFilter === "qris") {
+          if (!pm.includes("qris")) return false;
+        }
+      }
+
+      // 4. Cashier Filter
+      if (posCashierFilter !== "all") {
+        if (String(sale.cashier_name || "").toLowerCase() !== posCashierFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // 5. Status Filter
+      if (posStatusFilter !== "all") {
+        if (String(sale.status || "").toLowerCase() !== posStatusFilter.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // 6. Date Range Filter
+      if (posDateFilter !== "all" && sale.created_at) {
+        const saleDate = new Date(sale.created_at);
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+        const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+        const time = saleDate.getTime();
+
+        if (posDateFilter === "today") {
+          if (time < startOfToday) return false;
+        } else if (posDateFilter === "yesterday") {
+          if (time < startOfYesterday || time >= startOfToday) return false;
+        } else if (posDateFilter === "last7days") {
+          if (time < now.getTime() - 7 * 24 * 60 * 60 * 1000) return false;
+        } else if (posDateFilter === "last30days") {
+          if (time < now.getTime() - 30 * 24 * 60 * 60 * 1000) return false;
+        } else if (posDateFilter === "thisMonth") {
+          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+          if (time < startOfMonth) return false;
+        }
+      }
+
+      return true;
     });
 
     filtered.sort((a, b) => {
@@ -2121,7 +2246,76 @@ function AdminTransactionsPage() {
       return 0;
     });
     return filtered;
-  }, [offlineSales, searchQuery, sortField, sortDirection]);
+  }, [
+    offlineSales,
+    searchQuery,
+    sortField,
+    sortDirection,
+    productFilter,
+    productFilterMode,
+    products,
+    posPaymentMethodFilter,
+    posCashierFilter,
+    posStatusFilter,
+    posDateFilter,
+    rowItems,
+  ]);
+
+  const groupedOfflineSales = useMemo(() => {
+    if (!groupByCustomer) return [];
+
+    const groups: Array<{
+      key: string;
+      customer_name: string;
+      customer_email?: string;
+      customer_phone?: string;
+      customer_nim?: string;
+      sales: OfflineSale[];
+      total_amount: number;
+      latest_created_at: string;
+    }> = [];
+
+    const getCleanName = (name: string) => {
+      const s = String(name || "").trim().toLowerCase();
+      if (!s || s === "-" || s === "walk-in" || s === "pelanggan pos") return "";
+      return s;
+    };
+
+    sortedOfflineSales.forEach((sale) => {
+      const rawName = (sale.customer_name || "").trim();
+      const cleanName = getCleanName(rawName);
+      const email = String(sale.customer_email || "").trim().toLowerCase();
+      const phone = String(sale.customer_phone || "").trim().replace(/\D/g, "");
+
+      let matchedGroup = cleanName ? groups.find((g) => {
+        if (email && email !== "-" && g.customer_email === email) return true;
+        if (phone && phone.length >= 8 && g.customer_phone && g.customer_phone.includes(phone.slice(-8))) return true;
+        if (g.customer_name && g.customer_name.toLowerCase() === cleanName) return true;
+        return false;
+      }) : null;
+
+      if (matchedGroup) {
+        matchedGroup.sales.push(sale);
+        matchedGroup.total_amount += Number(sale.total || 0);
+        if (new Date(sale.created_at).getTime() > new Date(matchedGroup.latest_created_at).getTime()) {
+          matchedGroup.latest_created_at = sale.created_at;
+        }
+      } else {
+        groups.push({
+          key: sale.sale_id,
+          customer_name: rawName || "-",
+          customer_email: email,
+          customer_phone: phone,
+          customer_nim: sale.customer_nim || "",
+          sales: [sale],
+          total_amount: Number(sale.total || 0),
+          latest_created_at: sale.created_at,
+        });
+      }
+    });
+
+    return groups;
+  }, [sortedOfflineSales, groupByCustomer]);
 
   return (
     <div className="p-6 lg:p-8 space-y-6 bg-background min-h-screen">
@@ -2349,7 +2543,15 @@ function AdminTransactionsPage() {
         </div>
       )}
 
-      <Tabs defaultValue="online">
+      <Tabs
+        value={mainTab}
+        onValueChange={(val: any) => {
+          setMainTab(val);
+          if (val === "online" || val === "offline") {
+            setFilterModalTab(val);
+          }
+        }}
+      >
         <TabsList>
           <TabsTrigger value="online">Pesanan Online</TabsTrigger>
           <TabsTrigger value="offline">Penjualan Offline / POS</TabsTrigger>
@@ -3687,311 +3889,794 @@ function AdminTransactionsPage() {
         <TabsContent value="offline">
           <Card>
             <CardHeader>
-              <CardTitle className="display text-sm tracking-wider text-ink">
-                Penjualan Offline / POS ({sortedOfflineSales.length})
-              </CardTitle>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <CardTitle className="display text-sm tracking-wider text-ink">
+                  Penjualan Offline / POS ({
+                    groupByCustomer
+                      ? `${groupedOfflineSales.length} Pembeli`
+                      : `${sortedOfflineSales.length} Transaksi`
+                  })
+                </CardTitle>
+
+                {/* Control Bar with Filter POS Modal Trigger & Column Setup */}
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <Button
+                    type="button"
+                    variant={activeOfflineFilterCount > 0 ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => {
+                      setFilterModalTab("offline");
+                      setFilterModalOpen(true);
+                    }}
+                    className={`h-9 text-xs font-black border-2 border-ink transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-2 ${
+                      activeOfflineFilterCount > 0
+                        ? "bg-brand-orange text-white hover:bg-brand-orange/90"
+                        : "bg-white text-ink hover:bg-cream"
+                    }`}
+                  >
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Filter POS</span>
+                    {activeOfflineFilterCount > 0 && (
+                      <span className="bg-white text-brand-orange text-[10px] font-extrabold px-1.5 py-0.2 rounded-full min-w-[18px] text-center border border-brand-orange/30">
+                        {activeOfflineFilterCount}
+                      </span>
+                    )}
+                  </Button>
+
+                  {/* Popover Pengaturan Kolom Tabel */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-9 text-xs font-black border-2 border-ink bg-white text-ink hover:bg-cream transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5"
+                        title="Atur Kolom Tabel POS Yang Ingin Ditampilkan"
+                      >
+                        <Columns3 className="w-3.5 h-3.5 text-brand-orange" />
+                        <span>Atur Kolom</span>
+                        {Object.values(visibleColumns).filter(Boolean).length < Object.keys(visibleColumns).length && (
+                          <span className="bg-brand-orange text-white text-[9px] font-black px-1.5 py-0.2 rounded-full min-w-[16px] text-center">
+                            {Object.values(visibleColumns).filter(Boolean).length}/11
+                          </span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="end"
+                      className="w-72 p-3 bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-2.5 z-50"
+                    >
+                      <div className="flex items-center justify-between pb-2 border-b border-dashed border-ink/20">
+                        <div className="flex items-center gap-1.5">
+                          <Columns3 className="w-4 h-4 text-brand-orange" />
+                          <span className="text-xs font-black uppercase text-ink tracking-wider">
+                            Pengaturan Kolom
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={resetDefaultColumns}
+                          className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer"
+                        >
+                          Reset Default
+                        </button>
+                      </div>
+
+                      <div className="space-y-1 max-h-64 overflow-y-auto pr-1">
+                        {COLUMN_DEFINITIONS.map((col) => {
+                          const isChecked = visibleColumns[col.id as keyof VisibleColumns];
+                          return (
+                            <label
+                              key={col.id}
+                              className={`flex items-center justify-between gap-2 p-1.5 rounded-lg text-xs cursor-pointer select-none transition-colors ${
+                                isChecked
+                                  ? "bg-cream/50 font-bold text-ink hover:bg-cream/80"
+                                  : "text-muted-foreground hover:bg-black/5"
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleColumn(col.id as keyof VisibleColumns)}
+                                  className="w-3.5 h-3.5 accent-brand-orange cursor-pointer rounded"
+                                />
+                                <span>{col.label}</span>
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+
+                      <div className="pt-2 border-t border-dashed border-ink/10 flex items-center justify-between text-[10px] text-muted-foreground font-semibold">
+                        <span>{Object.values(visibleColumns).filter(Boolean).length} dari {Object.keys(visibleColumns).length} aktif</span>
+                        <button
+                          type="button"
+                          onClick={() => setAllColumns(true)}
+                          className="text-blue-700 hover:underline cursor-pointer font-bold"
+                        >
+                          Tampilkan Semua
+                        </button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
+                  {activeOfflineFilterCount > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setPosPaymentMethodFilter("all");
+                        setPosCashierFilter("all");
+                        setPosDateFilter("all");
+                        setPosStatusFilter("all");
+                        setProductFilter([]);
+                        setProductFilterMode("include");
+                      }}
+                      className="h-9 px-2 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 flex items-center gap-1 cursor-pointer"
+                      title="Reset semua filter POS"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Reset Filter</span>
+                    </Button>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant={groupByCustomer ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setGroupByCustomer(!groupByCustomer)}
+                    className={`h-9 text-xs font-black border-2 border-ink transition-all cursor-pointer ${
+                      groupByCustomer
+                        ? "bg-purple-600 text-white hover:bg-purple-700 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]"
+                        : "bg-white text-ink hover:bg-cream"
+                    }`}
+                  >
+                    <Users className="w-3.5 h-3.5 mr-1.5" />
+                    {groupByCustomer ? "Gabung Pembeli (Aktif)" : "Gabungkan Nama Pembeli Sama"}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Active Filter Chips for POS */}
+              {activeOfflineFilterCount > 0 && (
+                <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-dashed border-border mt-3">
+                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                    Filter POS Aktif:
+                  </span>
+                  {posCashierFilter !== "all" && (
+                    <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 text-[10px] font-bold flex items-center gap-1">
+                      Kasir: {posCashierFilter}
+                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setPosCashierFilter("all")} />
+                    </Badge>
+                  )}
+                  {posPaymentMethodFilter !== "all" && (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-900 border-blue-300 text-[10px] font-bold flex items-center gap-1">
+                      Metode: {posPaymentMethodFilter}
+                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setPosPaymentMethodFilter("all")} />
+                    </Badge>
+                  )}
+                  {posDateFilter !== "all" && (
+                    <Badge variant="outline" className="bg-emerald-50 text-emerald-900 border-emerald-300 text-[10px] font-bold flex items-center gap-1">
+                      Waktu: {
+                        posDateFilter === "today" ? "Hari Ini" :
+                        posDateFilter === "yesterday" ? "Kemarin" :
+                        posDateFilter === "7days" ? "7 Hari Terakhir" :
+                        posDateFilter === "30days" ? "30 Hari Terakhir" :
+                        posDateFilter === "thisMonth" ? "Bulan Ini" : posDateFilter
+                      }
+                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setPosDateFilter("all")} />
+                    </Badge>
+                  )}
+                  {posStatusFilter !== "all" && (
+                    <Badge variant="outline" className="bg-purple-50 text-purple-900 border-purple-300 text-[10px] font-bold flex items-center gap-1">
+                      Status: {posStatusFilter}
+                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setPosStatusFilter("all")} />
+                    </Badge>
+                  )}
+                  {productFilter.length > 0 && (
+                    <Badge variant="outline" className={`${productFilterMode === "exclude" ? "bg-red-50 text-red-900 border-red-300" : "bg-blue-50 text-blue-900 border-blue-300"} text-[10px] font-bold flex items-center gap-1`}>
+                      {productFilterMode === "exclude" ? "TANPA" : "Produk"} ({productFilter.length}): {
+                        productFilter.map(id => uniqueProductNames.find(p => String(p.id) === id)?.name || id).slice(0, 2).join(", ")
+                      }{productFilter.length > 2 ? "..." : ""}
+                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => { setProductFilter([]); setProductFilterMode("include"); }} />
+                    </Badge>
+                  )}
+                </div>
+              )}
             </CardHeader>
+
             <CardContent className="p-3 sm:p-6">
               {/* Responsive Mobile Card View (< lg screens) */}
               <div className="block lg:hidden space-y-3">
-                {sortedOfflineSales.length === 0 ? (
-                  <div className="p-8 text-center text-muted-foreground font-bold bg-white rounded-xl border-2 border-ink/20">
-                    Tidak ada penjualan offline
-                  </div>
-                ) : (
-                  sortedOfflineSales.map((sale, idx) => {
-                    const isExpanded = !!expandedRows[sale.sale_id];
-                    const dt = formatCompactDateTime(sale.created_at);
-                    return (
-                      <div
-                        key={sale.sale_id}
-                        className="bg-white border-2 border-ink/20 rounded-xl p-3.5 shadow-sm space-y-2.5"
-                      >
-                        {/* Top: Sale ID + Status + Date */}
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-xs font-black text-brand-blue">{sale.sale_id}</span>
-                          <div className="flex items-center gap-1.5">
-                            <Badge
-                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColor[sale.status] || statusColor.completed}`}
-                            >
-                              {sale.status}
-                            </Badge>
-                            <span className="text-[11px] text-muted-foreground font-medium">
-                              {dt.date}, {dt.time}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Customer & Total Row */}
-                        <div className="flex items-start justify-between gap-2 pt-1 border-t border-border/40">
-                          <div>
-                            <p className="font-bold text-ink uppercase text-xs">
-                              {sale.customer_name || "Walk-in"}
-                            </p>
-                            <p className="text-[10px] text-muted-foreground">
-                              Kasir: {sale.cashier_name || "-"} • {sale.payment_method}
-                            </p>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <span className="text-[10px] text-muted-foreground block font-bold">Total</span>
-                            <span className="font-mono font-black text-ink text-sm">
-                              Rp {Number(sale.total).toLocaleString("id-ID")}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Inline items accordion if expanded */}
-                        {isExpanded && (
-                          <div className="p-2.5 bg-cream/40 border border-border rounded-lg space-y-2 text-xs">
-                            <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase pb-1 border-b border-border">
-                              <span>Daftar Item</span>
-                              <span>Subtotal</span>
+                {groupByCustomer ? (
+                  groupedOfflineSales.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground font-bold bg-white rounded-xl border-2 border-ink/20">
+                      Tidak ada pelanggan POS yang cocok
+                    </div>
+                  ) : (
+                    groupedOfflineSales.map((group) => {
+                      const isExpanded = !!expandedRows[`pos-group-${group.key}`];
+                      return (
+                        <div key={group.key} className="bg-white border-2 border-ink/20 rounded-xl p-3.5 shadow-sm space-y-3">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="font-black text-ink uppercase text-sm tracking-wide">
+                                {group.customer_name}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground font-medium">
+                                {group.sales.length} Penjualan POS Tergabung
+                              </p>
                             </div>
-                            {rowItemsLoading[sale.sale_id] ? (
-                              <p className="text-[11px] text-muted-foreground animate-pulse">Memuat item...</p>
-                            ) : (
-                              (rowItems[sale.sale_id] || []).map((item: any, i: number) => (
-                                <div key={i} className="flex justify-between items-center text-xs py-0.5">
-                                  <div className="min-w-0 pr-2">
-                                    <p className="font-bold text-ink truncate uppercase">{item.product_name}</p>
-                                    <p className="text-[10px] text-muted-foreground">
-                                      {item.quantity}x • {[item.size, item.color].filter(Boolean).join(" / ") || "Default"}
-                                    </p>
-                                  </div>
-                                  <span className="font-mono font-bold text-brand-blue shrink-0">
-                                    Rp {Number(item.subtotal).toLocaleString("id-ID")}
-                                  </span>
-                                </div>
-                              ))
-                            )}
+                            <div className="text-right">
+                              <span className="text-[10px] text-muted-foreground block font-bold">Total</span>
+                              <span className="font-mono font-black text-ink text-sm">
+                                Rp {Number(group.total_amount).toLocaleString("id-ID")}
+                              </span>
+                            </div>
                           </div>
-                        )}
 
-                        {/* Action buttons */}
-                        <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-border">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void toggleRow(sale.sale_id, "offline")}
-                            className="h-8 px-2 text-[11px] font-bold text-muted-foreground hover:text-ink"
-                          >
-                            {isExpanded ? (
-                              <span className="flex items-center gap-1"><ChevronUp className="w-3.5 h-3.5" /> Tutup Item</span>
-                            ) : (
-                              <span className="flex items-center gap-1"><ChevronDown className="w-3.5 h-3.5" /> Lihat Item</span>
-                            )}
-                          </Button>
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-dashed border-border text-xs">
+                            <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold text-[10px]">
+                              {group.sales.length} Transaksi
+                            </Badge>
                             <Button
                               variant="outline"
                               size="sm"
-                              onClick={() => void handleOpenManagement(sale.sale_id, "offline")}
-                              className="h-8 px-3 border-2 border-ink bg-white text-ink font-bold text-xs uppercase shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)]"
+                              className="h-8 border-2 border-ink text-xs font-bold"
+                              onClick={() => {
+                                setExpandedRows((prev) => ({ ...prev, [`pos-group-${group.key}`]: !isExpanded }));
+                              }}
                             >
-                              Kelola
+                              {isExpanded ? "Tutup Detail" : `Lihat ${group.sales.length} Transaksi`}
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => void handleDirectPrintReceipt(sale.sale_id, "offline")}
-                              className="h-8 px-2 border-2 border-ink bg-white hover:bg-cream text-ink font-bold text-xs uppercase shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer"
-                              title="Cetak Struk POS"
-                            >
-                              <Printer className="w-3.5 h-3.5 text-brand-orange" />
-                              <span className="hidden sm:inline">Struk</span>
-                            </Button>
-                            {!isCashier && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-destructive hover:bg-red-50"
-                                onClick={() => void handleDeleteSale(sale.sale_id)}
+                          </div>
+
+                          {isExpanded && (
+                            <div className="space-y-2 pt-2 border-t border-border">
+                              {group.sales.map((subSale) => {
+                                const dt = formatCompactDateTime(subSale.created_at);
+                                return (
+                                  <div
+                                    key={subSale.sale_id}
+                                    className="p-3 bg-cream/40 border border-ink/20 rounded-lg space-y-2"
+                                  >
+                                    <div className="flex items-center justify-between text-xs">
+                                      <span className="font-mono font-bold text-brand-blue">{subSale.sale_id}</span>
+                                      <span className="font-black text-ink font-mono">
+                                        Rp {Number(subSale.total).toLocaleString("id-ID")}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[11px]">
+                                      <span className="text-muted-foreground">
+                                        Kasir: {subSale.cashier_name || "-"} • {subSale.payment_method}
+                                      </span>
+                                      <span className="text-muted-foreground font-mono">
+                                        {dt.date}, {dt.time}
+                                      </span>
+                                    </div>
+                                    <div className="flex justify-end gap-1.5 pt-1">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => void handleOpenManagement(subSale.sale_id, "offline")}
+                                        className="h-7 px-2.5 border border-ink bg-white text-ink font-bold text-xs uppercase"
+                                      >
+                                        Kelola
+                                      </Button>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => void handleDirectPrintReceipt(subSale.sale_id, "offline")}
+                                        className="h-7 px-2 border border-ink bg-white hover:bg-cream text-ink font-bold text-xs uppercase flex items-center gap-1"
+                                      >
+                                        <Printer className="w-3 h-3 text-brand-orange" />
+                                        <span>Struk</span>
+                                      </Button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )
+                ) : (
+                  sortedOfflineSales.length === 0 ? (
+                    <div className="p-8 text-center text-muted-foreground font-bold bg-white rounded-xl border-2 border-ink/20">
+                      Tidak ada penjualan offline yang cocok dengan filter
+                    </div>
+                  ) : (
+                    sortedOfflineSales.map((sale) => {
+                      const isExpanded = !!expandedRows[sale.sale_id];
+                      const dt = formatCompactDateTime(sale.created_at);
+                      return (
+                        <div
+                          key={sale.sale_id}
+                          className="bg-white border-2 border-ink/20 rounded-xl p-3.5 shadow-sm space-y-2.5"
+                        >
+                          {/* Top: Sale ID + Status + Date */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-xs font-black text-brand-blue">{sale.sale_id}</span>
+                            <div className="flex items-center gap-1.5">
+                              <Badge
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColor[sale.status] || statusColor.completed}`}
                               >
-                                <Trash2 className="h-3.5 w-3.5" />
+                                {sale.status}
+                              </Badge>
+                              <span className="text-[11px] text-muted-foreground font-medium">
+                                {dt.date}, {dt.time}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Customer & Total Row */}
+                          <div className="flex items-start justify-between gap-2 pt-1 border-t border-border/40">
+                            <div>
+                              <p className="font-bold text-ink uppercase text-xs">
+                                {sale.customer_name || "-"}
+                              </p>
+                              <p className="text-[10px] text-muted-foreground">
+                                Kasir: {sale.cashier_name || "-"} • {sale.payment_method}
+                              </p>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-[10px] text-muted-foreground block font-bold">Total</span>
+                              <span className="font-mono font-black text-ink text-sm">
+                                Rp {Number(sale.total).toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Inline items accordion if expanded */}
+                          {isExpanded && (
+                            <div className="p-2.5 bg-cream/40 border border-border rounded-lg space-y-2 text-xs">
+                              <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground uppercase pb-1 border-b border-border">
+                                <span>Daftar Item</span>
+                                <span>Subtotal</span>
+                              </div>
+                              {rowItemsLoading[sale.sale_id] ? (
+                                <p className="text-[11px] text-muted-foreground animate-pulse">Memuat item...</p>
+                              ) : (
+                                (rowItems[sale.sale_id] || []).map((item: any, i: number) => (
+                                  <div key={i} className="flex justify-between items-center text-xs py-0.5">
+                                    <div className="min-w-0 pr-2">
+                                      <p className="font-bold text-ink truncate uppercase">{item.product_name}</p>
+                                      <p className="text-[10px] text-muted-foreground">
+                                        {item.quantity}x • {[item.size, item.color].filter(Boolean).join(" / ") || "Default"}
+                                      </p>
+                                    </div>
+                                    <span className="font-mono font-bold text-brand-blue shrink-0">
+                                      Rp {Number(item.subtotal).toLocaleString("id-ID")}
+                                    </span>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          )}
+
+                          {/* Action buttons */}
+                          <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-border">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void toggleRow(sale.sale_id, "offline")}
+                              className="h-8 px-2 text-[11px] font-bold text-muted-foreground hover:text-ink"
+                            >
+                              {isExpanded ? (
+                                <span className="flex items-center gap-1"><ChevronUp className="w-3.5 h-3.5" /> Tutup Item</span>
+                              ) : (
+                                <span className="flex items-center gap-1"><ChevronDown className="w-3.5 h-3.5" /> Lihat Item</span>
+                              )}
+                            </Button>
+                            <div className="flex items-center gap-1.5">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleOpenManagement(sale.sale_id, "offline")}
+                                className="h-8 px-3 border-2 border-ink bg-white text-ink font-bold text-xs uppercase shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)]"
+                              >
+                                Kelola
                               </Button>
-                            )}
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => void handleDirectPrintReceipt(sale.sale_id, "offline")}
+                                className="h-8 px-2 border-2 border-ink bg-white hover:bg-cream text-ink font-bold text-xs uppercase shadow-[1.5px_1.5px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1 cursor-pointer"
+                                title="Cetak Struk POS"
+                              >
+                                <Printer className="w-3.5 h-3.5 text-brand-orange" />
+                                <span className="hidden sm:inline">Struk</span>
+                              </Button>
+                              {!isCashier && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:bg-red-50"
+                                  onClick={() => void handleDeleteSale(sale.sale_id)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    );
-                  })
+                      );
+                    })
+                  )
                 )}
               </div>
 
               {/* Compact Desktop Table View (lg+ screens) */}
               <div className="hidden lg:block border rounded-lg overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-left border-collapse text-xs">
                   <thead className="bg-cream">
                     <tr>
                       <th className="w-9 p-2.5"></th>
-                      <SortHeaderColumn label="NO" field="no" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
-                      <SortHeaderColumn label="SALE ID" field="order_id" currentField={sortField} direction={sortDirection} onSort={handleSort} />
-                      <th className="p-2.5 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        Kasir
-                      </th>
-                      <SortHeaderColumn label="PELANGGAN" field="customer_name" currentField={sortField} direction={sortDirection} onSort={handleSort} />
-                      <SortHeaderColumn label="TOTAL" field="gross_amount" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
-                      <th className="p-2.5 text-left text-xs font-semibold tracking-wider text-ink uppercase">
-                        Pembayaran
-                      </th>
-                      <SortHeaderColumn label="STATUS" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
-                      <SortHeaderColumn label="TANGGAL" field="created_at" currentField={sortField} direction={sortDirection} onSort={handleSort} />
-                      <th className="p-2.5 text-right text-xs font-semibold tracking-wider text-ink uppercase pr-4">
-                        Aksi
-                      </th>
+                      {visibleColumns.no && (
+                        <SortHeaderColumn label="NO" field="no" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                      )}
+                      {visibleColumns.order_id && (
+                        <SortHeaderColumn label="SALE ID" field="order_id" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      )}
+                      {visibleColumns.cashier && (
+                        <th className="p-2.5 text-left text-xs font-semibold tracking-wider text-ink uppercase">
+                          Kasir
+                        </th>
+                      )}
+                      {visibleColumns.customer_name && (
+                        <SortHeaderColumn label="PELANGGAN" field="customer_name" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      )}
+                      {visibleColumns.gross_amount && (
+                        <SortHeaderColumn label="TOTAL" field="gross_amount" currentField={sortField} direction={sortDirection} onSort={handleSort} align="right" />
+                      )}
+                      {visibleColumns.payment_method && (
+                        <th className="p-2.5 text-left text-xs font-semibold tracking-wider text-ink uppercase">
+                          Pembayaran
+                        </th>
+                      )}
+                      {visibleColumns.payment_status && (
+                        <SortHeaderColumn label="STATUS" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
+                      )}
+                      {visibleColumns.created_at && (
+                        <SortHeaderColumn label="TANGGAL" field="created_at" currentField={sortField} direction={sortDirection} onSort={handleSort} />
+                      )}
+                      {visibleColumns.actions && (
+                        <th className="p-2.5 text-right text-xs font-semibold tracking-wider text-ink uppercase pr-4">
+                          Aksi
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedOfflineSales.length === 0 ? (
-                      <tr>
-                        <td colSpan={10} className="p-8 text-center text-muted-foreground font-bold">
-                          Tidak ada penjualan offline
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedOfflineSales.map((sale, idx) => (
-                        <Fragment key={sale.sale_id}>
-                          <tr
-                            className="border-t border-border hover:bg-cream/10 transition-colors"
-                          >
-                            <td className="p-2.5 text-center">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-muted"
-                                onClick={() => void toggleRow(sale.sale_id, "offline")}
-                              >
-                                {expandedRows[sale.sale_id] ? (
-                                  <ChevronUp className="h-4 w-4 text-ink" />
-                                ) : (
-                                  <ChevronDown className="h-4 w-4 text-ink" />
-                                )}
-                              </Button>
-                            </td>
-                            <td className="p-2.5 font-semibold text-xs text-ink text-center">
-                              {idx + 1}
-                            </td>
-                            <td className="p-2.5 font-mono text-xs text-brand-blue font-bold whitespace-nowrap">
-                              {sale.sale_id}
-                            </td>
-                            <td className="p-2.5 font-semibold text-ink uppercase text-xs tracking-wide truncate max-w-[120px]">
-                              {sale.cashier_name || "-"}
-                            </td>
-                            <td className="p-2.5 font-medium text-ink truncate max-w-[150px]">
-                              {sale.customer_name || "Walk-in"}
-                            </td>
-                            <td className="p-2.5 text-right font-bold text-ink whitespace-nowrap">
-                              Rp {Number(sale.total).toLocaleString("id-ID")}
-                            </td>
-                            <td className="p-2.5 text-muted-foreground text-xs whitespace-nowrap">
-                              {sale.payment_method}
-                            </td>
-                            <td className="p-2.5 text-center whitespace-nowrap">
-                              <Badge
-                                className={`px-2 py-0.2 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor[sale.status] || statusColor.completed}`}
-                              >
-                                {sale.status}
-                              </Badge>
-                            </td>
-                            <td className="p-2.5 text-xs text-muted-foreground whitespace-nowrap">
-                              {(() => {
-                                const dt = formatCompactDateTime(sale.created_at);
-                                return (
-                                  <>
-                                    <div className="font-medium text-ink text-[11px] leading-tight">{dt.date}</div>
-                                    <div className="text-[10px] text-muted-foreground font-mono">{dt.time}</div>
-                                  </>
-                                );
-                              })()}
-                            </td>
-                            <td className="p-2.5 text-right whitespace-nowrap pr-4">
-                              <div className="flex justify-end gap-1 items-center">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => void handleOpenManagement(sale.sale_id, "offline")}
-                                  className="h-7 px-2.5 border border-ink hover:bg-cream text-ink font-bold text-xs uppercase shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]"
-                                >
-                                  Kelola
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => void handleDirectPrintReceipt(sale.sale_id, "offline")}
-                                  className="h-7 w-7 p-0 border border-ink hover:bg-cream text-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center justify-center cursor-pointer"
-                                  title="Cetak Struk POS"
-                                >
-                                  <Printer className="w-3.5 h-3.5 text-brand-orange" />
-                                </Button>
-                                {!isCashier && (
+                    {groupByCustomer ? (
+                      groupedOfflineSales.length === 0 ? (
+                        <tr>
+                          <td colSpan={visibleColumnCount} className="p-8 text-center text-muted-foreground font-bold">
+                            Tidak ada pelanggan POS yang cocok dengan filter
+                          </td>
+                        </tr>
+                      ) : (
+                        groupedOfflineSales.map((group, idx) => {
+                          const isExpanded = !!expandedRows[`pos-group-${group.key}`];
+                          return (
+                            <Fragment key={group.key}>
+                              <tr className="border-t border-border hover:bg-cream/20 transition-colors">
+                                <td className="p-2.5 text-center">
                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 text-destructive hover:bg-red-50"
-                                    onClick={() => void handleDeleteSale(sale.sale_id)}
+                                    className="h-6 w-6 hover:bg-muted"
+                                    onClick={() => {
+                                      setExpandedRows((prev) => ({ ...prev, [`pos-group-${group.key}`]: !isExpanded }));
+                                    }}
                                   >
-                                    <Trash2 className="h-3.5 w-3.5" />
+                                    {isExpanded ? (
+                                      <ChevronUp className="h-4 w-4 text-ink" />
+                                    ) : (
+                                      <ChevronDown className="h-4 w-4 text-ink" />
+                                    )}
                                   </Button>
+                                </td>
+                                {visibleColumns.no && (
+                                  <td className="p-2.5 font-semibold text-xs text-ink text-center">{idx + 1}</td>
                                 )}
-                              </div>
-                            </td>
-                          </tr>
-                          {expandedRows[sale.sale_id] && (
-                            <tr className="bg-[#FCFAF7] border-b border-border">
-                              <td colSpan={10} className="p-3 pl-8 sm:pl-12">
-                                {rowItemsLoading[sale.sale_id] ? (
-                                  <p className="text-xs text-muted-foreground animate-pulse">Memuat item...</p>
-                                ) : (
-                                  <div className="space-y-3 max-w-2xl border border-border rounded-lg p-3 bg-white shadow-sm">
-                                    <div className="flex justify-between items-center pb-2 border-b border-dashed border-border">
-                                      <h4 className="text-xs font-bold text-ink uppercase tracking-wider">Item Yang Dibeli</h4>
-                                      <span className="text-[10px] text-muted-foreground uppercase font-semibold">
-                                        ID: {sale.sale_id}
-                                      </span>
-                                    </div>
-                                    <div className="overflow-x-auto">
-                                      <table className="w-full text-xs">
-                                        <thead>
-                                          <tr className="text-muted-foreground border-b border-border pb-1">
-                                            <th className="text-left font-semibold pb-1">Nama Produk</th>
-                                            <th className="text-center font-semibold pb-1">Varian</th>
-                                            <th className="text-right font-semibold pb-1">Harga</th>
-                                            <th className="text-center font-semibold pb-1">Qty</th>
-                                            <th className="text-right font-semibold pb-1">Subtotal</th>
-                                          </tr>
-                                        </thead>
-                                        <tbody>
-                                          {(rowItems[sale.sale_id] || []).map((item: any, idx_item: number) => (
-                                            <tr key={idx_item} className="border-b border-dashed border-border/40 last:border-0">
-                                              <td className="py-2 font-bold text-ink uppercase">{item.product_name}</td>
-                                              <td className="py-2 text-center text-muted-foreground">
-                                                {[item.size, item.color].filter((s: string) => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(' / ') || '-'}
-                                              </td>
-                                              <td className="py-2 text-right">
-                                                Rp {Number(item.price || item.unit_price).toLocaleString("id-ID")}
-                                              </td>
-                                              <td className="py-2 text-center font-bold">{item.quantity}</td>
-                                              <td className="py-2 text-right font-bold text-brand-blue">
-                                                Rp {Number(item.subtotal).toLocaleString("id-ID")}
-                                              </td>
+                                {visibleColumns.order_id && (
+                                  <td className="p-2.5 font-bold text-xs text-brand-purple">
+                                    {group.sales.length} Transaksi
+                                  </td>
+                                )}
+                                {visibleColumns.cashier && (
+                                  <td className="p-2.5 text-xs text-muted-foreground truncate max-w-[120px]">
+                                    {group.cashier_names.join(", ") || "-"}
+                                  </td>
+                                )}
+                                {visibleColumns.customer_name && (
+                                  <td className="p-2.5 font-black text-ink uppercase">
+                                    {group.customer_name}
+                                  </td>
+                                )}
+                                {visibleColumns.gross_amount && (
+                                  <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
+                                    Rp {Number(group.total_amount).toLocaleString("id-ID")}
+                                  </td>
+                                )}
+                                {visibleColumns.payment_method && (
+                                  <td className="p-2.5 text-xs text-muted-foreground">-</td>
+                                )}
+                                {visibleColumns.payment_status && (
+                                  <td className="p-2.5 text-center">
+                                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 font-bold text-[10px]">
+                                      {group.sales.length} Sukses
+                                    </Badge>
+                                  </td>
+                                )}
+                                {visibleColumns.created_at && (
+                                  <td className="p-2.5 text-xs text-muted-foreground">-</td>
+                                )}
+                                {visibleColumns.actions && (
+                                  <td className="p-2.5 text-right pr-4">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setExpandedRows((prev) => ({ ...prev, [`pos-group-${group.key}`]: !isExpanded }));
+                                      }}
+                                      className="h-7 px-2.5 border border-ink text-xs font-bold"
+                                    >
+                                      {isExpanded ? "Tutup" : `Lihat (${group.sales.length})`}
+                                    </Button>
+                                  </td>
+                                )}
+                              </tr>
+
+                              {/* Expanded list of sales for this customer */}
+                              {isExpanded && (
+                                <tr className="bg-amber-50/20 border-b border-border">
+                                  <td colSpan={visibleColumnCount} className="p-3 pl-10 pr-6">
+                                    <div className="border border-ink/20 rounded-lg bg-white overflow-hidden shadow-sm">
+                                      <div className="bg-cream/60 px-3 py-2 border-b border-ink/10 flex justify-between items-center text-xs">
+                                        <span className="font-bold text-ink uppercase">
+                                          Riwayat Penjualan POS: {group.customer_name}
+                                        </span>
+                                        <span className="font-mono text-muted-foreground">
+                                          Total: Rp {Number(group.total_amount).toLocaleString("id-ID")}
+                                        </span>
+                                      </div>
+                                      <div className="overflow-x-auto">
+                                        <table className="w-full text-xs">
+                                          <thead className="bg-muted/30 border-b border-border">
+                                            <tr>
+                                              <th className="p-2 text-left font-bold">Sale ID</th>
+                                              <th className="p-2 text-left font-bold">Kasir</th>
+                                              <th className="p-2 text-left font-bold">Pembayaran</th>
+                                              <th className="p-2 text-right font-bold">Total</th>
+                                              <th className="p-2 text-left font-bold">Waktu</th>
+                                              <th className="p-2 text-right font-bold pr-3">Aksi</th>
                                             </tr>
-                                          ))}
-                                        </tbody>
-                                      </table>
+                                          </thead>
+                                          <tbody>
+                                            {group.sales.map((subSale) => {
+                                              const dt = formatCompactDateTime(subSale.created_at);
+                                              return (
+                                                <tr key={subSale.sale_id} className="border-b border-dashed border-border/50 hover:bg-cream/20">
+                                                  <td className="p-2 font-mono font-bold text-brand-blue">{subSale.sale_id}</td>
+                                                  <td className="p-2 font-medium">{subSale.cashier_name || "-"}</td>
+                                                  <td className="p-2 text-muted-foreground">{subSale.payment_method}</td>
+                                                  <td className="p-2 text-right font-black">
+                                                    Rp {Number(subSale.total).toLocaleString("id-ID")}
+                                                  </td>
+                                                  <td className="p-2 text-muted-foreground font-mono">
+                                                    {dt.date}, {dt.time}
+                                                  </td>
+                                                  <td className="p-2 text-right pr-3">
+                                                    <div className="flex justify-end gap-1">
+                                                      <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => void handleOpenManagement(subSale.sale_id, "offline")}
+                                                        className="h-6 px-2 text-[10px] font-bold border border-ink"
+                                                      >
+                                                        Kelola
+                                                      </Button>
+                                                      <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => void handleDirectPrintReceipt(subSale.sale_id, "offline")}
+                                                        className="h-6 px-2 text-[10px] font-bold border border-ink flex items-center gap-1"
+                                                      >
+                                                        <Printer className="w-3 h-3 text-brand-orange" />
+                                                        Struk
+                                                      </Button>
+                                                    </div>
+                                                  </td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
                                     </div>
-                                    <div className="flex justify-between items-center pt-2 border-t border-dashed border-border text-xs font-bold">
-                                      <span className="text-muted-foreground">TOTAL PEMBAYARAN:</span>
-                                      <span className="text-brand-orange text-sm font-extrabold">
-                                        Rp {Number(sale.total).toLocaleString("id-ID")}
-                                      </span>
-                                    </div>
-                                  </div>
-                                )}
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })
+                      )
+                    ) : (
+                      sortedOfflineSales.length === 0 ? (
+                        <tr>
+                          <td colSpan={visibleColumnCount} className="p-8 text-center text-muted-foreground font-bold">
+                            Tidak ada penjualan offline yang cocok dengan filter
+                          </td>
+                        </tr>
+                      ) : (
+                        sortedOfflineSales.map((sale, idx) => (
+                          <Fragment key={sale.sale_id}>
+                            <tr
+                              className="border-t border-border hover:bg-cream/10 transition-colors"
+                            >
+                              <td className="p-2.5 text-center">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 hover:bg-muted"
+                                  onClick={() => void toggleRow(sale.sale_id, "offline")}
+                                >
+                                  {expandedRows[sale.sale_id] ? (
+                                    <ChevronUp className="h-4 w-4 text-ink" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-ink" />
+                                  )}
+                                </Button>
                               </td>
+                              {visibleColumns.no && (
+                                <td className="p-2.5 font-semibold text-xs text-ink text-center">
+                                  {idx + 1}
+                                </td>
+                              )}
+                              {visibleColumns.order_id && (
+                                <td className="p-2.5 font-mono text-xs text-brand-blue font-bold whitespace-nowrap">
+                                  {sale.sale_id}
+                                </td>
+                              )}
+                              {visibleColumns.cashier && (
+                                <td className="p-2.5 font-semibold text-ink uppercase text-xs tracking-wide truncate max-w-[120px]">
+                                  {sale.cashier_name || "-"}
+                                </td>
+                              )}
+                              {visibleColumns.customer_name && (
+                                <td className="p-2.5 font-medium text-ink truncate max-w-[150px]">
+                                  {sale.customer_name || "-"}
+                                </td>
+                              )}
+                              {visibleColumns.gross_amount && (
+                                <td className="p-2.5 text-right font-bold text-ink whitespace-nowrap">
+                                  Rp {Number(sale.total).toLocaleString("id-ID")}
+                                </td>
+                              )}
+                              {visibleColumns.payment_method && (
+                                <td className="p-2.5 text-muted-foreground text-xs whitespace-nowrap">
+                                  {sale.payment_method}
+                                </td>
+                              )}
+                              {visibleColumns.payment_status && (
+                                <td className="p-2.5 text-center whitespace-nowrap">
+                                  <Badge
+                                    className={`px-2 py-0.2 rounded-full text-[10px] font-semibold uppercase tracking-wider ${statusColor[sale.status] || statusColor.completed}`}
+                                  >
+                                    {sale.status}
+                                  </Badge>
+                                </td>
+                              )}
+                              {visibleColumns.created_at && (
+                                <td className="p-2.5 text-xs text-muted-foreground whitespace-nowrap">
+                                  {(() => {
+                                    const dt = formatCompactDateTime(sale.created_at);
+                                    return (
+                                      <>
+                                        <div className="font-medium text-ink text-[11px] leading-tight">{dt.date}</div>
+                                        <div className="text-[10px] text-muted-foreground font-mono">{dt.time}</div>
+                                      </>
+                                    );
+                                  })()}
+                                </td>
+                              )}
+                              {visibleColumns.actions && (
+                                <td className="p-2.5 text-right whitespace-nowrap pr-4">
+                                  <div className="flex justify-end gap-1 items-center">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => void handleOpenManagement(sale.sale_id, "offline")}
+                                      className="h-7 px-2.5 border border-ink hover:bg-cream text-ink font-bold text-xs uppercase shadow-[1px_1px_0px_0px_rgba(27,27,27,1)]"
+                                    >
+                                      Kelola
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => void handleDirectPrintReceipt(sale.sale_id, "offline")}
+                                      className="h-7 w-7 p-0 border border-ink hover:bg-cream text-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] flex items-center justify-center cursor-pointer"
+                                      title="Cetak Struk POS"
+                                    >
+                                      <Printer className="w-3.5 h-3.5 text-brand-orange" />
+                                    </Button>
+                                    {!isCashier && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-destructive hover:bg-red-50"
+                                        onClick={() => void handleDeleteSale(sale.sale_id)}
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </td>
+                              )}
                             </tr>
-                          )}
-                        </Fragment>
-                      ))
+                            {expandedRows[sale.sale_id] && (
+                              <tr className="bg-[#FCFAF7] border-b border-border">
+                                <td colSpan={visibleColumnCount} className="p-3 pl-8 sm:pl-12">
+                                  {rowItemsLoading[sale.sale_id] ? (
+                                    <p className="text-xs text-muted-foreground animate-pulse">Memuat item...</p>
+                                  ) : (
+                                    <div className="space-y-3 max-w-2xl border border-border rounded-lg p-3 bg-white shadow-sm">
+                                      <div className="flex justify-between items-center pb-2 border-b border-dashed border-border">
+                                        <h4 className="text-xs font-bold text-ink uppercase tracking-wider">Item Yang Dibeli</h4>
+                                        <span className="text-[10px] text-muted-foreground uppercase font-semibold">
+                                          ID: {sale.sale_id}
+                                        </span>
+                                      </div>
+                                      <div className="overflow-x-auto">
+                                        <table className="w-full text-xs">
+                                          <thead>
+                                            <tr className="text-muted-foreground border-b border-border pb-1">
+                                              <th className="text-left font-semibold pb-1">Nama Produk</th>
+                                              <th className="text-center font-semibold pb-1">Varian</th>
+                                              <th className="text-right font-semibold pb-1">Harga</th>
+                                              <th className="text-center font-semibold pb-1">Qty</th>
+                                              <th className="text-right font-semibold pb-1">Subtotal</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {(rowItems[sale.sale_id] || []).map((item: any, idx_item: number) => (
+                                              <tr key={idx_item} className="border-b border-dashed border-border/40 last:border-0">
+                                                <td className="py-2 font-bold text-ink uppercase">{item.product_name}</td>
+                                                <td className="py-2 text-center text-muted-foreground">
+                                                  {[item.size, item.color].filter((s: string) => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(' / ') || '-'}
+                                                </td>
+                                                <td className="py-2 text-right">
+                                                  Rp {Number(item.price || item.unit_price).toLocaleString("id-ID")}
+                                                </td>
+                                                <td className="py-2 text-center font-bold">{item.quantity}</td>
+                                                <td className="py-2 text-right font-bold text-brand-blue">
+                                                  Rp {Number(item.subtotal).toLocaleString("id-ID")}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                      <div className="flex justify-between items-center pt-2 border-t border-dashed border-border text-xs font-bold">
+                                        <span className="text-muted-foreground">TOTAL PEMBAYARAN:</span>
+                                        <span className="text-brand-orange text-sm font-extrabold">
+                                          Rp {Number(sale.total).toLocaleString("id-ID")}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        ))
+                      )
                     )}
                   </tbody>
                 </table>
@@ -4100,12 +4785,89 @@ function AdminTransactionsPage() {
                 <div className="space-y-4">
                   <div className="bg-[#FCFAF7] border border-border p-4 rounded-lg text-xs space-y-3 shadow-sm">
                     <div>
-                      <p className="font-bold uppercase tracking-wider text-muted-foreground mb-1 text-[10px]">
-                        DATA PEMBELI
-                      </p>
-                      <p className="font-bold text-ink text-sm uppercase">
-                        {managedTransaction.customer_name}
-                      </p>
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-bold uppercase tracking-wider text-muted-foreground text-[10px]">
+                          DATA PEMBELI
+                        </p>
+                        {(managedType === "offline" || !!managedTransaction.sale_id) && !isEditingCustomerName && (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setIsEditingCustomerName(true);
+                              setEditingCustomerName(managedTransaction.customer_name || "");
+                            }}
+                            className="h-6 px-2 text-[10px] font-bold text-brand-orange hover:bg-orange-50 cursor-pointer"
+                            title="Koreksi nama pelanggan POS"
+                          >
+                            <Pencil className="w-3 h-3 mr-1" />
+                            Edit Nama
+                          </Button>
+                        )}
+                      </div>
+
+                      {isEditingCustomerName && (managedType === "offline" || !!managedTransaction.sale_id) ? (
+                        <div className="space-y-2 my-2 p-2.5 bg-amber-50 rounded-lg border border-amber-300">
+                          <label className="text-[10px] font-black text-ink uppercase tracking-wide">
+                            Koreksi Nama Pelanggan POS:
+                          </label>
+                          <input
+                            type="text"
+                            value={editingCustomerName}
+                            onChange={(e) => setEditingCustomerName(e.target.value)}
+                            placeholder="Ketik nama pelanggan atau '-' jika tanpa nama"
+                            className="w-full text-xs p-2 border border-ink/40 rounded bg-white font-bold"
+                          />
+                          <div className="flex items-center justify-end gap-1.5 pt-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              disabled={isUpdatingOfflineSale}
+                              onClick={() => setIsEditingCustomerName(false)}
+                              className="h-6 px-2 text-[10px] font-semibold"
+                            >
+                              Batal
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={isUpdatingOfflineSale}
+                              onClick={async () => {
+                                try {
+                                  setIsUpdatingOfflineSale(true);
+                                  const saleId = managedTransaction.sale_id || managedTransaction.order_id;
+                                  const trimmedName = editingCustomerName.trim() || "-";
+                                  const res = await updateOfflineSale(saleId, { customer_name: trimmedName });
+                                  if (res.success) {
+                                    setManagedTransaction((prev: any) => ({ ...prev, customer_name: trimmedName }));
+                                    setOfflineSales((prev) =>
+                                      prev.map((s) => s.sale_id === saleId ? { ...s, customer_name: trimmedName } : s)
+                                    );
+                                    setIsEditingCustomerName(false);
+                                    toast.success("Nama pelanggan POS berhasil disimpan");
+                                  } else {
+                                    toast.error(res.message || "Gagal memperbarui nama");
+                                  }
+                                } catch (err: any) {
+                                  toast.error(err.message || "Terjadi kesalahan koneksi");
+                                } finally {
+                                  setIsUpdatingOfflineSale(false);
+                                }
+                              }}
+                              className="h-6 px-2.5 text-[10px] font-black bg-brand-orange text-white hover:bg-brand-orange/90"
+                            >
+                              {isUpdatingOfflineSale ? "Menyimpan..." : "Simpan"}
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="font-bold text-ink text-sm uppercase">
+                          {managedTransaction.customer_name || "-"}
+                        </p>
+                      )}
+
                       {managedTransaction.customer_nim && (
                         <p className="text-muted-foreground mt-0.5">
                           NIM: {managedTransaction.customer_nim}
@@ -5719,7 +6481,44 @@ function AdminTransactionsPage() {
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4 py-2 text-xs">
+          {/* Mode Switcher Tabs within Modal */}
+          <div className="flex items-center gap-1 p-1 bg-cream/80 border-2 border-ink rounded-lg mt-1 mb-2">
+            <button
+              type="button"
+              onClick={() => setFilterModalTab("online")}
+              className={`flex-1 py-1.5 text-xs font-black uppercase rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                filterModalTab === "online"
+                  ? "bg-white text-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] border border-ink"
+                  : "text-muted-foreground hover:text-ink"
+              }`}
+            >
+              <span>Pesanan Online</span>
+              {activeFilterCount > 0 && (
+                <span className="bg-brand-orange text-white text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterModalTab("offline")}
+              className={`flex-1 py-1.5 text-xs font-black uppercase rounded-md transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                filterModalTab === "offline"
+                  ? "bg-white text-ink shadow-[1px_1px_0px_0px_rgba(27,27,27,1)] border border-ink"
+                  : "text-muted-foreground hover:text-ink"
+              }`}
+            >
+              <span>Penjualan POS</span>
+              {activeOfflineFilterCount > 0 && (
+                <span className="bg-brand-orange text-white text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                  {activeOfflineFilterCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {filterModalTab === "online" ? (
+            <div className="space-y-4 py-2 text-xs">
             {/* 1. Batch PO Filter */}
             <div className="space-y-1.5">
               <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
@@ -6042,25 +6841,227 @@ function AdminTransactionsPage() {
               </div>
             </div>
           </div>
+          ) : (
+            /* POS (Offline Sales) Filter Section */
+            <div className="space-y-4 py-2 text-xs">
+              {/* 1. Kasir POS Filter */}
+              <div className="space-y-1.5">
+                <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
+                  <Users className="w-3.5 h-3.5 text-brand-orange" />
+                  Pilih Kasir POS
+                </label>
+                <select
+                  value={posCashierFilter}
+                  onChange={(e) => setPosCashierFilter(e.target.value)}
+                  className="w-full text-xs font-bold text-ink bg-cream/40 border-2 border-ink rounded-lg p-2.5 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Semua Kasir ({uniqueCashiers.length} Kasir)</option>
+                  {uniqueCashiers.map((cName) => (
+                    <option key={cName} value={cName}>
+                      {cName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 2. Metode Pembayaran POS */}
+              <div className="space-y-1.5">
+                <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
+                  <CreditCard className="w-3.5 h-3.5 text-brand-orange" />
+                  Metode Pembayaran
+                </label>
+                <select
+                  value={posPaymentMethodFilter}
+                  onChange={(e) => setPosPaymentMethodFilter(e.target.value)}
+                  className="w-full text-xs font-bold text-ink bg-cream/40 border-2 border-ink rounded-lg p-2.5 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Semua Metode Pembayaran</option>
+                  <option value="Tunai">Tunai (Cash)</option>
+                  <option value="QRIS">QRIS</option>
+                </select>
+              </div>
+
+              {/* 3. Rentang Waktu POS */}
+              <div className="space-y-1.5">
+                <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
+                  <Clock className="w-3.5 h-3.5 text-brand-orange" />
+                  Rentang Waktu Transaksi
+                </label>
+                <select
+                  value={posDateFilter}
+                  onChange={(e) => setPosDateFilter(e.target.value as any)}
+                  className="w-full text-xs font-bold text-ink bg-cream/40 border-2 border-ink rounded-lg p-2.5 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Semua Waktu</option>
+                  <option value="today">Hari Ini</option>
+                  <option value="yesterday">Kemarin</option>
+                  <option value="7days">7 Hari Terakhir</option>
+                  <option value="30days">30 Hari Terakhir</option>
+                  <option value="thisMonth">Bulan Ini</option>
+                </select>
+              </div>
+
+              {/* 4. Filter Produk POS (Shared with include/exclude) */}
+              <div className="space-y-1.5 w-full">
+                <div className="flex items-center justify-between">
+                  <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
+                    <Package className="w-3.5 h-3.5 text-brand-orange" />
+                    Filter Produk POS
+                  </label>
+                  {productFilter.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setProductFilter([])}
+                      className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer"
+                    >
+                      Reset Produk ({productFilter.length})
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1 bg-cream/40 border-2 border-ink rounded-lg p-1.5 w-full">
+                  <button
+                    type="button"
+                    onClick={() => setProductFilterMode("include")}
+                    className={`flex-1 text-[10px] font-black uppercase tracking-wider py-1.5 rounded-md transition-all cursor-pointer ${
+                      productFilterMode === "include"
+                        ? "bg-brand-orange text-white shadow-sm"
+                        : "text-ink hover:bg-black/5"
+                    }`}
+                  >
+                    ✅ Berisi (Include)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setProductFilterMode("exclude")}
+                    className={`flex-1 text-[10px] font-black uppercase tracking-wider py-1.5 rounded-md transition-all cursor-pointer ${
+                      productFilterMode === "exclude"
+                        ? "bg-red-600 text-white shadow-sm"
+                        : "text-ink hover:bg-black/5"
+                    }`}
+                  >
+                    🚫 Tanpa (Exclude)
+                  </button>
+                </div>
+
+                <div className="w-full bg-cream/30 border-2 border-ink rounded-lg p-2 max-h-48 overflow-y-auto overflow-x-hidden space-y-1 box-border">
+                  <label
+                    className={`w-full flex items-center gap-2.5 p-2 rounded-md cursor-pointer text-xs font-bold transition-colors select-none ${
+                      productFilter.length === 0 ? "bg-brand-orange/15 text-brand-orange border border-brand-orange/40" : "hover:bg-black/5 text-ink"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={productFilter.length === 0}
+                      onChange={() => setProductFilter([])}
+                      className="w-4 h-4 accent-brand-orange cursor-pointer rounded shrink-0"
+                    />
+                    <span className="truncate">Semua Produk (Tanpa Filter)</span>
+                  </label>
+
+                  <div className="border-t border-dashed border-ink/20 my-1"></div>
+
+                  {uniqueProductNames.map((p) => {
+                    const pIdStr = String(p.id);
+                    const isChecked = productFilter.includes(pIdStr);
+                    return (
+                      <label
+                        key={p.id}
+                        className={`w-full flex items-center justify-between gap-2 p-1.5 rounded-md cursor-pointer text-xs transition-colors select-none ${
+                          isChecked ? "bg-amber-100/90 text-amber-950 font-bold border border-amber-300" : "hover:bg-black/5 text-ink font-semibold"
+                        }`}
+                        title={p.name}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1 overflow-hidden">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setProductFilter((prev) => [...prev, pIdStr]);
+                              } else {
+                                setProductFilter((prev) => prev.filter((id) => id !== pIdStr));
+                              }
+                            }}
+                            className="w-4 h-4 accent-brand-orange cursor-pointer rounded shrink-0"
+                          />
+                          <span className="truncate text-xs">{p.name}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 5. Status Penjualan POS */}
+              <div className="space-y-1.5">
+                <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
+                  <Filter className="w-3.5 h-3.5 text-brand-orange" />
+                  Status Penjualan POS
+                </label>
+                <select
+                  value={posStatusFilter}
+                  onChange={(e) => setPosStatusFilter(e.target.value)}
+                  className="w-full text-xs font-bold text-ink bg-cream/40 border-2 border-ink rounded-lg p-2.5 focus:outline-none cursor-pointer"
+                >
+                  <option value="all">Semua Status POS</option>
+                  <option value="completed">Completed (Selesai)</option>
+                  <option value="pending">Pending</option>
+                  <option value="cancelled">Cancelled (Dibatalkan)</option>
+                </select>
+              </div>
+            </div>
+          )}
 
           <DialogFooter className="flex flex-row items-center justify-between gap-2 pt-3 border-t border-dashed border-border">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleResetAllFilters}
-              disabled={activeFilterCount === 0}
-              className="border-2 border-ink text-xs font-black uppercase h-9 disabled:opacity-40 cursor-pointer"
-            >
-              <RotateCcw className="w-3.5 h-3.5 mr-1" />
-              Reset All
-            </Button>
-            <Button
-              type="button"
-              onClick={() => setFilterModalOpen(false)}
-              className="bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold text-xs uppercase h-9 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
-            >
-              Terapkan Filter
-            </Button>
+            {filterModalTab === "online" ? (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleResetAllFilters}
+                  disabled={activeFilterCount === 0}
+                  className="border-2 border-ink text-xs font-black uppercase h-9 disabled:opacity-40 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  Reset All
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setFilterModalOpen(false)}
+                  className="bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold text-xs uppercase h-9 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                >
+                  Terapkan Filter Online ({filteredOnlineOrders.length})
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setPosPaymentMethodFilter("all");
+                    setPosCashierFilter("all");
+                    setPosDateFilter("all");
+                    setPosStatusFilter("all");
+                    setProductFilter([]);
+                    setProductFilterMode("include");
+                  }}
+                  disabled={activeOfflineFilterCount === 0}
+                  className="border-2 border-ink text-xs font-black uppercase h-9 disabled:opacity-40 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                  Reset Filter POS
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => setFilterModalOpen(false)}
+                  className="bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold text-xs uppercase h-9 border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer"
+                >
+                  Terapkan Filter POS ({sortedOfflineSales.length})
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

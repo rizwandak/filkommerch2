@@ -1467,6 +1467,37 @@ export const deleteOfflineSale = createServerFn({ method: "POST" })
       return { success: false, error: error.message || "Failed to delete sale" };
     }
   });
+
+// Update offline sale
+export const updateOfflineSale = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      id: string;
+      customer_name?: string;
+      customer_email?: string;
+      customer_phone?: string;
+      customer_nim?: string;
+      notes?: string;
+      cashier_id?: number;
+    }) => data
+  )
+  .handler(async ({ data }) => {
+    try {
+      const res = await serverFetch(`${API_URL}/api/sales/${data.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(errorText || `HTTP ${res.status}`);
+      }
+      return res.json();
+    } catch (error: any) {
+      console.error("Error updating offline sale:", error);
+      return { success: false, error: error.message || "Failed to update offline sale" };
+    }
+  });
 // Get user orders
 export const getUserOrders = createServerFn({ method: "GET" })
   .validator((data: number | string | { userId?: number | string; email?: string }) => data)

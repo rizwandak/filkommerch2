@@ -711,14 +711,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     const effectiveManualName = (showManualCustomerInput && manualCustomerInput.trim())
       ? manualCustomerInput.trim()
       : customerName.trim();
-    let recordedCustomerName = selectedUser ? selectedUser.name : (effectiveManualName || undefined);
-    if (!recordedCustomerName) {
-      if (customerCategory === "internasional") {
-        recordedCustomerName = "Mhs. Internasional";
-      } else if (customerCategory === "filkom") {
-        recordedCustomerName = "Civitas FILKOM";
-      }
-    }
+    const recordedCustomerName = selectedUser ? selectedUser.name : (effectiveManualName || "-");
 
     const saleInput: CreateSaleInput = {
       admin_id,
@@ -796,6 +789,21 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
     if (cart.length === 0) {
       toast.error("Keranjang kosong!");
       return;
+    }
+
+    const effectiveName = selectedUser?.name?.trim() || customerName.trim() || manualCustomerInput.trim();
+    if (!effectiveName) {
+      toast.error("Wajib mengisi nama pelanggan!", {
+        description: "Pilih member terdaftar, ketik nama pembeli, atau tekan tombol '[-] Tanpa Nama' jika tanpa nama.",
+      });
+      setShowManualCustomerInput(true);
+      return;
+    }
+
+    if (!customerName.trim() && manualCustomerInput.trim()) {
+      setCustomerName(manualCustomerInput.trim());
+      setShowManualCustomerInput(false);
+      setManualCustomerInput("");
     }
 
     if (paymentMethod === "qris") {
@@ -1264,8 +1272,17 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 </div>
               </div>
 
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-ink flex items-center gap-1">
+                  Nama Pelanggan <span className="text-red-600 font-extrabold">*Wajib</span>
+                </span>
+                <span className="text-[9px] font-semibold text-muted-foreground">
+                  {selectedUser ? "Member Terdaftar" : customerName ? (customerName === "-" ? "Tanpa Nama (-)" : "Manual") : "Wajib Diisi"}
+                </span>
+              </div>
+
               {selectedUser ? (
-                <div className="p-2 bg-background border border-ink/40 rounded-lg shadow-2xs flex items-center justify-between gap-2">
+                <div className="p-2 bg-emerald-50 border-2 border-emerald-400 rounded-lg shadow-2xs flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <UserCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -1286,15 +1303,15 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   <button
                     type="button"
                     onClick={() => handleSelectCustomer(null)}
-                    className="text-[10px] font-bold text-red-600 hover:underline shrink-0"
+                    className="text-[10px] font-bold text-red-600 hover:underline shrink-0 cursor-pointer"
                   >
                     [Ganti]
                   </button>
                 </div>
               ) : showManualCustomerInput ? (
-                <div className="space-y-1.5 p-2 bg-background border border-border rounded-lg shadow-2xs">
+                <div className="space-y-1.5 p-2 bg-background border-2 border-ink/40 rounded-lg shadow-2xs">
                   <div className="flex items-center justify-between text-[11px] font-bold text-ink">
-                    <span>Nama Pembeli:</span>
+                    <span>Ketik Nama Pembeli:</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -1310,7 +1327,7 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                     <Input
                       placeholder={
                         customerCategory === "internasional"
-                          ? "Contoh: John / Jane (Mhs. Asing)..."
+                          ? "Contoh: John Doe (Mhs. Asing)..."
                           : "Contoh: Budi Santoso..."
                       }
                       value={manualCustomerInput}
@@ -1341,25 +1358,49 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                       Simpan
                     </Button>
                   </div>
+                  <div className="flex items-center justify-between pt-1 border-t border-dashed border-border/80">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCustomerName("-");
+                        setManualCustomerInput("");
+                        setShowManualCustomerInput(false);
+                        toast.info("Nama pelanggan diatur: '-' (Tanpa Nama)");
+                      }}
+                      className="text-[10px] font-bold text-brand-orange hover:underline cursor-pointer"
+                    >
+                      Beri tanda '-' saja (Tanpa Nama)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowManualCustomerInput(false);
+                        setShowUserModal(true);
+                      }}
+                      className="text-[10px] font-bold text-brand-blue hover:underline cursor-pointer"
+                    >
+                      Cari Member Terdaftar &rarr;
+                    </button>
+                  </div>
                 </div>
               ) : customerName ? (
-                <div className="p-2 bg-background border border-border rounded-lg shadow-2xs flex items-center justify-between gap-2">
+                <div className="p-2 bg-background border-2 border-ink/30 rounded-lg shadow-2xs flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1 flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <User className="w-3.5 h-3.5 text-brand-orange shrink-0" />
                     <span className="font-bold text-xs text-ink truncate">
-                      {customerName}
+                      {customerName === "-" ? "— (Tanpa Nama Pelanggan)" : customerName}
                     </span>
                     {customerCategory === "internasional" ? (
                       <span className="text-[9px] font-black bg-indigo-100 text-indigo-800 border border-indigo-300 px-1.5 py-0.2 rounded shrink-0">
-                        🏷️ Harga Coret (Khusus)
+                        🏷️ Tarif Coret
                       </span>
                     ) : customerCategory === "filkom" ? (
                       <span className="text-[9px] font-black bg-emerald-100 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded shrink-0">
-                        🎓 Civitas FILKOM
+                        🎓 Tarif FILKOM
                       </span>
                     ) : (
                       <span className="text-[9px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 px-1.5 py-0.2 rounded shrink-0">
-                        Umum / Non-Member
+                        Tarif Umum
                       </span>
                     )}
                   </div>
@@ -1388,29 +1429,59 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                   </div>
                 </div>
               ) : (
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 p-2 bg-amber-50/70 border-2 border-dashed border-amber-400/80 rounded-lg">
                   <div className="flex items-center gap-1.5">
+                    <Input
+                      placeholder="Ketik nama pembeli..."
+                      value={manualCustomerInput}
+                      onChange={(e) => setManualCustomerInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && manualCustomerInput.trim()) {
+                          setCustomerName(manualCustomerInput.trim());
+                          setManualCustomerInput("");
+                        }
+                      }}
+                      className="h-8 text-xs bg-white border-ink/40 flex-1 placeholder:text-muted-foreground/70"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!manualCustomerInput.trim()}
+                      onClick={() => {
+                        if (manualCustomerInput.trim()) {
+                          setCustomerName(manualCustomerInput.trim());
+                          setManualCustomerInput("");
+                        }
+                      }}
+                      className="h-8 text-xs px-2.5 font-bold bg-ink text-white hover:bg-brand-orange cursor-pointer"
+                    >
+                      Simpan
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-1.5 pt-0.5">
                     <Button
                       type="button"
                       variant="outline"
+                      size="sm"
                       onClick={() => setShowUserModal(true)}
-                      className="flex-1 h-8 text-xs font-bold border border-ink/40 bg-white hover:bg-cream/40 text-ink flex items-center justify-center gap-1.5 cursor-pointer rounded-lg shadow-2xs"
+                      className="flex-1 h-7 text-[11px] font-bold border border-ink/40 bg-white hover:bg-cream text-ink flex items-center justify-center gap-1 rounded-md cursor-pointer"
                     >
                       <UserCheck className="w-3.5 h-3.5 text-brand-orange" />
-                      Pilih Pelanggan Terdaftar
+                      Pilih Member
                     </Button>
                     <Button
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                       size="sm"
                       onClick={() => {
+                        setCustomerName("-");
                         setManualCustomerInput("");
-                        setShowManualCustomerInput(true);
+                        toast.info("Nama pelanggan diatur: '-' (Tanpa Nama)");
                       }}
-                      className="h-8 text-[11px] font-semibold text-muted-foreground hover:text-ink px-2 cursor-pointer border border-dashed border-border"
-                      title="Tulis nama pembeli non-member"
+                      className="h-7 text-[11px] font-black border border-ink/40 bg-white hover:bg-amber-100 text-ink px-2.5 rounded-md cursor-pointer"
+                      title="Beri tanda '-' jika pembeli tidak bersedia/tidak memiliki nama"
                     >
-                      + Manual
+                      [-] Tanpa Nama
                     </Button>
                   </div>
                 </div>
@@ -1819,9 +1890,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 Rp {total.toLocaleString("id-ID")}
               </div>
               <div className="text-xs text-emerald-900/80 mt-1 font-medium">
-                Pelanggan: <span className="font-bold">{selectedUser ? selectedUser.name : (customerName || "Umum")}</span>
-                <span className="ml-1 text-[10px] font-bold">
-                  ({customerCategory === "internasional" ? "Mhs. Internasional — Tarif Coret" : customerCategory === "filkom" ? "Civitas FILKOM" : "Umum"})
+                Pelanggan: <span className="font-bold">{selectedUser ? selectedUser.name : (customerName === "-" ? "— (Tanpa Nama)" : customerName || "-")}</span>
+                <span className="ml-1 text-[10px] font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-1.5 py-0.5 rounded">
+                  {customerCategory === "internasional" ? "Tarif Coret" : customerCategory === "filkom" ? "Tarif FILKOM" : "Tarif Umum"}
                 </span>
               </div>
             </div>
@@ -1980,9 +2051,9 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
                 Rp {total.toLocaleString("id-ID")}
               </div>
               <p className="text-xs text-amber-950 mt-1.5 font-medium">
-                Pelanggan: <span className="font-bold">{selectedUser ? selectedUser.name : (customerName || "Umum")}</span>
-                <span className="ml-1 text-[10px] font-bold">
-                  ({customerCategory === "internasional" ? "Mhs. Internasional — Tarif Coret" : customerCategory === "filkom" ? "Civitas FILKOM" : "Umum"})
+                Pelanggan: <span className="font-bold">{selectedUser ? selectedUser.name : (customerName === "-" ? "— (Tanpa Nama)" : customerName || "-")}</span>
+                <span className="ml-1 text-[10px] font-bold text-amber-900 bg-amber-100/90 border border-amber-300 px-1.5 py-0.5 rounded">
+                  {customerCategory === "internasional" ? "Tarif Coret" : customerCategory === "filkom" ? "Tarif FILKOM" : "Tarif Umum"}
                 </span>
               </p>
             </div>

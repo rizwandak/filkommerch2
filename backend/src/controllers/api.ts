@@ -3124,7 +3124,7 @@ export const createSale = async (req: Request, res: Response) => {
           saleId,
           targetUserId,
           input.admin_id || null,
-          input.customer_name || (isInternational ? "Mhs. Internasional" : "Pelanggan POS"),
+          (input.customer_name && input.customer_name.trim()) ? input.customer_name.trim() : "-",
           customerEmail,
           input.customer_phone || "081234567890",
           customerNim,
@@ -3246,9 +3246,33 @@ export const createSale = async (req: Request, res: Response) => {
   }
 };
 
-// Get offline sales
+// Get offline sales (unlimited, with items, and auto-healed customer names)
 export const getOfflineSales = async (req: Request, res: Response) => {
   try {
+    // Auto-repair historical POS customer names where generic label was saved instead of real customer name
+    try {
+      // 1. If sale is linked to a user_id, use users.name
+      await execute(`
+        UPDATE orders o
+        JOIN users u ON o.user_id = u.id
+        SET o.customer_name = u.name
+        WHERE o.channel = 'pos' 
+          AND o.user_id IS NOT NULL 
+          AND (o.customer_name IN ('Civitas FILKOM', 'Civitas Filkom', 'Mhs. Internasional', 'Pelanggan POS', 'Umum', 'Walk-in') OR o.customer_name IS NULL OR TRIM(o.customer_name) = '')
+      `);
+      // 2. If sale had no user_id, but has generic role label fallback, normalize to "-"
+      await execute(`
+        UPDATE orders
+        SET customer_name = '-'
+        WHERE channel = 'pos'
+          AND (user_id IS NULL OR user_id = 0)
+          AND (customer_name IN ('Civitas FILKOM', 'Civitas Filkom', 'Mhs. Internasional', 'Pelanggan POS') OR customer_name IS NULL OR TRIM(customer_name) = '')
+      `);
+    } catch (e) {
+      console.error("Notice: auto-repair POS customer names error", e);
+    }
+
+    // Fetch all offline sales (unlimited)
     const sales = await query<any>(
       `SELECT o.*, o.order_id AS sale_id, o.cashier_id AS admin_id, u.name AS cashier_name,
               o.discount_amount AS discount, o.tax_amount AS tax, o.gross_amount AS total,
@@ -3256,8 +3280,32 @@ export const getOfflineSales = async (req: Request, res: Response) => {
        FROM orders o
        LEFT JOIN users u ON u.id = o.cashier_id
        WHERE o.channel = 'pos'
-       ORDER BY o.created_at DESC LIMIT 100`
+       ORDER BY o.created_at DESC`
     );
+
+    // Batch attach items so that product filtering works seamlessly for offline sales too
+    if (sales && sales.length > 0) {
+      const saleIds = sales.map((s) => s.order_id);
+      const itemsByOrder: Record<string, any[]> = {};
+      const chunkSize = 500;
+      for (let i = 0; i < saleIds.length; i += chunkSize) {
+        const chunk = saleIds.slice(i, i + chunkSize);
+        const placeholders = chunk.map(() => "?").join(",");
+        const chunkItems = await query<any>(
+          `SELECT id, order_id, product_id, product_name, size, color, unit_price, quantity, subtotal 
+           FROM order_items WHERE order_id IN (${placeholders})`,
+          chunk
+        );
+        (chunkItems || []).forEach((item) => {
+          if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
+          itemsByOrder[item.order_id].push(item);
+        });
+      }
+      sales.forEach((s) => {
+        s.items = itemsByOrder[s.order_id] || [];
+      });
+    }
+
     return res.json({ sales });
   } catch (error: any) {
     console.error("Error fetching offline sales:", error);
@@ -3340,6 +3388,39 @@ export const deleteOfflineSale = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, error: error.message || "Failed to delete sale" });
   } finally {
     connection.release();
+  }
+};
+
+// Update offline sale (customer name, contact, notes, cashier)
+export const updateOfflineSale = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { customer_name, customer_email, customer_phone, customer_nim, notes, cashier_id } = req.body;
+
+    await execute(
+      `UPDATE orders 
+       SET customer_name = COALESCE(?, customer_name),
+           customer_email = COALESCE(?, customer_email),
+           customer_phone = COALESCE(?, customer_phone),
+           customer_nim = COALESCE(?, customer_nim),
+           notes = COALESCE(?, notes),
+           cashier_id = COALESCE(?, cashier_id)
+       WHERE order_id = ? AND channel = 'pos'`,
+      [
+        customer_name !== undefined ? (String(customer_name).trim() || "-") : null,
+        customer_email !== undefined ? customer_email : null,
+        customer_phone !== undefined ? customer_phone : null,
+        customer_nim !== undefined ? customer_nim : null,
+        notes !== undefined ? notes : null,
+        cashier_id !== undefined ? cashier_id : null,
+        id
+      ]
+    );
+
+    return res.json({ success: true, message: "Penjualan offline berhasil diperbarui" });
+  } catch (error: any) {
+    console.error("Error updating offline sale:", error);
+    return res.status(500).json({ success: false, error: error.message || "Gagal memperbarui penjualan offline" });
   }
 };
 
