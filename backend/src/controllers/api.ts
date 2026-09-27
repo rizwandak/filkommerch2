@@ -6192,9 +6192,44 @@ export const createVendorOrder = async (req: Request, res: Response) => {
 
     await connection.beginTransaction();
 
-    const [cntRows] = await connection.query("SELECT COUNT(*) as cnt FROM vendor_orders");
-    const count = ((cntRows as any[])[0]?.cnt || 0) + 1;
-    const poNumber = `VO-${new Date().getFullYear()}-${String(count).padStart(3, "0")}`;
+    // Generate unique PO Number based on current year and highest sequence number
+    const currentYear = new Date().getFullYear();
+    const prefix = `VO-${currentYear}-`;
+
+    const [existingPoRows] = await connection.query(
+      "SELECT po_number FROM vendor_orders WHERE po_number LIKE ? FOR UPDATE",
+      [`${prefix}%`]
+    );
+
+    let maxSeq = 0;
+    for (const r of (existingPoRows as any[])) {
+      const match = String(r.po_number || "").match(/^VO-\d{4}-(\d+)$/);
+      if (match) {
+        const seq = parseInt(match[1], 10);
+        if (!isNaN(seq) && seq > maxSeq) {
+          maxSeq = seq;
+        }
+      }
+    }
+
+    let nextSeq = maxSeq + 1;
+    let poNumber = `${prefix}${String(nextSeq).padStart(3, "0")}`;
+
+    let isUnique = false;
+    let attempts = 0;
+    while (!isUnique && attempts < 1000) {
+      const [checkRows] = await connection.query(
+        "SELECT id FROM vendor_orders WHERE po_number = ? LIMIT 1",
+        [poNumber]
+      );
+      if ((checkRows as any[]).length === 0) {
+        isUnique = true;
+      } else {
+        nextSeq++;
+        poNumber = `${prefix}${String(nextSeq).padStart(3, "0")}`;
+        attempts++;
+      }
+    }
 
     let totalCost = 0;
     for (const item of items) {
