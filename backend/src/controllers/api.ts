@@ -7922,11 +7922,16 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
     // 2. Fetch all valid orders
     let orderQuery = `
       SELECT o.id, o.order_id, o.user_id, o.customer_name, o.customer_email, o.customer_phone,
-             o.gross_amount, o.subtotal, o.shipping_cost, o.discount_amount,
+             o.customer_nim, o.gross_amount, o.subtotal, o.shipping_cost, o.discount_amount,
              o.payment_status, o.order_status, o.transaction_status,
              o.channel, o.batch_source, o.pre_order_campaign_id, o.notes,
-             o.created_at
+             o.created_at, o.voucher_code,
+             o.payment_proof_url, o.payment_proof_verified_amount, o.payment_proof_match_status,
+             o.payment_proof_difference, o.payment_proof_bank, o.payment_proof_sender,
+             o.refund_status, o.shortage_status,
+             u.is_filkom_verified, u.nim as user_nim
       FROM orders o
+      LEFT JOIN users u ON o.user_id = u.id
       WHERE o.order_status NOT IN ('cancelled', 'cancel')
     `;
     const orderParams: any[] = [];
@@ -7942,7 +7947,7 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
 
     const allOrders = await query<any>(orderQuery, orderParams);
 
-    // 3. Fetch order items for all orders to accurately calculate DP/Pelunasan
+    // 3. Fetch order items for all orders to accurately calculate DP/Pelunasan & Price Breakdown
     const orderIds = allOrders.map((o) => o.order_id);
     let orderItemsMap: Record<string, any[]> = {};
     if (orderIds.length > 0) {
@@ -7952,7 +7957,12 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
         const slice = orderIds.slice(i, i + chunkSize);
         const placeholders = slice.map(() => "?").join(",");
         const itemsRows = await query<any>(
-          `SELECT order_id, product_name, size, color, quantity, unit_price, subtotal FROM order_items WHERE order_id IN (${placeholders})`,
+          `SELECT oi.order_id, oi.product_id, oi.product_name, oi.size, oi.color,
+                  oi.quantity, oi.unit_price, oi.subtotal,
+                  p.name as catalog_name, p.price as catalog_price, p.filkom_price as catalog_filkom_price
+           FROM order_items oi
+           LEFT JOIN products p ON oi.product_id = p.id
+           WHERE oi.order_id IN (${placeholders})`,
           slice
         );
         for (const row of itemsRows) {
@@ -8028,6 +8038,27 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
       settlement_rate: 0,
     };
 
+    // Containers for detailed business insights requested by user
+    const unpaidOrdersList: any[] = [];
+    const productPriceMap: Record<string, any> = {};
+    let totalFilkomRevenue = 0;
+    let totalFilkomItems = 0;
+    let totalFilkomOrders = 0;
+    let totalUmumRevenue = 0;
+    let totalUmumItems = 0;
+    let totalUmumOrders = 0;
+    let totalCivitasSavings = 0;
+
+    let totalVoucherDiscount = 0;
+    let totalVoucherOrders = 0;
+    const vouchersMap: Record<string, any> = {};
+
+    let totalOverpaidAmount = 0;
+    let totalOverpaidCount = 0;
+    let totalUnderpaidAmount = 0;
+    let totalUnderpaidCount = 0;
+    const aiDiscrepancyList: any[] = [];
+
     // Helper to identify DP
     const checkIsDp = (o: any, items: any[]) => {
       if (o.is_dp !== undefined && o.is_dp !== null) return !!o.is_dp;
@@ -8097,24 +8128,38 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
 
       summary.total_orders += 1;
 
+      // 1. Inflow calculations per batch
+      let orderPotentialTotal = grossAmount;
+      let orderPaidAmount = 0;
+      let orderUnpaidRemaining = 0;
+      let orderType: "dp_unpaid" | "unpaid" = "unpaid";
+
       if (isDp) {
         const pelunasanAmount = calculateBackendPelunasan(o, items, linkedLns);
-        const potentialOrderTotal = grossAmount + pelunasanAmount;
-        summary.potential_revenue += potentialOrderTotal;
+        orderPotentialTotal = grossAmount + pelunasanAmount;
+        summary.potential_revenue += orderPotentialTotal;
 
         if (isPaid) {
           if (isLnsPaid) {
-            summary.realized_revenue += potentialOrderTotal;
+            summary.realized_revenue += orderPotentialTotal;
             summary.paid_full_orders += 1;
+            orderPaidAmount = orderPotentialTotal;
+            orderUnpaidRemaining = 0;
           } else {
             summary.realized_revenue += grossAmount;
             summary.unpaid_remaining += pelunasanAmount;
             summary.dp_unpaid_orders += 1;
+            orderPaidAmount = grossAmount;
+            orderUnpaidRemaining = pelunasanAmount;
+            orderType = "dp_unpaid";
           }
         } else {
           // DP itself is unpaid
-          summary.unpaid_remaining += potentialOrderTotal;
+          summary.unpaid_remaining += orderPotentialTotal;
           summary.unpaid_orders += 1;
+          orderPaidAmount = 0;
+          orderUnpaidRemaining = orderPotentialTotal;
+          orderType = "unpaid";
         }
       } else {
         // Regular full-paid or ready-stock order
@@ -8122,12 +8167,209 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
         if (isPaid) {
           summary.realized_revenue += grossAmount;
           summary.paid_full_orders += 1;
+          orderPaidAmount = grossAmount;
+          orderUnpaidRemaining = 0;
         } else {
           summary.unpaid_remaining += grossAmount;
           summary.unpaid_orders += 1;
+          orderPaidAmount = 0;
+          orderUnpaidRemaining = grossAmount;
+          orderType = "unpaid";
+        }
+      }
+
+      // Check whether customer is Civitas FILKOM (NIM / UB email / verified status)
+      const isCivitas =
+        Number(o.is_filkom_verified) === 1 ||
+        Boolean(o.customer_nim && String(o.customer_nim).trim().length > 0) ||
+        Boolean(o.user_nim && String(o.user_nim).trim().length > 0) ||
+        /@(?:student\.)?ub\.ac\.id$/i.test(String(o.customer_email || "").trim());
+
+      // Collect Unpaid Orders List (Requirement 2)
+      if (orderUnpaidRemaining > 0) {
+        const itemsSummary = (items || []).map((it: any) => {
+          const v = [it.size, it.color].filter(Boolean).join("/");
+          return `${it.product_name}${v ? ` (${v})` : ""} x${it.quantity}`;
+        }).join(", ") || o.notes || "Pesanan";
+
+        let cleanPhone = String(o.customer_phone || "").replace(/\D/g, "");
+        if (cleanPhone.startsWith("0")) {
+          cleanPhone = "62" + cleanPhone.slice(1);
+        } else if (cleanPhone.startsWith("8")) {
+          cleanPhone = "62" + cleanPhone;
+        }
+
+        const reminderMsg = encodeURIComponent(
+          `Halo Kak ${o.customer_name || ""}, kami dari Admin FILKOM Merch ingin mengonfirmasi status tagihan pesanan #${o.order_id} sebesar Rp ${orderUnpaidRemaining.toLocaleString("id-ID")}. Silakan konfirmasi untuk proses pelunasan ya. Terima kasih! 🙏`
+        );
+        const waLink = cleanPhone ? `https://wa.me/${cleanPhone}?text=${reminderMsg}` : null;
+
+        unpaidOrdersList.push({
+          id: o.id,
+          order_id: o.order_id,
+          customer_name: o.customer_name,
+          customer_phone: o.customer_phone,
+          customer_email: o.customer_email,
+          customer_nim: o.customer_nim || o.user_nim || null,
+          is_civitas: isCivitas,
+          batch_id: matchedKey,
+          batch_name: summary.name,
+          type: orderType,
+          type_label: orderType === "dp_unpaid" ? "DP Lunas (Kurang Pelunasan)" : "Belum Bayar (Pending)",
+          total_order_amount: orderPaidAmount + orderUnpaidRemaining,
+          paid_amount: orderPaidAmount,
+          unpaid_amount: orderUnpaidRemaining,
+          items_summary: itemsSummary,
+          created_at: o.created_at,
+          wa_link: waLink,
+        });
+      }
+
+      // 2. Product Price Breakdown: FILKOM vs Umum (Requirement 1)
+      let orderHasFilkomItem = false;
+      let orderHasUmumItem = false;
+
+      for (const it of items) {
+        const qty = Number(it.quantity || 1);
+        const unitPrice = Number(it.unit_price || 0);
+        const filkomPrice = Number(it.catalog_filkom_price || 0);
+        const normalPrice = Number(it.catalog_price || 0);
+
+        let isFilkomItem = false;
+        if (isCivitas) {
+          isFilkomItem = true;
+        } else if (filkomPrice > 0 && unitPrice <= filkomPrice && (normalPrice <= 0 || unitPrice < normalPrice)) {
+          isFilkomItem = true;
+        }
+
+        if (isFilkomItem) {
+          orderHasFilkomItem = true;
+          totalFilkomRevenue += unitPrice * qty;
+          totalFilkomItems += qty;
+          if (normalPrice > unitPrice && normalPrice > 0) {
+            totalCivitasSavings += (normalPrice - unitPrice) * qty;
+          }
+        } else {
+          orderHasUmumItem = true;
+          totalUmumRevenue += unitPrice * qty;
+          totalUmumItems += qty;
+        }
+
+        const prodName = String(it.catalog_name || it.product_name || "Produk Lainnya").trim();
+        if (!productPriceMap[prodName]) {
+          productPriceMap[prodName] = {
+            product_id: it.product_id || null,
+            product_name: prodName,
+            filkom_qty: 0,
+            filkom_revenue: 0,
+            filkom_unit_price: filkomPrice > 0 ? filkomPrice : (isFilkomItem ? unitPrice : 0),
+            umum_qty: 0,
+            umum_revenue: 0,
+            umum_unit_price: normalPrice > 0 ? normalPrice : (!isFilkomItem ? unitPrice : 0),
+            total_qty: 0,
+            total_revenue: 0,
+            subsidy_total: 0,
+          };
+        }
+        const pRecord = productPriceMap[prodName];
+        if (isFilkomItem) {
+          pRecord.filkom_qty += qty;
+          pRecord.filkom_revenue += unitPrice * qty;
+          if (pRecord.filkom_unit_price === 0) pRecord.filkom_unit_price = unitPrice;
+        } else {
+          pRecord.umum_qty += qty;
+          pRecord.umum_revenue += unitPrice * qty;
+          if (pRecord.umum_unit_price === 0) pRecord.umum_unit_price = unitPrice;
+        }
+        pRecord.total_qty += qty;
+        pRecord.total_revenue += unitPrice * qty;
+        if (normalPrice > unitPrice && normalPrice > 0 && isFilkomItem) {
+          pRecord.subsidy_total += (normalPrice - unitPrice) * qty;
+        }
+      }
+
+      if (orderHasFilkomItem) totalFilkomOrders += 1;
+      if (orderHasUmumItem || (!orderHasFilkomItem && !orderHasUmumItem)) totalUmumOrders += 1;
+
+      // 3. Voucher Usage Breakdown (Requirement 3)
+      const vCode = o.voucher_code ? String(o.voucher_code).trim().toUpperCase() : null;
+      const discountAmt = Number(o.discount_amount || 0);
+      if (discountAmt > 0) {
+        totalVoucherDiscount += discountAmt;
+        totalVoucherOrders += 1;
+        const key = vCode || "DISKON_PROMO";
+        if (!vouchersMap[key]) {
+          vouchersMap[key] = {
+            code: key,
+            usage_count: 0,
+            total_discount: 0,
+            total_gross_generated: 0,
+          };
+        }
+        vouchersMap[key].usage_count += 1;
+        vouchersMap[key].total_discount += discountAmt;
+        vouchersMap[key].total_gross_generated += grossAmount;
+      }
+
+      // 4. AI Payment Proof Inspection Audit (Requirement 4)
+      const verifiedNominal = Number(o.payment_proof_verified_amount || 0);
+      const invoiceExpected = Number(o.gross_amount || 0);
+      const aiStatus = String(o.payment_proof_match_status || "").toUpperCase();
+      let diff = Number(o.payment_proof_difference || 0);
+      if (!diff && verifiedNominal > 0 && invoiceExpected > 0) {
+        diff = Math.abs(verifiedNominal - invoiceExpected);
+      }
+
+      if (verifiedNominal > 0 && diff > 0) {
+        if (aiStatus === "OVERPAID" || (verifiedNominal > invoiceExpected && aiStatus !== "MATCH")) {
+          totalOverpaidAmount += diff;
+          totalOverpaidCount += 1;
+          aiDiscrepancyList.push({
+            id: o.id,
+            order_id: o.order_id,
+            customer_name: o.customer_name,
+            customer_phone: o.customer_phone,
+            customer_email: o.customer_email,
+            expected_amount: invoiceExpected,
+            verified_amount: verifiedNominal,
+            difference: diff,
+            type: "OVERPAID",
+            type_label: "Kelebihan Bayar",
+            bank: o.payment_proof_bank || "Tidak Terdeteksi",
+            sender: o.payment_proof_sender || "-",
+            proof_url: o.payment_proof_url || null,
+            resolution_status: o.refund_status || "pending",
+            created_at: o.created_at,
+          });
+        } else if (aiStatus === "UNDERPAID" || (verifiedNominal < invoiceExpected && aiStatus !== "MATCH")) {
+          totalUnderpaidAmount += diff;
+          totalUnderpaidCount += 1;
+          aiDiscrepancyList.push({
+            id: o.id,
+            order_id: o.order_id,
+            customer_name: o.customer_name,
+            customer_phone: o.customer_phone,
+            customer_email: o.customer_email,
+            expected_amount: invoiceExpected,
+            verified_amount: verifiedNominal,
+            difference: diff,
+            type: "UNDERPAID",
+            type_label: "Kekurangan Bayar",
+            bank: o.payment_proof_bank || "Tidak Terdeteksi",
+            sender: o.payment_proof_sender || "-",
+            proof_url: o.payment_proof_url || null,
+            resolution_status: o.shortage_status || "pending",
+            created_at: o.created_at,
+          });
         }
       }
     }
+
+    // Sort business breakdowns
+    unpaidOrdersList.sort((a, b) => b.unpaid_amount - a.unpaid_amount);
+    const productPriceList = Object.values(productPriceMap).sort((a, b) => b.total_revenue - a.total_revenue);
+    const voucherList = Object.values(vouchersMap).sort((a, b) => b.total_discount - a.total_discount);
+    aiDiscrepancyList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     // Compute settlement rates
     for (const key of Object.keys(batchSummaries)) {
@@ -8227,6 +8469,22 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
           dp_unpaid_orders: grandDpUnpaidOrders,
           unpaid_orders: grandUnpaidOrders,
           batches: batchList,
+          unpaid_list: unpaidOrdersList,
+          price_breakdown: {
+            total_filkom_revenue: totalFilkomRevenue,
+            total_filkom_items: totalFilkomItems,
+            total_filkom_orders: totalFilkomOrders,
+            total_umum_revenue: totalUmumRevenue,
+            total_umum_items: totalUmumItems,
+            total_umum_orders: totalUmumOrders,
+            total_civitas_savings: totalCivitasSavings,
+            products: productPriceList,
+          },
+          voucher_summary: {
+            total_discount_absorbed: totalVoucherDiscount,
+            total_orders_used: totalVoucherOrders,
+            vouchers: voucherList,
+          },
         },
         outflow: {
           total_realized_expense: totalRealizedExpense,
@@ -8252,6 +8510,14 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
           current_cash_margin: currentCashMargin,
           customer_receivables: grandUnpaidRemaining,
           vendor_payables: totalVendorUnpaid,
+        },
+        ai_audit: {
+          total_overpaid_amount: totalOverpaidAmount,
+          total_overpaid_count: totalOverpaidCount,
+          total_underpaid_amount: totalUnderpaidAmount,
+          total_underpaid_count: totalUnderpaidCount,
+          discrepancy_count: totalOverpaidCount + totalUnderpaidCount,
+          items: aiDiscrepancyList,
         },
       },
     });

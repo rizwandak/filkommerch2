@@ -36,6 +36,9 @@ import {
   ShieldCheck,
   Tag,
   Download,
+  Users,
+  Ticket,
+  MessageCircle,
 } from "lucide-react";
 import {
   getFinancialBalanceSheetServerAction,
@@ -103,6 +106,13 @@ export function AdminFinancePage() {
   const [expenseCategoryFilter, setExpenseCategoryFilter] = useState("all");
   const [expenseBatchFilter, setExpenseBatchFilter] = useState("all");
 
+  // Specific Financial Business Insight States
+  const [unpaidSearch, setUnpaidSearch] = useState("");
+  const [unpaidBatchFilter, setUnpaidBatchFilter] = useState("all");
+  const [unpaidTypeFilter, setUnpaidTypeFilter] = useState("all");
+  const [priceProductSearch, setPriceProductSearch] = useState("");
+  const [aiAuditFilter, setAiAuditFilter] = useState("all");
+
   // Modal States
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<any>(null);
@@ -159,7 +169,53 @@ export function AdminFinancePage() {
   const inflow = balanceData?.inflow;
   const outflow = balanceData?.outflow;
   const balance = balanceData?.balance;
+  const aiAudit = balanceData?.ai_audit;
   const expensesList: any[] = expensesRes?.data || [];
+
+  // Filtered unpaid buyers list
+  const unpaidList = useMemo(() => {
+    let list: any[] = inflow?.unpaid_list || [];
+    if (unpaidBatchFilter !== "all") {
+      list = list.filter((u: any) => String(u.batch_id) === String(unpaidBatchFilter));
+    }
+    if (unpaidTypeFilter !== "all") {
+      list = list.filter((u: any) => u.type === unpaidTypeFilter);
+    }
+    if (unpaidSearch.trim()) {
+      const q = unpaidSearch.toLowerCase();
+      list = list.filter(
+        (u: any) =>
+          u.customer_name?.toLowerCase().includes(q) ||
+          u.order_id?.toLowerCase().includes(q) ||
+          u.customer_phone?.toLowerCase().includes(q) ||
+          u.customer_nim?.toLowerCase().includes(q) ||
+          u.items_summary?.toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [inflow?.unpaid_list, unpaidBatchFilter, unpaidTypeFilter, unpaidSearch]);
+
+  // Filtered price products
+  const priceBreakdown = inflow?.price_breakdown;
+  const filteredProducts = useMemo(() => {
+    let list: any[] = priceBreakdown?.products || [];
+    if (priceProductSearch.trim()) {
+      const q = priceProductSearch.toLowerCase();
+      list = list.filter((p: any) => p.product_name?.toLowerCase().includes(q));
+    }
+    return list;
+  }, [priceBreakdown?.products, priceProductSearch]);
+
+  // Filtered AI audit discrepancies
+  const filteredAiList = useMemo(() => {
+    let list: any[] = aiAudit?.items || [];
+    if (aiAuditFilter !== "all") {
+      list = list.filter((item: any) => item.type === aiAuditFilter);
+    }
+    return list;
+  }, [aiAudit?.items, aiAuditFilter]);
+
+  const voucherSummary = inflow?.voucher_summary;
 
   // Mutations
   const createExpenseMutation = useMutation({
@@ -369,6 +425,70 @@ export function AdminFinancePage() {
         e.notes || "-",
       ]);
     });
+    rows.push([]);
+
+    rows.push(["=== 5. DAFTAR PEMBELI BELUM LUNAS ==="]);
+    rows.push(["Order ID", "Nama Pembeli", "No HP", "Batch", "Produk Dipesan", "Total Tagihan", "Sudah Masuk", "Kekurangan Lunas", "Tipe Status"]);
+    (inflow?.unpaid_list || []).forEach((u: any) => {
+      rows.push([
+        u.order_id,
+        u.customer_name,
+        u.customer_phone || "-",
+        u.batch_name || "-",
+        u.items_summary || "-",
+        String(u.total_order_amount),
+        String(u.paid_amount),
+        String(u.unpaid_amount),
+        u.type_label,
+      ]);
+    });
+    rows.push([]);
+
+    rows.push(["=== 6. PENJUALAN HARGA CIVITAS FILKOM VS HARGA UMUM ==="]);
+    rows.push(["Nama Produk", "Harga FILKOM", "Qty FILKOM", "Omzet FILKOM", "Harga Umum", "Qty Umum", "Omzet Umum", "Total Qty", "Total Omzet", "Subsidi Diskon Civitas"]);
+    (priceBreakdown?.products || []).forEach((p: any) => {
+      rows.push([
+        p.product_name,
+        String(p.filkom_unit_price),
+        String(p.filkom_qty),
+        String(p.filkom_revenue),
+        String(p.umum_unit_price),
+        String(p.umum_qty),
+        String(p.umum_revenue),
+        String(p.total_qty),
+        String(p.total_revenue),
+        String(p.subsidy_total),
+      ]);
+    });
+    rows.push([]);
+
+    rows.push(["=== 7. PENGGUNAAN KODE VOUCHER & DISKON ==="]);
+    rows.push(["Kode Voucher", "Total Pemakaian", "Total Potongan Diskon (Beban Toko)", "Total Omzet Dihasilkan"]);
+    (voucherSummary?.vouchers || []).forEach((v: any) => {
+      rows.push([
+        v.code,
+        String(v.usage_count),
+        String(v.total_discount),
+        String(v.total_gross_generated || 0),
+      ]);
+    });
+    rows.push([]);
+
+    rows.push(["=== 8. AUDIT AI BUKTI TRANSFER (LEBIH / KURANG BAYAR) ==="]);
+    rows.push(["Order ID", "Nama Pembeli", "Tagihan Invoice", "Terdeteksi AI di Struk", "Selisih", "Tipe Selisih", "Bank", "Pengirim"]);
+    (aiAudit?.items || []).forEach((ai: any) => {
+      rows.push([
+        ai.order_id,
+        ai.customer_name,
+        String(ai.expected_amount),
+        String(ai.verified_amount),
+        String(ai.difference),
+        ai.type_label,
+        ai.bank,
+        ai.sender,
+      ]);
+    });
+    rows.push([]);
 
     const csvContent =
       "data:text/csv;charset=utf-8,\uFEFF" +
@@ -525,9 +645,29 @@ export function AdminFinancePage() {
                   <span className="font-semibold text-blue-600">{inflow?.settlement_rate || 0}%</span>
                 </div>
                 <Progress value={inflow?.settlement_rate || 0} className="h-1.5 bg-blue-100 dark:bg-blue-950/40" />
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
-                  Kurang {formatRupiah(inflow?.unpaid_remaining)} hingga lunas
-                </p>
+                <div className="flex items-center justify-between pt-0.5">
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                    Kurang {formatRupiah(inflow?.unpaid_remaining)}
+                  </p>
+                  {(inflow?.unpaid_list?.length || 0) > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("unpaid")}
+                      className="text-[10px] font-bold text-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <span>{inflow?.unpaid_list?.length} Belum Lunas</span>
+                      <ChevronRight className="h-2.5 w-2.5" />
+                    </button>
+                  )}
+                </div>
+                <div className="pt-2 border-t border-border/50 text-[10px] text-muted-foreground flex items-center justify-between">
+                  <span className="text-blue-600 font-medium">
+                    FILKOM: {formatRupiah(inflow?.price_breakdown?.total_filkom_revenue)}
+                  </span>
+                  <span className="text-foreground font-medium">
+                    Umum: {formatRupiah(inflow?.price_breakdown?.total_umum_revenue)}
+                  </span>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -652,19 +792,83 @@ export function AdminFinancePage() {
           </Card>
         </div>
 
+        {/* AI AUDIT BANNER IF DISCREPANCIES DETECTED */}
+        {(aiAudit?.discrepancy_count || 0) > 0 && (
+          <div className="p-3.5 sm:p-4 rounded-xl border border-indigo-500/30 bg-indigo-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-indigo-500/10 text-indigo-600">
+                <Sparkles className="h-5 w-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 className="text-xs sm:text-sm font-bold text-foreground">
+                    Temuan Pemindaian AI Struk: {aiAudit?.discrepancy_count} Transaksi Memiliki Selisih Transfer
+                  </h4>
+                  <Badge variant="outline" className="text-[10px] bg-indigo-500/10 text-indigo-700 border-indigo-500/30">
+                    AI Vision OCR
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Terdapat {aiAudit?.total_overpaid_count} transaksi kelebihan bayar ({formatRupiah(aiAudit?.total_overpaid_amount)}) dan {aiAudit?.total_underpaid_count} transaksi kekurangan bayar ({formatRupiah(aiAudit?.total_underpaid_amount)}).
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setActiveTab("ai_audit")}
+              className="h-8 text-xs border-indigo-500/40 text-indigo-700 dark:text-indigo-400 hover:bg-indigo-500/10 gap-1.5 self-start sm:self-auto shrink-0"
+            >
+              <span>Periksa Selisih Struk</span>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        )}
+
         {/* TABS NAVIGATION */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <div className="flex items-center justify-between border-b border-border pb-1">
-            <TabsList className="bg-muted/60 p-1">
-              <TabsTrigger value="inflow" className="gap-2 text-xs sm:text-sm">
+            <TabsList className="bg-muted/60 p-1 flex-wrap h-auto gap-1">
+              <TabsTrigger value="inflow" className="gap-1.5 text-xs sm:text-sm">
                 <Coins className="h-4 w-4 text-emerald-600" />
                 <span>Pemasukan ({batches.length} Batch)</span>
               </TabsTrigger>
-              <TabsTrigger value="outflow" className="gap-2 text-xs sm:text-sm">
+              <TabsTrigger value="unpaid" className="gap-1.5 text-xs sm:text-sm">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <span>Daftar Belum Lunas</span>
+                {(inflow?.unpaid_list?.length || 0) > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px] bg-amber-500/15 text-amber-700 font-bold border border-amber-500/30">
+                    {inflow.unpaid_list.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="price_breakdown" className="gap-1.5 text-xs sm:text-sm">
+                <Users className="h-4 w-4 text-blue-600" />
+                <span>Harga FILKOM vs Umum</span>
+              </TabsTrigger>
+              <TabsTrigger value="vouchers" className="gap-1.5 text-xs sm:text-sm">
+                <Ticket className="h-4 w-4 text-purple-600" />
+                <span>Voucher & Diskon</span>
+                {(inflow?.voucher_summary?.total_discount_absorbed || 0) > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px] bg-purple-500/15 text-purple-700 font-bold border border-purple-500/30">
+                    {formatRupiah(inflow.voucher_summary.total_discount_absorbed)}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="ai_audit" className="gap-1.5 text-xs sm:text-sm">
+                <Sparkles className="h-4 w-4 text-indigo-600" />
+                <span>Audit Struk AI</span>
+                {(aiAudit?.discrepancy_count || 0) > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px] bg-indigo-500/15 text-indigo-700 font-bold border border-indigo-500/30">
+                    {aiAudit.discrepancy_count}
+                  </Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="outflow" className="gap-1.5 text-xs sm:text-sm">
                 <TrendingDown className="h-4 w-4 text-rose-600" />
                 <span>Pengeluaran & Kebutuhan</span>
               </TabsTrigger>
-              <TabsTrigger value="balance" className="gap-2 text-xs sm:text-sm">
+              <TabsTrigger value="balance" className="gap-1.5 text-xs sm:text-sm">
                 <Scale className="h-4 w-4 text-primary" />
                 <span>Neraca & Laba Rugi</span>
               </TabsTrigger>
@@ -843,6 +1047,694 @@ export function AdminFinancePage() {
                       </td>
                       <td className="py-3.5 px-4 text-center">-</td>
                     </tr>
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB: DAFTAR BELUM LUNAS */}
+          <TabsContent value="unpaid" className="space-y-6">
+            {/* Header / Summary KPIs */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Total Kurang Pelunasan
+                  </span>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-amber-600 mt-1">
+                    {formatRupiah(inflow?.unpaid_remaining)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <p className="text-xs text-muted-foreground">
+                    Piutang belum terbayar dari {inflow?.unpaid_list?.length || 0} pembeli
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    DP Kurang Pelunasan
+                  </span>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-foreground mt-1">
+                    {inflow?.dp_unpaid_orders || 0} <span className="text-sm font-normal text-muted-foreground">pesanan</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <p className="text-xs text-muted-foreground">
+                    Sudah membayar DP, menunggu transfer pelunasan barang
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Pending Belum Bayar
+                  </span>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-rose-600 mt-1">
+                    {inflow?.unpaid_orders || 0} <span className="text-sm font-normal text-muted-foreground">pesanan</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <p className="text-xs text-muted-foreground">
+                    Pesanan baru yang belum melakukan pembayaran sama sekali
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Filter and Search Controls */}
+            <Card className="border border-border/80 shadow-sm">
+              <CardHeader className="pb-3 border-b border-border/40">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <CardTitle className="text-base font-bold text-foreground">
+                      Daftar Siapa Saja yang Belum Lunas
+                    </CardTitle>
+                    <CardDescription>
+                      Daftar seluruh pembeli yang masih memiliki sisa tagihan, baik pesanan DP maupun pesanan pending. Dilengkapi link WhatsApp konfirmasi tagihan.
+                    </CardDescription>
+                  </div>
+                  <Badge variant="outline" className="text-amber-700 bg-amber-500/10 border-amber-500/30 self-start md:self-auto">
+                    {unpaidList.length} dari {inflow?.unpaid_list?.length || 0} Pesanan
+                  </Badge>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3 pt-3">
+                  <div className="relative flex-1 min-w-[220px]">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Cari nama, no WA/HP, Order ID, atau produk..."
+                      value={unpaidSearch}
+                      onChange={(e) => setUnpaidSearch(e.target.value)}
+                      className="pl-8 h-8 text-xs"
+                    />
+                  </div>
+
+                  <div className="w-44">
+                    <Select value={unpaidBatchFilter} onValueChange={setUnpaidBatchFilter}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Semua Batch" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Semua Batch & Ready</SelectItem>
+                        {batches.map((b: any) => (
+                          <SelectItem key={b.id} value={String(b.id)}>
+                            {b.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="w-44">
+                    <Select value={unpaidTypeFilter} onValueChange={setUnpaidTypeFilter}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Semua Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Semua Status</SelectItem>
+                        <SelectItem value="dp_unpaid">DP Belum Pelunasan</SelectItem>
+                        <SelectItem value="unpaid">Belum Bayar (Pending)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {(unpaidSearch || unpaidBatchFilter !== "all" || unpaidTypeFilter !== "all") && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={() => {
+                        setUnpaidSearch("");
+                        setUnpaidBatchFilter("all");
+                        setUnpaidTypeFilter("all");
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-muted/40 text-muted-foreground border-b border-border">
+                    <tr>
+                      <th className="py-2.5 px-4 font-semibold">Order ID</th>
+                      <th className="py-2.5 px-4 font-semibold">Data Pembeli</th>
+                      <th className="py-2.5 px-4 font-semibold">Batch</th>
+                      <th className="py-2.5 px-4 font-semibold">Produk Dipesan</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Total Tagihan</th>
+                      <th className="py-2.5 px-4 font-semibold text-right text-emerald-600">Sudah Masuk</th>
+                      <th className="py-2.5 px-4 font-semibold text-right text-amber-600">Kurang Lunas</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Tipe Tagihan</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Aksi Reminder</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {unpaidList.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                          {inflow?.unpaid_list?.length === 0
+                            ? "🎉 Luar biasa! Seluruh pesanan telah lunas 100%."
+                            : "Tidak ada pembeli yang cocok dengan filter pencarian."}
+                        </td>
+                      </tr>
+                    ) : (
+                      unpaidList.map((u: any) => (
+                        <tr key={u.order_id} className="hover:bg-muted/20">
+                          <td className="py-3 px-4 font-mono font-bold text-foreground align-top">
+                            <Link
+                              to="/admin/transactions"
+                              className="text-primary hover:underline flex items-center gap-1"
+                              title="Buka di Menu Transaksi"
+                            >
+                              <span>{u.order_id}</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                            <span className="text-[10px] text-muted-foreground block font-normal mt-0.5">
+                              {new Date(u.created_at).toLocaleDateString("id-ID")}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 align-top">
+                            <p className="font-semibold text-foreground">{u.customer_name}</p>
+                            <p className="text-[11px] text-muted-foreground">{u.customer_phone || "-"}</p>
+                            <div className="flex items-center gap-1.5 mt-1">
+                              {u.is_civitas ? (
+                                <Badge variant="outline" className="text-[9px] bg-blue-500/10 text-blue-700 border-blue-500/30 px-1 py-0">
+                                  Civitas FILKOM {u.customer_nim ? `(${u.customer_nim})` : ""}
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-[9px] bg-muted text-muted-foreground px-1 py-0">
+                                  Umum
+                                </Badge>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 align-top">
+                            <Badge variant="secondary" className="text-[10px]">
+                              {u.batch_name}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 max-w-xs align-top">
+                            <span className="text-foreground line-clamp-2" title={u.items_summary}>
+                              {u.items_summary}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-medium align-top">
+                            {formatRupiah(u.total_order_amount)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-emerald-600 align-top">
+                            {formatRupiah(u.paid_amount)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-amber-600 align-top">
+                            {formatRupiah(u.unpaid_amount)}
+                          </td>
+                          <td className="py-3 px-4 text-center align-top">
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] ${
+                                u.type === "dp_unpaid"
+                                  ? "border-amber-500/40 text-amber-700 bg-amber-500/10"
+                                  : "border-rose-500/40 text-rose-700 bg-rose-500/10"
+                              }`}
+                            >
+                              {u.type_label}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 text-center align-top">
+                            {u.wa_link ? (
+                              <a
+                                href={u.wa_link}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-[11px] shadow-sm transition-colors"
+                              >
+                                <MessageCircle className="h-3 w-3" />
+                                <span>Tagih WA</span>
+                              </a>
+                            ) : (
+                              <span className="text-muted-foreground text-[10px]">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB: HARGA FILKOM VS HARGA UMUM */}
+          <TabsContent value="price_breakdown" className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
+                      Penjualan Civitas FILKOM
+                    </span>
+                    <Badge variant="outline" className="text-blue-600 border-blue-500/30 text-[10px]">
+                      Civitas UB
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-foreground mt-1">
+                    {formatRupiah(priceBreakdown?.total_filkom_revenue)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    <p>{priceBreakdown?.total_filkom_items || 0} pcs barang terjual</p>
+                    <p>{priceBreakdown?.total_filkom_orders || 0} transaksi mahasiswa/dosen/staf</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Penjualan Harga Umum
+                    </span>
+                    <Badge variant="outline" className="text-muted-foreground border-border text-[10px]">
+                      Non-Civitas
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-foreground mt-1">
+                    {formatRupiah(priceBreakdown?.total_umum_revenue)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="text-xs text-muted-foreground space-y-0.5">
+                    <p>{priceBreakdown?.total_umum_items || 0} pcs barang terjual</p>
+                    <p>{priceBreakdown?.total_umum_orders || 0} transaksi umum / publik</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-purple-600 uppercase tracking-wider">
+                      Subsidi Khusus Civitas
+                    </span>
+                    <Badge variant="outline" className="text-purple-600 border-purple-500/30 text-[10px]">
+                      Hemat
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-purple-600 mt-1">
+                    {formatRupiah(priceBreakdown?.total_civitas_savings)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <p className="text-xs text-muted-foreground">
+                    Total selisih harga spesial mahasiswa dibanding harga umum yang diberikan toko
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="border border-border/80 shadow-sm">
+              <CardHeader className="pb-3 border-b border-border/40">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base font-bold text-foreground">
+                      Komparasi Penjualan per Produk: Harga FILKOM vs Umum
+                    </CardTitle>
+                    <CardDescription>
+                      Rincian kuantitas dan omzet per produk yang terjual menggunakan harga civitas FILKOM vs harga umum normal.
+                    </CardDescription>
+                  </div>
+                  <div className="relative w-64">
+                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    <Input
+                      placeholder="Cari nama produk..."
+                      value={priceProductSearch}
+                      onChange={(e) => setPriceProductSearch(e.target.value)}
+                      className="pl-8 h-8 text-xs"
+                    />
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-muted/40 text-muted-foreground border-b border-border">
+                    <tr>
+                      <th className="py-2.5 px-4 font-semibold">Nama Produk</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Harga FILKOM</th>
+                      <th className="py-2.5 px-4 font-semibold text-center text-blue-600">Terjual FILKOM</th>
+                      <th className="py-2.5 px-4 font-semibold text-right text-blue-600">Omzet FILKOM</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Harga Umum</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Terjual Umum</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Omzet Umum</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Total Terjual</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Total Omzet</th>
+                      <th className="py-2.5 px-4 font-semibold text-right text-purple-600">Subsidi Civitas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredProducts.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="py-8 text-center text-muted-foreground">
+                          Belum ada transaksi produk yang tercatat.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredProducts.map((p: any) => (
+                        <tr key={p.product_name} className="hover:bg-muted/20">
+                          <td className="py-3 px-4 font-semibold text-foreground">{p.product_name}</td>
+                          <td className="py-3 px-4 text-right font-medium">
+                            {p.filkom_unit_price > 0 ? formatRupiah(p.filkom_unit_price) : "-"}
+                          </td>
+                          <td className="py-3 px-4 text-center font-bold text-blue-600">
+                            {p.filkom_qty} pcs
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-blue-600">
+                            {formatRupiah(p.filkom_revenue)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-medium">
+                            {p.umum_unit_price > 0 ? formatRupiah(p.umum_unit_price) : "-"}
+                          </td>
+                          <td className="py-3 px-4 text-center font-medium">
+                            {p.umum_qty} pcs
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold">
+                            {formatRupiah(p.umum_revenue)}
+                          </td>
+                          <td className="py-3 px-4 text-center font-bold text-foreground">
+                            {p.total_qty} pcs
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-foreground">
+                            {formatRupiah(p.total_revenue)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-medium text-purple-600">
+                            {p.subsidy_total > 0 ? formatRupiah(p.subsidy_total) : "-"}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB: VOUCHER & DISKON */}
+          <TabsContent value="vouchers" className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <span className="text-xs font-semibold text-rose-600 uppercase tracking-wider">
+                    Total Diskon Dikeluarkan
+                  </span>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-rose-600 mt-1">
+                    {formatRupiah(voucherSummary?.total_discount_absorbed)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <p className="text-xs text-muted-foreground">
+                    Potensi pemasukan yang dipotong karena penggunaan kode promo/voucher
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Total Pesanan Pakai Voucher
+                  </span>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-foreground mt-1">
+                    {voucherSummary?.total_orders_used || 0} <span className="text-sm font-normal text-muted-foreground">pesanan</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <p className="text-xs text-muted-foreground">
+                    Jumlah transaksi yang mendapatkan potongan diskon
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <span className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">
+                    Rata-rata Diskon per Order
+                  </span>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-foreground mt-1">
+                    {formatRupiah(
+                      (voucherSummary?.total_orders_used || 0) > 0
+                        ? Math.round(Number(voucherSummary?.total_discount_absorbed || 0) / Number(voucherSummary?.total_orders_used || 1))
+                        : 0
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <p className="text-xs text-muted-foreground">
+                    Rata-rata subsidi diskon per pembeli pengguna voucher
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="border border-border/80 shadow-sm">
+              <CardHeader className="pb-3 border-b border-border/40">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base font-bold text-foreground">
+                      Rincian Beban Diskon per Kode Voucher
+                    </CardTitle>
+                    <CardDescription>
+                      Data pengeluaran diskon dan omzet yang berhasil digenerate dari setiap kode voucher yang digunakan pembeli.
+                    </CardDescription>
+                  </div>
+                  <Link to="/admin/vouchers">
+                    <Button variant="outline" size="sm" className="text-xs gap-1.5">
+                      Kelola Kode Voucher
+                      <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                  </Link>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-muted/40 text-muted-foreground border-b border-border">
+                    <tr>
+                      <th className="py-2.5 px-4 font-semibold">Kode Voucher</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Jumlah Dipakai</th>
+                      <th className="py-2.5 px-4 font-semibold text-right text-rose-600">Total Potongan (Beban Toko)</th>
+                      <th className="py-2.5 px-4 font-semibold text-right text-emerald-600">Omzet Dihasilkan</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Rata-rata Diskon</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {(voucherSummary?.vouchers || []).length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                          Belum ada transaksi yang menggunakan kode voucher pada periode ini.
+                        </td>
+                      </tr>
+                    ) : (
+                      (voucherSummary?.vouchers || []).map((v: any) => (
+                        <tr key={v.code} className="hover:bg-muted/20">
+                          <td className="py-3 px-4 font-mono font-bold text-foreground flex items-center gap-1.5">
+                            <Tag className="h-3.5 w-3.5 text-purple-600" />
+                            <span>{v.code}</span>
+                          </td>
+                          <td className="py-3 px-4 text-center font-semibold text-foreground">
+                            {v.usage_count} kali
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-rose-600">
+                            {formatRupiah(v.total_discount)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-emerald-600">
+                            {formatRupiah(v.total_gross_generated || v.total_order_value || 0)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-medium">
+                            {formatRupiah(Math.round(v.total_discount / (v.usage_count || 1)))}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB: AUDIT STRUK AI (LEBIH / KURANG BAYAR) */}
+          <TabsContent value="ai_audit" className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-amber-600 uppercase tracking-wider">
+                      Total Kelebihan Bayar (Overpaid)
+                    </span>
+                    <Badge variant="outline" className="text-amber-700 bg-amber-500/10 border-amber-500/30 text-[10px]">
+                      {aiAudit?.total_overpaid_count || 0} Transaksi
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-amber-600 mt-1">
+                    {formatRupiah(aiAudit?.total_overpaid_amount)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <p className="text-xs text-muted-foreground">
+                    Nominal lebih transfer yang terdeteksi AI pada struk (kewajiban refund toko ke pembeli)
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="border border-border/80 shadow-sm bg-card">
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-rose-600 uppercase tracking-wider">
+                      Total Kekurangan Bayar (Underpaid)
+                    </span>
+                    <Badge variant="outline" className="text-rose-700 bg-rose-500/10 border-rose-500/30 text-[10px]">
+                      {aiAudit?.total_underpaid_count || 0} Transaksi
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-rose-600 mt-1">
+                    {formatRupiah(aiAudit?.total_underpaid_amount)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <p className="text-xs text-muted-foreground">
+                    Nominal kurang transfer yang terdeteksi AI pada struk (piutang toko yang belum ditransfer penuh)
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="border border-border/80 shadow-sm">
+              <CardHeader className="pb-3 border-b border-border/40">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <CardTitle className="text-base font-bold text-foreground">
+                      Temuan Audit Hasil Pemindaian AI Vision Bukti Transfer
+                    </CardTitle>
+                    <CardDescription>
+                      Daftar pesanan dengan selisih antara nominal tagihan invoice dengan nominal riil yang tertera pada struk perbankan/QRIS.
+                    </CardDescription>
+                  </div>
+
+                  <div className="w-52">
+                    <Select value={aiAuditFilter} onValueChange={setAiAuditFilter}>
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="Semua Temuan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Semua Temuan AI ({aiAudit?.discrepancy_count || 0})</SelectItem>
+                        <SelectItem value="OVERPAID">Kelebihan Bayar ({aiAudit?.total_overpaid_count || 0})</SelectItem>
+                        <SelectItem value="UNDERPAID">Kekurangan Bayar ({aiAudit?.total_underpaid_count || 0})</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0 overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-muted/40 text-muted-foreground border-b border-border">
+                    <tr>
+                      <th className="py-2.5 px-4 font-semibold">Order ID</th>
+                      <th className="py-2.5 px-4 font-semibold">Pembeli</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Tagihan Invoice</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Terbaca AI di Struk</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Selisih</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Tipe Selisih</th>
+                      <th className="py-2.5 px-4 font-semibold">Bank / Pengirim</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Bukti Struk</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredAiList.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                          {aiAudit?.discrepancy_count === 0
+                            ? "✅ Tidak ditemukan selisih nominal pada bukti transfer yang dipindai AI."
+                            : "Tidak ada temuan AI yang sesuai dengan filter."}
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredAiList.map((item: any) => (
+                        <tr key={item.order_id} className="hover:bg-muted/20">
+                          <td className="py-3 px-4 font-mono font-bold text-foreground">
+                            <Link
+                              to="/admin/transactions"
+                              className="text-primary hover:underline flex items-center gap-1"
+                              title="Buka detail transaksi"
+                            >
+                              <span>{item.order_id}</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </Link>
+                            <span className="text-[10px] text-muted-foreground block font-normal mt-0.5">
+                              {new Date(item.created_at).toLocaleDateString("id-ID")}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-semibold text-foreground">{item.customer_name}</p>
+                            <p className="text-[11px] text-muted-foreground">{item.customer_phone || "-"}</p>
+                          </td>
+                          <td className="py-3 px-4 text-right font-medium">
+                            {formatRupiah(item.expected_amount)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold text-foreground">
+                            {formatRupiah(item.verified_amount)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-bold">
+                            <span className={item.type === "OVERPAID" ? "text-amber-600" : "text-rose-600"}>
+                              {item.type === "OVERPAID" ? "+" : "-"} {formatRupiah(item.difference)}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <Badge
+                              variant="outline"
+                              className={`text-[10px] ${
+                                item.type === "OVERPAID"
+                                  ? "border-amber-500/40 text-amber-700 bg-amber-500/10"
+                                  : "border-rose-500/40 text-rose-700 bg-rose-500/10"
+                              }`}
+                            >
+                              {item.type_label}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-medium text-foreground">{item.bank || "-"}</p>
+                            <p className="text-[11px] text-muted-foreground">{item.sender || "-"}</p>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {item.proof_url ? (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setPreviewReceiptUrl(item.proof_url)}
+                                className="h-7 text-xs gap-1 text-primary hover:text-primary"
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                <span>Lihat</span>
+                              </Button>
+                            ) : (
+                              <span className="text-muted-foreground text-[11px]">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <Badge
+                              variant={item.resolution_status === "completed" || item.resolution_status === "resolved" ? "default" : "secondary"}
+                              className="text-[10px]"
+                            >
+                              {item.resolution_status === "completed" || item.resolution_status === "resolved"
+                                ? "Selesai"
+                                : "Menunggu Tindakan"}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </CardContent>
