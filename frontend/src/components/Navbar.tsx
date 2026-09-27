@@ -161,15 +161,20 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
     const handleOpenVerification = () => {
       setIsVerifyOpen(true);
     };
+    const handleOpenClaim = () => {
+      setIsClaimOpen(true);
+    };
 
     window.addEventListener("cart-updated", handleCartUpdated);
     window.addEventListener("open-cart", handleOpenCart);
     window.addEventListener("open-verification", handleOpenVerification);
+    window.addEventListener("open-claim", handleOpenClaim);
 
     return () => {
       window.removeEventListener("cart-updated", handleCartUpdated);
       window.removeEventListener("open-cart", handleOpenCart);
       window.removeEventListener("open-verification", handleOpenVerification);
+      window.removeEventListener("open-claim", handleOpenClaim);
     };
   }, [loadCart]);
 

@@ -11,9 +11,16 @@ export type ElementType =
   | "limited_drop"
   | "bundle_recommendation"
   | "gallery"
-  | "testimonial";
+  | "testimonial"
+  | "popup_announcement";
 
 export type SegmentType = ElementType;
+
+export interface PopupAnnouncementConfig {
+  activeTemplate: "filkom_verification" | "notification" | "thank_you";
+  version: string;
+  delayMs: number;
+}
 
 export interface SegmentElement {
   id: string;
@@ -115,13 +122,42 @@ function getTypeName(type: ElementType): string {
     case "bundle_recommendation": return "Bundle Recommendation";
     case "gallery": return "Lifestyle Gallery";
     case "testimonial": return "Testimonials";
+    case "popup_announcement": return "Pop-up Pengumuman";
     default: return type;
   }
 }
 
+export function ensurePopupAnnouncementSegment(segments: HomepageSegment[]): HomepageSegment[] {
+  const hasPopup = segments.some(
+    (s) => s.elements?.some((e) => e.type === "popup_announcement") || s.id.includes("popup-announcement")
+  );
+  if (!hasPopup) {
+    return [
+      {
+        id: "seg-popup-announcement",
+        title: "Pop-up Pengumuman Beranda",
+        enabled: true,
+        elements: [
+          {
+            id: "el-popup-announcement",
+            type: "popup_announcement",
+            config: {
+              activeTemplate: "filkom_verification",
+              version: "v1",
+              delayMs: 600,
+            },
+          },
+        ],
+      },
+      ...segments,
+    ];
+  }
+  return segments;
+}
+
 export function convertLegacyToSegments(legacy: any): HomepageSegment[] {
   if (Array.isArray(legacy) && legacy.length > 0 && "elements" in legacy[0]) {
-    return legacy.map((seg: any) => ({
+    const segs = legacy.map((seg: any) => ({
       ...seg,
       elements: seg.elements?.map((el: any) => {
         if (el.type === "hero_banner" && el.config) {
@@ -137,10 +173,11 @@ export function convertLegacyToSegments(legacy: any): HomepageSegment[] {
         return el;
       }) || [],
     }));
+    return ensurePopupAnnouncementSegment(segs);
   }
 
   if (Array.isArray(legacy)) {
-    return legacy.map((oldSeg: any) => ({
+    const segs = legacy.map((oldSeg: any) => ({
       id: oldSeg.id || `seg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       title: getTypeName(oldSeg.type),
       enabled: oldSeg.enabled !== undefined ? oldSeg.enabled : true,
@@ -152,6 +189,7 @@ export function convertLegacyToSegments(legacy: any): HomepageSegment[] {
         }
       ]
     }));
+    return ensurePopupAnnouncementSegment(segs);
   }
 
   const legacyFlat = legacy || {};
@@ -315,11 +353,27 @@ export function convertLegacyToSegments(legacy: any): HomepageSegment[] {
     ]
   });
 
-  return segments;
+  return ensurePopupAnnouncementSegment(segments);
 }
 
 export function getDefaultSegments(): HomepageSegment[] {
   return [
+    {
+      id: "default-popup-announcement",
+      title: "Pop-up Pengumuman Beranda",
+      enabled: true,
+      elements: [
+        {
+          id: "default-el-popup-announcement",
+          type: "popup_announcement",
+          config: {
+            activeTemplate: "filkom_verification",
+            version: "v1",
+            delayMs: 600,
+          },
+        },
+      ],
+    },
     {
       id: "default-marquee",
       title: "Marquee Pengumuman",

@@ -668,6 +668,17 @@ function Index() {
     }
   }, [settings]);
 
+  // Extract popup announcement segment configuration
+  const popupSegment = useMemo(() => {
+    return segments.find(
+      (s) => s.elements?.some((e) => e.type === "popup_announcement") || s.id.includes("popup-announcement")
+    );
+  }, [segments]);
+
+  const popupElement = useMemo(() => {
+    return popupSegment?.elements?.find((e) => e.type === "popup_announcement");
+  }, [popupSegment]);
+
   // Merge database layout configuration with default editorial layout
   const layout = useMemo(() => {
     const defaults = {
@@ -901,6 +912,8 @@ function Index() {
             {(seg.elements || []).map((el) => {
               switch (el.type) {
                 case "marquee":
+                  return null;
+                case "popup_announcement":
                   return null;
 
                 case "hero_banner":
@@ -2227,8 +2240,13 @@ function Index() {
         </div>
       )}
 
-      {/* Pre-Order Closing Thank You Announcement Modal */}
-      <AnnouncementModal />
+      {/* Homepage Announcement Modal */}
+      <AnnouncementModal
+        enabled={popupSegment ? popupSegment.enabled : true}
+        activeTemplate={popupElement?.config?.activeTemplate || "filkom_verification"}
+        version={popupElement?.config?.version || "v1"}
+        delayMs={popupElement?.config?.delayMs ?? 600}
+      />
     </div>
   );
 }

@@ -152,6 +152,12 @@ const getElementTemplate = (type: SegmentType): any => {
         subtitle: "",
         items: [],
       };
+    case "popup_announcement":
+      return {
+        activeTemplate: "filkom_verification",
+        version: "v1",
+        delayMs: 600,
+      };
   }
 };
 
@@ -170,6 +176,8 @@ const getIcon = (type: SegmentType) => {
     case "bundle_recommendation": return "🎁";
     case "gallery": return "📸";
     case "testimonial": return "💬";
+    case "popup_announcement": return "🔔";
+    default: return "📄";
   }
 };
 
@@ -185,6 +193,11 @@ const getTypeName = (type: SegmentType) => {
     case "value_props": return "Value Props";
     case "faq": return "FAQ Section";
     case "limited_drop": return "Limited Drop";
+    case "bundle_recommendation": return "Bundle Recommendation";
+    case "gallery": return "Lifestyle Gallery";
+    case "testimonial": return "Testimonials";
+    case "popup_announcement": return "Pop-up Pengumuman";
+    default: return type;
   }
 };
 
@@ -2177,6 +2190,160 @@ function AdminHomepageEditorPage() {
                                     </div>
                                   </div>
                                 )}
+
+                                {/* POPUP ANNOUNCEMENT CONFIG */}
+                                {el.type === "popup_announcement" && (
+                                  <div className="space-y-5">
+                                    <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-500/40 rounded-xl space-y-2">
+                                      <div className="flex items-center gap-2 text-xs font-black text-amber-900 dark:text-amber-200 uppercase tracking-wide">
+                                        <span>📢 KONTROL POP-UP PENGUMUMAN BERANDA</span>
+                                      </div>
+                                      <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                        Pop-up pengumuman akan otomatis muncul di layar awal saat pengunjung membuka beranda jika segmen ini diaktifkan (ikon mata menyala). Konten visual & interaksi teknis (Google OAuth, Verifikasi NIM, Klaim Alumni, Push Notifikasi, Confetti) dikelola secara spesifik melalui kode agar tampilan dan alur interaksinya berjalan presisi.
+                                      </p>
+                                    </div>
+
+                                    {/* Template Selector */}
+                                    <div className="space-y-2.5">
+                                      <Label className="font-bold text-xs uppercase tracking-wider text-brand-orange">
+                                        Pilih Template Pop-up yang Ditampilkan
+                                      </Label>
+                                      <div className="space-y-2.5">
+                                        {/* Option 1: Filkom Student & Alumni Verification */}
+                                        <label
+                                          className={`block p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                                            (el.config.activeTemplate || "filkom_verification") === "filkom_verification"
+                                              ? "border-brand-orange bg-orange-50/80 dark:bg-orange-950/40 shadow-xs"
+                                              : "border-ink/20 hover:border-ink/40 bg-background"
+                                          }`}
+                                        >
+                                          <div className="flex items-start gap-3">
+                                            <input
+                                              type="radio"
+                                              name={`popup_template_${el.id}`}
+                                              value="filkom_verification"
+                                              checked={(el.config.activeTemplate || "filkom_verification") === "filkom_verification"}
+                                              onChange={() => updateElementConfig(activeSegment.id, el.id, { activeTemplate: "filkom_verification" })}
+                                              className="mt-1 accent-brand-orange"
+                                            />
+                                            <div className="space-y-1">
+                                              <div className="text-xs font-black text-ink flex items-center gap-1.5">
+                                                <span>🎓 Diskon Khusus Mahasiswa / Alumni FILKOM UB</span>
+                                                <span className="text-[9px] bg-brand-orange text-cream px-2 py-0.5 rounded-full font-bold">TERBARU</span>
+                                              </div>
+                                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                                Ajakan login langsung dengan Google UB (@student.ub.ac.id) untuk aktivasi diskon civitas, verifikasi NIM, serta panduan &amp; tombol klaim akun alumni bagi yang email student-nya telah dinonaktifkan.
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </label>
+
+                                        {/* Option 2: Push Notification */}
+                                        <label
+                                          className={`block p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                                            el.config.activeTemplate === "notification"
+                                              ? "border-brand-orange bg-orange-50/80 dark:bg-orange-950/40 shadow-xs"
+                                              : "border-ink/20 hover:border-ink/40 bg-background"
+                                          }`}
+                                        >
+                                          <div className="flex items-start gap-3">
+                                            <input
+                                              type="radio"
+                                              name={`popup_template_${el.id}`}
+                                              value="notification"
+                                              checked={el.config.activeTemplate === "notification"}
+                                              onChange={() => updateElementConfig(activeSegment.id, el.id, { activeTemplate: "notification" })}
+                                              className="mt-1 accent-brand-orange"
+                                            />
+                                            <div className="space-y-1">
+                                              <div className="text-xs font-black text-ink">
+                                                🔔 Wajib Aktifkan Notifikasi Web (Pengambilan Jaket PO)
+                                              </div>
+                                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                                Edukasi &amp; tombol aktivasi Push Notification browser untuk jadwal pengambilan Jaket PO Batch #1 &amp; #2 dan konfirmasi pembayaran.
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </label>
+
+                                        {/* Option 3: Thank You Pre-Order */}
+                                        <label
+                                          className={`block p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+                                            el.config.activeTemplate === "thank_you"
+                                              ? "border-brand-orange bg-orange-50/80 dark:bg-orange-950/40 shadow-xs"
+                                              : "border-ink/20 hover:border-ink/40 bg-background"
+                                          }`}
+                                        >
+                                          <div className="flex items-start gap-3">
+                                            <input
+                                              type="radio"
+                                              name={`popup_template_${el.id}`}
+                                              value="thank_you"
+                                              checked={el.config.activeTemplate === "thank_you"}
+                                              onChange={() => updateElementConfig(activeSegment.id, el.id, { activeTemplate: "thank_you" })}
+                                              className="mt-1 accent-brand-orange"
+                                            />
+                                            <div className="space-y-1">
+                                              <div className="text-xs font-black text-ink">
+                                                🎉 Selebrasi &amp; Terima Kasih Penutupan Pre-Order
+                                              </div>
+                                              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                                Ucapan terima kasih penutupan Pre-Order Batch #1 &amp; #2 dengan hujan confetti dan info pantauan via Instagram &amp; web.
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </label>
+                                      </div>
+                                    </div>
+
+                                    {/* Version & Reset Dismissal */}
+                                    <div className="space-y-2 pt-2 border-t border-ink/10">
+                                      <Label className="font-bold text-xs uppercase tracking-wider text-brand-orange">
+                                        Versi Pop-up (Reset Tampilan Pengunjung)
+                                      </Label>
+                                      <p className="text-[11px] text-muted-foreground">
+                                        Pengunjung yang sudah pernah mengklik "Tutup/Nanti Saja" tidak akan terganggu lagi oleh pop-up versi yang sama. Klik tombol di bawah jika Anda ingin pop-up ini muncul kembali ke seluruh pengunjung.
+                                      </p>
+                                      <div className="flex items-center gap-2">
+                                        <Input
+                                          value={el.config.version || "v1"}
+                                          onChange={(e) => updateElementConfig(activeSegment.id, el.id, { version: e.target.value })}
+                                          placeholder="v1"
+                                          className="w-32 text-xs font-mono font-bold"
+                                        />
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={() => {
+                                            const newVer = `v${Date.now().toString().slice(-4)}`;
+                                            updateElementConfig(activeSegment.id, el.id, { version: newVer });
+                                            toast.success(`Versi pop-up diubah ke ${newVer}. Pop-up akan tampil ulang ke pengunjung!`);
+                                          }}
+                                          className="text-xs font-bold border-ink hover:bg-neutral-100 cursor-pointer"
+                                        >
+                                          🔄 Reset Supaya Muncul Lagi
+                                        </Button>
+                                      </div>
+                                    </div>
+
+                                    {/* Delay Configuration */}
+                                    <div className="space-y-2 pt-2 border-t border-ink/10">
+                                      <Label className="font-bold text-xs">Delay Waktu Muncul (Milidetik)</Label>
+                                      <Input
+                                        type="number"
+                                        min="100"
+                                        step="100"
+                                        value={el.config.delayMs ?? 600}
+                                        onChange={(e) => updateElementConfig(activeSegment.id, el.id, { delayMs: parseInt(e.target.value, 10) || 600 })}
+                                        placeholder="600"
+                                        className="w-36 text-xs"
+                                      />
+                                      <p className="text-[10px] text-muted-foreground">
+                                        Waktu tunggu setelah halaman beranda dimuat sebelum pop-up muncul (default: 600 ms).
+                                      </p>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
@@ -2515,6 +2682,26 @@ function AdminHomepageEditorPage() {
                                          </div>
                                        ))}
                                      </div>
+                                   </div>
+                                 )}
+
+                                 {/* POPUP ANNOUNCEMENT PREVIEW */}
+                                 {el.type === "popup_announcement" && (
+                                   <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border-2 border-dashed border-amber-600/40 rounded-xl space-y-1.5">
+                                     <div className="flex items-center justify-between text-[6px] font-black uppercase text-amber-700">
+                                       <span>📢 MODAL POP-UP BERANDA</span>
+                                       <span className="bg-amber-600 text-white px-1.5 py-0.5 rounded font-mono">
+                                         {el.config.version || "v1"}
+                                       </span>
+                                     </div>
+                                     <div className="text-[7.5px] font-black text-ink uppercase">
+                                       {(el.config.activeTemplate || "filkom_verification") === "filkom_verification" && "🎓 Diskon Civitas: Login Google UB & Klaim Alumni"}
+                                       {el.config.activeTemplate === "notification" && "🔔 Push Notifikasi Pengambilan Jaket PO"}
+                                       {el.config.activeTemplate === "thank_you" && "🎉 Terima Kasih Penutupan Pre-Order"}
+                                     </div>
+                                     <p className="text-[5.5px] text-muted-foreground line-clamp-2">
+                                       Pop-up modal akan muncul otomatis {el.config.delayMs || 600}ms setelah pengunjung membuka halaman beranda.
+                                     </p>
                                    </div>
                                  )}
 
