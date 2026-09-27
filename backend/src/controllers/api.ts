@@ -8456,6 +8456,237 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
     const projectedProfitMargin = grandPotentialRevenue > 0 ? Number(((projectedNetProfit / grandPotentialRevenue) * 100).toFixed(1)) : 0;
     const currentCashMargin = grandRealizedRevenue > 0 ? Number(((currentNetCash / grandRealizedRevenue) * 100).toFixed(1)) : 0;
 
+    // 9. Vendor Stock Projections & Break-Even Point (BEP) Analysis
+    const vendorOrderItems = await query<any>(`
+      SELECT voi.id, voi.vendor_order_id, voi.product_id, voi.size, voi.color,
+             voi.quantity, voi.unit_cost, voi.subtotal_cost, voi.notes,
+             vo.po_number, vo.status as po_status,
+             p.name as catalog_name, p.price as catalog_price, p.filkom_price as catalog_filkom_price, p.vendor_cost as catalog_vendor_cost
+      FROM vendor_order_items voi
+      JOIN vendor_orders vo ON voi.vendor_order_id = vo.id
+      LEFT JOIN products p ON voi.product_id = p.id
+      WHERE vo.status != 'cancelled'
+    `);
+
+    // Group vendor items by product
+    const productVendorMap: Record<string, {
+      product_id: number | null;
+      product_name: string;
+      ordered_qty: number;
+      total_vendor_cost: number;
+      filkom_price: number;
+      umum_price: number;
+      catalog_vendor_cost: number;
+    }> = {};
+
+    for (const voi of vendorOrderItems) {
+      const pId = voi.product_id ? Number(voi.product_id) : null;
+      const pName = String(voi.catalog_name || voi.notes || `Produk #${voi.product_id || voi.id}`).trim();
+      const key = pId ? `id_${pId}` : `name_${pName.toLowerCase()}`;
+
+      if (!productVendorMap[key]) {
+        productVendorMap[key] = {
+          product_id: pId,
+          product_name: pName,
+          ordered_qty: 0,
+          total_vendor_cost: 0,
+          filkom_price: Number(voi.catalog_filkom_price || 0),
+          umum_price: Number(voi.catalog_price || 0),
+          catalog_vendor_cost: Number(voi.catalog_vendor_cost || 0),
+        };
+      }
+
+      productVendorMap[key].ordered_qty += Number(voi.quantity || 0);
+      productVendorMap[key].total_vendor_cost += Number(voi.subtotal_cost || 0);
+      if (!productVendorMap[key].filkom_price && voi.catalog_filkom_price) {
+        productVendorMap[key].filkom_price = Number(voi.catalog_filkom_price);
+      }
+      if (!productVendorMap[key].umum_price && voi.catalog_price) {
+        productVendorMap[key].umum_price = Number(voi.catalog_price);
+      }
+      if (!productVendorMap[key].catalog_vendor_cost && voi.catalog_vendor_cost) {
+        productVendorMap[key].catalog_vendor_cost = Number(voi.catalog_vendor_cost);
+      }
+    }
+
+    // Also include products from productPriceMap (sales) even if not yet on vendor PO
+    for (const [pName, pRec] of Object.entries(productPriceMap)) {
+      const pId = pRec.product_id ? Number(pRec.product_id) : null;
+      const key = pId ? `id_${pId}` : `name_${pName.toLowerCase()}`;
+      if (!productVendorMap[key]) {
+        productVendorMap[key] = {
+          product_id: pId,
+          product_name: pRec.product_name || pName,
+          ordered_qty: pRec.total_qty || 0,
+          total_vendor_cost: 0,
+          filkom_price: Number(pRec.filkom_unit_price || 0),
+          umum_price: Number(pRec.umum_unit_price || 0),
+          catalog_vendor_cost: 0,
+        };
+      }
+      if (productVendorMap[key].filkom_price <= 0 && pRec.filkom_unit_price > 0) {
+        productVendorMap[key].filkom_price = pRec.filkom_unit_price;
+      }
+      if (productVendorMap[key].umum_price <= 0 && pRec.umum_unit_price > 0) {
+        productVendorMap[key].umum_price = pRec.umum_unit_price;
+      }
+    }
+
+    // Compute per-product analytics
+    const productProjectionsList: any[] = [];
+    let totalVendorStockUnits = 0;
+    let totalSoldUnits = 0;
+    let totalRemainingUnits = 0;
+    let totalConservativeRevenue = 0;
+    let totalUpsideBonus = 0;
+    let totalMaxRevenue = 0;
+    let totalIdleCapitalAtCost = 0;
+    let totalPotentialRecovery = 0;
+    let totalBepRequiredUnits = 0;
+
+    for (const item of Object.values(productVendorMap)) {
+      const pId = item.product_id;
+      const pName = item.product_name;
+
+      // Match sales data
+      let matchedSales: any = null;
+      for (const [sName, sRec] of Object.entries(productPriceMap)) {
+        if ((pId && sRec.product_id === pId) || sName.toLowerCase() === pName.toLowerCase()) {
+          matchedSales = sRec;
+          break;
+        }
+      }
+
+      const orderedQty = item.ordered_qty;
+      const totalCost = item.total_vendor_cost;
+      const avgUnitCost = orderedQty > 0 ? Math.round(totalCost / orderedQty) : item.catalog_vendor_cost;
+
+      let filkomPrice = item.filkom_price;
+      let umumPrice = item.umum_price;
+      if (filkomPrice <= 0 && matchedSales?.filkom_unit_price > 0) filkomPrice = matchedSales.filkom_unit_price;
+      if (umumPrice <= 0 && matchedSales?.umum_unit_price > 0) umumPrice = matchedSales.umum_unit_price;
+      if (filkomPrice <= 0 && umumPrice > 0) filkomPrice = umumPrice;
+      if (umumPrice <= 0 && filkomPrice > 0) umumPrice = filkomPrice;
+
+      const soldQty = matchedSales ? Number(matchedSales.total_qty || 0) : 0;
+      const soldFilkomQty = matchedSales ? Number(matchedSales.filkom_qty || 0) : 0;
+      const soldUmumQty = matchedSales ? Number(matchedSales.umum_qty || 0) : 0;
+      const soldRevenue = matchedSales ? Number(matchedSales.total_revenue || 0) : 0;
+
+      const remainingQty = Math.max(0, orderedQty - soldQty);
+      const sellThroughPct = orderedQty > 0 ? Math.min(100, Math.round((soldQty / orderedQty) * 100)) : 100;
+
+      // BEP in units (conservative calculation based on filkom_price)
+      const targetSellingPrice = filkomPrice > 0 ? filkomPrice : (umumPrice > 0 ? umumPrice : (avgUnitCost > 0 ? avgUnitCost : 1));
+      const bepUnits = totalCost > 0 && targetSellingPrice > 0 ? Math.ceil(totalCost / targetSellingPrice) : 0;
+      const bepProgressPct = bepUnits > 0 ? Math.min(100, Math.round((soldQty / bepUnits) * 100)) : (soldQty > 0 ? 100 : 0);
+      const isBepReached = bepUnits > 0 ? soldQty >= bepUnits : true;
+      const bepShortageUnits = Math.max(0, bepUnits - soldQty);
+      const bepSurplusUnits = Math.max(0, soldQty - bepUnits);
+
+      // Conservative Projection (100% stock sold at Harga FILKOM)
+      const projRevConservative = orderedQty * filkomPrice;
+      const projGrossProfitConservative = projRevConservative - totalCost;
+      const projGrossMarginConservative = projRevConservative > 0 ? Number(((projGrossProfitConservative / projRevConservative) * 100).toFixed(1)) : 0;
+
+      // Upside Bonus (Price difference if sold at Harga Umum instead of FILKOM)
+      const unitUpsideBonus = Math.max(0, umumPrice - filkomPrice);
+      const upsideBonusTotal = orderedQty * unitUpsideBonus;
+
+      // Max Projection (100% stock sold at Harga Umum)
+      const projRevMax = orderedQty * umumPrice;
+      const projGrossProfitMax = projRevMax - totalCost;
+      const projGrossMarginMax = projRevMax > 0 ? Number(((projGrossProfitMax / projRevMax) * 100).toFixed(1)) : 0;
+
+      // Idle Capital in unsold inventory
+      const idleCapitalCost = remainingQty * avgUnitCost;
+      const potentialCashRecovery = remainingQty * filkomPrice;
+
+      // Unit Margin
+      const unitMarginFilkom = filkomPrice - avgUnitCost;
+      const unitMarginFilkomPct = filkomPrice > 0 ? Number(((unitMarginFilkom / filkomPrice) * 100).toFixed(1)) : 0;
+      const unitMarginUmum = umumPrice - avgUnitCost;
+      const unitMarginUmumPct = umumPrice > 0 ? Number(((unitMarginUmum / umumPrice) * 100).toFixed(1)) : 0;
+
+      // Accumulate totals
+      totalVendorStockUnits += orderedQty;
+      totalSoldUnits += soldQty;
+      totalRemainingUnits += remainingQty;
+      totalConservativeRevenue += projRevConservative;
+      totalUpsideBonus += upsideBonusTotal;
+      totalMaxRevenue += projRevMax;
+      totalIdleCapitalAtCost += idleCapitalCost;
+      totalPotentialRecovery += potentialCashRecovery;
+      totalBepRequiredUnits += bepUnits;
+
+      productProjectionsList.push({
+        product_id: pId,
+        product_name: pName,
+        ordered_qty: orderedQty,
+        sold_qty: soldQty,
+        sold_filkom_qty: soldFilkomQty,
+        sold_umum_qty: soldUmumQty,
+        remaining_qty: remainingQty,
+        sell_through_pct: sellThroughPct,
+        avg_unit_cost: avgUnitCost,
+        total_vendor_cost: totalCost,
+        filkom_price: filkomPrice,
+        umum_price: umumPrice,
+        unit_upside_bonus: unitUpsideBonus,
+        bep_units: bepUnits,
+        bep_progress_pct: bepProgressPct,
+        is_bep_reached: isBepReached,
+        bep_shortage_units: bepShortageUnits,
+        bep_surplus_units: bepSurplusUnits,
+        unit_margin_filkom: unitMarginFilkom,
+        unit_margin_filkom_pct: unitMarginFilkomPct,
+        unit_margin_umum: unitMarginUmum,
+        unit_margin_umum_pct: unitMarginUmumPct,
+        proj_revenue_conservative: projRevConservative,
+        proj_gross_profit_conservative: projGrossProfitConservative,
+        proj_gross_margin_conservative: projGrossMarginConservative,
+        upside_bonus_total: upsideBonusTotal,
+        proj_revenue_max: projRevMax,
+        proj_gross_profit_max: projGrossProfitMax,
+        idle_capital_cost: idleCapitalCost,
+        potential_cash_recovery: potentialCashRecovery,
+        sold_revenue: soldRevenue,
+      });
+    }
+
+    // Sort by total_vendor_cost descending or ordered_qty descending
+    productProjectionsList.sort((a, b) => b.total_vendor_cost - a.total_vendor_cost || b.ordered_qty - a.ordered_qty);
+
+    // Summary calculations
+    const totalVendorCostOverall = totalVendorContract;
+    const totalProjNetProfitConservative = totalConservativeRevenue - totalVendorCostOverall - totalOperationalExpenses;
+    const totalProjNetMarginConservative = totalConservativeRevenue > 0 ? Number(((totalProjNetProfitConservative / totalConservativeRevenue) * 100).toFixed(1)) : 0;
+    const totalProjNetProfitMax = totalMaxRevenue - totalVendorCostOverall - totalOperationalExpenses;
+    const totalProjNetMarginMax = totalMaxRevenue > 0 ? Number(((totalProjNetProfitMax / totalMaxRevenue) * 100).toFixed(1)) : 0;
+
+    const overallBepProgressPct = totalBepRequiredUnits > 0 ? Math.min(100, Math.round((totalSoldUnits / totalBepRequiredUnits) * 100)) : 100;
+    const overallIsBepReached = totalSoldUnits >= totalBepRequiredUnits;
+    const overallBepShortage = Math.max(0, totalBepRequiredUnits - totalSoldUnits);
+
+    // Cash Liquidity & Solvency against unpaid vendor liability
+    const netCashRunway = currentNetCash - totalVendorUnpaid;
+    const isSolvent = netCashRunway >= 0;
+    const cashCoverageRatio = totalVendorUnpaid > 0 ? Number(((currentNetCash / totalVendorUnpaid) * 100).toFixed(1)) : 100;
+
+    let solvencyStatus = "SURPLUS_SAFE";
+    let solvencyTitle = "Likuiditas Aman (Surplus Kas)";
+    let solvencyMessage = "Saldo kas riil saat ini cukup untuk melunasi seluruh sisa hutang vendor tanpa harus menunggu piutang pembeli tertagih.";
+
+    if (totalVendorUnpaid === 0) {
+      solvencyStatus = "DEBT_FREE";
+      solvencyTitle = "Bebas Hutang Vendor (100% Lunas)";
+      solvencyMessage = "Seluruh tagihan produksi vendor telah lunas dibayar. Arus kas toko bebas dari kewajiban kontraktual vendor.";
+    } else if (!isSolvent) {
+      solvencyStatus = "DEFICIT_WARNING";
+      solvencyTitle = "Peringatan Likuiditas (Defisit Kas)";
+      solvencyMessage = `Kas riil saat ini kurang Rp ${Math.abs(netCashRunway).toLocaleString("id-ID")} untuk melunasi sisa tagihan vendor sebesar Rp ${totalVendorUnpaid.toLocaleString("id-ID")}. Perlu mempercepat penagihan pelunasan pembeli (tersisa Rp ${grandUnpaidRemaining.toLocaleString("id-ID")}) atau mengatur termin pembayaran ke vendor.`;
+    }
+
     return res.json({
       success: true,
       data: {
@@ -8518,6 +8749,40 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
           total_underpaid_count: totalUnderpaidCount,
           discrepancy_count: totalOverpaidCount + totalUnderpaidCount,
           items: aiDiscrepancyList,
+        },
+        stock_projections: {
+          summary: {
+            total_vendor_units: totalVendorStockUnits,
+            total_sold_units: totalSoldUnits,
+            total_remaining_units: totalRemainingUnits,
+            total_vendor_cost: totalVendorCostOverall,
+            total_conservative_revenue: totalConservativeRevenue,
+            total_proj_net_profit_conservative: totalProjNetProfitConservative,
+            total_proj_net_margin_conservative: totalProjNetMarginConservative,
+            total_upside_bonus: totalUpsideBonus,
+            total_max_revenue: totalMaxRevenue,
+            total_proj_net_profit_max: totalProjNetProfitMax,
+            total_proj_net_margin_max: totalProjNetMarginMax,
+            total_idle_capital_at_cost: totalIdleCapitalAtCost,
+            total_potential_recovery: totalPotentialRecovery,
+            total_bep_required_units: totalBepRequiredUnits,
+            overall_bep_progress_pct: overallBepProgressPct,
+            overall_is_bep_reached: overallIsBepReached,
+            overall_bep_shortage: overallBepShortage,
+            operational_expenses_deducted: totalOperationalExpenses,
+          },
+          solvency: {
+            current_net_cash: currentNetCash,
+            unpaid_vendor_debt: totalVendorUnpaid,
+            customer_receivables: grandUnpaidRemaining,
+            net_cash_runway: netCashRunway,
+            is_solvent: isSolvent,
+            cash_coverage_ratio: cashCoverageRatio,
+            status: solvencyStatus,
+            title: solvencyTitle,
+            message: solvencyMessage,
+          },
+          products: productProjectionsList,
         },
       },
     });

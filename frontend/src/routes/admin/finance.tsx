@@ -39,6 +39,13 @@ import {
   Users,
   Ticket,
   MessageCircle,
+  Target,
+  Boxes,
+  Package,
+  Layers,
+  Info,
+  DollarSign,
+  AlertTriangle,
 } from "lucide-react";
 import {
   getFinancialBalanceSheetServerAction,
@@ -112,6 +119,8 @@ export function AdminFinancePage() {
   const [unpaidTypeFilter, setUnpaidTypeFilter] = useState("all");
   const [priceProductSearch, setPriceProductSearch] = useState("");
   const [aiAuditFilter, setAiAuditFilter] = useState("all");
+  const [projectionSearch, setProjectionSearch] = useState("");
+  const [projectionFilter, setProjectionFilter] = useState("all");
 
   // Modal States
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
@@ -216,6 +225,30 @@ export function AdminFinancePage() {
   }, [aiAudit?.items, aiAuditFilter]);
 
   const voucherSummary = inflow?.voucher_summary;
+
+  // Vendor Stock Projections & BEP
+  const stockProjections = balanceData?.stock_projections;
+  const projSummary = stockProjections?.summary;
+  const projSolvency = stockProjections?.solvency;
+  const projProducts: any[] = stockProjections?.products || [];
+
+  const filteredProjections = useMemo(() => {
+    let list: any[] = projProducts;
+    if (projectionFilter === "bep_reached") {
+      list = list.filter((p: any) => p.is_bep_reached);
+    } else if (projectionFilter === "bep_pending") {
+      list = list.filter((p: any) => !p.is_bep_reached && p.ordered_qty > 0);
+    } else if (projectionFilter === "has_stock") {
+      list = list.filter((p: any) => p.remaining_qty > 0);
+    } else if (projectionFilter === "high_margin") {
+      list = list.filter((p: any) => Number(p.unit_margin_filkom_pct || 0) >= 40);
+    }
+    if (projectionSearch.trim()) {
+      const q = projectionSearch.toLowerCase();
+      list = list.filter((p: any) => p.product_name?.toLowerCase().includes(q));
+    }
+    return list;
+  }, [projProducts, projectionFilter, projectionSearch]);
 
   // Mutations
   const createExpenseMutation = useMutation({
@@ -486,6 +519,43 @@ export function AdminFinancePage() {
         ai.type_label,
         ai.bank,
         ai.sender,
+      ]);
+    });
+    rows.push([]);
+
+    rows.push(["=== 9. PROYEKSI KEUNTUNGAN STOK VENDOR & ANALISIS BEP ==="]);
+    rows.push([
+      "Nama Produk",
+      "Total Stok PO",
+      "HPP Vendor (Unit)",
+      "Total Modal PO",
+      "Harga FILKOM",
+      "Harga Umum",
+      "Target BEP (pcs)",
+      "Realisasi Terjual",
+      "Status BEP",
+      "Sisa Stok (pcs)",
+      "Modal Mengendap",
+      "Proyeksi Laba Konservatif",
+      "Potensi Bonus Umum",
+      "Margin %",
+    ]);
+    (projProducts || []).forEach((p: any) => {
+      rows.push([
+        p.product_name,
+        String(p.ordered_qty),
+        String(p.avg_unit_cost),
+        String(p.total_vendor_cost),
+        String(p.filkom_price),
+        String(p.umum_price),
+        String(p.bep_units),
+        String(p.sold_qty),
+        p.is_bep_reached ? `Impas (+${p.bep_surplus_units} pcs laba)` : `Kurang ${p.bep_shortage_units} pcs`,
+        String(p.remaining_qty),
+        String(p.idle_capital_cost),
+        String(p.proj_gross_profit_conservative),
+        String(p.upside_bonus_total),
+        `${p.unit_margin_filkom_pct}%`,
       ]);
     });
     rows.push([]);
@@ -765,6 +835,14 @@ export function AdminFinancePage() {
               <p className="text-xs text-muted-foreground">
                 Uang kas riil tersedia saat ini (Kas Masuk Diterima dikurangi Kas Keluar Vendor & Operasional).
               </p>
+              {projSolvency?.unpaid_vendor_debt > 0 && (
+                <div className="pt-2 mt-2 border-t border-border/50 flex items-center justify-between text-[11px]">
+                  <span className="text-muted-foreground">Sisa Hutang Vendor:</span>
+                  <span className="font-semibold text-rose-600">
+                    {formatRupiah(projSolvency.unpaid_vendor_debt)}
+                  </span>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -788,6 +866,17 @@ export function AdminFinancePage() {
               <p className="text-xs text-muted-foreground">
                 Estimasi laba bersih akhir setelah semua pesanan lunas 100% dan seluruh kewajiban vendor terbayar.
               </p>
+              <div className="pt-2 mt-2 border-t border-border/50 flex items-center justify-between">
+                <span className="text-[10px] text-muted-foreground">Stok PO (FILKOM):</span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("projections")}
+                  className="text-[10px] font-bold text-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>Lihat Proyeksi & BEP</span>
+                  <ChevronRight className="h-2.5 w-2.5" />
+                </button>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -832,6 +921,15 @@ export function AdminFinancePage() {
               <TabsTrigger value="inflow" className="gap-1.5 text-xs sm:text-sm">
                 <Coins className="h-4 w-4 text-emerald-600" />
                 <span>Pemasukan ({batches.length} Batch)</span>
+              </TabsTrigger>
+              <TabsTrigger value="projections" className="gap-1.5 text-xs sm:text-sm">
+                <Target className="h-4 w-4 text-cyan-600" />
+                <span>Proyeksi Stok & BEP</span>
+                {(projProducts.length || 0) > 0 && (
+                  <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-[10px] bg-cyan-500/15 text-cyan-700 font-bold border border-cyan-500/30">
+                    {projProducts.length} Produk
+                  </Badge>
+                )}
               </TabsTrigger>
               <TabsTrigger value="unpaid" className="gap-1.5 text-xs sm:text-sm">
                 <AlertCircle className="h-4 w-4 text-amber-600" />
@@ -1285,6 +1383,523 @@ export function AdminFinancePage() {
                     )}
                   </tbody>
                 </table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* TAB: PROYEKSI STOK & BEP (BREAK-EVEN POINT) */}
+          <TabsContent value="projections" className="space-y-6">
+            {/* 1. KETAHANAN LIKUIDITAS KAS VS JATUH TEMPO VENDOR */}
+            <div
+              className={`p-4 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm ${
+                projSolvency?.status === "DEFICIT_WARNING"
+                  ? "border-amber-500/30 bg-amber-500/5 text-amber-950 dark:text-amber-100"
+                  : projSolvency?.status === "DEBT_FREE"
+                  ? "border-blue-500/30 bg-blue-500/5 text-blue-950 dark:text-blue-100"
+                  : "border-emerald-500/30 bg-emerald-500/5 text-emerald-950 dark:text-emerald-100"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className={`p-2 rounded-lg mt-0.5 ${
+                    projSolvency?.status === "DEFICIT_WARNING"
+                      ? "bg-amber-500/20 text-amber-600"
+                      : projSolvency?.status === "DEBT_FREE"
+                      ? "bg-blue-500/20 text-blue-600"
+                      : "bg-emerald-500/20 text-emerald-600"
+                  }`}
+                >
+                  {projSolvency?.status === "DEFICIT_WARNING" ? (
+                    <AlertTriangle className="h-5 w-5" />
+                  ) : (
+                    <ShieldCheck className="h-5 w-5" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-foreground">
+                      {projSolvency?.title || "Status Likuiditas Kas vs Vendor"}
+                    </h4>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] ${
+                        projSolvency?.status === "DEFICIT_WARNING"
+                          ? "bg-amber-500/10 text-amber-700 border-amber-500/30"
+                          : projSolvency?.status === "DEBT_FREE"
+                          ? "bg-blue-500/10 text-blue-700 border-blue-500/30"
+                          : "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                      }`}
+                    >
+                      {projSolvency?.status === "DEFICIT_WARNING"
+                        ? "Defisit Berjalan"
+                        : projSolvency?.status === "DEBT_FREE"
+                        ? "Bebas Hutang"
+                        : "Surplus Aman"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-2xl leading-relaxed">
+                    {projSolvency?.message}
+                  </p>
+                </div>
+              </div>
+
+              {/* Mini Quick Numbers */}
+              <div className="flex items-center gap-4 text-xs shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-border/40">
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-medium">Kas Riil Saat Ini</p>
+                  <p className="text-sm font-bold text-foreground mt-0.5">
+                    {formatRupiah(projSolvency?.current_net_cash)}
+                  </p>
+                </div>
+                <div className="h-8 w-px bg-border/60" />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-medium">Sisa Hutang Vendor</p>
+                  <p className="text-sm font-bold text-rose-600 mt-0.5">
+                    {formatRupiah(projSolvency?.unpaid_vendor_debt)}
+                  </p>
+                </div>
+                <div className="h-8 w-px bg-border/60" />
+                <div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-medium">Ketahanan Kas (Runway)</p>
+                  <p
+                    className={`text-sm font-bold mt-0.5 ${
+                      Number(projSolvency?.net_cash_runway || 0) >= 0
+                        ? "text-emerald-600"
+                        : "text-amber-600"
+                    }`}
+                  >
+                    {formatRupiah(projSolvency?.net_cash_runway)}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. 4 KARTU KPI PROYEKSI STOK UTAMA */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Card 1: Proyeksi Laba Bersih Konservatif */}
+              <Card className="border border-border/80 shadow-sm relative overflow-hidden bg-card hover:border-cyan-500/40 transition-all">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-cyan-500" />
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Laba Proyeksi Konservatif
+                    </span>
+                    <Badge variant="outline" className="text-cyan-700 bg-cyan-500/10 border-cyan-500/30 text-[10px]">
+                      100% Harga FILKOM
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-foreground mt-1">
+                    {formatRupiah(projSummary?.total_proj_net_profit_conservative)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="space-y-1.5 text-xs text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Margin Bersih:</span>
+                      <span className="font-semibold text-cyan-600">
+                        {projSummary?.total_proj_net_margin_conservative || 0}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px]">
+                      <span>Omzet (Harga FILKOM):</span>
+                      <span className="font-medium text-foreground">
+                        {formatRupiah(projSummary?.total_conservative_revenue)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px]">
+                      <span>Modal PO Vendor:</span>
+                      <span className="font-medium text-rose-600">
+                        -{formatRupiah(projSummary?.total_vendor_cost)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px]">
+                      <span>Beban Operasional:</span>
+                      <span className="font-medium text-rose-600">
+                        -{formatRupiah(projSummary?.operational_expenses_deducted)}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/80 pt-1 border-t border-border/40">
+                      *Estimasi dasar paling aman jika seluruh stok terjual habis kepada civitas FILKOM.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card 2: Potensi Upside Bonus Harga Umum */}
+              <Card className="border border-border/80 shadow-sm relative overflow-hidden bg-card hover:border-emerald-500/40 transition-all">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-500" />
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Potensi Upside Bonus
+                    </span>
+                    <Badge variant="outline" className="text-emerald-700 bg-emerald-500/10 border-emerald-500/30 text-[10px]">
+                      Harga Umum
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-emerald-600 dark:text-emerald-400 mt-1">
+                    +{formatRupiah(projSummary?.total_upside_bonus)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="space-y-1.5 text-xs text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Proyeksi Laba Maksimum:</span>
+                      <span className="font-semibold text-foreground">
+                        {formatRupiah(projSummary?.total_proj_net_profit_max)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px]">
+                      <span>Margin Maksimal:</span>
+                      <span className="font-semibold text-emerald-600">
+                        {projSummary?.total_proj_net_margin_max || 0}%
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px]">
+                      <span>Omzet Maksimum:</span>
+                      <span className="font-medium text-foreground">
+                        {formatRupiah(projSummary?.total_max_revenue)}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/80 pt-2 border-t border-border/40">
+                      *Keuntungan tambahan tak terduga setiap kali produk laku terjual ke pembeli umum/non-civitas.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card 3: Break-Even Point (BEP) Global */}
+              <Card className="border border-border/80 shadow-sm relative overflow-hidden bg-card hover:border-indigo-500/40 transition-all">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-indigo-500" />
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Titik Impas (BEP) Global
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`text-[10px] ${
+                        projSummary?.overall_is_bep_reached
+                          ? "bg-emerald-500/10 text-emerald-700 border-emerald-500/30"
+                          : "bg-indigo-500/10 text-indigo-700 border-indigo-500/30"
+                      }`}
+                    >
+                      {projSummary?.overall_is_bep_reached ? "🎉 Impas Tercapai" : "Sedang Berjalan"}
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-foreground mt-1">
+                    {projSummary?.total_sold_units || 0} / {projSummary?.total_bep_required_units || 0}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">pcs terjual</span>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Realisasi Target Modal:</span>
+                      <span className="font-bold text-indigo-600">
+                        {projSummary?.overall_bep_progress_pct || 0}%
+                      </span>
+                    </div>
+                    <Progress
+                      value={projSummary?.overall_bep_progress_pct || 0}
+                      className="h-1.5 bg-indigo-100 dark:bg-indigo-950/40"
+                    />
+                    <p className="text-[11px] text-muted-foreground pt-0.5">
+                      {projSummary?.overall_is_bep_reached ? (
+                        <span className="text-emerald-600 font-semibold">
+                          Biaya PO vendor tertutup lunas! Seluruh unit terjual berikutnya menghasilkan laba kotor murni.
+                        </span>
+                      ) : (
+                        <span className="text-amber-600 font-medium">
+                          Perlu {projSummary?.overall_bep_shortage} pcs lagi terjual untuk menutup seluruh biaya modal PO vendor.
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Card 4: Modal Mengendap di Sisa Stok */}
+              <Card className="border border-border/80 shadow-sm relative overflow-hidden bg-card hover:border-amber-500/40 transition-all">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500" />
+                <CardHeader className="pb-2 pt-4 px-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                      Modal Mengendap di Stok
+                    </span>
+                    <Badge variant="outline" className="text-amber-700 bg-amber-500/10 border-amber-500/30 text-[10px]">
+                      {projSummary?.total_remaining_units || 0} pcs sisa
+                    </Badge>
+                  </div>
+                  <CardTitle className="text-2xl font-bold tracking-tight text-amber-700 dark:text-amber-400 mt-1">
+                    {formatRupiah(projSummary?.total_idle_capital_at_cost)}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-4 pt-0">
+                  <div className="space-y-1.5 text-xs text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Total Stok Vendor:</span>
+                      <span className="font-medium text-foreground">
+                        {projSummary?.total_vendor_units || 0} pcs
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Terjual ke Pembeli:</span>
+                      <span className="font-semibold text-emerald-600">
+                        {projSummary?.total_sold_units || 0} pcs
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-[11px] pt-1 border-t border-border/40">
+                      <span>Potensi Kas Sisa (FILKOM):</span>
+                      <span className="font-bold text-foreground">
+                        {formatRupiah(projSummary?.total_potential_recovery)}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground/80">
+                      *Kas yang dapat dicairkan kembali ke kas toko jika sisa barang gudang terjual habis.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* 3. TABEL ANALISIS BEP & PROFITABILITAS PER PRODUK */}
+            <Card className="border border-border/80 shadow-sm">
+              <CardHeader className="pb-3 border-b border-border/40">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Target className="h-5 w-5 text-primary" />
+                      <CardTitle className="text-base font-bold text-foreground">
+                        Break-Even Point (BEP) & Proyeksi Profit per Produk
+                      </CardTitle>
+                    </div>
+                    <CardDescription className="mt-0.5">
+                      Evaluasi performa penjualan setiap artikel merchandise terhadap modal produksi vendor dan potensi labanya.
+                    </CardDescription>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Filter Selector */}
+                    <div className="w-48">
+                      <Select value={projectionFilter} onValueChange={setProjectionFilter}>
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="Filter Analisis" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Semua Produk ({projProducts.length})</SelectItem>
+                          <SelectItem value="bep_reached">Sudah Impas BEP (Profit)</SelectItem>
+                          <SelectItem value="bep_pending">Belum Impas BEP (Kejar Target)</SelectItem>
+                          <SelectItem value="has_stock">Masih Memiliki Sisa Stok</SelectItem>
+                          <SelectItem value="high_margin">Margin Tinggi (≥40%)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Search */}
+                    <div className="relative w-56">
+                      <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                      <Input
+                        placeholder="Cari nama artikel..."
+                        value={projectionSearch}
+                        onChange={(e) => setProjectionSearch(e.target.value)}
+                        className="pl-8 h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="p-0 overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-muted/40 text-muted-foreground border-b border-border">
+                    <tr>
+                      <th className="py-2.5 px-4 font-semibold">Nama Produk / Artikel</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Harga (FILKOM / Umum)</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">HPP Vendor (Unit / Total)</th>
+                      <th className="py-2.5 px-4 font-semibold text-center w-52">Target BEP vs Terjual</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Status BEP</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Sisa Stok & Modal Tertahan</th>
+                      <th className="py-2.5 px-4 font-semibold text-right">Proyeksi Laba Bersih (100% Laku)</th>
+                      <th className="py-2.5 px-4 font-semibold text-center">Margin %</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredProjections.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                          Tidak ada produk yang cocok dengan pencarian / filter.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredProjections.map((p: any) => (
+                        <tr key={p.product_id || p.product_name} className="hover:bg-muted/20">
+                          {/* 1. Nama Produk */}
+                          <td className="py-3 px-4">
+                            <p className="font-semibold text-foreground">{p.product_name}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              Total PO: <span className="font-medium text-foreground">{p.ordered_qty} pcs</span> • Terjual: <span className="font-semibold text-emerald-600">{p.sold_qty} pcs</span> ({p.sell_through_pct}%)
+                            </p>
+                          </td>
+
+                          {/* 2. Harga Acuan */}
+                          <td className="py-3 px-4 text-right">
+                            <p className="font-semibold text-blue-600">{formatRupiah(p.filkom_price)}</p>
+                            <p className="text-[11px] text-muted-foreground">Umum: {formatRupiah(p.umum_price)}</p>
+                            {p.unit_upside_bonus > 0 && (
+                              <p className="text-[10px] text-emerald-600 font-medium">+{formatRupiah(p.unit_upside_bonus)} bonus</p>
+                            )}
+                          </td>
+
+                          {/* 3. HPP Vendor */}
+                          <td className="py-3 px-4 text-right">
+                            <p className="font-medium text-foreground">{formatRupiah(p.avg_unit_cost)} /pcs</p>
+                            <p className="text-[11px] text-rose-600 font-semibold">Total: {formatRupiah(p.total_vendor_cost)}</p>
+                          </td>
+
+                          {/* 4. Target BEP vs Realisasi */}
+                          <td className="py-3 px-4">
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-[11px]">
+                                <span className="text-muted-foreground">
+                                  BEP: <strong className="text-foreground">{p.bep_units} pcs</strong>
+                                </span>
+                                <span className="font-bold text-foreground">
+                                  {p.sold_qty} pcs ({p.bep_progress_pct}%)
+                                </span>
+                              </div>
+                              <Progress
+                                value={p.bep_progress_pct}
+                                className={`h-1.5 ${
+                                  p.is_bep_reached
+                                    ? "bg-emerald-100 dark:bg-emerald-950/40 [&>div]:bg-emerald-600"
+                                    : "bg-indigo-100 dark:bg-indigo-950/40 [&>div]:bg-indigo-600"
+                                }`}
+                              />
+                            </div>
+                          </td>
+
+                          {/* 5. Status BEP */}
+                          <td className="py-3 px-4 text-center">
+                            {p.is_bep_reached ? (
+                              <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-700 border-emerald-500/30 font-semibold">
+                                Impas (+{p.bep_surplus_units} pcs laba)
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-700 border-amber-500/30 font-medium">
+                                Kurang {p.bep_shortage_units} pcs
+                              </Badge>
+                            )}
+                          </td>
+
+                          {/* 6. Sisa Stok & Modal Tertahan */}
+                          <td className="py-3 px-4 text-right">
+                            <p className={`font-semibold ${p.remaining_qty > 0 ? "text-amber-700 dark:text-amber-400" : "text-emerald-600"}`}>
+                              {p.remaining_qty > 0 ? `${p.remaining_qty} pcs tersisa` : "Habis Terjual"}
+                            </p>
+                            {p.remaining_qty > 0 && (
+                              <>
+                                <p className="text-[11px] text-muted-foreground">
+                                  Modal: {formatRupiah(p.idle_capital_cost)}
+                                </p>
+                                <p className="text-[10px] text-cyan-600 font-medium">
+                                  Potensi Kas: {formatRupiah(p.potential_cash_recovery)}
+                                </p>
+                              </>
+                            )}
+                          </td>
+
+                          {/* 7. Proyeksi Laba Bersih */}
+                          <td className="py-3 px-4 text-right">
+                            <p className="font-bold text-foreground">
+                              {formatRupiah(p.proj_gross_profit_conservative)}
+                            </p>
+                            {p.upside_bonus_total > 0 && (
+                              <p className="text-[11px] text-emerald-600 font-medium">
+                                Bonus Umum: +{formatRupiah(p.upside_bonus_total)}
+                              </p>
+                            )}
+                            <p className="text-[10px] text-muted-foreground">
+                              Omzet Dasar: {formatRupiah(p.proj_revenue_conservative)}
+                            </p>
+                          </td>
+
+                          {/* 8. Margin % */}
+                          <td className="py-3 px-4 text-center">
+                            <Badge
+                              variant="secondary"
+                              className={`text-[10px] font-bold ${
+                                p.unit_margin_filkom_pct >= 40
+                                  ? "bg-blue-500/15 text-blue-700 border border-blue-500/30"
+                                  : p.unit_margin_filkom_pct >= 20
+                                  ? "bg-emerald-500/15 text-emerald-700 border border-emerald-500/30"
+                                  : "bg-slate-500/15 text-slate-700 border border-slate-500/30"
+                              }`}
+                            >
+                              {p.unit_margin_filkom_pct}%
+                            </Badge>
+                            <p className="text-[9px] text-muted-foreground mt-0.5">
+                              Umum: {p.unit_margin_umum_pct}%
+                            </p>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+
+            {/* 4. GLOSARIUM & PANDUAN ANALISIS BISNIS (KETERANGAN JELAS) */}
+            <Card className="border border-border/80 shadow-sm bg-muted/10">
+              <CardHeader className="pb-3 border-b border-border/40">
+                <div className="flex items-center gap-2">
+                  <Info className="h-4 w-4 text-primary" />
+                  <CardTitle className="text-sm font-bold text-foreground">
+                    Glosarium & Panduan Pengambilan Keputusan Bisnis
+                  </CardTitle>
+                </div>
+              </CardHeader>
+              <CardContent className="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-muted-foreground">
+                <div className="space-y-1.5 p-3 rounded-lg border border-border/50 bg-card">
+                  <p className="font-semibold text-foreground flex items-center gap-1.5">
+                    <Target className="h-3.5 w-3.5 text-cyan-600" />
+                    1. Apa itu Titik Impas (Break-Even Point / BEP)?
+                  </p>
+                  <p className="leading-relaxed">
+                    Jumlah minimum unit yang harus terjual agar seluruh biaya produksi PO ke vendor tertutup 100% (balik modal). Setelah titik BEP terlampaui, setiap 1 pcs produk yang terjual berikutnya bernilai laba kotor murni tanpa beban vendor.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 p-3 rounded-lg border border-border/50 bg-card">
+                  <p className="font-semibold text-foreground flex items-center gap-1.5">
+                    <Coins className="h-3.5 w-3.5 text-blue-600" />
+                    2. Mengapa Memakai Harga FILKOM sebagai Proyeksi Dasar?
+                  </p>
+                  <p className="leading-relaxed">
+                    Menggunakan prinsip kehati-hatian akuntansi (konservatif). Mayoritas civitas akademika membeli dengan harga spesial mahasiswa. Selisih harga jika terjual ke pembeli umum dicatat sebagai <em>upside bonus</em> (keuntungan ekstra).
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 p-3 rounded-lg border border-border/50 bg-card">
+                  <p className="font-semibold text-foreground flex items-center gap-1.5">
+                    <Boxes className="h-3.5 w-3.5 text-amber-600" />
+                    3. Apa itu Modal Mengendap (Idle Capital)?
+                  </p>
+                  <p className="leading-relaxed">
+                    Jumlah uang kas organisasi yang saat ini tertahan dalam bentuk produk fisik di gudang penyimpanan. Jika stok ini lambat berputar, admin disarankan membuat program <em>flash sale</em> atau <em>bundling</em> agar kas kembali cair.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 p-3 rounded-lg border border-border/50 bg-card">
+                  <p className="font-semibold text-foreground flex items-center gap-1.5">
+                    <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                    4. Bagaimana Membaca Uji Likuiditas Kas vs Vendor?
+                  </p>
+                  <p className="leading-relaxed">
+                    Menghitung ketahanan kas riil saat ini terhadap sisa tagihan invoice vendor yang belum lunas. Jika berstatus peringatan defisit, tim keuangan wajib memprioritaskan penagihan pelunasan pembeli agar tidak terjadi gagal bayar ke vendor.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
