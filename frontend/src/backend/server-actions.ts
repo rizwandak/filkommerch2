@@ -21,7 +21,7 @@ const getAuthHeaders = async () => {
     "Content-Type": "application/json",
     "ngrok-skip-browser-warning": "true",
     "Bypass-Tunnel-Reminder": "true",
-    "User-Agent": "PostmanRuntime/7.32.3"
+    "User-Agent": "PostmanRuntime/7.32.3",
   };
 
   if (typeof window !== "undefined") {
@@ -42,14 +42,15 @@ const getAuthHeaders = async () => {
         if (storedUserJson) {
           const u = JSON.parse(storedUserJson);
           if (u) {
-            role = role || (u.type === "admin" ? (u.role || "admin") : "buyer");
+            role = role || (u.type === "admin" ? u.role || "admin" : "buyer");
             id = id || String(u.id || "");
             name = name || (u.type === "admin" ? u.username : u.name) || "";
 
             // Re-sync missing cookies for consistency
             if (role) document.cookie = `user_role=${role}; path=/; max-age=604800; SameSite=Lax`;
             if (id) document.cookie = `user_id=${id}; path=/; max-age=604800; SameSite=Lax`;
-            if (name) document.cookie = `user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
+            if (name)
+              document.cookie = `user_name=${encodeURIComponent(name)}; path=/; max-age=604800; SameSite=Lax`;
           }
         }
       } catch (e) {
@@ -111,11 +112,7 @@ const serverFetch = async (url: string, init?: RequestInit) => {
   });
 };
 
-const executeApiCall = async (
-  endpoint: string,
-  method: string = "POST",
-  bodyData?: any
-) => {
+const executeApiCall = async (endpoint: string, method: string = "POST", bodyData?: any) => {
   const baseUrl = getApiUrl();
   const cleanEndpoint = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
   const fullUrl = `${baseUrl}${cleanEndpoint}`;
@@ -135,7 +132,9 @@ const executeApiCall = async (
       } else {
         const rawText = await res.text();
         console.error(`Backend ${fullUrl} returned non-JSON HTTP ${res.status}:`, rawText);
-        throw new Error(`Server Backend (cPanel Node.js) tidak merespons (HTTP ${res.status}). Silakan klik 'Restart Application' di cPanel.`);
+        throw new Error(
+          `Server Backend (cPanel Node.js) tidak merespons (HTTP ${res.status}). Silakan klik 'Restart Application' di cPanel.`,
+        );
       }
     }
 
@@ -151,8 +150,14 @@ const executeApiCall = async (
     }
   } catch (err: any) {
     const message = err instanceof Error ? err.message : String(err);
-    if (message.includes("<!doctype") || message.includes("This page didn't load") || message.includes("<html")) {
-      throw new Error("Server Backend (cPanel Node.js) belum aktif/merespons. Silakan klik 'Restart Application' di cPanel.");
+    if (
+      message.includes("<!doctype") ||
+      message.includes("This page didn't load") ||
+      message.includes("<html")
+    ) {
+      throw new Error(
+        "Server Backend (cPanel Node.js) belum aktif/merespons. Silakan klik 'Restart Application' di cPanel.",
+      );
     }
     throw err;
   }
@@ -244,12 +249,12 @@ export interface Order {
   channel: "online" | "pos";
   fulfillment_type: "shipping" | "pickup" | "walk_in";
   fulfillment_status:
-  | "unfulfilled"
-  | "processing"
-  | "ready_for_pickup"
-  | "shipped"
-  | "completed"
-  | "cancelled";
+    | "unfulfilled"
+    | "processing"
+    | "ready_for_pickup"
+    | "shipped"
+    | "completed"
+    | "cancelled";
   user_id: number | null;
   cashier_id: number | null;
   customer_name: string;
@@ -264,22 +269,22 @@ export interface Order {
   tax_amount: number;
   gross_amount: number;
   payment_status:
-  | "unpaid"
-  | "pending"
-  | "paid"
-  | "expired"
-  | "failed"
-  | "refunded"
-  | "partial_refund";
+    | "unpaid"
+    | "pending"
+    | "paid"
+    | "expired"
+    | "failed"
+    | "refunded"
+    | "partial_refund";
   order_status:
-  | "pending_payment"
-  | "paid"
-  | "processing"
-  | "ready_for_pickup"
-  | "shipped"
-  | "completed"
-  | "cancelled"
-  | "refunded";
+    | "pending_payment"
+    | "paid"
+    | "processing"
+    | "ready_for_pickup"
+    | "shipped"
+    | "completed"
+    | "cancelled"
+    | "refunded";
   pickup_code: string | null;
   pickup_location: string | null;
   tracking_number: string | null;
@@ -628,7 +633,13 @@ const getOrderByIdServerFn = createServerFn({ method: "GET" })
   .handler(
     async ({
       data: orderId,
-    }): Promise<{ success: boolean; order?: Order; items?: OrderItem[]; reviews?: any[]; error?: string }> => {
+    }): Promise<{
+      success: boolean;
+      order?: Order;
+      items?: OrderItem[];
+      reviews?: any[];
+      error?: string;
+    }> => {
       try {
         return await executeApiCall(`/api/orders/${orderId}`, "GET");
       } catch (error) {
@@ -638,7 +649,15 @@ const getOrderByIdServerFn = createServerFn({ method: "GET" })
     },
   );
 
-export const getOrderById = async (opts: { data: string }): Promise<{ success: boolean; order?: Order; items?: OrderItem[]; reviews?: any[]; error?: string }> => {
+export const getOrderById = async (opts: {
+  data: string;
+}): Promise<{
+  success: boolean;
+  order?: Order;
+  items?: OrderItem[];
+  reviews?: any[];
+  error?: string;
+}> => {
   if (typeof window !== "undefined") {
     try {
       return await executeApiCall(`/api/orders/${opts.data}`, "GET");
@@ -783,6 +802,71 @@ export const getAllProductsAdmin = createServerFn({ method: "GET" }).handler(
     }
   },
 );
+
+export interface StockMovement {
+  id: number;
+  variant_id: number;
+  variant_size?: string;
+  variant_color?: string;
+  movement_type:
+    | "initial"
+    | "sale"
+    | "reservation"
+    | "reservation_release"
+    | "restock"
+    | "adjustment_in"
+    | "adjustment_out"
+    | "return"
+    | "refund";
+  quantity_change: number;
+  stock_before: number;
+  stock_after: number;
+  reference_type: "order" | "stock_opname" | "purchase" | "return" | "manual";
+  reference_id?: string | null;
+  created_by?: number | null;
+  actor_name?: string | null;
+  actor_username?: string | null;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface ProductStockMovementsResponse {
+  success: boolean;
+  error?: string;
+  data?: {
+    product: {
+      id: number;
+      name: string;
+      image_url?: string;
+      price?: number;
+      sale_type?: string;
+    } | null;
+    variants: Array<{
+      id: number;
+      size: string;
+      color?: string;
+      stock: number;
+    }>;
+    movements: StockMovement[];
+  };
+}
+
+// Get Product Stock Movements
+export const getProductStockMovementsServerAction = createServerFn({ method: "POST" })
+  .validator((data: { id: number }) => data)
+  .handler(async ({ data }): Promise<ProductStockMovementsResponse> => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/products/${data.id}/stock-movements`);
+      if (!res.ok) {
+        return { success: false, data: { product: null, variants: [], movements: [] } };
+      }
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getProductStockMovementsServerAction error:", e);
+      return { success: false, error: e.message || "Failed to fetch stock movements" };
+    }
+  });
 
 // Create product
 export const createProduct = createServerFn({ method: "POST" })
@@ -1233,7 +1317,16 @@ export const deleteUserAdmin = createServerFn({ method: "POST" })
 
 // Update order status
 export const updateOrderStatus = createServerFn({ method: "POST" })
-  .validator((d: { id: string; status: string; shipping_address?: string; fulfillment_type?: string; notes?: string; fulfillment_proof_url?: string }) => d)
+  .validator(
+    (d: {
+      id: string;
+      status: string;
+      shipping_address?: string;
+      fulfillment_type?: string;
+      notes?: string;
+      fulfillment_proof_url?: string;
+    }) => d,
+  )
   .handler(async ({ data: input }) => {
     try {
       const res = await serverFetch(`${API_URL}/api/admin/orders/${input.id}/status`, {
@@ -1301,7 +1394,9 @@ export const analyzePaymentProofAction = createServerFn({ method: "POST" })
 
 // Batch scan payment proofs with Gemini AI Vision
 export const scanAllPaymentProofsAction = createServerFn({ method: "POST" })
-  .validator((d: { limit?: number; forceAll?: boolean; excludeOrderIds?: string[] } | undefined) => d || {})
+  .validator(
+    (d: { limit?: number; forceAll?: boolean; excludeOrderIds?: string[] } | undefined) => d || {},
+  )
   .handler(async ({ data: input }) => {
     try {
       const res = await serverFetch(`${API_URL}/api/admin/orders/scan-all-proofs`, {
@@ -1316,7 +1411,12 @@ export const scanAllPaymentProofsAction = createServerFn({ method: "POST" })
           const parsed = JSON.parse(text);
           if (parsed?.error) errorMsg = parsed.error;
         } catch {
-          if (text.includes("Request Timeout") || text.includes("Connection Timeout") || res.status === 504 || res.status === 500) {
+          if (
+            text.includes("Request Timeout") ||
+            text.includes("Connection Timeout") ||
+            res.status === 504 ||
+            res.status === 500
+          ) {
             errorMsg = "Koneksi ke server timeout saat membaca gambar. Silakan coba kembali.";
           }
         }
@@ -1325,9 +1425,10 @@ export const scanAllPaymentProofsAction = createServerFn({ method: "POST" })
       return res.json();
     } catch (error: any) {
       console.error("Error batch scanning payment proofs with AI:", error);
-      const cleanMsg = (error.message && !error.message.includes("<html") && !error.message.includes("<body"))
-        ? error.message
-        : "Koneksi ke server timeout saat memindai bukti transfer.";
+      const cleanMsg =
+        error.message && !error.message.includes("<html") && !error.message.includes("<body")
+          ? error.message
+          : "Koneksi ke server timeout saat memindai bukti transfer.";
       return { success: false, error: cleanMsg };
     }
   });
@@ -1349,7 +1450,10 @@ export const submitRefundAccountAction = createServerFn({ method: "POST" })
       return res.json();
     } catch (error: any) {
       console.error("Error submitting refund account info:", error);
-      return { success: false, error: error.message || "Gagal menyimpan info rekening pengembalian" };
+      return {
+        success: false,
+        error: error.message || "Gagal menyimpan info rekening pengembalian",
+      };
     }
   });
 
@@ -1370,7 +1474,10 @@ export const submitShortageProofAction = createServerFn({ method: "POST" })
       return res.json();
     } catch (error: any) {
       console.error("Error submitting shortage payment proof:", error);
-      return { success: false, error: error.message || "Gagal mengunggah bukti pembayaran kekurangan" };
+      return {
+        success: false,
+        error: error.message || "Gagal mengunggah bukti pembayaran kekurangan",
+      };
     }
   });
 
@@ -1379,11 +1486,14 @@ export const adminCompleteRefundAction = createServerFn({ method: "POST" })
   .validator((d: { orderId: string; refund_proof_url: string }) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await serverFetch(`${API_URL}/api/admin/orders/${input.orderId}/complete-refund`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refund_proof_url: input.refund_proof_url }),
-      });
+      const res = await serverFetch(
+        `${API_URL}/api/admin/orders/${input.orderId}/complete-refund`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refund_proof_url: input.refund_proof_url }),
+        },
+      );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
@@ -1400,11 +1510,14 @@ export const adminVerifyShortageAction = createServerFn({ method: "POST" })
   .validator((d: { orderId: string; isAccepted: boolean; note?: string }) => d)
   .handler(async ({ data: input }) => {
     try {
-      const res = await serverFetch(`${API_URL}/api/admin/orders/${input.orderId}/verify-shortage`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isAccepted: input.isAccepted, note: input.note }),
-      });
+      const res = await serverFetch(
+        `${API_URL}/api/admin/orders/${input.orderId}/verify-shortage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ isAccepted: input.isAccepted, note: input.note }),
+        },
+      );
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || `HTTP ${res.status}`);
@@ -1412,7 +1525,10 @@ export const adminVerifyShortageAction = createServerFn({ method: "POST" })
       return res.json();
     } catch (error: any) {
       console.error("Error verifying shortage proof:", error);
-      return { success: false, error: error.message || "Gagal memverifikasi bukti kekurangan bayar" };
+      return {
+        success: false,
+        error: error.message || "Gagal memverifikasi bukti kekurangan bayar",
+      };
     }
   });
 
@@ -1479,7 +1595,7 @@ export const updateOfflineSale = createServerFn({ method: "POST" })
       customer_nim?: string;
       notes?: string;
       cashier_id?: number;
-    }) => data
+    }) => data,
   )
   .handler(async ({ data }) => {
     try {
@@ -1501,28 +1617,26 @@ export const updateOfflineSale = createServerFn({ method: "POST" })
 // Get user orders
 export const getUserOrders = createServerFn({ method: "GET" })
   .validator((data: number | string | { userId?: number | string; email?: string }) => data)
-  .handler(
-    async ({ data }): Promise<{ success: boolean; orders: any[]; error?: string }> => {
-      try {
-        let uId = "0";
-        let emailQuery = "";
-        if (typeof data === "number" || typeof data === "string") {
-          uId = encodeURIComponent(String(data));
-        } else if (data && typeof data === "object") {
-          uId = data.userId ? encodeURIComponent(String(data.userId)) : "0";
-          if (data.email) {
-            emailQuery = `?email=${encodeURIComponent(data.email)}`;
-          }
+  .handler(async ({ data }): Promise<{ success: boolean; orders: any[]; error?: string }> => {
+    try {
+      let uId = "0";
+      let emailQuery = "";
+      if (typeof data === "number" || typeof data === "string") {
+        uId = encodeURIComponent(String(data));
+      } else if (data && typeof data === "object") {
+        uId = data.userId ? encodeURIComponent(String(data.userId)) : "0";
+        if (data.email) {
+          emailQuery = `?email=${encodeURIComponent(data.email)}`;
         }
-        const res = await serverFetch(`${API_URL}/api/orders/user/${uId}${emailQuery}`);
-        if (!res.ok) throw new Error("Failed to fetch user orders");
-        return res.json();
-      } catch (error) {
-        console.error("Error fetching user orders:", error);
-        return { success: false, orders: [], error: "Failed to fetch orders" };
       }
-    },
-  );
+      const res = await serverFetch(`${API_URL}/api/orders/user/${uId}${emailQuery}`);
+      if (!res.ok) throw new Error("Failed to fetch user orders");
+      return res.json();
+    } catch (error) {
+      console.error("Error fetching user orders:", error);
+      return { success: false, orders: [], error: "Failed to fetch orders" };
+    }
+  });
 
 export interface ActivityLog {
   id: number;
@@ -1582,7 +1696,9 @@ export const uploadImagesServerAction = createServerFn({ method: "POST" })
 
     // 1. Try primary configured API URL
     try {
-      const baseUrl = getApiUrl().replace(/\/api\/?$/, "").replace(/\/$/, "");
+      const baseUrl = getApiUrl()
+        .replace(/\/api\/?$/, "")
+        .replace(/\/$/, "");
       const res = await serverFetch(`${baseUrl}/api/upload-multiple-base64`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1625,7 +1741,9 @@ export const uploadSingleImageServerAction = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     // 1. Try primary configured API URL
     try {
-      const baseUrl = getApiUrl().replace(/\/api\/?$/, "").replace(/\/$/, "");
+      const baseUrl = getApiUrl()
+        .replace(/\/api\/?$/, "")
+        .replace(/\/$/, "");
       const res = await serverFetch(`${baseUrl}/api/upload-base64`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1677,8 +1795,8 @@ export interface PreOrderCampaign {
 }
 
 // Fetch All Pre-Order Campaigns
-export const getPreOrderCampaignsServerAction = createServerFn({ method: "GET" })
-  .handler(async () => {
+export const getPreOrderCampaignsServerAction = createServerFn({ method: "GET" }).handler(
+  async () => {
     try {
       const baseUrl = getApiUrl();
       const res = await serverFetch(`${baseUrl}/api/pre-order-campaigns`);
@@ -1688,11 +1806,12 @@ export const getPreOrderCampaignsServerAction = createServerFn({ method: "GET" }
       console.warn("getPreOrderCampaignsServerAction error:", e);
       return { success: false, data: [] };
     }
-  });
+  },
+);
 
 // Fetch Active Pre-Order Campaign
-export const getActivePreOrderCampaignServerAction = createServerFn({ method: "GET" })
-  .handler(async () => {
+export const getActivePreOrderCampaignServerAction = createServerFn({ method: "GET" }).handler(
+  async () => {
     try {
       const baseUrl = getApiUrl();
       const res = await serverFetch(`${baseUrl}/api/pre-order-campaigns/active`);
@@ -1702,7 +1821,8 @@ export const getActivePreOrderCampaignServerAction = createServerFn({ method: "G
       console.warn("getActivePreOrderCampaignServerAction error:", e);
       return { success: false, data: null };
     }
-  });
+  },
+);
 
 // Create Pre-Order Campaign
 export const createPreOrderCampaignServerAction = createServerFn({ method: "POST" })
@@ -1770,7 +1890,10 @@ export const togglePreOrderCampaignActiveServerAction = createServerFn({ method:
       return await res.json();
     } catch (e: any) {
       console.warn("togglePreOrderCampaignActiveServerAction error:", e);
-      return { success: false, error: e.message || "Failed to toggle pre-order campaign active status" };
+      return {
+        success: false,
+        error: e.message || "Failed to toggle pre-order campaign active status",
+      };
     }
   });
 
@@ -1795,11 +1918,19 @@ export const getPelunasanInfoServerAction = createServerFn({ method: "POST" })
   .handler(async ({ data: input }) => {
     try {
       const baseUrl = getApiUrl();
-      const res = await serverFetch(`${baseUrl}/api/orders/${input.originalOrderId}/pelunasan-info`);
+      const res = await serverFetch(
+        `${baseUrl}/api/orders/${input.originalOrderId}/pelunasan-info`,
+      );
       if (!res.ok) {
         return { success: false, error: `HTTP ${res.status}` };
       }
-      return await res.json() as { success: boolean; isExisting?: boolean; order?: any; items?: any[]; error?: string };
+      return (await res.json()) as {
+        success: boolean;
+        isExisting?: boolean;
+        order?: any;
+        items?: any[];
+        error?: string;
+      };
     } catch (error: any) {
       console.error("Error getting pelunasan info:", error);
       return { success: false, error: error.message || "Failed to get pelunasan info" };
@@ -1812,10 +1943,13 @@ export const createPelunasanOrderServerAction = createServerFn({ method: "POST" 
   .handler(async ({ data: input }) => {
     try {
       const baseUrl = getApiUrl();
-      const res = await serverFetch(`${baseUrl}/api/orders/${input.originalOrderId}/create-pelunasan`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+      const res = await serverFetch(
+        `${baseUrl}/api/orders/${input.originalOrderId}/create-pelunasan`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        },
+      );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         return { success: false, error: data.error || `HTTP ${res.status}`, orderId: data.orderId };
@@ -1849,18 +1983,17 @@ export interface Voucher {
 }
 
 // Fetch All Vouchers
-export const getVouchersServerAction = createServerFn({ method: "GET" })
-  .handler(async () => {
-    try {
-      const baseUrl = getApiUrl();
-      const res = await serverFetch(`${baseUrl}/api/admin/vouchers`);
-      if (!res.ok) return { success: false, data: [] };
-      return await res.json();
-    } catch (e) {
-      console.warn("getVouchersServerAction error:", e);
-      return { success: false, data: [] };
-    }
-  });
+export const getVouchersServerAction = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const baseUrl = getApiUrl();
+    const res = await serverFetch(`${baseUrl}/api/admin/vouchers`);
+    if (!res.ok) return { success: false, data: [] };
+    return await res.json();
+  } catch (e) {
+    console.warn("getVouchersServerAction error:", e);
+    return { success: false, data: [] };
+  }
+});
 
 // Create Voucher
 export const createVoucherServerAction = createServerFn({ method: "POST" })
@@ -2025,7 +2158,6 @@ export const getProductReviewsServerAction = createServerFn({ method: "POST" })
     }
   });
 
-
 // ============ VENDORING & CSV IMPORT SERVER ACTIONS ============
 
 export interface Vendor {
@@ -2048,6 +2180,8 @@ export interface VendorOrderItem {
   size?: string;
   color?: string;
   quantity: number;
+  received_quantity?: number | null;
+  defect_quantity?: number;
   unit_cost: number;
   subtotal_cost?: number;
   notes?: string | null;
@@ -2073,6 +2207,10 @@ export interface VendorOrder {
   vendor_phone?: string;
   contact_person?: string;
   status: "draft" | "sent" | "in_production" | "completed" | "cancelled";
+  is_inbounded?: number | boolean;
+  inbounded_at?: string | null;
+  inbounded_by?: string | null;
+  inbound_notes?: string | null;
   total_cost: number;
   total_paid?: number;
   remaining_cost?: number;
@@ -2089,18 +2227,17 @@ export interface VendorOrder {
 }
 
 // Fetch All Vendors
-export const getVendorsServerAction = createServerFn({ method: "GET" })
-  .handler(async () => {
-    try {
-      const baseUrl = getApiUrl();
-      const res = await serverFetch(`${baseUrl}/api/admin/vendors`);
-      if (!res.ok) return { success: false, data: [] };
-      return await res.json();
-    } catch (e) {
-      console.warn("getVendorsServerAction error:", e);
-      return { success: false, data: [] };
-    }
-  });
+export const getVendorsServerAction = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const baseUrl = getApiUrl();
+    const res = await serverFetch(`${baseUrl}/api/admin/vendors`);
+    if (!res.ok) return { success: false, data: [] };
+    return await res.json();
+  } catch (e) {
+    console.warn("getVendorsServerAction error:", e);
+    return { success: false, data: [] };
+  }
+});
 
 // Create Vendor
 export const createVendorServerAction = createServerFn({ method: "POST" })
@@ -2171,22 +2308,24 @@ export const getProductionSummaryServerAction = createServerFn({ method: "POST" 
   });
 
 // Get Vendor Orders (PO)
-export const getVendorOrdersServerAction = createServerFn({ method: "GET" })
-  .handler(async () => {
-    try {
-      const baseUrl = getApiUrl();
-      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders`);
-      if (!res.ok) return { success: false, data: [] };
-      return await res.json();
-    } catch (e: any) {
-      console.warn("getVendorOrdersServerAction error:", e);
-      return { success: false, data: [] };
-    }
-  });
+export const getVendorOrdersServerAction = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const baseUrl = getApiUrl();
+    const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders`);
+    if (!res.ok) return { success: false, data: [] };
+    return await res.json();
+  } catch (e: any) {
+    console.warn("getVendorOrdersServerAction error:", e);
+    return { success: false, data: [] };
+  }
+});
 
 // Create Vendor Order (PO)
 export const createVendorOrderServerAction = createServerFn({ method: "POST" })
-  .validator((data: { vendor_id: number; deadline?: string | null; notes?: string | null; items: any[] }) => data)
+  .validator(
+    (data: { vendor_id: number; deadline?: string | null; notes?: string | null; items: any[] }) =>
+      data,
+  )
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();
@@ -2204,7 +2343,16 @@ export const createVendorOrderServerAction = createServerFn({ method: "POST" })
 
 // Update Vendor Order (PO / SPK)
 export const updateVendorOrderServerAction = createServerFn({ method: "POST" })
-  .validator((data: { id: number; vendor_id: number; deadline?: string | null; notes?: string | null; status?: string; items: any[] }) => data)
+  .validator(
+    (data: {
+      id: number;
+      vendor_id: number;
+      deadline?: string | null;
+      notes?: string | null;
+      status?: string;
+      items: any[];
+    }) => data,
+  )
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();
@@ -2235,6 +2383,45 @@ export const updateVendorOrderStatusServerAction = createServerFn({ method: "POS
     } catch (e: any) {
       console.warn("updateVendorOrderStatusServerAction error:", e);
       return { success: false, error: e.message || "Failed to update vendor order status" };
+    }
+  });
+
+// Inbound Vendor Order (Penerimaan Barang ke Stok Website)
+export const inboundVendorOrderServerAction = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      id: number;
+      inbound_notes?: string | null;
+      update_status_completed?: boolean;
+      items: Array<{
+        item_id?: number;
+        id?: number;
+        product_id: number;
+        catalog_product_name?: string;
+        size?: string;
+        color?: string;
+        received_quantity: number;
+        defect_quantity?: number;
+        notes?: string | null;
+      }>;
+    }) => data,
+  )
+  .handler(async ({ data }) => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders/${data.id}/inbound`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          items: data.items,
+          inbound_notes: data.inbound_notes,
+          update_status_completed: data.update_status_completed,
+        }),
+      });
+      return await res.json();
+    } catch (e: any) {
+      console.warn("inboundVendorOrderServerAction error:", e);
+      return { success: false, error: e.message || "Failed to process inbound vendor order" };
     }
   });
 
@@ -2270,7 +2457,16 @@ export const getVendorOrderPaymentsServerAction = createServerFn({ method: "POST
 
 // Create Vendor Order Payment (Termin Transfer)
 export const createVendorOrderPaymentServerAction = createServerFn({ method: "POST" })
-  .validator((data: { id: number; term_name: string; amount: number; payment_date: string; proof_image?: string | null; notes?: string | null }) => data)
+  .validator(
+    (data: {
+      id: number;
+      term_name: string;
+      amount: number;
+      payment_date: string;
+      proof_image?: string | null;
+      notes?: string | null;
+    }) => data,
+  )
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();
@@ -2292,9 +2488,12 @@ export const deleteVendorOrderPaymentServerAction = createServerFn({ method: "PO
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();
-      const res = await serverFetch(`${baseUrl}/api/admin/vendoring/orders/${data.id}/payments/${data.paymentId}`, {
-        method: "DELETE",
-      });
+      const res = await serverFetch(
+        `${baseUrl}/api/admin/vendoring/orders/${data.id}/payments/${data.paymentId}`,
+        {
+          method: "DELETE",
+        },
+      );
       return await res.json();
     } catch (e: any) {
       console.warn("deleteVendorOrderPaymentServerAction error:", e);
@@ -2388,20 +2587,19 @@ export const submitClaimServerAction = createServerFn({ method: "POST" })
     }
   });
 
-export const getAllClaimsServerAction = createServerFn({ method: "POST" })
-  .handler(async () => {
-    try {
-      const baseUrl = getApiUrl();
-      const res = await serverFetch(`${baseUrl}/api/admin/order-claims`);
-      return await res.json();
-    } catch (e: any) {
-      console.warn("getAllClaimsServerAction error:", e);
-      return { success: false, error: e.message || "Gagal memuat daftar klaim" };
-    }
-  });
+export const getAllClaimsServerAction = createServerFn({ method: "POST" }).handler(async () => {
+  try {
+    const baseUrl = getApiUrl();
+    const res = await serverFetch(`${baseUrl}/api/admin/order-claims`);
+    return await res.json();
+  } catch (e: any) {
+    console.warn("getAllClaimsServerAction error:", e);
+    return { success: false, error: e.message || "Gagal memuat daftar klaim" };
+  }
+});
 
 export const approveClaimServerAction = createServerFn({ method: "POST" })
-  .validator((data: { id: number, adminNote?: string }) => data)
+  .validator((data: { id: number; adminNote?: string }) => data)
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();
@@ -2418,13 +2616,13 @@ export const approveClaimServerAction = createServerFn({ method: "POST" })
   });
 
 export const rejectClaimServerAction = createServerFn({ method: "POST" })
-  .validator((d: { id: number, adminNote?: string }) => d)
+  .validator((d: { id: number; adminNote?: string }) => d)
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();
       const res = await serverFetch(`${baseUrl}/api/admin/order-claims/${data.id}/reject`, {
         method: "POST",
-        body: JSON.stringify({ adminNote: data.adminNote })
+        body: JSON.stringify({ adminNote: data.adminNote }),
       });
       const resJson = await res.json();
       return { success: true, message: resJson.message || "Klaim berhasil ditolak" };
@@ -2440,7 +2638,7 @@ export const annulClaimServerAction = createServerFn({ method: "POST" })
     try {
       const baseUrl = getApiUrl();
       const res = await serverFetch(`${baseUrl}/api/admin/order-claims/${data.id}/annul`, {
-        method: "POST"
+        method: "POST",
       });
       const resJson = await res.json();
       return { success: true, message: resJson.message || "Klaim berhasil dianulir" };
@@ -2450,17 +2648,16 @@ export const annulClaimServerAction = createServerFn({ method: "POST" })
     }
   });
 
-export const getUserClaimsServerAction = createServerFn({ method: "GET" })
-  .handler(async () => {
-    try {
-      const baseUrl = getApiUrl();
-      const res = await serverFetch(`${baseUrl}/api/orders/claims/me`);
-      return await res.json();
-    } catch (e: any) {
-      console.warn("getUserClaimsServerAction error:", e);
-      return { success: false, error: e.message || "Gagal mengambil riwayat klaim" };
-    }
-  });
+export const getUserClaimsServerAction = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const baseUrl = getApiUrl();
+    const res = await serverFetch(`${baseUrl}/api/orders/claims/me`);
+    return await res.json();
+  } catch (e: any) {
+    console.warn("getUserClaimsServerAction error:", e);
+    return { success: false, error: e.message || "Gagal mengambil riwayat klaim" };
+  }
+});
 
 export const trackVisitServerAction = createServerFn({ method: "POST" })
   .validator((data: { path: string }) => data)
@@ -2502,7 +2699,15 @@ export const getFinancialBalanceSheetServerAction = createServerFn({ method: "PO
   });
 
 export const getOperationalExpensesServerAction = createServerFn({ method: "POST" })
-  .validator((data?: { category?: string; batch_id?: string; search?: string; startDate?: string; endDate?: string }) => data)
+  .validator(
+    (data?: {
+      category?: string;
+      batch_id?: string;
+      search?: string;
+      startDate?: string;
+      endDate?: string;
+    }) => data,
+  )
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();
@@ -2523,7 +2728,18 @@ export const getOperationalExpensesServerAction = createServerFn({ method: "POST
   });
 
 export const createOperationalExpenseServerAction = createServerFn({ method: "POST" })
-  .validator((data: { title: string; category: string; amount: number; expense_date: string; batch_id?: number | null; notes?: string; receipt_url?: string; created_by?: string }) => data)
+  .validator(
+    (data: {
+      title: string;
+      category: string;
+      amount: number;
+      expense_date: string;
+      batch_id?: number | null;
+      notes?: string;
+      receipt_url?: string;
+      created_by?: string;
+    }) => data,
+  )
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();
@@ -2540,7 +2756,18 @@ export const createOperationalExpenseServerAction = createServerFn({ method: "PO
   });
 
 export const updateOperationalExpenseServerAction = createServerFn({ method: "POST" })
-  .validator((data: { id: number; title: string; category: string; amount: number; expense_date: string; batch_id?: number | null; notes?: string; receipt_url?: string }) => data)
+  .validator(
+    (data: {
+      id: number;
+      title: string;
+      category: string;
+      amount: number;
+      expense_date: string;
+      batch_id?: number | null;
+      notes?: string;
+      receipt_url?: string;
+    }) => data,
+  )
   .handler(async ({ data }) => {
     try {
       const baseUrl = getApiUrl();

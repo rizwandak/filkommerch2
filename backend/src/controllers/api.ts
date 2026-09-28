@@ -6,7 +6,6 @@ import { config } from "../config/config";
 import bcrypt from "bcryptjs";
 import { createAndSendNotification } from "./notificationController";
 
-
 // ============ GENERAL HELPERS & DYNAMIC PRICING ============
 
 /**
@@ -17,7 +16,7 @@ export const isUbEmail = (email?: string | null): boolean => {
   if (!email) return false;
   const domains = (process.env.UB_DOMAINS || "student.ub.ac.id,ub.ac.id")
     .split(",")
-    .map(d => d.trim().toLowerCase());
+    .map((d) => d.trim().toLowerCase());
   const emailDomain = email.split("@")[1]?.toLowerCase();
   return domains.includes(emailDomain);
 };
@@ -26,29 +25,55 @@ export const isUbEmail = (email?: string | null): boolean => {
  * Determines the correct dynamic price for a product/variant based on user context.
  * Priority: promo_price -> filkom_price (if UB email) -> fallback price (variant override or base product price).
  */
-export const determinePrice = (variant: any, isFilkomVerified: boolean, isInternational?: boolean): number => {
+export const determinePrice = (
+  variant: any,
+  isFilkomVerified: boolean,
+  isInternational?: boolean,
+): number => {
   // 1. Determine base price (harga asli)
   let basePrice = Number(variant.product_price);
   if (isInternational) {
     // Harga Coret / Asli (original_price di database)
-    if (variant.product_original_price !== undefined && variant.product_original_price !== null && Number(variant.product_original_price) > 0) {
+    if (
+      variant.product_original_price !== undefined &&
+      variant.product_original_price !== null &&
+      Number(variant.product_original_price) > 0
+    ) {
       basePrice = Number(variant.product_original_price);
     } else {
       basePrice = Number(variant.product_price);
     }
-  } else if (variant.product_promo_price !== undefined && variant.product_promo_price !== null && Number(variant.product_promo_price) > 0) {
+  } else if (
+    variant.product_promo_price !== undefined &&
+    variant.product_promo_price !== null &&
+    Number(variant.product_promo_price) > 0
+  ) {
     basePrice = Number(variant.product_promo_price);
   } else if (isFilkomVerified) {
-    if (variant.product_filkom_price !== undefined && variant.product_filkom_price !== null && Number(variant.product_filkom_price) > 0) {
+    if (
+      variant.product_filkom_price !== undefined &&
+      variant.product_filkom_price !== null &&
+      Number(variant.product_filkom_price) > 0
+    ) {
       basePrice = Number(variant.product_filkom_price);
     }
   }
 
   // 2. Determine variant add-on price
   let addon = 0;
-  if (isFilkomVerified && !isInternational && variant.filkom_price !== undefined && variant.filkom_price !== null && Number(variant.filkom_price) > 0) {
+  if (
+    isFilkomVerified &&
+    !isInternational &&
+    variant.filkom_price !== undefined &&
+    variant.filkom_price !== null &&
+    Number(variant.filkom_price) > 0
+  ) {
     addon = Number(variant.filkom_price);
-  } else if (variant.price_override !== undefined && variant.price_override !== null && Number(variant.price_override) > 0) {
+  } else if (
+    variant.price_override !== undefined &&
+    variant.price_override !== null &&
+    Number(variant.price_override) > 0
+  ) {
     addon = Number(variant.price_override);
   }
 
@@ -67,7 +92,7 @@ export const logActivity = async (
   entityId: string | number | null,
   description: string,
   ipAddress?: string | null,
-  userAgent?: string | null
+  userAgent?: string | null,
 ) => {
   try {
     await execute(
@@ -82,14 +107,13 @@ export const logActivity = async (
         entityId ? String(entityId) : null,
         description,
         ipAddress || null,
-        userAgent || null
-      ]
+        userAgent || null,
+      ],
     );
   } catch (error) {
     console.error("Failed to log activity:", error);
   }
 };
-
 
 // ============ STOCK MANAGEMENT HELPERS ============
 
@@ -100,26 +124,42 @@ export const logActivity = async (
 export const logStockMovement = async (
   connection: any,
   variantId: number,
-  movementType: 'initial' | 'sale' | 'reservation' | 'reservation_release' | 'restock' | 'adjustment_in' | 'adjustment_out' | 'return' | 'refund',
+  movementType:
+    | "initial"
+    | "sale"
+    | "reservation"
+    | "reservation_release"
+    | "restock"
+    | "adjustment_in"
+    | "adjustment_out"
+    | "return"
+    | "refund",
   quantityChange: number,
-  referenceType: 'order' | 'stock_opname' | 'purchase' | 'return' | 'manual',
+  referenceType: "order" | "stock_opname" | "purchase" | "return" | "manual",
   referenceId?: string | null,
   createdBy?: number | null,
   notes?: string | null,
   stockBeforeOverride?: number,
-  stockAfterOverride?: number
+  stockAfterOverride?: number,
 ) => {
   let stockBefore = stockBeforeOverride;
   let stockAfter = stockAfterOverride;
 
   if (stockBefore === undefined || stockAfter === undefined) {
     // Read current stock inside connection (no FOR UPDATE needed as caller already holds row lock if modified)
-    const [rows] = await connection.execute(
-      "SELECT stock FROM product_variants WHERE id = ?",
-      [variantId]
-    );
+    const [rows] = await connection.execute("SELECT stock FROM product_variants WHERE id = ?", [
+      variantId,
+    ]);
     const currentStock = (rows as any[])[0]?.stock ?? 0;
-    const isStockChanging = ['sale', 'restock', 'initial', 'adjustment_in', 'adjustment_out', 'return', 'refund'].includes(movementType);
+    const isStockChanging = [
+      "sale",
+      "restock",
+      "initial",
+      "adjustment_in",
+      "adjustment_out",
+      "return",
+      "refund",
+    ].includes(movementType);
     if (stockBefore === undefined) {
       stockBefore = isStockChanging ? currentStock - quantityChange : currentStock;
     }
@@ -128,7 +168,9 @@ export const logStockMovement = async (
     }
   }
 
-  console.log(`[Stock Movement] Var ${variantId}: type=${movementType}, change=${quantityChange}, before=${stockBefore}, after=${stockAfter}`);
+  console.log(
+    `[Stock Movement] Var ${variantId}: type=${movementType}, change=${quantityChange}, before=${stockBefore}, after=${stockAfter}`,
+  );
 
   await connection.execute(
     `INSERT INTO stock_movements (
@@ -144,8 +186,8 @@ export const logStockMovement = async (
       referenceType,
       referenceId || null,
       createdBy || null,
-      notes || null
-    ]
+      notes || null,
+    ],
   );
 };
 
@@ -157,21 +199,21 @@ export const reserveVariantStock = async (
   variantId: number,
   quantity: number,
   orderId: string,
-  userId?: number | null
+  userId?: number | null,
 ) => {
   await connection.execute(
     "UPDATE product_variants SET stock_reserved = stock_reserved + ? WHERE id = ?",
-    [quantity, variantId]
+    [quantity, variantId],
   );
   await logStockMovement(
     connection,
     variantId,
-    'reservation',
+    "reservation",
     quantity,
-    'order',
+    "order",
     orderId,
     userId || null,
-    'Reservasi stok pesanan online pending'
+    "Reservasi stok pesanan online pending",
   );
 };
 
@@ -183,21 +225,21 @@ export const releaseVariantReservation = async (
   variantId: number,
   quantity: number,
   orderId: string,
-  userId?: number | null
+  userId?: number | null,
 ) => {
   await connection.execute(
     "UPDATE product_variants SET stock_reserved = GREATEST(0, CAST(stock_reserved AS SIGNED) - ?) WHERE id = ?",
-    [quantity, variantId]
+    [quantity, variantId],
   );
   await logStockMovement(
     connection,
     variantId,
-    'reservation_release',
+    "reservation_release",
     -quantity,
-    'order',
+    "order",
     orderId,
     userId || null,
-    'Pelepasan reservasi stok pesanan'
+    "Pelepasan reservasi stok pesanan",
   );
 };
 
@@ -209,21 +251,21 @@ export const executeVariantSale = async (
   variantId: number,
   quantity: number,
   orderId: string,
-  userId?: number | null
+  userId?: number | null,
 ) => {
-  await connection.execute(
-    "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
-    [quantity, variantId]
-  );
+  await connection.execute("UPDATE product_variants SET stock = stock - ? WHERE id = ?", [
+    quantity,
+    variantId,
+  ]);
   await logStockMovement(
     connection,
     variantId,
-    'sale',
+    "sale",
     -quantity,
-    'order',
+    "order",
     orderId,
     userId || null,
-    'Pengurangan stok untuk transaksi penjualan selesai'
+    "Pengurangan stok untuk transaksi penjualan selesai",
   );
 };
 
@@ -234,7 +276,9 @@ export const registerBuyer = async (req: Request, res: Response) => {
   try {
     const { name, username, email, password, nim, phone, address } = req.body;
     if (!name || !email || !password) {
-      return res.status(400).json({ success: false, error: "Nama, email, dan password wajib diisi" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Nama, email, dan password wajib diisi" });
     }
 
     const existingEmail = await queryOne<any>("SELECT id FROM users WHERE email = ?", [email]);
@@ -253,7 +297,7 @@ export const registerBuyer = async (req: Request, res: Response) => {
     const result = await execute(
       `INSERT INTO users (name, email, password_hash, nim, phone, address, role)
        VALUES (?, ?, ?, ?, ?, ?, 'customer')`,
-      [name, email, hash, nim || null, phone || null, address || null]
+      [name, email, hash, nim || null, phone || null, address || null],
     );
 
     return res.json({ success: true, user_id: result.insertId });
@@ -268,14 +312,16 @@ export const loginUser = async (req: Request, res: Response) => {
   try {
     const { username, password } = req.body;
     if (!username || !password) {
-      return res.status(400).json({ success: false, error: "Username/Email dan password wajib diisi" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Username/Email dan password wajib diisi" });
     }
 
     // Cari user di database
-    let dbUser = await queryOne<any>(
-      "SELECT * FROM users WHERE email = ? OR nim = ?",
-      [username, username]
-    );
+    let dbUser = await queryOne<any>("SELECT * FROM users WHERE email = ? OR nim = ?", [
+      username,
+      username,
+    ]);
 
     // Fallback pencarian manual nama admin/kasir (adminfm, kasirfm)
     if (!dbUser) {
@@ -292,8 +338,10 @@ export const loginUser = async (req: Request, res: Response) => {
 
     const isValid = await bcrypt.compare(password, dbUser.password_hash);
     if (!isValid) {
-      const isHardcodedAdmin = username === "adminfm" && password === "Filkommerch123_wkwk" && dbUser.role === "admin";
-      const isHardcodedCashier = username === "kasirfm" && password === "Kasir123_wkwk" && dbUser.role === "cashier";
+      const isHardcodedAdmin =
+        username === "adminfm" && password === "Filkommerch123_wkwk" && dbUser.role === "admin";
+      const isHardcodedCashier =
+        username === "kasirfm" && password === "Kasir123_wkwk" && dbUser.role === "cashier";
       if (!isHardcodedAdmin && !isHardcodedCashier) {
         return res.status(401).json({ success: false, error: "Password salah" });
       }
@@ -304,7 +352,7 @@ export const loginUser = async (req: Request, res: Response) => {
       try {
         await execute(
           "UPDATE orders SET user_id = ? WHERE user_id IS NULL AND customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?))",
-          [dbUser.id, dbUser.email]
+          [dbUser.id, dbUser.email],
         );
       } catch (linkErr) {
         console.warn("Notice: auto-linking orders on login failed:", linkErr);
@@ -322,7 +370,7 @@ export const loginUser = async (req: Request, res: Response) => {
           id: dbUser.id,
           nim: dbUser.nim,
           is_filkom_verified: dbUser.is_filkom_verified || 0,
-        }
+        },
       });
     } else {
       return res.json({
@@ -336,7 +384,7 @@ export const loginUser = async (req: Request, res: Response) => {
           phone: dbUser.phone,
           address: dbUser.address,
           is_filkom_verified: dbUser.is_filkom_verified || 0,
-        }
+        },
       });
     }
   } catch (error: any) {
@@ -360,14 +408,16 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
       const result = await execute(
         `INSERT INTO users (name, email, password_hash, role)
          VALUES (?, ?, ?, 'customer')`,
-        [name, email, hash]
+        [name, email, hash],
       );
       dbUser = await queryOne<any>("SELECT * FROM users WHERE id = ?", [result.insertId]);
     }
 
     // If account was previously merged into another account, resolve to the active account
     if (dbUser && dbUser.merged_into_id) {
-      const mergedUser = await queryOne<any>("SELECT * FROM users WHERE id = ?", [dbUser.merged_into_id]);
+      const mergedUser = await queryOne<any>("SELECT * FROM users WHERE id = ?", [
+        dbUser.merged_into_id,
+      ]);
       if (mergedUser) {
         dbUser = mergedUser;
       }
@@ -378,7 +428,7 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
       try {
         await execute(
           "UPDATE orders SET user_id = ? WHERE user_id IS NULL AND customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?))",
-          [dbUser.id, dbUser.email]
+          [dbUser.id, dbUser.email],
         );
       } catch (linkErr) {
         console.warn("Notice: auto-linking orders on Google login failed:", linkErr);
@@ -396,7 +446,7 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
           id: dbUser.id,
           nim: dbUser.nim,
           is_filkom_verified: dbUser.is_filkom_verified || 0,
-        }
+        },
       });
     } else {
       return res.json({
@@ -410,7 +460,7 @@ export const loginGoogleUser = async (req: Request, res: Response) => {
           phone: dbUser.phone,
           address: dbUser.address,
           is_filkom_verified: dbUser.is_filkom_verified || 0,
-        }
+        },
       });
     }
   } catch (error: any) {
@@ -471,7 +521,7 @@ export const getUserTransactionsAdmin = async (req: Request, res: Response) => {
 
     const targetUser = await queryOne<any>(
       "SELECT id, name, email, phone, nim FROM users WHERE id = ?",
-      [userId]
+      [userId],
     );
     if (!targetUser) {
       return res.status(404).json({ success: false, error: "Pengguna tidak ditemukan" });
@@ -491,7 +541,7 @@ export const getUserTransactionsAdmin = async (req: Request, res: Response) => {
           OR (? != '' AND (customer_nim = ? OR notes LIKE CONCAT('%', ?, '%')))
           OR (? != '' AND LOWER(TRIM(customer_name)) = ?)
        ORDER BY created_at DESC`,
-      [userId, email, email, nim, nim, nim, name, name]
+      [userId, email, email, nim, nim, nim, name, name],
     );
 
     if (!orders || orders.length === 0) {
@@ -505,7 +555,7 @@ export const getUserTransactionsAdmin = async (req: Request, res: Response) => {
        FROM order_items oi 
        LEFT JOIN products p ON p.id = oi.product_id 
        WHERE oi.order_id IN (${placeholders})`,
-      orderIds
+      orderIds,
     );
 
     const ordersWithItems = orders.map((order) => {
@@ -519,13 +569,11 @@ export const getUserTransactionsAdmin = async (req: Request, res: Response) => {
     return res.json({ success: true, orders: ordersWithItems });
   } catch (error: any) {
     console.error("Error fetching user transactions:", error);
-    return res.status(500).json({ success: false, error: "Gagal memuat riwayat transaksi pengguna" });
+    return res
+      .status(500)
+      .json({ success: false, error: "Gagal memuat riwayat transaksi pengguna" });
   }
 };
-
-
-
-
 
 // Create user
 export const createUser = async (req: Request, res: Response) => {
@@ -536,7 +584,9 @@ export const createUser = async (req: Request, res: Response) => {
     const actorRole = req.header("x-user-role") || null;
 
     if (!name || !email || !password || !role) {
-      return res.status(400).json({ success: false, error: "Nama, username/email, password, dan peran wajib diisi" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Nama, username/email, password, dan peran wajib diisi" });
     }
 
     const existingEmail = await queryOne<any>("SELECT id FROM users WHERE email = ?", [email]);
@@ -548,7 +598,16 @@ export const createUser = async (req: Request, res: Response) => {
     const result = await execute(
       `INSERT INTO users (name, email, password_hash, nim, phone, address, role, is_filkom_verified)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, email, hash, nim || null, phone || null, address || null, role, is_filkom_verified ? 1 : 0]
+      [
+        name,
+        email,
+        hash,
+        nim || null,
+        phone || null,
+        address || null,
+        role,
+        is_filkom_verified ? 1 : 0,
+      ],
     );
 
     await logActivity(
@@ -558,13 +617,15 @@ export const createUser = async (req: Request, res: Response) => {
       "create_user",
       "user",
       result.insertId,
-      `Pengguna "${name}" (${role}) dibuat oleh ${actorName || 'Sistem'}`
+      `Pengguna "${name}" (${role}) dibuat oleh ${actorName || "Sistem"}`,
     );
 
     return res.json({ success: true, user_id: result.insertId });
   } catch (error: any) {
     console.error("Error creating user:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal menambahkan pengguna" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Gagal menambahkan pengguna" });
   }
 };
 
@@ -577,24 +638,50 @@ export const updateUser = async (req: Request, res: Response) => {
     const actorRole = req.header("x-user-role") || null;
 
     if (!id || !name || !email || !role) {
-      return res.status(400).json({ success: false, error: "ID, nama, username/email, dan peran wajib diisi" });
+      return res
+        .status(400)
+        .json({ success: false, error: "ID, nama, username/email, dan peran wajib diisi" });
     }
 
-    const existing = await queryOne<any>("SELECT id FROM users WHERE email = ? AND id != ?", [email, id]);
+    const existing = await queryOne<any>("SELECT id FROM users WHERE email = ? AND id != ?", [
+      email,
+      id,
+    ]);
     if (existing) {
-      return res.status(400).json({ success: false, error: "Username atau Email sudah digunakan pengguna lain" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Username atau Email sudah digunakan pengguna lain" });
     }
 
     if (password) {
       const hash = await bcrypt.hash(password, 10);
       await execute(
         `UPDATE users SET name = ?, email = ?, password_hash = ?, nim = ?, phone = ?, address = ?, role = ?, is_filkom_verified = ? WHERE id = ?`,
-        [name, email, hash, nim || null, phone || null, address || null, role, is_filkom_verified ? 1 : 0, id]
+        [
+          name,
+          email,
+          hash,
+          nim || null,
+          phone || null,
+          address || null,
+          role,
+          is_filkom_verified ? 1 : 0,
+          id,
+        ],
       );
     } else {
       await execute(
         `UPDATE users SET name = ?, email = ?, nim = ?, phone = ?, address = ?, role = ?, is_filkom_verified = ? WHERE id = ?`,
-        [name, email, nim || null, phone || null, address || null, role, is_filkom_verified ? 1 : 0, id]
+        [
+          name,
+          email,
+          nim || null,
+          phone || null,
+          address || null,
+          role,
+          is_filkom_verified ? 1 : 0,
+          id,
+        ],
       );
     }
 
@@ -605,13 +692,15 @@ export const updateUser = async (req: Request, res: Response) => {
       "update_user",
       "user",
       id,
-      `Pengguna "${name}" (${role}) diperbarui oleh ${actorName || 'Sistem'}`
+      `Pengguna "${name}" (${role}) diperbarui oleh ${actorName || "Sistem"}`,
     );
 
     return res.json({ success: true });
   } catch (error: any) {
     console.error("Error updating user:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal memperbarui pengguna" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Gagal memperbarui pengguna" });
   }
 };
 
@@ -653,13 +742,15 @@ export const deleteUser = async (req: Request, res: Response) => {
       "delete_user",
       "user",
       id,
-      `Pengguna ID ${id} dihapus oleh ${actorName || 'Sistem'}`
+      `Pengguna ID ${id} dihapus oleh ${actorName || "Sistem"}`,
     );
 
     return res.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting user:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal menghapus pengguna" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Gagal menghapus pengguna" });
   }
 };
 
@@ -673,14 +764,14 @@ export const getProducts = async (req: Request, res: Response) => {
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
        WHERE p.is_active = TRUE
-       ORDER BY p.id DESC`
+       ORDER BY p.id DESC`,
     );
 
     const productsWithVariants = await Promise.all(
       products.map(async (product: any) => {
         const variants = await query<any>(
           "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
-          [product.id]
+          [product.id],
         );
         let bundle_components: any[] = [];
         if (product.product_type === "bundle") {
@@ -688,20 +779,20 @@ export const getProducts = async (req: Request, res: Response) => {
             `SELECT p.* FROM products p
              JOIN bundle_items bi ON bi.component_product_id = p.id
              WHERE bi.bundle_product_id = ? AND p.is_active = TRUE`,
-            [product.id]
+            [product.id],
           );
           bundle_components = await Promise.all(
             comps.map(async (comp: any) => {
               const compVariants = await query<any>(
                 "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
-                [comp.id]
+                [comp.id],
               );
               return { ...comp, variants: compVariants };
-            })
+            }),
           );
         }
         return { ...product, variants, bundle_components };
-      })
+      }),
     );
 
     return res.json({ products: productsWithVariants });
@@ -720,7 +811,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
        WHERE p.slug = ? AND p.is_active = TRUE`,
-      [slug]
+      [slug],
     );
 
     if (!product) {
@@ -729,15 +820,18 @@ export const getProductBySlug = async (req: Request, res: Response) => {
 
     const variants = await query<any>(
       "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
-      [product.id]
+      [product.id],
     );
 
     const images = await query<any>(
       "SELECT image_url FROM product_images WHERE product_id = ? ORDER BY sort_order ASC",
-      [product.id]
+      [product.id],
     );
 
-    const imageUrls = images.length > 0 ? images.map((img: any) => img.image_url) : [product.image_url].filter(Boolean);
+    const imageUrls =
+      images.length > 0
+        ? images.map((img: any) => img.image_url)
+        : [product.image_url].filter(Boolean);
 
     let bundle_components: any[] = [];
     if (product.product_type === "bundle") {
@@ -745,20 +839,23 @@ export const getProductBySlug = async (req: Request, res: Response) => {
         `SELECT p.* FROM products p
          JOIN bundle_items bi ON bi.component_product_id = p.id
          WHERE bi.bundle_product_id = ? AND p.is_active = TRUE`,
-        [product.id]
+        [product.id],
       );
       bundle_components = await Promise.all(
         comps.map(async (comp: any) => {
           const compVariants = await query<any>(
             "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
-            [comp.id]
+            [comp.id],
           );
           return { ...comp, variants: compVariants };
-        })
+        }),
       );
     }
 
-    return res.json({ success: true, product: { ...product, variants, images: imageUrls, bundle_components } });
+    return res.json({
+      success: true,
+      product: { ...product, variants, images: imageUrls, bundle_components },
+    });
   } catch (error: any) {
     console.error("Error fetching product by slug:", error);
     return res.status(500).json({ success: false, error: "Gagal mengambil data produk" });
@@ -768,9 +865,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
 // Check Database Connection
 export const checkDatabaseConnection = async (req: Request, res: Response) => {
   try {
-    const result = await queryOne<any>(
-      "SELECT 1 AS ok, DATABASE() AS db_name"
-    );
+    const result = await queryOne<any>("SELECT 1 AS ok, DATABASE() AS db_name");
 
     if (!result) {
       return res.json({
@@ -826,7 +921,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
     if (details.userId) {
       const [userRows] = await connection.execute(
         "SELECT is_filkom_verified FROM users WHERE id = ?",
-        [details.userId]
+        [details.userId],
       );
       const userRow = (userRows as any[])[0];
       if (userRow && userRow.is_filkom_verified === 1) {
@@ -836,7 +931,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
 
     // Check active pre-order campaign status
     const [campaignRows] = await connection.execute(
-      "SELECT * FROM pre_order_campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1"
+      "SELECT * FROM pre_order_campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1",
     );
     const activeCampaign = (campaignRows as any[])[0];
     let isPoOpen = false;
@@ -865,7 +960,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
-        [variantId]
+        [variantId],
       );
 
       const variant = (rows as any[])[0];
@@ -874,23 +969,27 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       }
 
       // Verify Pre-Order status if product is pre-order
-      if (variant.sale_type === 'preorder' || variant.sale_type === 'pre_order') {
+      if (variant.sale_type === "preorder" || variant.sale_type === "pre_order") {
         if (!isPoOpen) {
-          throw new Error(`Periode Pre-Order saat ini telah DITUTUP. Produk "${variant.product_name}" tidak dapat dipesan lagi.`);
+          throw new Error(
+            `Periode Pre-Order saat ini telah DITUTUP. Produk "${variant.product_name}" tidak dapat dipesan lagi.`,
+          );
         }
       }
 
       // Check stock availability (physical stock minus reserved stock)
-      if (variant.product_type !== 'bundle') {
+      if (variant.product_type !== "bundle") {
         const availableStock = variant.stock - variant.stock_reserved;
         if (availableStock < item.quantity) {
-          throw new Error(`Stok tidak cukup untuk ${variant.product_name} (${variant.size}${variant.color ? ` / ${variant.color}` : ""}). Tersedia: ${availableStock}`);
+          throw new Error(
+            `Stok tidak cukup untuk ${variant.product_name} (${variant.size}${variant.color ? ` / ${variant.color}` : ""}). Tersedia: ${availableStock}`,
+          );
         }
       }
 
       // Determine correct price based on verified status
       let price = determinePrice(variant, isFilkomVerified);
-      if (variant.product_type === 'bundle') {
+      if (variant.product_type === "bundle") {
         if (item.bundle_selections && Array.isArray(item.bundle_selections)) {
           let bundleAddon = 0;
           for (const selection of item.bundle_selections) {
@@ -900,29 +999,42 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
                FROM product_variants pv
                JOIN products p ON p.id = pv.product_id
                WHERE pv.id = ? AND pv.is_active = TRUE`,
-              [selection.variant_id]
+              [selection.variant_id],
             );
             const compVar = (compRows as any[])[0];
             if (compVar) {
               const [allCompVarsRows] = await connection.execute(
                 `SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE`,
-                [compVar.product_id]
+                [compVar.product_id],
               );
               const allCompVars = allCompVarsRows as any[];
 
-              const hasLunas = allCompVars.some((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
+              const hasLunas = allCompVars.some(
+                (v: any) => v.color && v.color.toUpperCase() === "LUNAS",
+              );
               let refVariant = null;
               if (hasLunas) {
-                refVariant = allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS" && v.size && v.size.toUpperCase() === "S")
-                  || allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
+                refVariant =
+                  allCompVars.find(
+                    (v: any) =>
+                      v.color &&
+                      v.color.toUpperCase() === "LUNAS" &&
+                      v.size &&
+                      v.size.toUpperCase() === "S",
+                  ) || allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
               } else {
-                refVariant = allCompVars.find((v: any) => v.size && v.size.toUpperCase() === "S")
-                  || allCompVars[0];
+                refVariant =
+                  allCompVars.find((v: any) => v.size && v.size.toUpperCase() === "S") ||
+                  allCompVars[0];
               }
 
               let refAddon = 0;
               if (refVariant) {
-                if (isFilkomVerified && refVariant.filkom_price && Number(refVariant.filkom_price) > 0) {
+                if (
+                  isFilkomVerified &&
+                  refVariant.filkom_price &&
+                  Number(refVariant.filkom_price) > 0
+                ) {
                   refAddon = Number(refVariant.filkom_price);
                 } else if (refVariant.price_override && Number(refVariant.price_override) > 0) {
                   refAddon = Number(refVariant.price_override);
@@ -936,7 +1048,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
                 selectedAddon = Number(compVar.price_override);
               }
 
-              bundleAddon += (selectedAddon - refAddon);
+              bundleAddon += selectedAddon - refAddon;
             }
           }
           price += bundleAddon;
@@ -947,7 +1059,9 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       calculatedSubtotal += subtotalItem;
 
       // Construct SKU snapshot
-      const skuSnapshot = variant.sku || (variant.sku_prefix ? `${variant.sku_prefix}-${variant.id}` : `VAR-${variant.id}`);
+      const skuSnapshot =
+        variant.sku ||
+        (variant.sku_prefix ? `${variant.sku_prefix}-${variant.id}` : `VAR-${variant.id}`);
 
       resolvedItems.push({
         product_id: variant.product_id,
@@ -959,13 +1073,15 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         price: price,
         subtotal: subtotalItem,
         skuSnapshot: skuSnapshot,
-        bypassStockReservation: variant.product_type === 'bundle'
+        bypassStockReservation: variant.product_type === "bundle",
       });
 
       // Resolve bundle component selections
-      if (variant.product_type === 'bundle') {
+      if (variant.product_type === "bundle") {
         if (!item.bundle_selections || !Array.isArray(item.bundle_selections)) {
-          throw new Error(`Pilihan komponen wajib disertakan untuk produk bundel: ${variant.product_name}`);
+          throw new Error(
+            `Pilihan komponen wajib disertakan untuk produk bundel: ${variant.product_name}`,
+          );
         }
 
         for (const selection of item.bundle_selections) {
@@ -974,7 +1090,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
              FROM product_variants pv
              JOIN products p ON p.id = pv.product_id
              WHERE pv.id = ? AND pv.is_active = TRUE FOR UPDATE`,
-            [selection.variant_id]
+            [selection.variant_id],
           );
           const compVariant = (compRows as any[])[0];
           if (!compVariant) {
@@ -984,10 +1100,16 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
           const compAvailableStock = compVariant.stock - compVariant.stock_reserved;
           const requiredQty = (selection.quantity || 1) * item.quantity;
           if (compAvailableStock < requiredQty) {
-            throw new Error(`Stok komponen ${compVariant.product_name} (${compVariant.size}${compVariant.color ? ` / ${compVariant.color}` : ""}) tidak cukup. Tersedia: ${compAvailableStock}`);
+            throw new Error(
+              `Stok komponen ${compVariant.product_name} (${compVariant.size}${compVariant.color ? ` / ${compVariant.color}` : ""}) tidak cukup. Tersedia: ${compAvailableStock}`,
+            );
           }
 
-          const compSku = compVariant.sku || (compVariant.sku_prefix ? `${compVariant.sku_prefix}-${compVariant.id}` : `VAR-${compVariant.id}`);
+          const compSku =
+            compVariant.sku ||
+            (compVariant.sku_prefix
+              ? `${compVariant.sku_prefix}-${compVariant.id}`
+              : `VAR-${compVariant.id}`);
           resolvedItems.push({
             product_id: compVariant.product_id,
             variant_id: compVariant.id,
@@ -998,7 +1120,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
             price: 0,
             subtotal: 0,
             skuSnapshot: compSku,
-            bypassStockReservation: false
+            bypassStockReservation: false,
           });
         }
       }
@@ -1010,10 +1132,9 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
 
     if (details.voucherCode) {
       const normalizedCode = String(details.voucherCode).trim().toUpperCase();
-      const [vRows] = await connection.execute(
-        "SELECT * FROM vouchers WHERE code = ? FOR UPDATE",
-        [normalizedCode]
-      );
+      const [vRows] = await connection.execute("SELECT * FROM vouchers WHERE code = ? FOR UPDATE", [
+        normalizedCode,
+      ]);
       const voucher = (vRows as any[])[0];
 
       if (!voucher) {
@@ -1032,7 +1153,9 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         throw new Error("Stok voucher ini telah habis");
       }
       if (calculatedSubtotal < voucher.min_purchase) {
-        throw new Error(`Minimal pembelian untuk menggunakan voucher ini adalah Rp ${voucher.min_purchase.toLocaleString("id-ID")}`);
+        throw new Error(
+          `Minimal pembelian untuk menggunakan voucher ini adalah Rp ${voucher.min_purchase.toLocaleString("id-ID")}`,
+        );
       }
 
       if (voucher.target_nim_prefix) {
@@ -1043,7 +1166,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
 
         const [uRows] = await connection.execute(
           "SELECT is_filkom_verified, nim FROM users WHERE id = ?",
-          [orderUserId]
+          [orderUserId],
         );
         const user = (uRows as any[])[0];
 
@@ -1053,7 +1176,9 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
 
         const cleanNim = (user.nim || "").trim();
         if (!cleanNim.startsWith(voucher.target_nim_prefix)) {
-          throw new Error(`Voucher ini hanya berlaku untuk mahasiswa angkatan 20${voucher.target_nim_prefix}`);
+          throw new Error(
+            `Voucher ini hanya berlaku untuk mahasiswa angkatan 20${voucher.target_nim_prefix}`,
+          );
         }
       }
 
@@ -1062,11 +1187,13 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         if (orderUserId) {
           const [usageRows] = await connection.execute(
             "SELECT COUNT(*) AS count FROM orders WHERE user_id = ? AND voucher_code = ? AND order_status != 'cancelled'",
-            [orderUserId, voucher.code]
+            [orderUserId, voucher.code],
           );
           const usageCount = (usageRows as any[])[0]?.count || 0;
           if (usageCount >= voucher.usage_limit_per_user) {
-            throw new Error(`Anda sudah melebihi batas penggunaan voucher ini (Maks ${voucher.usage_limit_per_user} kali)`);
+            throw new Error(
+              `Anda sudah melebihi batas penggunaan voucher ini (Maks ${voucher.usage_limit_per_user} kali)`,
+            );
           }
         }
       }
@@ -1083,16 +1210,15 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       verifiedVoucherCode = voucher.code;
 
       // Decrement stock
-      await connection.execute(
-        "UPDATE vouchers SET stock = stock - 1 WHERE id = ?",
-        [voucher.id]
-      );
+      await connection.execute("UPDATE vouchers SET stock = stock - 1 WHERE id = ?", [voucher.id]);
     }
 
     const shippingCost = Number(details.shippingCost) || 0;
     const serviceFee = Number(details.serviceFee) || 0;
     const taxAmount = Number(details.taxAmount) || 0;
-    const discountAmount = verifiedVoucherCode ? verifiedDiscountAmount : (Number(details.discountAmount) || 0);
+    const discountAmount = verifiedVoucherCode
+      ? verifiedDiscountAmount
+      : Number(details.discountAmount) || 0;
     const grossAmount = calculatedSubtotal - discountAmount + shippingCost + serviceFee + taxAmount;
 
     // Resolve order user_id: check if details.userId exists or if customerEmail matches a registered user
@@ -1101,7 +1227,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       try {
         const [matchedUsers] = await connection.execute(
           "SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) LIMIT 1",
-          [details.customerEmail]
+          [details.customerEmail],
         );
         const matched = (matchedUsers as any[])[0];
         if (matched && matched.id) {
@@ -1141,8 +1267,8 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         "pending_payment",
         details.notes || null,
         "pending",
-        verifiedVoucherCode
-      ]
+        verifiedVoucherCode,
+      ],
     );
 
     // 2. Insert order items & reserve stock
@@ -1163,18 +1289,26 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
           item.price,
           0,
           item.subtotal,
-          item.skuSnapshot
-        ]
+          item.skuSnapshot,
+        ],
       );
 
       // Reserve stock in database
       if (!item.bypassStockReservation && item.variant_id) {
-        await reserveVariantStock(connection, item.variant_id, item.quantity, details.orderId, details.userId);
+        await reserveVariantStock(
+          connection,
+          item.variant_id,
+          item.quantity,
+          details.orderId,
+          details.userId,
+        );
       }
     }
 
     // 3. Check payment mode from store settings
-    const [storeSettingsRows] = await connection.execute("SELECT payment_mode, qris_static_url FROM store_settings LIMIT 1");
+    const [storeSettingsRows] = await connection.execute(
+      "SELECT payment_mode, qris_static_url FROM store_settings LIMIT 1",
+    );
     const storeSettings = (storeSettingsRows as any[])[0];
     const paymentMode = storeSettings?.payment_mode ?? "mayar";
 
@@ -1186,10 +1320,10 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       qrUrl = storeSettings?.qris_static_url || "";
 
       // Update order to set payment_type
-      await connection.execute(
-        "UPDATE orders SET payment_type = ? WHERE order_id = ?",
-        ["manual_qris", details.orderId]
-      );
+      await connection.execute("UPDATE orders SET payment_type = ? WHERE order_id = ?", [
+        "manual_qris",
+        details.orderId,
+      ]);
     } else if (paymentMode === "mayar") {
       // ============ MAYAR INVOICE CREATION ============
       console.log("💳 Generating Mayar invoice for:", details.orderId);
@@ -1197,7 +1331,10 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       const mayarItems = resolvedItems
         .filter((item: any) => Number(item.price) > 0)
         .map((item: any) => ({
-          description: `${item.product_name}${item.size ? ` (${item.size})` : ""}`.substring(0, 100),
+          description: `${item.product_name}${item.size ? ` (${item.size})` : ""}`.substring(
+            0,
+            100,
+          ),
           quantity: Number(item.quantity),
           rate: Number(item.price),
         }));
@@ -1242,7 +1379,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       const mayarResponse = await fetch(`${config.mayar.apiUrl}/invoice/create`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${config.mayar.apiKey}`,
+          Authorization: `Bearer ${config.mayar.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(mayarPayload),
@@ -1254,7 +1391,11 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
         throw new Error(`Gagal membuat invoice Mayar: ${mayarResponse.status}`);
       }
 
-      const mayarResult = (await mayarResponse.json()) as { statusCode: number; messages: string; data?: { id?: string; link?: string; transactionId?: string } };
+      const mayarResult = (await mayarResponse.json()) as {
+        statusCode: number;
+        messages: string;
+        data?: { id?: string; link?: string; transactionId?: string };
+      };
       console.log("✅ Mayar invoice created:", mayarResult.data?.id);
 
       checkoutUrl = mayarResult.data?.link || null;
@@ -1263,7 +1404,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       // Store Mayar checkout URL in snap_token column so continuation does not hit Mayar 429 rate limit
       await connection.execute(
         "UPDATE orders SET snap_token = ?, payment_type = ? WHERE order_id = ?",
-        [checkoutUrl || mayarInvoiceId, "mayar", details.orderId]
+        [checkoutUrl || mayarInvoiceId, "mayar", details.orderId],
       );
     } else {
       // Fallback: unknown payment mode — just proceed without gateway
@@ -1278,7 +1419,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       "create_order",
       "order",
       details.orderId,
-      `Pesanan online dibuat untuk ${details.customerName} (${details.orderId})`
+      `Pesanan online dibuat untuk ${details.customerName} (${details.orderId})`,
     );
 
     await connection.commit();
@@ -1288,7 +1429,7 @@ export const createOrderAndPayment = async (req: Request, res: Response) => {
       orderId: details.orderId,
       checkoutUrl: checkoutUrl,
       qrUrl: qrUrl,
-      paymentMode: paymentMode
+      paymentMode: paymentMode,
     });
   } catch (error: any) {
     await connection.rollback();
@@ -1317,17 +1458,16 @@ export const getOrderById = async (req: Request, res: Response) => {
        FROM order_items oi 
        LEFT JOIN products p ON p.id = oi.product_id 
        WHERE oi.order_id = ?`,
-      [id]
+      [id],
     );
 
-    const reviews = await query<any>(
-      `SELECT * FROM product_reviews WHERE order_id = ?`,
-      [id]
-    );
+    const reviews = await query<any>(`SELECT * FROM product_reviews WHERE order_id = ?`, [id]);
 
     const resolvedItems = items.map((oi: any) => {
       if (!oi.pickup_status) {
-        const isJacket = (oi.product_name || "").toLowerCase().match(/jaket|jacket|varsity|hoodie|bomber/);
+        const isJacket = (oi.product_name || "")
+          .toLowerCase()
+          .match(/jaket|jacket|varsity|hoodie|bomber/);
         return { ...oi, pickup_status: isJacket ? "pending" : "ready" };
       }
       return oi;
@@ -1355,7 +1495,9 @@ export const getPaymentMethods = async (req: Request, res: Response) => {
       ],
     });
   } catch (error: any) {
-    return res.status(500).json({ success: false, methods: [], error: "Failed to fetch payment methods" });
+    return res
+      .status(500)
+      .json({ success: false, methods: [], error: "Failed to fetch payment methods" });
   }
 };
 
@@ -1363,7 +1505,7 @@ export const getPaymentMethods = async (req: Request, res: Response) => {
 export const getCategories = async (req: Request, res: Response) => {
   try {
     const categories = await query<any>(
-      "SELECT id, name, slug, is_active FROM categories WHERE is_active = TRUE OR is_active IS NULL OR is_active = 1 ORDER BY name"
+      "SELECT id, name, slug, is_active FROM categories WHERE is_active = TRUE OR is_active IS NULL OR is_active = 1 ORDER BY name",
     );
     return res.json({ categories });
   } catch (error: any) {
@@ -1371,8 +1513,6 @@ export const getCategories = async (req: Request, res: Response) => {
     return res.status(500).json({ categories: [], error: "Failed to fetch categories" });
   }
 };
-
-
 
 // Create category
 export const createCategory = async (req: Request, res: Response) => {
@@ -1386,16 +1526,22 @@ export const createCategory = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: "Nama kategori wajib diisi" });
     }
 
-    const slug = name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const slug = name
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
 
     const existing = await queryOne<any>("SELECT id FROM categories WHERE slug = ?", [slug]);
     if (existing) {
-      return res.status(400).json({ success: false, error: "Kategori dengan nama serupa sudah ada" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Kategori dengan nama serupa sudah ada" });
     }
 
     const result = await execute(
       "INSERT INTO categories (name, slug, is_active) VALUES (?, ?, TRUE)",
-      [name.trim(), slug]
+      [name.trim(), slug],
     );
 
     await logActivity(
@@ -1405,13 +1551,18 @@ export const createCategory = async (req: Request, res: Response) => {
       "create_category",
       "category",
       result.insertId,
-      `Kategori "${name.trim()}" ditambahkan oleh ${userName || 'Sistem'}`
+      `Kategori "${name.trim()}" ditambahkan oleh ${userName || "Sistem"}`,
     );
 
-    return res.json({ success: true, category: { id: result.insertId, name: name.trim(), slug, is_active: true } });
+    return res.json({
+      success: true,
+      category: { id: result.insertId, name: name.trim(), slug, is_active: true },
+    });
   } catch (error: any) {
     console.error("Error creating category:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to create category" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Failed to create category" });
   }
 };
 
@@ -1428,17 +1579,23 @@ export const updateCategory = async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: "Nama kategori wajib diisi" });
     }
 
-    const slug = name.trim().toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const slug = name
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
 
-    const existing = await queryOne<any>("SELECT id FROM categories WHERE slug = ? AND id != ?", [slug, id]);
+    const existing = await queryOne<any>("SELECT id FROM categories WHERE slug = ? AND id != ?", [
+      slug,
+      id,
+    ]);
     if (existing) {
-      return res.status(400).json({ success: false, error: "Kategori dengan nama serupa sudah ada" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Kategori dengan nama serupa sudah ada" });
     }
 
-    await execute(
-      "UPDATE categories SET name = ?, slug = ? WHERE id = ?",
-      [name.trim(), slug, id]
-    );
+    await execute("UPDATE categories SET name = ?, slug = ? WHERE id = ?", [name.trim(), slug, id]);
 
     await logActivity(
       userId,
@@ -1447,13 +1604,15 @@ export const updateCategory = async (req: Request, res: Response) => {
       "update_category",
       "category",
       id,
-      `Kategori "${name.trim()}" diperbarui oleh ${userName || 'Sistem'}`
+      `Kategori "${name.trim()}" diperbarui oleh ${userName || "Sistem"}`,
     );
 
     return res.json({ success: true, category: { id: parseInt(id), name: name.trim(), slug } });
   } catch (error: any) {
     console.error("Error updating category:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to update category" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Failed to update category" });
   }
 };
 
@@ -1466,10 +1625,7 @@ export const deleteCategory = async (req: Request, res: Response) => {
     const userRole = req.header("x-user-role") || null;
 
     // Soft delete by updating is_active to false
-    await execute(
-      "UPDATE categories SET is_active = FALSE WHERE id = ?",
-      [id]
-    );
+    await execute("UPDATE categories SET is_active = FALSE WHERE id = ?", [id]);
 
     await logActivity(
       userId,
@@ -1478,13 +1634,15 @@ export const deleteCategory = async (req: Request, res: Response) => {
       "delete_category",
       "category",
       id,
-      `Kategori ID ${id} dinonaktifkan oleh ${userName || 'Sistem'}`
+      `Kategori ID ${id} dinonaktifkan oleh ${userName || "Sistem"}`,
     );
 
     return res.json({ success: true });
   } catch (error: any) {
     console.error("Error deleting category:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to delete category" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Failed to delete category" });
   }
 };
 
@@ -1497,20 +1655,23 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
       `SELECT p.*, c.name AS category_name, c.slug AS category_slug
        FROM products p
        LEFT JOIN categories c ON c.id = p.category_id
-       ORDER BY p.id DESC`
+       ORDER BY p.id DESC`,
     );
 
     const productsWithVariants = await Promise.all(
       products.map(async (product: any) => {
         const variants = await query<any>(
           "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
-          [product.id]
+          [product.id],
         );
         const images = await query<any>(
           "SELECT image_url FROM product_images WHERE product_id = ? ORDER BY sort_order ASC",
-          [product.id]
+          [product.id],
         );
-        const imageUrls = images.length > 0 ? images.map((img: any) => img.image_url) : [product.image_url].filter(Boolean);
+        const imageUrls =
+          images.length > 0
+            ? images.map((img: any) => img.image_url)
+            : [product.image_url].filter(Boolean);
 
         let bundle_components: any[] = [];
         if (product.product_type === "bundle") {
@@ -1518,21 +1679,21 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
             `SELECT p.* FROM products p
              JOIN bundle_items bi ON bi.component_product_id = p.id
              WHERE bi.bundle_product_id = ?`,
-            [product.id]
+            [product.id],
           );
           bundle_components = await Promise.all(
             comps.map(async (comp: any) => {
               const compVariants = await query<any>(
                 "SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE",
-                [comp.id]
+                [comp.id],
               );
               return { ...comp, variants: compVariants };
-            })
+            }),
           );
         }
 
         return { ...product, variants, images: imageUrls, bundle_components };
-      })
+      }),
     );
 
     return res.json({ products: productsWithVariants });
@@ -1541,8 +1702,6 @@ export const getAllProductsAdmin = async (req: Request, res: Response) => {
     return res.status(500).json({ products: [], error: "Failed to fetch products" });
   }
 };
-
-
 
 // Create product
 export const createProduct = async (req: Request, res: Response) => {
@@ -1553,7 +1712,8 @@ export const createProduct = async (req: Request, res: Response) => {
     const userRole = req.header("x-user-role") || null;
 
     // Set the first image from images array as main image_url if provided
-    const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
+    const mainImageUrl =
+      input.images && input.images.length > 0 ? input.images[0] : input.image_url || null;
 
     const result = await execute(
       `INSERT INTO products (
@@ -1571,8 +1731,8 @@ export const createProduct = async (req: Request, res: Response) => {
         input.original_price || null,
         input.filkom_price || null,
         input.promo_price || null,
-        input.sale_type || 'ready_stock',
-        input.product_type || 'apparel',
+        input.sale_type || "ready_stock",
+        input.product_type || "apparel",
         input.low_stock_threshold ?? 5,
         input.is_best_seller ? 1 : 0,
         input.is_limited ? 1 : 0,
@@ -1587,17 +1747,41 @@ export const createProduct = async (req: Request, res: Response) => {
         input.aplikasi || null,
         input.size_chart_url || null,
         input.pre_order_campaign_id || null,
-      ]
+      ],
     );
 
     const productId = result.insertId;
 
     // Insert variants
     for (const variant of input.variants) {
-      await execute(
+      const vStock = Number(variant.stock) || 0;
+      const insertVarRes = await execute(
         "INSERT INTO product_variants (product_id, size, color, stock, filkom_price, image_url) VALUES (?, ?, ?, ?, ?, ?)",
-        [productId, variant.size || "One Size", variant.color || "", variant.stock || 0, variant.filkom_price || null, variant.image_url || null]
+        [
+          productId,
+          variant.size || "One Size",
+          variant.color || "",
+          vStock,
+          variant.filkom_price || null,
+          variant.image_url || null,
+        ],
       );
+
+      if (vStock > 0 && (insertVarRes as any)?.insertId) {
+        await execute(
+          `INSERT INTO stock_movements (
+            variant_id, movement_type, quantity_change, stock_before, stock_after,
+            reference_type, reference_id, created_by, notes
+          ) VALUES (?, 'initial', ?, 0, ?, 'manual', NULL, ?, ?)`,
+          [
+            (insertVarRes as any).insertId,
+            vStock,
+            vStock,
+            userId || null,
+            `Stok awal produk dibuat oleh ${userName || "Admin"}`,
+          ],
+        );
+      }
     }
 
     // Insert multiple product images
@@ -1606,17 +1790,21 @@ export const createProduct = async (req: Request, res: Response) => {
         await execute(
           `INSERT INTO product_images (product_id, image_url, sort_order, is_primary, alt_text)
            VALUES (?, ?, ?, ?, ?)`,
-          [productId, input.images[i], i, i === 0 ? 1 : 0, input.name]
+          [productId, input.images[i], i, i === 0 ? 1 : 0, input.name],
         );
       }
     }
 
     // Insert bundle components
-    if (input.product_type === 'bundle' && input.component_ids && Array.isArray(input.component_ids)) {
+    if (
+      input.product_type === "bundle" &&
+      input.component_ids &&
+      Array.isArray(input.component_ids)
+    ) {
       for (const compId of input.component_ids) {
         await execute(
           "INSERT INTO bundle_items (bundle_product_id, component_product_id, quantity) VALUES (?, ?, 1)",
-          [productId, compId]
+          [productId, compId],
         );
       }
     }
@@ -1628,7 +1816,7 @@ export const createProduct = async (req: Request, res: Response) => {
       "create_product",
       "product",
       productId,
-      `Produk "${input.name}" ditambahkan oleh ${userName || 'Sistem'}`
+      `Produk "${input.name}" ditambahkan oleh ${userName || "Sistem"}`,
     );
 
     return res.json({ success: true, product_id: productId });
@@ -1649,14 +1837,16 @@ export const updateProduct = async (req: Request, res: Response) => {
     const userRole = req.header("x-user-role") || null;
 
     // Set the first image from images array as main image_url if provided
-    const mainImageUrl = input.images && input.images.length > 0 ? input.images[0] : (input.image_url || null);
+    const mainImageUrl =
+      input.images && input.images.length > 0 ? input.images[0] : input.image_url || null;
 
     // Preserve existing pre_order_campaign_id if not explicitly provided in input
     const existingProd = await queryOne<any>(
       "SELECT pre_order_campaign_id FROM products WHERE id = ?",
-      [input.id]
+      [input.id],
     );
-    const campaignIdToSave = input.pre_order_campaign_id || existingProd?.pre_order_campaign_id || null;
+    const campaignIdToSave =
+      input.pre_order_campaign_id || existingProd?.pre_order_campaign_id || null;
 
     await execute(
       `UPDATE products 
@@ -1674,8 +1864,8 @@ export const updateProduct = async (req: Request, res: Response) => {
         input.original_price || null,
         input.filkom_price || null,
         input.promo_price || null,
-        input.sale_type || 'ready_stock',
-        input.product_type || 'apparel',
+        input.sale_type || "ready_stock",
+        input.product_type || "apparel",
         input.low_stock_threshold ?? 5,
         input.is_best_seller ? 1 : 0,
         input.is_limited ? 1 : 0,
@@ -1691,7 +1881,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         input.size_chart_url || null,
         campaignIdToSave,
         input.id,
-      ]
+      ],
     );
 
     // Synchronize variants rather than DELETE + INSERT to avoid foreign key restrict failures on stock_movements
@@ -1699,20 +1889,66 @@ export const updateProduct = async (req: Request, res: Response) => {
 
     for (const variant of input.variants) {
       const existing = await queryOne<any>(
-        "SELECT id FROM product_variants WHERE product_id = ? AND size = ? AND COALESCE(color, '') = COALESCE(?, '') LIMIT 1",
-        [input.id, variant.size || "One Size", variant.color || ""]
+        "SELECT id, stock FROM product_variants WHERE product_id = ? AND size = ? AND COALESCE(color, '') = COALESCE(?, '') LIMIT 1",
+        [input.id, variant.size || "One Size", variant.color || ""],
       );
 
+      const newStock = Number(variant.stock) || 0;
+
       if (existing) {
+        const oldStock = Number(existing.stock) || 0;
+        const diff = newStock - oldStock;
+
         await execute(
           "UPDATE product_variants SET stock = ?, filkom_price = ?, image_url = ?, is_active = TRUE WHERE id = ?",
-          [variant.stock || 0, variant.filkom_price || null, variant.image_url || null, existing.id]
+          [newStock, variant.filkom_price || null, variant.image_url || null, existing.id],
         );
+
+        if (diff !== 0) {
+          await execute(
+            `INSERT INTO stock_movements (
+              variant_id, movement_type, quantity_change, stock_before, stock_after,
+              reference_type, reference_id, created_by, notes
+            ) VALUES (?, ?, ?, ?, ?, 'manual', NULL, ?, ?)`,
+            [
+              existing.id,
+              diff > 0 ? "adjustment_in" : "adjustment_out",
+              diff,
+              oldStock,
+              newStock,
+              userId || null,
+              `Penyesuaian stok manual via Admin Produk oleh ${userName || "Admin"} (${diff > 0 ? `+${diff}` : diff} pcs)`,
+            ],
+          );
+        }
       } else {
-        await execute(
+        const insertRes = await execute(
           "INSERT INTO product_variants (product_id, size, color, stock, filkom_price, image_url, is_active) VALUES (?, ?, ?, ?, ?, ?, TRUE)",
-          [input.id, variant.size || "One Size", variant.color || "", variant.stock || 0, variant.filkom_price || null, variant.image_url || null]
+          [
+            input.id,
+            variant.size || "One Size",
+            variant.color || "",
+            newStock,
+            variant.filkom_price || null,
+            variant.image_url || null,
+          ],
         );
+
+        if (newStock > 0 && (insertRes as any)?.insertId) {
+          await execute(
+            `INSERT INTO stock_movements (
+              variant_id, movement_type, quantity_change, stock_before, stock_after,
+              reference_type, reference_id, created_by, notes
+            ) VALUES (?, 'initial', ?, 0, ?, 'manual', NULL, ?, ?)`,
+            [
+              (insertRes as any).insertId,
+              newStock,
+              newStock,
+              userId || null,
+              `Stok awal varian baru dibuat oleh ${userName || "Admin"}`,
+            ],
+          );
+        }
       }
     }
 
@@ -1726,18 +1962,22 @@ export const updateProduct = async (req: Request, res: Response) => {
         await execute(
           `INSERT INTO product_images (product_id, image_url, sort_order, is_primary, alt_text)
            VALUES (?, ?, ?, ?, ?)`,
-          [input.id, input.images[i], i, i === 0 ? 1 : 0, input.name]
+          [input.id, input.images[i], i, i === 0 ? 1 : 0, input.name],
         );
       }
     }
 
     // Sync bundle components
     await execute("DELETE FROM bundle_items WHERE bundle_product_id = ?", [input.id]);
-    if (input.product_type === 'bundle' && input.component_ids && Array.isArray(input.component_ids)) {
+    if (
+      input.product_type === "bundle" &&
+      input.component_ids &&
+      Array.isArray(input.component_ids)
+    ) {
       for (const compId of input.component_ids) {
         await execute(
           "INSERT INTO bundle_items (bundle_product_id, component_product_id, quantity) VALUES (?, ?, 1)",
-          [input.id, compId]
+          [input.id, compId],
         );
       }
     }
@@ -1749,7 +1989,7 @@ export const updateProduct = async (req: Request, res: Response) => {
       "update_product",
       "product",
       input.id,
-      `Produk "${input.name}" diperbarui oleh ${userName || 'Sistem'}`
+      `Produk "${input.name}" diperbarui oleh ${userName || "Sistem"}`,
     );
 
     return res.json({ success: true });
@@ -1774,13 +2014,19 @@ export const deleteProduct = async (req: Request, res: Response) => {
     await connection.beginTransaction();
 
     // 1. Delete bundle item associations where this product is either the bundle itself or a component
-    await connection.execute("DELETE FROM bundle_items WHERE bundle_product_id = ? OR component_product_id = ?", [id, id]);
+    await connection.execute(
+      "DELETE FROM bundle_items WHERE bundle_product_id = ? OR component_product_id = ?",
+      [id, id],
+    );
 
     // 2. Delete product images
     await connection.execute("DELETE FROM product_images WHERE product_id = ?", [id]);
 
     // 2.5. Delete stock movements referencing product variants
-    await connection.execute("DELETE FROM stock_movements WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = ?)", [id]);
+    await connection.execute(
+      "DELETE FROM stock_movements WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = ?)",
+      [id],
+    );
 
     // 3. Delete product variants
     await connection.execute("DELETE FROM product_variants WHERE product_id = ?", [id]);
@@ -1797,7 +2043,7 @@ export const deleteProduct = async (req: Request, res: Response) => {
       "delete_product",
       "product",
       id,
-      `Produk ID ${id} dihapus permanen dari database oleh ${userName || 'Sistem'}`
+      `Produk ID ${id} dihapus permanen dari database oleh ${userName || "Sistem"}`,
     );
 
     return res.json({ success: true });
@@ -1806,10 +2052,15 @@ export const deleteProduct = async (req: Request, res: Response) => {
     console.error("Error deleting product:", error);
 
     // Check for foreign key constraints violation (ordered/referenced product)
-    if (error.code === 'ER_ROW_IS_REFERENCED' || error.code === 'ER_ROW_IS_REFERENCED_2' || (error.message && error.message.includes('foreign key constraint fails'))) {
+    if (
+      error.code === "ER_ROW_IS_REFERENCED" ||
+      error.code === "ER_ROW_IS_REFERENCED_2" ||
+      (error.message && error.message.includes("foreign key constraint fails"))
+    ) {
       return res.status(400).json({
         success: false,
-        error: "Produk tidak bisa dihapus permanen karena sudah memiliki riwayat order/transaksi. Silakan nonaktifkan (sembunyikan) produk saja.",
+        error:
+          "Produk tidak bisa dihapus permanen karena sudah memiliki riwayat order/transaksi. Silakan nonaktifkan (sembunyikan) produk saja.",
       });
     }
 
@@ -1822,6 +2073,55 @@ export const deleteProduct = async (req: Request, res: Response) => {
   }
 };
 
+// Get Product Stock Movements (Riwayat Mutasi Stok Produk)
+export const getProductStockMovements = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const product = await queryOne<any>(
+      "SELECT id, name, image_url, price, sale_type FROM products WHERE id = ?",
+      [id],
+    );
+
+    if (!product) {
+      return res.status(404).json({ success: false, error: "Produk tidak ditemukan" });
+    }
+
+    const movements = await query<any>(
+      `SELECT sm.*, 
+              pv.size as variant_size, pv.color as variant_color,
+              u.name as actor_name, u.username as actor_username
+       FROM stock_movements sm
+       JOIN product_variants pv ON sm.variant_id = pv.id
+       LEFT JOIN users u ON sm.created_by = u.id
+       WHERE pv.product_id = ?
+       ORDER BY sm.created_at DESC, sm.id DESC
+       LIMIT 250`,
+      [id],
+    );
+
+    const variants = await query<any>(
+      "SELECT id, size, color, stock FROM product_variants WHERE product_id = ? AND is_active = 1",
+      [id],
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        product,
+        variants: variants || [],
+        movements: movements || [],
+      },
+    });
+  } catch (error: any) {
+    console.error("Error fetching product stock movements:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+      data: { product: null, variants: [], movements: [] },
+    });
+  }
+};
 
 // Get online orders
 export const getOnlineOrders = async (req: Request, res: Response) => {
@@ -1849,7 +2149,7 @@ export const getOnlineOrders = async (req: Request, res: Response) => {
     } catch {}
 
     const orders = await query<any>(
-      "SELECT * FROM orders WHERE channel = 'online' ORDER BY created_at DESC LIMIT 10000"
+      "SELECT * FROM orders WHERE channel = 'online' ORDER BY created_at DESC LIMIT 10000",
     );
 
     if (orders && orders.length > 0) {
@@ -1857,7 +2157,7 @@ export const getOnlineOrders = async (req: Request, res: Response) => {
       const placeholders = orderIds.map(() => "?").join(",");
       const allItems = await query<any>(
         `SELECT id, order_id, product_id, product_name, size, color, unit_price, quantity, subtotal FROM order_items WHERE order_id IN (${placeholders})`,
-        orderIds
+        orderIds,
       );
 
       const itemsByOrder: Record<string, any[]> = {};
@@ -1875,7 +2175,9 @@ export const getOnlineOrders = async (req: Request, res: Response) => {
         const hasLunasVariant = items.some((i: any) => {
           const c = String(i.color || "").toUpperCase();
           const s = String(i.size || "").toUpperCase();
-          return c.includes("LUNAS") || s.includes("LUNAS") || c.includes("FULL") || s.includes("FULL");
+          return (
+            c.includes("LUNAS") || s.includes("LUNAS") || c.includes("FULL") || s.includes("FULL")
+          );
         });
 
         const hasDpVariant = items.some((i: any) => {
@@ -1908,7 +2210,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
 
     const [orderRows] = await connection.execute(
       "SELECT payment_status, order_status, fulfillment_status FROM orders WHERE order_id = ? FOR UPDATE",
-      [id]
+      [id],
     );
     const order = (orderRows as any[])[0];
 
@@ -1917,7 +2219,11 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: "Order tidak ditemukan" });
     }
 
-    const isNowPaid = status === "settlement" || status === "completed" || status === "ready_for_pickup" || status === "shipped";
+    const isNowPaid =
+      status === "settlement" ||
+      status === "completed" ||
+      status === "ready_for_pickup" ||
+      status === "shipped";
     const wasUnpaid = order.payment_status !== "paid";
 
     let paymentStatus = order.payment_status;
@@ -1950,7 +2256,12 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       orderStatus = "cancelled";
     }
 
-    const updateFields: string[] = ["transaction_status = ?", "payment_status = ?", "order_status = ?", "fulfillment_status = ?"];
+    const updateFields: string[] = [
+      "transaction_status = ?",
+      "payment_status = ?",
+      "order_status = ?",
+      "fulfillment_status = ?",
+    ];
     const updateParams: any[] = [status, paymentStatus, orderStatus, fulfillmentStatus];
 
     if (shipping_address !== undefined) {
@@ -1973,41 +2284,41 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
     updateParams.push(id);
     await connection.execute(
       `UPDATE orders SET ${updateFields.join(", ")} WHERE order_id = ?`,
-      updateParams
+      updateParams,
     );
 
     // Trigger stock deduction if transitioning to paid manually
     if (isNowPaid && wasUnpaid) {
       const [items] = await connection.execute(
         "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
-        [id]
+        [id],
       );
       for (const item of items as any[]) {
         if (item.variant_id) {
           // Deduct stock, release reservation, log movements
-          await connection.execute(
-            "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
-            [item.quantity, item.variant_id]
-          );
+          await connection.execute("UPDATE product_variants SET stock = stock - ? WHERE id = ?", [
+            item.quantity,
+            item.variant_id,
+          ]);
           await connection.execute(
             "UPDATE product_variants SET stock_reserved = GREATEST(0, CAST(stock_reserved AS SIGNED) - ?) WHERE id = ?",
-            [item.quantity, item.variant_id]
+            [item.quantity, item.variant_id],
           );
           // Log movements manually using locks
           const [vRows] = await connection.execute(
             "SELECT stock FROM product_variants WHERE id = ? FOR UPDATE",
-            [item.variant_id]
+            [item.variant_id],
           );
           const curStock = (vRows as any)[0]?.stock || 0;
           await connection.execute(
             `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
              VALUES (?, 'reservation_release', ?, ?, ?, 'order', ?, 'Pelepasan reservasi stok (manual)')`,
-            [item.variant_id, -item.quantity, curStock, curStock, id]
+            [item.variant_id, -item.quantity, curStock, curStock, id],
           );
           await connection.execute(
             `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
              VALUES (?, 'sale', ?, ?, ?, 'order', ?, 'Penjualan selesai (manual)')`,
-            [item.variant_id, -item.quantity, curStock + item.quantity, curStock, id]
+            [item.variant_id, -item.quantity, curStock + item.quantity, curStock, id],
           );
         }
       }
@@ -2018,7 +2329,9 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback();
     console.error("Error updating order status:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to update order status" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Failed to update order status" });
   } finally {
     connection.release();
   }
@@ -2039,7 +2352,7 @@ export const verifyPaymentProof = async (req: Request, res: Response) => {
     // Lock the order for update
     const [orderRows] = await connection.execute(
       "SELECT payment_status, order_status, fulfillment_status FROM orders WHERE order_id = ? FOR UPDATE",
-      [id]
+      [id],
     );
     const order = (orderRows as any[])[0];
 
@@ -2059,41 +2372,41 @@ export const verifyPaymentProof = async (req: Request, res: Response) => {
              fulfillment_status = 'processing',
              payment_proof_note = NULL 
          WHERE order_id = ?`,
-        [id]
+        [id],
       );
 
       // Trigger stock deduction if transitioning to paid manually
       if (wasUnpaid) {
         const [items] = await connection.execute(
           "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
-          [id]
+          [id],
         );
         for (const item of items as any[]) {
           if (item.variant_id) {
             // Deduct stock, release reservation, log movements
-            await connection.execute(
-              "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
-              [item.quantity, item.variant_id]
-            );
+            await connection.execute("UPDATE product_variants SET stock = stock - ? WHERE id = ?", [
+              item.quantity,
+              item.variant_id,
+            ]);
             await connection.execute(
               "UPDATE product_variants SET stock_reserved = GREATEST(0, CAST(stock_reserved AS SIGNED) - ?) WHERE id = ?",
-              [item.quantity, item.variant_id]
+              [item.quantity, item.variant_id],
             );
             // Log movements manually using locks
             const [vRows] = await connection.execute(
               "SELECT stock FROM product_variants WHERE id = ? FOR UPDATE",
-              [item.variant_id]
+              [item.variant_id],
             );
             const curStock = (vRows as any)[0]?.stock || 0;
             await connection.execute(
               `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
                VALUES (?, 'reservation_release', ?, ?, ?, 'order', ?, 'Pelepasan reservasi stok (verifikasi QRIS)')`,
-              [item.variant_id, -item.quantity, curStock, curStock, id]
+              [item.variant_id, -item.quantity, curStock, curStock, id],
             );
             await connection.execute(
               `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
                VALUES (?, 'sale', ?, ?, ?, 'order', ?, 'Penjualan selesai (verifikasi QRIS)')`,
-              [item.variant_id, -item.quantity, curStock + item.quantity, curStock, id]
+              [item.variant_id, -item.quantity, curStock + item.quantity, curStock, id],
             );
           }
         }
@@ -2106,7 +2419,7 @@ export const verifyPaymentProof = async (req: Request, res: Response) => {
         "verify_payment_accept",
         "order",
         id,
-        `Pembayaran QRIS untuk Order ID ${id} diterima dan pesanan mulai diproses oleh ${userName || 'Sistem'}`
+        `Pembayaran QRIS untuk Order ID ${id} diterima dan pesanan mulai diproses oleh ${userName || "Sistem"}`,
       );
     } else {
       // Reject: set payment status to rejected, order status to pending_payment, KEEP payment_proof_url, and set payment_proof_note
@@ -2117,7 +2430,7 @@ export const verifyPaymentProof = async (req: Request, res: Response) => {
              order_status = 'pending_payment', 
              payment_proof_note = ? 
          WHERE order_id = ?`,
-        [note || "Bukti pembayaran tidak sesuai", id]
+        [note || "Bukti pembayaran tidak sesuai", id],
       );
 
       await logActivity(
@@ -2127,7 +2440,7 @@ export const verifyPaymentProof = async (req: Request, res: Response) => {
         "verify_payment_reject",
         "order",
         id,
-        `Pembayaran QRIS untuk Order ID ${id} ditolak dengan catatan: "${note}" oleh ${userName || 'Sistem'}`
+        `Pembayaran QRIS untuk Order ID ${id} ditolak dengan catatan: "${note}" oleh ${userName || "Sistem"}`,
       );
     }
 
@@ -2136,7 +2449,9 @@ export const verifyPaymentProof = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback();
     console.error("Error verifying payment proof:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to verify payment proof" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Failed to verify payment proof" });
   } finally {
     connection.release();
   }
@@ -2157,11 +2472,13 @@ export interface ProofInspectionResult {
 }
 
 // Reusable inspector: runs Gemini AI Vision on payment proof and immediately updates the orders database table
-export const inspectAndSavePaymentProof = async (orderId: string): Promise<{ success: boolean; data?: ProofInspectionResult; error?: string }> => {
+export const inspectAndSavePaymentProof = async (
+  orderId: string,
+): Promise<{ success: boolean; data?: ProofInspectionResult; error?: string }> => {
   try {
     const order = await queryOne<any>(
       "SELECT id, order_id, customer_name, gross_amount, payment_proof_url, payment_type FROM orders WHERE order_id = ? OR id = ? LIMIT 1",
-      [orderId, orderId]
+      [orderId, orderId],
     );
 
     if (!order) {
@@ -2217,7 +2534,7 @@ export const inspectAndSavePaymentProof = async (orderId: string): Promise<{ suc
     const base64Data = imgBuffer.toString("base64");
     const defaultGeminiKey = Buffer.from(
       "QVEuQWI4Uk42Sy1Lek1sN1Q1OGJ2ZnNPTDJmbllJcDFpX0ItR2kwc0cxLWs4ZkJjTzZJVEE=",
-      "base64"
+      "base64",
     ).toString("utf-8");
     const apiKey =
       (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim()) ||
@@ -2308,16 +2625,20 @@ PENTING:
       // Mark as UNREADABLE in database so we know it has been scanned but needs manual inspection
       await execute(
         "UPDATE orders SET payment_proof_match_status = 'UNREADABLE' WHERE order_id = ?",
-        [order.order_id]
+        [order.order_id],
       );
       return {
         success: false,
-        error: "AI tidak dapat membaca bukti transfer ini saat ini. Silakan verifikasi secara manual.",
+        error:
+          "AI tidak dapat membaca bukti transfer ini saat ini. Silakan verifikasi secara manual.",
       };
     }
 
     const expectedAmount = Number(order.gross_amount || 0);
-    const detectedNominal = typeof aiJson.nominal === "number" ? aiJson.nominal : parseInt(String(aiJson.nominal || "").replace(/\D/g, ""), 10);
+    const detectedNominal =
+      typeof aiJson.nominal === "number"
+        ? aiJson.nominal
+        : parseInt(String(aiJson.nominal || "").replace(/\D/g, ""), 10);
 
     let matchStatus: "MATCH" | "UNDERPAID" | "OVERPAID" | "UNREADABLE" = "UNREADABLE";
     let difference = 0;
@@ -2366,7 +2687,7 @@ PENTING:
         inspectionData.difference,
         JSON.stringify(inspectionData),
         order.order_id,
-      ]
+      ],
     );
 
     return {
@@ -2403,7 +2724,8 @@ export const scanAllPaymentProofs = async (req: Request, res: Response) => {
 
     let whereClause = "WHERE payment_proof_url IS NOT NULL AND payment_proof_url != ''";
     if (!forceAll) {
-      whereClause += " AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '' OR payment_proof_match_status = 'UNREADABLE')";
+      whereClause +=
+        " AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '' OR payment_proof_match_status = 'UNREADABLE')";
     }
 
     let excludeClause = "";
@@ -2416,12 +2738,12 @@ export const scanAllPaymentProofs = async (req: Request, res: Response) => {
 
     const ordersToScan = await query<any>(
       `SELECT order_id FROM orders ${whereClause}${excludeClause} ORDER BY created_at DESC LIMIT ?`,
-      [...queryParams, limit]
+      [...queryParams, limit],
     );
 
     const scannedResults: any[] = [];
 
-    for (const row of (ordersToScan || [])) {
+    for (const row of ordersToScan || []) {
       try {
         const result = await inspectAndSavePaymentProof(row.order_id);
         scannedResults.push({
@@ -2450,7 +2772,7 @@ export const scanAllPaymentProofs = async (req: Request, res: Response) => {
 
     const totalRemainingRowAfter = await queryOne<any>(
       `SELECT COUNT(*) as count FROM orders ${whereClause}${remainingExcludeClause}`,
-      remainingParams
+      remainingParams,
     );
     const totalRemainingAfter = Number(totalRemainingRowAfter?.count || 0);
 
@@ -2472,11 +2794,20 @@ export const submitRefundAccount = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { refund_account_info } = req.body;
 
-    if (!refund_account_info || typeof refund_account_info !== "string" || !refund_account_info.trim()) {
-      return res.status(400).json({ success: false, error: "Informasi rekening pengembalian dana tidak boleh kosong" });
+    if (
+      !refund_account_info ||
+      typeof refund_account_info !== "string" ||
+      !refund_account_info.trim()
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Informasi rekening pengembalian dana tidak boleh kosong" });
     }
 
-    const order = await queryOne<any>("SELECT order_id, payment_proof_match_status FROM orders WHERE order_id = ?", [id]);
+    const order = await queryOne<any>(
+      "SELECT order_id, payment_proof_match_status FROM orders WHERE order_id = ?",
+      [id],
+    );
     if (!order) {
       return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
     }
@@ -2487,7 +2818,7 @@ export const submitRefundAccount = async (req: Request, res: Response) => {
         refund_account_submitted_at = NOW(),
         refund_status = 'pending'
       WHERE order_id = ?`,
-      [refund_account_info.trim(), id]
+      [refund_account_info.trim(), id],
     );
 
     const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
@@ -2501,13 +2832,15 @@ export const submitRefundAccount = async (req: Request, res: Response) => {
       "submit_refund_account",
       "order",
       id,
-      `Pembeli mengirim info rekening pengembalian dana untuk Order ID ${id}`
+      `Pembeli mengirim info rekening pengembalian dana untuk Order ID ${id}`,
     );
 
     return res.json({ success: true, message: "Informasi rekening berhasil disimpan" });
   } catch (error: any) {
     console.error("Error in submitRefundAccount:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal menyimpan info rekening" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Gagal menyimpan info rekening" });
   }
 };
 
@@ -2517,8 +2850,14 @@ export const submitShortageProof = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { shortage_proof_url } = req.body;
 
-    if (!shortage_proof_url || typeof shortage_proof_url !== "string" || !shortage_proof_url.trim()) {
-      return res.status(400).json({ success: false, error: "Bukti transfer kekurangan harus diunggah" });
+    if (
+      !shortage_proof_url ||
+      typeof shortage_proof_url !== "string" ||
+      !shortage_proof_url.trim()
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Bukti transfer kekurangan harus diunggah" });
     }
 
     const order = await queryOne<any>("SELECT order_id FROM orders WHERE order_id = ?", [id]);
@@ -2533,7 +2872,7 @@ export const submitShortageProof = async (req: Request, res: Response) => {
         shortage_status = 'submitted',
         shortage_proof_note = NULL
       WHERE order_id = ?`,
-      [shortage_proof_url.trim(), id]
+      [shortage_proof_url.trim(), id],
     );
 
     const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
@@ -2547,13 +2886,15 @@ export const submitShortageProof = async (req: Request, res: Response) => {
       "submit_shortage_proof",
       "order",
       id,
-      `Pembeli mengunggah bukti pembayaran kekurangan untuk Order ID ${id}`
+      `Pembeli mengunggah bukti pembayaran kekurangan untuk Order ID ${id}`,
     );
 
     return res.json({ success: true, message: "Bukti kekurangan pembayaran berhasil dikirim" });
   } catch (error: any) {
     console.error("Error in submitShortageProof:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal mengunggah bukti kekurangan" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Gagal mengunggah bukti kekurangan" });
   }
 };
 
@@ -2564,7 +2905,9 @@ export const adminCompleteRefund = async (req: Request, res: Response) => {
     const { refund_proof_url } = req.body;
 
     if (!refund_proof_url || typeof refund_proof_url !== "string" || !refund_proof_url.trim()) {
-      return res.status(400).json({ success: false, error: "Bukti transfer pengembalian dana harus diunggah" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Bukti transfer pengembalian dana harus diunggah" });
     }
 
     const order = await queryOne<any>("SELECT order_id FROM orders WHERE order_id = ?", [id]);
@@ -2578,7 +2921,7 @@ export const adminCompleteRefund = async (req: Request, res: Response) => {
         refund_status = 'completed',
         refund_completed_at = NOW()
       WHERE order_id = ?`,
-      [refund_proof_url.trim(), id]
+      [refund_proof_url.trim(), id],
     );
 
     const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
@@ -2592,13 +2935,15 @@ export const adminCompleteRefund = async (req: Request, res: Response) => {
       "complete_refund",
       "order",
       id,
-      `Admin ${userName || 'Petugas'} menyelesaikan pengembalian lebih bayar untuk Order ID ${id}`
+      `Admin ${userName || "Petugas"} menyelesaikan pengembalian lebih bayar untuk Order ID ${id}`,
     );
 
     return res.json({ success: true, message: "Pengembalian dana berhasil dicatat selesai" });
   } catch (error: any) {
     console.error("Error in adminCompleteRefund:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal menyelesaikan pengembalian dana" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Gagal menyelesaikan pengembalian dana" });
   }
 };
 
@@ -2616,7 +2961,7 @@ export const adminVerifyShortage = async (req: Request, res: Response) => {
 
     const [orderRows] = await connection.execute(
       "SELECT payment_status, order_status, fulfillment_status FROM orders WHERE order_id = ? FOR UPDATE",
-      [id]
+      [id],
     );
     const order = (orderRows as any[])[0];
 
@@ -2640,39 +2985,39 @@ export const adminVerifyShortage = async (req: Request, res: Response) => {
           payment_proof_match_status = 'MATCH',
           payment_proof_difference = 0
         WHERE order_id = ?`,
-        [id]
+        [id],
       );
 
       // Deduct stock if was unpaid
       if (wasUnpaid) {
         const [items] = await connection.execute(
           "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
-          [id]
+          [id],
         );
         for (const item of items as any[]) {
           if (item.variant_id) {
-            await connection.execute(
-              "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
-              [item.quantity, item.variant_id]
-            );
+            await connection.execute("UPDATE product_variants SET stock = stock - ? WHERE id = ?", [
+              item.quantity,
+              item.variant_id,
+            ]);
             await connection.execute(
               "UPDATE product_variants SET stock_reserved = GREATEST(0, CAST(stock_reserved AS SIGNED) - ?) WHERE id = ?",
-              [item.quantity, item.variant_id]
+              [item.quantity, item.variant_id],
             );
             const [vRows] = await connection.execute(
               "SELECT stock FROM product_variants WHERE id = ? FOR UPDATE",
-              [item.variant_id]
+              [item.variant_id],
             );
             const curStock = (vRows as any)[0]?.stock || 0;
             await connection.execute(
               `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
                VALUES (?, 'reservation_release', ?, ?, ?, 'order', ?, 'Pelepasan reservasi stok (verifikasi kekurangan bayar)')`,
-              [item.variant_id, -item.quantity, curStock, curStock, id]
+              [item.variant_id, -item.quantity, curStock, curStock, id],
             );
             await connection.execute(
               `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
                VALUES (?, 'sale', ?, ?, ?, 'order', ?, 'Penjualan selesai (verifikasi kekurangan bayar)')`,
-              [item.variant_id, -item.quantity, curStock + item.quantity, curStock, id]
+              [item.variant_id, -item.quantity, curStock + item.quantity, curStock, id],
             );
           }
         }
@@ -2685,7 +3030,7 @@ export const adminVerifyShortage = async (req: Request, res: Response) => {
         "verify_shortage_accept",
         "order",
         id,
-        `Bukti transfer kekurangan Order ID ${id} disetujui, pesanan disahkan lunas oleh ${userName || 'Sistem'}`
+        `Bukti transfer kekurangan Order ID ${id} disetujui, pesanan disahkan lunas oleh ${userName || "Sistem"}`,
       );
     } else {
       await connection.execute(
@@ -2693,7 +3038,7 @@ export const adminVerifyShortage = async (req: Request, res: Response) => {
           shortage_status = 'rejected',
           shortage_proof_note = ?
         WHERE order_id = ?`,
-        [note || "Bukti transfer kekurangan tidak valid atau nominal tidak sesuai", id]
+        [note || "Bukti transfer kekurangan tidak valid atau nominal tidak sesuai", id],
       );
 
       await logActivity(
@@ -2703,7 +3048,7 @@ export const adminVerifyShortage = async (req: Request, res: Response) => {
         "verify_shortage_reject",
         "order",
         id,
-        `Bukti transfer kekurangan Order ID ${id} ditolak dengan catatan: "${note || 'Bukti transfer tidak valid'}" oleh ${userName || 'Sistem'}`
+        `Bukti transfer kekurangan Order ID ${id} ditolak dengan catatan: "${note || "Bukti transfer tidak valid"}" oleh ${userName || "Sistem"}`,
       );
     }
 
@@ -2712,7 +3057,10 @@ export const adminVerifyShortage = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback();
     console.error("Error verifying shortage proof:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal memverifikasi bukti kekurangan bayar" });
+    return res.status(500).json({
+      success: false,
+      error: error.message || "Gagal memverifikasi bukti kekurangan bayar",
+    });
   } finally {
     connection.release();
   }
@@ -2725,7 +3073,7 @@ export const triggerBackgroundProofScanning = async () => {
   isAutoProofScanningRunning = true;
   try {
     const unscanned = await query<any>(
-      "SELECT order_id FROM orders WHERE payment_proof_url IS NOT NULL AND payment_proof_url != '' AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '') ORDER BY created_at DESC LIMIT 3"
+      "SELECT order_id FROM orders WHERE payment_proof_url IS NOT NULL AND payment_proof_url != '' AND (payment_proof_match_status IS NULL OR payment_proof_match_status = '') ORDER BY created_at DESC LIMIT 3",
     );
     if (unscanned && unscanned.length > 0) {
       for (const row of unscanned) {
@@ -2753,7 +3101,7 @@ export const deleteOrder = async (req: Request, res: Response) => {
 
     const [orderRows] = await connection.execute(
       "SELECT payment_status FROM orders WHERE order_id = ? FOR UPDATE",
-      [id]
+      [id],
     );
     const order = (orderRows as any[])[0];
 
@@ -2761,23 +3109,23 @@ export const deleteOrder = async (req: Request, res: Response) => {
       // Release reservations
       const [items] = await connection.execute(
         "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
-        [id]
+        [id],
       );
       for (const item of items as any[]) {
         if (item.variant_id) {
           await connection.execute(
             "UPDATE product_variants SET stock_reserved = GREATEST(0, CAST(stock_reserved AS SIGNED) - ?) WHERE id = ?",
-            [item.quantity, item.variant_id]
+            [item.quantity, item.variant_id],
           );
           const [vRows] = await connection.execute(
             "SELECT stock FROM product_variants WHERE id = ?",
-            [item.variant_id]
+            [item.variant_id],
           );
           const curStock = (vRows as any)[0]?.stock || 0;
           await connection.execute(
             `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
              VALUES (?, 'reservation_release', ?, ?, ?, 'order', ?, 'Pelepasan reservasi stok (order deleted)')`,
-            [item.variant_id, -item.quantity, curStock, curStock, id]
+            [item.variant_id, -item.quantity, curStock, curStock, id],
           );
         }
       }
@@ -2786,7 +3134,7 @@ export const deleteOrder = async (req: Request, res: Response) => {
     // Delete any linked LNS pelunasan sub-orders and their order_items
     const [lnsRows] = await connection.execute(
       "SELECT order_id FROM orders WHERE order_id LIKE CONCAT('LNS-', ?, '-%') OR notes LIKE CONCAT('%Pelunasan untuk Order: ', ?)",
-      [id, id]
+      [id, id],
     );
     for (const lnsOrder of lnsRows as any[]) {
       await connection.execute("DELETE FROM order_items WHERE order_id = ?", [lnsOrder.order_id]);
@@ -2800,7 +3148,9 @@ export const deleteOrder = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback();
     console.error("Error deleting order:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to delete order" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Failed to delete order" });
   } finally {
     connection.release();
   }
@@ -2826,7 +3176,8 @@ export const createSale = async (req: Request, res: Response) => {
         qris: "QRIS",
         debit: "Debit",
       };
-      const paymentLabel = PAYMENT_LABELS[input.payment_method?.toLowerCase()] || input.payment_method || "Tunai";
+      const paymentLabel =
+        PAYMENT_LABELS[input.payment_method?.toLowerCase()] || input.payment_method || "Tunai";
 
       // CASE 1: If order already exists (meaning it was created via createOrderAndPayment for online POS payment)
       if (input.order_id) {
@@ -2834,7 +3185,7 @@ export const createSale = async (req: Request, res: Response) => {
 
         const [orderRows] = await connection.execute(
           "SELECT id, order_id, payment_status FROM orders WHERE order_id = ? FOR UPDATE",
-          [input.order_id]
+          [input.order_id],
         );
         const order = (orderRows as any[])[0];
 
@@ -2850,33 +3201,38 @@ export const createSale = async (req: Request, res: Response) => {
               payment_status = 'paid', order_status = 'completed', fulfillment_status = 'completed', 
               payment_type = ?, transaction_status = 'settlement', updated_at = NOW() 
              WHERE order_id = ?`,
-            [paymentLabel, input.order_id]
+            [paymentLabel, input.order_id],
           );
 
           // Check if payment row exists
           const [paymentRows] = await connection.execute(
             "SELECT id FROM payments WHERE order_id = ? AND provider = 'midtrans' LIMIT 1 FOR UPDATE",
-            [input.order_id]
+            [input.order_id],
           );
           const existingPayment = (paymentRows as any[])[0];
 
           if (existingPayment) {
             await connection.execute(
               "UPDATE payments SET status = 'paid', paid_at = NOW(), raw_callback_json = ? WHERE id = ?",
-              [JSON.stringify({ note: "Finalized via cashier screen" }), existingPayment.id]
+              [JSON.stringify({ note: "Finalized via cashier screen" }), existingPayment.id],
             );
           } else {
             await connection.execute(
               `INSERT INTO payments (order_id, provider, payment_method, amount, status, paid_at, raw_callback_json) 
                VALUES (?, 'midtrans', ?, ?, 'paid', NOW(), ?)`,
-              [input.order_id, paymentLabel, input.total, JSON.stringify({ note: "Finalized via cashier screen" })]
+              [
+                input.order_id,
+                paymentLabel,
+                input.total,
+                JSON.stringify({ note: "Finalized via cashier screen" }),
+              ],
             );
           }
 
           // Fetch order items to release reservations and deduct stock
           const [items] = await connection.execute(
             "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
-            [input.order_id]
+            [input.order_id],
           );
 
           // Sort items by variant_id ASC to prevent deadlock cycles
@@ -2886,18 +3242,36 @@ export const createSale = async (req: Request, res: Response) => {
 
           for (const item of sortedItems) {
             // Decrement physical stock
-            await connection.execute(
-              "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
-              [item.quantity, item.variant_id]
-            );
+            await connection.execute("UPDATE product_variants SET stock = stock - ? WHERE id = ?", [
+              item.quantity,
+              item.variant_id,
+            ]);
             // Decrement reserved stock
             await connection.execute(
               "UPDATE product_variants SET stock_reserved = GREATEST(0, CAST(stock_reserved AS SIGNED) - ?) WHERE id = ?",
-              [item.quantity, item.variant_id]
+              [item.quantity, item.variant_id],
             );
             // Log movements
-            await logStockMovement(connection, item.variant_id, 'reservation_release', -item.quantity, 'order', input.order_id, input.admin_id, 'Rilis reservasi POS online');
-            await logStockMovement(connection, item.variant_id, 'sale', -item.quantity, 'order', input.order_id, input.admin_id, 'Penjualan POS online sukses');
+            await logStockMovement(
+              connection,
+              item.variant_id,
+              "reservation_release",
+              -item.quantity,
+              "order",
+              input.order_id,
+              input.admin_id,
+              "Rilis reservasi POS online",
+            );
+            await logStockMovement(
+              connection,
+              item.variant_id,
+              "sale",
+              -item.quantity,
+              "order",
+              input.order_id,
+              input.admin_id,
+              "Penjualan POS online sukses",
+            );
           }
         }
 
@@ -2921,7 +3295,8 @@ export const createSale = async (req: Request, res: Response) => {
 
       let targetUserId: number | null = input.user_id ? Number(input.user_id) : null;
       let customerNim: string | null = input.customer_nim || null;
-      const isInternational = input.customer_type === "internasional" || Boolean(input.is_international);
+      const isInternational =
+        input.customer_type === "internasional" || Boolean(input.is_international);
       let isUb = false;
 
       if (input.is_filkom_verified || input.customer_type === "filkom") {
@@ -2931,7 +3306,7 @@ export const createSale = async (req: Request, res: Response) => {
       if (targetUserId) {
         const [uRows] = await connection.execute(
           "SELECT id, is_filkom_verified, nim, email FROM users WHERE id = ?",
-          [targetUserId]
+          [targetUserId],
         );
         const uRow = (uRows as any[])[0];
         if (uRow) {
@@ -2941,7 +3316,7 @@ export const createSale = async (req: Request, res: Response) => {
       } else if (input.customer_email) {
         const [userRows] = await connection.execute(
           "SELECT id, is_filkom_verified, nim FROM users WHERE email = ?",
-          [input.customer_email]
+          [input.customer_email],
         );
         const userRow = (userRows as any[])[0];
         if (userRow) {
@@ -2969,7 +3344,7 @@ export const createSale = async (req: Request, res: Response) => {
            FROM product_variants pv
            JOIN products p ON p.id = pv.product_id
            WHERE pv.id = ? AND pv.is_active = TRUE`,
-          [variantId]
+          [variantId],
         );
 
         const variant = (rows as any[])[0];
@@ -2978,7 +3353,7 @@ export const createSale = async (req: Request, res: Response) => {
         }
 
         let price = determinePrice(variant, isUb, isInternational);
-        if (variant.product_type === 'bundle') {
+        if (variant.product_type === "bundle") {
           if (item.bundle_selections && Array.isArray(item.bundle_selections)) {
             let bundleAddon = 0;
             for (const selection of item.bundle_selections) {
@@ -2989,24 +3364,33 @@ export const createSale = async (req: Request, res: Response) => {
                  FROM product_variants pv
                  JOIN products p ON p.id = pv.product_id
                  WHERE pv.id = ? AND pv.is_active = TRUE`,
-                [selection.variant_id]
+                [selection.variant_id],
               );
               const compVar = (compRows as any[])[0];
               if (compVar) {
                 const [allCompVarsRows] = await connection.execute(
                   `SELECT * FROM product_variants WHERE product_id = ? AND is_active = TRUE`,
-                  [compVar.product_id]
+                  [compVar.product_id],
                 );
                 const allCompVars = allCompVarsRows as any[];
 
-                const hasLunas = allCompVars.some((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
+                const hasLunas = allCompVars.some(
+                  (v: any) => v.color && v.color.toUpperCase() === "LUNAS",
+                );
                 let refVariant = null;
                 if (hasLunas) {
-                  refVariant = allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS" && v.size && v.size.toUpperCase() === "S")
-                    || allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
+                  refVariant =
+                    allCompVars.find(
+                      (v: any) =>
+                        v.color &&
+                        v.color.toUpperCase() === "LUNAS" &&
+                        v.size &&
+                        v.size.toUpperCase() === "S",
+                    ) || allCompVars.find((v: any) => v.color && v.color.toUpperCase() === "LUNAS");
                 } else {
-                  refVariant = allCompVars.find((v: any) => v.size && v.size.toUpperCase() === "S")
-                    || allCompVars[0];
+                  refVariant =
+                    allCompVars.find((v: any) => v.size && v.size.toUpperCase() === "S") ||
+                    allCompVars[0];
                 }
 
                 let refAddon = 0;
@@ -3025,7 +3409,7 @@ export const createSale = async (req: Request, res: Response) => {
                   selectedAddon = Number(compVar.price_override);
                 }
 
-                bundleAddon += (selectedAddon - refAddon);
+                bundleAddon += selectedAddon - refAddon;
               }
             }
             price += bundleAddon;
@@ -3035,7 +3419,9 @@ export const createSale = async (req: Request, res: Response) => {
         const subtotalItem = price * item.quantity;
         calculatedSubtotal += subtotalItem;
 
-        const skuSnapshot = variant.sku || (variant.sku_prefix ? `${variant.sku_prefix}-${variant.id}` : `VAR-${variant.id}`);
+        const skuSnapshot =
+          variant.sku ||
+          (variant.sku_prefix ? `${variant.sku_prefix}-${variant.id}` : `VAR-${variant.id}`);
 
         resolvedItems.push({
           product_id: variant.product_id,
@@ -3047,13 +3433,15 @@ export const createSale = async (req: Request, res: Response) => {
           price: price,
           subtotal: subtotalItem,
           skuSnapshot: skuSnapshot,
-          bypassStockDeduction: variant.product_type === 'bundle'
+          bypassStockDeduction: variant.product_type === "bundle",
         });
 
         // If it is a bundle, resolve component variants
-        if (variant.product_type === 'bundle') {
+        if (variant.product_type === "bundle") {
           if (!item.bundle_selections || !Array.isArray(item.bundle_selections)) {
-            throw new Error(`Detail pilihan komponen wajib disertakan untuk bundel: ${variant.product_name}`);
+            throw new Error(
+              `Detail pilihan komponen wajib disertakan untuk bundel: ${variant.product_name}`,
+            );
           }
 
           for (const selection of item.bundle_selections) {
@@ -3062,7 +3450,7 @@ export const createSale = async (req: Request, res: Response) => {
                FROM product_variants pv
                JOIN products p ON p.id = pv.product_id
                WHERE pv.id = ? AND pv.is_active = TRUE`,
-              [selection.variant_id]
+              [selection.variant_id],
             );
             const compVariant = (compRows as any[])[0];
             if (!compVariant) {
@@ -3070,7 +3458,11 @@ export const createSale = async (req: Request, res: Response) => {
             }
 
             const requiredQty = (selection.quantity || 1) * item.quantity;
-            const compSku = compVariant.sku || (compVariant.sku_prefix ? `${compVariant.sku_prefix}-${compVariant.id}` : `VAR-${compVariant.id}`);
+            const compSku =
+              compVariant.sku ||
+              (compVariant.sku_prefix
+                ? `${compVariant.sku_prefix}-${compVariant.id}`
+                : `VAR-${compVariant.id}`);
             resolvedItems.push({
               product_id: compVariant.product_id,
               variant_id: compVariant.id,
@@ -3081,7 +3473,7 @@ export const createSale = async (req: Request, res: Response) => {
               price: 0,
               subtotal: 0,
               skuSnapshot: compSku,
-              bypassStockDeduction: false
+              bypassStockDeduction: false,
             });
           }
         }
@@ -3097,7 +3489,7 @@ export const createSale = async (req: Request, res: Response) => {
       for (const item of itemsToDeduct) {
         const [varRows] = await connection.execute(
           "SELECT id, stock, stock_reserved FROM product_variants WHERE id = ? FOR UPDATE",
-          [item.variant_id]
+          [item.variant_id],
         );
         const v = (varRows as any[])[0];
         if (!v) {
@@ -3124,7 +3516,7 @@ export const createSale = async (req: Request, res: Response) => {
           saleId,
           targetUserId,
           input.admin_id || null,
-          (input.customer_name && input.customer_name.trim()) ? input.customer_name.trim() : "-",
+          input.customer_name && input.customer_name.trim() ? input.customer_name.trim() : "-",
           customerEmail,
           input.customer_phone || "081234567890",
           customerNim,
@@ -3132,8 +3524,8 @@ export const createSale = async (req: Request, res: Response) => {
           discountAmount,
           taxAmount,
           grossAmount,
-          input.notes || null
-        ]
+          input.notes || null,
+        ],
       );
 
       const insertedOrderId = (orderResult as any).insertId;
@@ -3156,28 +3548,28 @@ export const createSale = async (req: Request, res: Response) => {
             item.price,
             0,
             item.subtotal,
-            item.skuSnapshot
-          ]
+            item.skuSnapshot,
+          ],
         );
       }
 
       // 3. Decrement stock directly (rows are already locked in sorted order)
       for (const item of itemsToDeduct) {
-        await connection.execute(
-          "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
-          [item.quantity, item.variant_id]
-        );
+        await connection.execute("UPDATE product_variants SET stock = stock - ? WHERE id = ?", [
+          item.quantity,
+          item.variant_id,
+        ]);
 
         // Log movement in stock_movements
         await logStockMovement(
           connection,
           item.variant_id,
-          'sale',
+          "sale",
           -item.quantity,
-          'order',
+          "order",
           saleId,
           input.admin_id,
-          'Penjualan POS langsung selesai'
+          "Penjualan POS langsung selesai",
         );
       }
 
@@ -3190,12 +3582,7 @@ export const createSale = async (req: Request, res: Response) => {
         `INSERT INTO payments (
           order_id, provider, payment_method, amount, status, paid_at
         ) VALUES (?, ?, ?, ?, 'paid', NOW())`,
-        [
-          saleId,
-          paymentProvider,
-          paymentLabel,
-          grossAmount
-        ]
+        [saleId, paymentProvider, paymentLabel, grossAmount],
       );
 
       await connection.commit();
@@ -3209,7 +3596,7 @@ export const createSale = async (req: Request, res: Response) => {
         "create_sale",
         "order",
         saleId,
-        `Transaksi POS langsung dibuat oleh Kasir (${saleId})`
+        `Transaksi POS langsung dibuat oleh Kasir (${saleId})`,
       ).catch((err) => console.error("Failed to log POS activity:", err));
 
       return res.json({
@@ -3218,7 +3605,6 @@ export const createSale = async (req: Request, res: Response) => {
         db_id: insertedOrderId,
         message: "Sale created successfully",
       });
-
     } catch (err: any) {
       try {
         await connection.rollback();
@@ -3235,13 +3621,17 @@ export const createSale = async (req: Request, res: Response) => {
 
       if (isDeadlock && attempt < MAX_RETRIES) {
         const delay = 50 * attempt + Math.floor(Math.random() * 60);
-        console.warn(`[createSale] Deadlock encountered on attempt ${attempt}/${MAX_RETRIES}. Retrying in ${delay}ms...`);
+        console.warn(
+          `[createSale] Deadlock encountered on attempt ${attempt}/${MAX_RETRIES}. Retrying in ${delay}ms...`,
+        );
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue;
       }
 
       console.error("Error creating POS sale:", err);
-      return res.status(500).json({ success: false, error: err.message || "Failed to create POS sale" });
+      return res
+        .status(500)
+        .json({ success: false, error: err.message || "Failed to create POS sale" });
     }
   }
 };
@@ -3280,7 +3670,7 @@ export const getOfflineSales = async (req: Request, res: Response) => {
        FROM orders o
        LEFT JOIN users u ON u.id = o.cashier_id
        WHERE o.channel = 'pos'
-       ORDER BY o.created_at DESC`
+       ORDER BY o.created_at DESC`,
     );
 
     // Batch attach items so that product filtering works seamlessly for offline sales too
@@ -3294,7 +3684,7 @@ export const getOfflineSales = async (req: Request, res: Response) => {
         const chunkItems = await query<any>(
           `SELECT id, order_id, product_id, product_name, size, color, unit_price, quantity, subtotal 
            FROM order_items WHERE order_id IN (${placeholders})`,
-          chunk
+          chunk,
         );
         (chunkItems || []).forEach((item) => {
           if (!itemsByOrder[item.order_id]) itemsByOrder[item.order_id] = [];
@@ -3324,14 +3714,14 @@ export const getOfflineSaleById = async (req: Request, res: Response) => {
        FROM orders o
        LEFT JOIN users u ON u.id = o.cashier_id
        WHERE o.order_id = ? AND o.channel = 'pos' LIMIT 1`,
-      [id]
+      [id],
     );
     if (!sale) {
       return res.status(404).json({ success: false, error: "Penjualan offline tidak ditemukan" });
     }
     const items = await query<any>(
       "SELECT *, unit_price AS price FROM order_items WHERE order_id = ?",
-      [id]
+      [id],
     );
     return res.json({ success: true, sale, items });
   } catch (error: any) {
@@ -3349,7 +3739,7 @@ export const deleteOfflineSale = async (req: Request, res: Response) => {
 
     const [orderRows] = await connection.execute(
       "SELECT payment_status FROM orders WHERE order_id = ? AND channel = 'pos' FOR UPDATE",
-      [id]
+      [id],
     );
     const order = (orderRows as any[])[0];
 
@@ -3357,23 +3747,23 @@ export const deleteOfflineSale = async (req: Request, res: Response) => {
       // Return stock back to inventory
       const [items] = await connection.execute(
         "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
-        [id]
+        [id],
       );
       for (const item of items as any[]) {
         if (item.variant_id) {
-          await connection.execute(
-            "UPDATE product_variants SET stock = stock + ? WHERE id = ?",
-            [item.quantity, item.variant_id]
-          );
+          await connection.execute("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [
+            item.quantity,
+            item.variant_id,
+          ]);
           const [vRows] = await connection.execute(
             "SELECT stock FROM product_variants WHERE id = ?",
-            [item.variant_id]
+            [item.variant_id],
           );
           const curStock = (vRows as any)[0]?.stock || 0;
           await connection.execute(
             `INSERT INTO stock_movements (variant_id, movement_type, quantity_change, stock_before, stock_after, reference_type, reference_id, notes) 
              VALUES (?, 'return', ?, ?, ?, 'order', ?, 'Pengembalian stok (penjualan POS dihapus)')`,
-            [item.variant_id, item.quantity, curStock - item.quantity, curStock, id]
+            [item.variant_id, item.quantity, curStock - item.quantity, curStock, id],
           );
         }
       }
@@ -3385,7 +3775,9 @@ export const deleteOfflineSale = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback();
     console.error("Error deleting offline sale:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to delete sale" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Failed to delete sale" });
   } finally {
     connection.release();
   }
@@ -3395,7 +3787,8 @@ export const deleteOfflineSale = async (req: Request, res: Response) => {
 export const updateOfflineSale = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { customer_name, customer_email, customer_phone, customer_nim, notes, cashier_id } = req.body;
+    const { customer_name, customer_email, customer_phone, customer_nim, notes, cashier_id } =
+      req.body;
 
     await execute(
       `UPDATE orders 
@@ -3407,20 +3800,22 @@ export const updateOfflineSale = async (req: Request, res: Response) => {
            cashier_id = COALESCE(?, cashier_id)
        WHERE order_id = ? AND channel = 'pos'`,
       [
-        customer_name !== undefined ? (String(customer_name).trim() || "-") : null,
+        customer_name !== undefined ? String(customer_name).trim() || "-" : null,
         customer_email !== undefined ? customer_email : null,
         customer_phone !== undefined ? customer_phone : null,
         customer_nim !== undefined ? customer_nim : null,
         notes !== undefined ? notes : null,
         cashier_id !== undefined ? cashier_id : null,
-        id
-      ]
+        id,
+      ],
     );
 
     return res.json({ success: true, message: "Penjualan offline berhasil diperbarui" });
   } catch (error: any) {
     console.error("Error updating offline sale:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal memperbarui penjualan offline" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Gagal memperbarui penjualan offline" });
   }
 };
 
@@ -3448,8 +3843,6 @@ export const getStoreSettings = async (req: Request, res: Response) => {
   }
 };
 
-
-
 // Update store settings
 export const updateStoreSettings = async (req: Request, res: Response) => {
   try {
@@ -3462,7 +3855,7 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
     const homepageLayoutToSave =
       input.homepage_layout !== undefined
         ? input.homepage_layout
-        : existing?.homepage_layout ?? null;
+        : (existing?.homepage_layout ?? null);
 
     if (existing) {
       await execute(
@@ -3470,14 +3863,18 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
          tax_rate = ?, qris_static_url = ?, homepage_layout = ?, payment_mode = ? WHERE id = ?`,
         [
           input.store_name !== undefined ? input.store_name : existing.store_name,
-          input.address !== undefined ? (input.address || null) : existing.address,
-          input.phone !== undefined ? (input.phone || null) : existing.phone,
+          input.address !== undefined ? input.address || null : existing.address,
+          input.phone !== undefined ? input.phone || null : existing.phone,
           input.tax_rate !== undefined ? input.tax_rate : existing.tax_rate,
-          input.qris_static_url !== undefined ? (input.qris_static_url || null) : existing.qris_static_url,
+          input.qris_static_url !== undefined
+            ? input.qris_static_url || null
+            : existing.qris_static_url,
           homepageLayoutToSave,
-          input.payment_mode !== undefined ? (input.payment_mode || "midtrans") : existing.payment_mode,
+          input.payment_mode !== undefined
+            ? input.payment_mode || "midtrans"
+            : existing.payment_mode,
           existing.id,
-        ]
+        ],
       );
     } else {
       await execute(
@@ -3491,7 +3888,7 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
           input.qris_static_url || null,
           homepageLayoutToSave,
           input.payment_mode || "midtrans",
-        ]
+        ],
       );
     }
 
@@ -3502,7 +3899,7 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
       "update_settings",
       "settings",
       existing ? existing.id : 1,
-      `Pengaturan toko diperbarui oleh ${actorName || 'Sistem'}`
+      `Pengaturan toko diperbarui oleh ${actorName || "Sistem"}`,
     );
 
     return res.json({ success: true });
@@ -3518,13 +3915,13 @@ export const updateStoreSettings = async (req: Request, res: Response) => {
 // Get activity logs (Admin only)
 export const getActivityLogs = async (req: Request, res: Response) => {
   try {
-    const logs = await query<any>(
-      `SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 500`
-    );
+    const logs = await query<any>(`SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 500`);
     return res.json({ success: true, logs });
   } catch (error: any) {
     console.error("Error getting activity logs:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to fetch activity logs" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Failed to fetch activity logs" });
   }
 };
 
@@ -3540,7 +3937,7 @@ export const getDailySalesSummary = async (req: Request, res: Response) => {
         COALESCE(AVG(gross_amount), 0) AS avg_transaction
        FROM orders
        WHERE payment_status = 'paid' AND DATE(created_at) = ?`,
-      [date]
+      [date],
     );
 
     return res.json({
@@ -3554,15 +3951,21 @@ export const getDailySalesSummary = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error("Error fetching daily summary:", error);
-    return res.status(500).json({ success: false, summary: null, error: "Failed to fetch summary" });
+    return res
+      .status(500)
+      .json({ success: false, summary: null, error: "Failed to fetch summary" });
   }
 };
 
 // Get top products sold
 export const getTopProducts = async (req: Request, res: Response) => {
   try {
-    const limit = Number.isFinite(Number(req.query.limit)) ? Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10))) : 10;
-    const days = Number.isFinite(Number(req.query.days)) ? Math.max(1, Math.min(365, parseInt(req.query.days as string, 10))) : 30;
+    const limit = Number.isFinite(Number(req.query.limit))
+      ? Math.max(1, Math.min(100, parseInt(req.query.limit as string, 10)))
+      : 10;
+    const days = Number.isFinite(Number(req.query.days))
+      ? Math.max(1, Math.min(365, parseInt(req.query.days as string, 10)))
+      : 30;
 
     const products = await query<any>(
       `SELECT p.id, p.name,
@@ -3574,7 +3977,7 @@ export const getTopProducts = async (req: Request, res: Response) => {
        WHERE o.payment_status = 'paid' AND o.created_at >= DATE_SUB(NOW(), INTERVAL ${days} DAY)
        GROUP BY p.id, p.name
        ORDER BY total_quantity_sold DESC
-       LIMIT ${limit}`
+       LIMIT ${limit}`,
     );
 
     return res.json({ success: true, products });
@@ -3596,7 +3999,7 @@ export const getInventory = async (req: Request, res: Response) => {
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
        WHERE p.is_active = TRUE
-       ORDER BY p.name, pv.size`
+       ORDER BY p.name, pv.size`,
     );
 
     const inventory = rows.map((row: any) => ({
@@ -3612,7 +4015,9 @@ export const getInventory = async (req: Request, res: Response) => {
     return res.json({ success: true, inventory });
   } catch (error: any) {
     console.error("Error fetching inventory:", error);
-    return res.status(500).json({ success: false, inventory: [], error: "Failed to fetch inventory" });
+    return res
+      .status(500)
+      .json({ success: false, inventory: [], error: "Failed to fetch inventory" });
   }
 };
 
@@ -3655,7 +4060,10 @@ export const getUserOrders = async (req: Request, res: Response) => {
       } catch (err) {}
     } else if (!targetUserId && targetEmail) {
       try {
-        const u = await queryOne<any>("SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) LIMIT 1", [targetEmail]);
+        const u = await queryOne<any>(
+          "SELECT id FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(?)) LIMIT 1",
+          [targetEmail],
+        );
         if (u && u.id) {
           targetUserId = u.id;
         }
@@ -3667,7 +4075,7 @@ export const getUserOrders = async (req: Request, res: Response) => {
       try {
         await execute(
           "UPDATE orders SET user_id = ? WHERE user_id IS NULL AND customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?))",
-          [targetUserId, targetEmail]
+          [targetUserId, targetEmail],
         );
       } catch (linkErr) {
         console.warn("Notice: auto-linking orders by email in getUserOrders failed:", linkErr);
@@ -3679,17 +4087,16 @@ export const getUserOrders = async (req: Request, res: Response) => {
     if (targetUserId && targetEmail) {
       orders = await query<any>(
         "SELECT * FROM orders WHERE user_id = ? OR (customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?))) ORDER BY created_at DESC",
-        [targetUserId, targetEmail]
+        [targetUserId, targetEmail],
       );
     } else if (targetUserId) {
-      orders = await query<any>(
-        "SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC",
-        [targetUserId]
-      );
+      orders = await query<any>("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC", [
+        targetUserId,
+      ]);
     } else if (targetEmail) {
       orders = await query<any>(
         "SELECT * FROM orders WHERE customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?)) ORDER BY created_at DESC",
-        [targetEmail]
+        [targetEmail],
       );
     }
 
@@ -3705,7 +4112,7 @@ export const getUserOrders = async (req: Request, res: Response) => {
        FROM order_items oi 
        LEFT JOIN products p ON p.id = oi.product_id 
        WHERE oi.order_id IN (${placeholders})`,
-      orderIds
+      orderIds,
     );
 
     // Fetch reviews submitted for these orders
@@ -3714,7 +4121,7 @@ export const getUserOrders = async (req: Request, res: Response) => {
       if (targetUserId) {
         reviews = await query<any>(
           `SELECT * FROM product_reviews WHERE order_id IN (${placeholders}) AND user_id = ?`,
-          [...orderIds, targetUserId]
+          [...orderIds, targetUserId],
         );
       }
     } catch (e) {
@@ -3752,32 +4159,37 @@ export const submitPaymentProof = async (req: Request, res: Response) => {
     // Fetch existing order to store previous proof in history if replacing
     const existingOrder = await queryOne<any>(
       "SELECT payment_proof_url, payment_proof_note, payment_proof_history FROM orders WHERE order_id = ?",
-      [id]
+      [id],
     );
 
     let history: any[] = [];
     if (existingOrder && existingOrder.payment_proof_history) {
       try {
-        history = typeof existingOrder.payment_proof_history === "string"
-          ? JSON.parse(existingOrder.payment_proof_history)
-          : existingOrder.payment_proof_history;
+        history =
+          typeof existingOrder.payment_proof_history === "string"
+            ? JSON.parse(existingOrder.payment_proof_history)
+            : existingOrder.payment_proof_history;
         if (!Array.isArray(history)) history = [];
       } catch (e) {
         history = [];
       }
     }
 
-    if (existingOrder && existingOrder.payment_proof_url && existingOrder.payment_proof_url !== paymentProofUrl) {
+    if (
+      existingOrder &&
+      existingOrder.payment_proof_url &&
+      existingOrder.payment_proof_url !== paymentProofUrl
+    ) {
       history.push({
         url: existingOrder.payment_proof_url,
         note: existingOrder.payment_proof_note || null,
-        replaced_at: new Date().toISOString()
+        replaced_at: new Date().toISOString(),
       });
     }
 
     await execute(
       "UPDATE orders SET payment_proof_url = ?, transaction_status = 'pending', payment_status = 'pending', payment_type = 'manual_qris', payment_proof_note = NULL, payment_proof_history = ?, payment_proof_match_status = NULL, payment_proof_difference = NULL, payment_proof_verified_amount = NULL WHERE order_id = ?",
-      [paymentProofUrl, JSON.stringify(history), id]
+      [paymentProofUrl, JSON.stringify(history), id],
     );
 
     // Auto-scan payment proof immediately with Gemini AI in background
@@ -3788,14 +4200,17 @@ export const submitPaymentProof = async (req: Request, res: Response) => {
     return res.json({ success: true });
   } catch (error: any) {
     console.error("Error submitting payment proof:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to submit payment proof" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Failed to submit payment proof" });
   }
 };
 
-
 export const getPreOrderCampaigns = async (req: Request, res: Response) => {
   try {
-    const campaigns = await query<any>("SELECT * FROM pre_order_campaigns ORDER BY created_at DESC");
+    const campaigns = await query<any>(
+      "SELECT * FROM pre_order_campaigns ORDER BY created_at DESC",
+    );
     return res.json({ success: true, data: campaigns });
   } catch (error: any) {
     console.error("Error fetching pre-order campaigns:", error);
@@ -3815,7 +4230,9 @@ export const getAllPreOrderCampaigns = async (req: Request, res: Response) => {
 
 export const getActivePreOrderCampaign = async (req: Request, res: Response) => {
   try {
-    const campaign = await queryOne<any>("SELECT * FROM pre_order_campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1");
+    const campaign = await queryOne<any>(
+      "SELECT * FROM pre_order_campaigns WHERE is_active = 1 ORDER BY id DESC LIMIT 1",
+    );
 
     return res.json({ success: true, data: campaign || null });
   } catch (error: any) {
@@ -3828,10 +4245,11 @@ export const createPreOrderCampaign = async (req: Request, res: Response) => {
   try {
     let { batch_name, start_date, end_date, extended_end_date, is_active, description } = req.body;
     if (!batch_name || !start_date || !end_date) {
-      return res.status(400).json({ success: false, error: "Nama batch, tanggal mulai, dan tanggal selesai wajib diisi" });
+      return res.status(400).json({
+        success: false,
+        error: "Nama batch, tanggal mulai, dan tanggal selesai wajib diisi",
+      });
     }
-
-
 
     if (is_active) {
       await execute("UPDATE pre_order_campaigns SET is_active = 0");
@@ -3840,10 +4258,21 @@ export const createPreOrderCampaign = async (req: Request, res: Response) => {
     const result = await execute(
       `INSERT INTO pre_order_campaigns (batch_name, start_date, end_date, extended_end_date, is_active, description)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [batch_name, start_date, end_date, extended_end_date || null, is_active ? 1 : 0, description || null]
+      [
+        batch_name,
+        start_date,
+        end_date,
+        extended_end_date || null,
+        is_active ? 1 : 0,
+        description || null,
+      ],
     );
 
-    return res.json({ success: true, id: (result as any).insertId, message: "Campaign Pre-Order berhasil dibuat" });
+    return res.json({
+      success: true,
+      id: (result as any).insertId,
+      message: "Campaign Pre-Order berhasil dibuat",
+    });
   } catch (error: any) {
     console.error("Error creating pre-order campaign:", error);
     return res.status(500).json({ success: false, error: error.message });
@@ -3856,10 +4285,11 @@ export const updatePreOrderCampaign = async (req: Request, res: Response) => {
     let { batch_name, start_date, end_date, extended_end_date, is_active, description } = req.body;
 
     if (!batch_name || !start_date || !end_date) {
-      return res.status(400).json({ success: false, error: "Nama batch, tanggal mulai, dan tanggal selesai wajib diisi" });
+      return res.status(400).json({
+        success: false,
+        error: "Nama batch, tanggal mulai, dan tanggal selesai wajib diisi",
+      });
     }
-
-
 
     if (is_active) {
       await execute("UPDATE pre_order_campaigns SET is_active = 0 WHERE id != ?", [id]);
@@ -3869,7 +4299,15 @@ export const updatePreOrderCampaign = async (req: Request, res: Response) => {
       `UPDATE pre_order_campaigns 
        SET batch_name = ?, start_date = ?, end_date = ?, extended_end_date = ?, is_active = ?, description = ?
        WHERE id = ?`,
-      [batch_name, start_date, end_date, extended_end_date || null, is_active ? 1 : 0, description || null, id]
+      [
+        batch_name,
+        start_date,
+        end_date,
+        extended_end_date || null,
+        is_active ? 1 : 0,
+        description || null,
+        id,
+      ],
     );
 
     return res.json({ success: true, message: "Campaign Pre-Order berhasil diperbarui" });
@@ -3886,7 +4324,10 @@ export const togglePreOrderCampaignActive = async (req: Request, res: Response) 
     if (is_active) {
       await execute("UPDATE pre_order_campaigns SET is_active = 0 WHERE id != ?", [id]);
     }
-    await execute("UPDATE pre_order_campaigns SET is_active = ? WHERE id = ?", [is_active ? 1 : 0, id]);
+    await execute("UPDATE pre_order_campaigns SET is_active = ? WHERE id = ?", [
+      is_active ? 1 : 0,
+      id,
+    ]);
     return res.json({ success: true, message: "Status batch berhasil diubah" });
   } catch (error: any) {
     console.error("Error toggling pre-order campaign status:", error);
@@ -3920,7 +4361,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
        FROM products p 
        LEFT JOIN categories c ON p.category_id = c.id 
        WHERE p.sale_type = 'pre_order' OR p.product_type = 'preorder' OR p.pre_order_campaign_id = ?`,
-      [id]
+      [id],
     );
 
     // Fetch bundle component mappings
@@ -3928,10 +4369,13 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       `SELECT bi.bundle_product_id, bi.component_product_id, COALESCE(bi.quantity, 1) as comp_qty,
               bp.name as bundle_name
        FROM bundle_items bi
-       JOIN products bp ON bi.bundle_product_id = bp.id`
+       JOIN products bp ON bi.bundle_product_id = bp.id`,
     );
 
-    const bundleComponentsMap: Record<number, Array<{ component_product_id: number; comp_qty: number; bundle_name: string }>> = {};
+    const bundleComponentsMap: Record<
+      number,
+      Array<{ component_product_id: number; comp_qty: number; bundle_name: string }>
+    > = {};
     for (const bi of bundleItemsRows) {
       const bId = Number(bi.bundle_product_id);
       if (!bundleComponentsMap[bId]) bundleComponentsMap[bId] = [];
@@ -3947,7 +4391,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       `SELECT pv.*, p.name as product_name 
        FROM product_variants pv 
        JOIN products p ON pv.product_id = p.id 
-       WHERE pv.is_active = TRUE`
+       WHERE pv.is_active = TRUE`,
     );
 
     const componentVariantsMap: Record<number, string[]> = {};
@@ -3956,7 +4400,15 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       if (!componentVariantsMap[pId]) componentVariantsMap[pId] = [];
       const vLabel = [pv.size, pv.color]
         .map((s) => (s || "").trim())
-        .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard")
+        .filter(
+          (s) =>
+            s &&
+            s !== "-" &&
+            s !== "Default" &&
+            s !== "One Size" &&
+            s !== "All Size" &&
+            s !== "Standard",
+        )
         .join(" / ");
       if (vLabel && !componentVariantsMap[pId].includes(vLabel)) {
         componentVariantsMap[pId].push(vLabel);
@@ -4013,7 +4465,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
        )
          AND o.order_id NOT LIKE 'LNS%'
        ORDER BY o.created_at DESC`,
-      [id, id, campaign.start_date, effectiveEndDate]
+      [id, id, campaign.start_date, effectiveEndDate],
     );
 
     // Group items by order_id
@@ -4023,21 +4475,24 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
     let totalDiscountAmount = 0;
     let totalUnitsSold = 0;
 
-    const productSalesMap: Record<number, {
-      product_id: number;
-      name: string;
-      image_url: string | null;
-      product_type: string;
-      unit_price: number;
-      total_qty: number;
-      direct_qty: number;
-      bundle_qty: number;
-      total_subtotal: number;
-      variants: Record<string, number>;
-      direct_variants: Record<string, number>;
-      bundle_variants: Record<string, number>;
-      bundle_source_breakdown: Record<string, number>;
-    }> = {};
+    const productSalesMap: Record<
+      number,
+      {
+        product_id: number;
+        name: string;
+        image_url: string | null;
+        product_type: string;
+        unit_price: number;
+        total_qty: number;
+        direct_qty: number;
+        bundle_qty: number;
+        total_subtotal: number;
+        variants: Record<string, number>;
+        direct_variants: Record<string, number>;
+        bundle_variants: Record<string, number>;
+        bundle_source_breakdown: Record<string, number>;
+      }
+    > = {};
 
     // Initialize product map for connected products
     for (const prod of connectedProducts) {
@@ -4061,9 +4516,13 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
     const uniqueBuyersSet = new Set<string>();
 
     for (const item of items) {
-      const isPaid = item.payment_status === "paid" || item.payment_status === "settlement" || item.order_status === "completed";
+      const isPaid =
+        item.payment_status === "paid" ||
+        item.payment_status === "settlement" ||
+        item.order_status === "completed";
 
-      const buyerId = item.customer_email || item.user_email || item.customer_phone || `order-${item.order_id}`;
+      const buyerId =
+        item.customer_email || item.user_email || item.customer_phone || `order-${item.order_id}`;
       if (isPaid) {
         uniqueBuyersSet.add(buyerId);
       }
@@ -4071,7 +4530,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
       if (!ordersMap[item.order_id]) {
         const orderGrandTotal = Number(item.grand_total || 0);
         const orderDiscount = Number(item.order_discount_amount || 0);
-        const orderSubtotal = Number(item.order_subtotal || (orderGrandTotal + orderDiscount));
+        const orderSubtotal = Number(item.order_subtotal || orderGrandTotal + orderDiscount);
 
         ordersMap[item.order_id] = {
           order_id: item.order_id,
@@ -4106,7 +4565,7 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         color: item.color || "-",
         quantity: item.quantity,
         unit_price: Number(item.unit_price),
-        subtotal: Number(item.subtotal || (item.quantity * item.unit_price)),
+        subtotal: Number(item.subtotal || item.quantity * item.unit_price),
       });
 
       // Aggregate product sales
@@ -4138,7 +4597,15 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
         const formatVariantKey = (rawSize?: string, rawColor?: string) => {
           const parts = [rawSize, rawColor]
             .map((s) => (s || "").trim())
-            .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard");
+            .filter(
+              (s) =>
+                s &&
+                s !== "-" &&
+                s !== "Default" &&
+                s !== "One Size" &&
+                s !== "All Size" &&
+                s !== "Standard",
+            );
           return parts.join(" / ");
         };
 
@@ -4156,9 +4623,12 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
 
           const parentOrderItems = items.filter((i) => i.order_id === item.order_id);
           const parentBundle = parentOrderItems.find(
-            (i) => i.connected_product_type === "bundle" || Boolean(bundleComponentsMap[i.product_id])
+            (i) =>
+              i.connected_product_type === "bundle" || Boolean(bundleComponentsMap[i.product_id]),
           );
-          const parentBundleName = parentBundle ? (parentBundle.product_name || parentBundle.connected_product_name) : "Paket Bundle";
+          const parentBundleName = parentBundle
+            ? parentBundle.product_name || parentBundle.connected_product_name
+            : "Paket Bundle";
 
           const bKey = `${parentBundleName}${cleanedVar ? ` — ${cleanedVar}` : ""}`;
 
@@ -4174,11 +4644,20 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           totalUnitsSold += item.quantity;
           productSalesMap[pid].direct_qty += item.quantity;
           productSalesMap[pid].total_qty += item.quantity;
-          productSalesMap[pid].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
-          productSalesMap[pid].variants[variantKey] = (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
-          productSalesMap[pid].direct_variants[variantKey] = (productSalesMap[pid].direct_variants[variantKey] || 0) + item.quantity;
+          productSalesMap[pid].total_subtotal += Number(
+            item.subtotal || item.quantity * item.unit_price,
+          );
+          productSalesMap[pid].variants[variantKey] =
+            (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
+          productSalesMap[pid].direct_variants[variantKey] =
+            (productSalesMap[pid].direct_variants[variantKey] || 0) + item.quantity;
 
-          const hasComponentRows = items.some((i) => i.order_id === item.order_id && ((i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")) || Number(i.unit_price || i.price) === 0));
+          const hasComponentRows = items.some(
+            (i) =>
+              i.order_id === item.order_id &&
+              ((i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")) ||
+                Number(i.unit_price || i.price) === 0),
+          );
 
           if (!hasComponentRows) {
             const comps = bundleComponentsMap[pid];
@@ -4189,7 +4668,8 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
                 if (productSalesMap[cid]) {
                   let matchedCompVar = cleanedVar;
                   if (!matchedCompVar && componentVariantsMap[cid]) {
-                    const searchStr = `${item.size || ""} ${item.color || ""} ${item.product_name || ""} ${item.notes || ""}`.toLowerCase();
+                    const searchStr =
+                      `${item.size || ""} ${item.color || ""} ${item.product_name || ""} ${item.notes || ""}`.toLowerCase();
                     for (const vName of componentVariantsMap[cid]) {
                       if (searchStr.includes(vName.toLowerCase())) {
                         matchedCompVar = vName;
@@ -4220,9 +4700,13 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           totalUnitsSold += item.quantity;
           productSalesMap[pid].direct_qty += item.quantity;
           productSalesMap[pid].total_qty += item.quantity;
-          productSalesMap[pid].total_subtotal += Number(item.subtotal || (item.quantity * item.unit_price));
-          productSalesMap[pid].variants[variantKey] = (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
-          productSalesMap[pid].direct_variants[variantKey] = (productSalesMap[pid].direct_variants[variantKey] || 0) + item.quantity;
+          productSalesMap[pid].total_subtotal += Number(
+            item.subtotal || item.quantity * item.unit_price,
+          );
+          productSalesMap[pid].variants[variantKey] =
+            (productSalesMap[pid].variants[variantKey] || 0) + item.quantity;
+          productSalesMap[pid].direct_variants[variantKey] =
+            (productSalesMap[pid].direct_variants[variantKey] || 0) + item.quantity;
         }
       }
     }
@@ -4248,8 +4732,15 @@ export const getPreOrderCampaignStats = async (req: Request, res: Response) => {
           total_units_sold: totalUnitsSold,
           total_orders: ordersList.length,
           total_buyers: uniqueBuyersSet.size,
-          paid_orders_count: ordersList.filter(o => o.payment_status === 'paid' || o.payment_status === 'settlement' || o.order_status === 'completed').length,
-          pending_orders_count: ordersList.filter(o => o.payment_status === 'pending' || o.payment_status === 'unpaid').length,
+          paid_orders_count: ordersList.filter(
+            (o) =>
+              o.payment_status === "paid" ||
+              o.payment_status === "settlement" ||
+              o.order_status === "completed",
+          ).length,
+          pending_orders_count: ordersList.filter(
+            (o) => o.payment_status === "pending" || o.payment_status === "unpaid",
+          ).length,
         },
         product_breakdown: productBreakdown,
         orders: ordersList,
@@ -4271,7 +4762,8 @@ export const handleMayarWebhook = async (req: Request, res: Response) => {
 
     // 1. Verify webhook token
     const webhookToken = config.mayar.webhookToken;
-    const receivedToken = req.headers["x-callback-token"] || req.headers["x-mayar-token"] || payload?.token;
+    const receivedToken =
+      req.headers["x-callback-token"] || req.headers["x-mayar-token"] || payload?.token;
 
     if (webhookToken && receivedToken !== webhookToken) {
       console.error("❌ [SECURITY] Invalid Mayar webhook token");
@@ -4305,7 +4797,8 @@ export const handleMayarWebhook = async (req: Request, res: Response) => {
     const orderIdFromPayload = invoiceData?.extraData?.orderId || payload?.extraData?.orderId;
     const mayarInvoiceId = invoiceData?.id || null;
     const mayarLink = invoiceData?.link || null;
-    const transactionId = invoiceData?.transactionId || invoiceData?.transaction?.id || invoiceData?.id || null;
+    const transactionId =
+      invoiceData?.transactionId || invoiceData?.transaction?.id || invoiceData?.id || null;
 
     await connection.beginTransaction();
 
@@ -4315,7 +4808,7 @@ export const handleMayarWebhook = async (req: Request, res: Response) => {
     if (orderIdFromPayload) {
       const [rows] = await connection.execute(
         "SELECT id, order_id, user_id, channel, fulfillment_status, payment_status, order_status FROM orders WHERE order_id = ? FOR UPDATE",
-        [orderIdFromPayload]
+        [orderIdFromPayload],
       );
       order = (rows as any[])[0];
     }
@@ -4324,7 +4817,7 @@ export const handleMayarWebhook = async (req: Request, res: Response) => {
     if (!order && mayarInvoiceId) {
       const [rows] = await connection.execute(
         "SELECT id, order_id, user_id, channel, fulfillment_status, payment_status, order_status FROM orders WHERE snap_token = ? OR snap_token = ? OR (snap_token IS NOT NULL AND snap_token LIKE ?) FOR UPDATE",
-        [mayarInvoiceId, mayarLink, `%${mayarInvoiceId}%`]
+        [mayarInvoiceId, mayarLink, `%${mayarInvoiceId}%`],
       );
       order = (rows as any[])[0];
     }
@@ -4337,7 +4830,7 @@ export const handleMayarWebhook = async (req: Request, res: Response) => {
         const extractedOrderId = match[0];
         const [rows] = await connection.execute(
           "SELECT id, order_id, user_id, channel, fulfillment_status, payment_status, order_status FROM orders WHERE order_id = ? FOR UPDATE",
-          [extractedOrderId]
+          [extractedOrderId],
         );
         order = (rows as any[])[0];
       }
@@ -4361,7 +4854,7 @@ export const handleMayarWebhook = async (req: Request, res: Response) => {
     // 4. Update payments table
     const [existingPaymentRows] = await connection.execute(
       "SELECT id, status FROM payments WHERE order_id = ? AND provider = 'mayar' LIMIT 1 FOR UPDATE",
-      [orderId]
+      [orderId],
     );
     const existingPayment = (existingPaymentRows as any[])[0];
     const paidAt = new Date();
@@ -4371,23 +4864,23 @@ export const handleMayarWebhook = async (req: Request, res: Response) => {
         `UPDATE payments SET 
           status = 'paid', provider_transaction_id = ?, paid_at = ?, raw_callback_json = ?, updated_at = NOW()
          WHERE id = ?`,
-        [transactionId, paidAt, JSON.stringify(payload), existingPayment.id]
+        [transactionId, paidAt, JSON.stringify(payload), existingPayment.id],
       );
     } else {
       await connection.execute(
         `INSERT INTO payments (
           order_id, provider, payment_method, amount, status, provider_transaction_id, paid_at, raw_callback_json
         ) VALUES (?, 'mayar', 'mayar', ?, 'paid', ?, ?, ?)`,
-        [orderId, invoiceData?.amount || 0, transactionId, paidAt, JSON.stringify(payload)]
+        [orderId, invoiceData?.amount || 0, transactionId, paidAt, JSON.stringify(payload)],
       );
     }
 
     // 5. Update orders table
-    let orderStatus = 'paid';
+    let orderStatus = "paid";
     let fulfillmentStatus = order.fulfillment_status;
-    if (order.channel === 'pos') {
-      orderStatus = 'completed';
-      fulfillmentStatus = 'completed';
+    if (order.channel === "pos") {
+      orderStatus = "completed";
+      fulfillmentStatus = "completed";
     }
 
     await connection.execute(
@@ -4395,33 +4888,33 @@ export const handleMayarWebhook = async (req: Request, res: Response) => {
         payment_status = 'paid', order_status = ?, fulfillment_status = ?, payment_type = 'mayar',
         transaction_status = 'settlement', midtrans_transaction_id = ?, updated_at = NOW()
        WHERE order_id = ?`,
-      [orderStatus, fulfillmentStatus, transactionId, orderId]
+      [orderStatus, fulfillmentStatus, transactionId, orderId],
     );
 
     // 6. Handle stock — release reservations + deduct physical stock
     const [items] = await connection.execute(
       "SELECT variant_id, quantity FROM order_items WHERE order_id = ?",
-      [orderId]
+      [orderId],
     );
     const orderItemsList = items as any[];
 
     for (const item of orderItemsList) {
       if (item.variant_id) {
         // Deduct physical stock
-        await connection.execute(
-          "UPDATE product_variants SET stock = stock - ? WHERE id = ?",
-          [item.quantity, item.variant_id]
-        );
+        await connection.execute("UPDATE product_variants SET stock = stock - ? WHERE id = ?", [
+          item.quantity,
+          item.variant_id,
+        ]);
         // Release stock reservation
         await connection.execute(
           "UPDATE product_variants SET stock_reserved = GREATEST(0, CAST(stock_reserved AS SIGNED) - ?) WHERE id = ?",
-          [item.quantity, item.variant_id]
+          [item.quantity, item.variant_id],
         );
 
         // Log stock movements
         const [vRows] = await connection.execute(
           "SELECT stock FROM product_variants WHERE id = ?",
-          [item.variant_id]
+          [item.variant_id],
         );
         const curStock = (vRows as any[])[0]?.stock || 0;
         await connection.execute(
@@ -4429,7 +4922,7 @@ export const handleMayarWebhook = async (req: Request, res: Response) => {
             variant_id, movement_type, quantity_change, stock_before, stock_after,
             reference_type, reference_id, created_by, notes
           ) VALUES (?, 'sale', ?, ?, ?, 'order', ?, NULL, 'Pembayaran Mayar berhasil')`,
-          [item.variant_id, -item.quantity, curStock + item.quantity, curStock, orderId]
+          [item.variant_id, -item.quantity, curStock + item.quantity, curStock, orderId],
         );
       }
     }
@@ -4437,7 +4930,6 @@ export const handleMayarWebhook = async (req: Request, res: Response) => {
     await connection.commit();
     console.log(`✅ Mayar webhook processed: Order ${orderId} marked as PAID`);
     return res.status(200).json({ success: true, message: "Payment processed successfully" });
-
   } catch (error: any) {
     await connection.rollback();
     console.error("❌ Error processing Mayar webhook:", error);
@@ -4459,10 +4951,9 @@ export const regeneratePaymentToken = async (req: Request, res: Response) => {
 
     console.log("🔄 Regenerating Mayar payment link for order:", orderId);
 
-    const [orderRows] = await connection.execute(
-      "SELECT * FROM orders WHERE order_id = ?",
-      [orderId]
-    );
+    const [orderRows] = await connection.execute("SELECT * FROM orders WHERE order_id = ?", [
+      orderId,
+    ]);
     const order = (orderRows as any[])[0];
 
     if (!order) {
@@ -4474,7 +4965,10 @@ export const regeneratePaymentToken = async (req: Request, res: Response) => {
     }
 
     // Reuse existing valid Mayar checkout URL if already generated to avoid hitting 429 rate limit
-    if (order.snap_token && (order.snap_token.startsWith("http://") || order.snap_token.startsWith("https://"))) {
+    if (
+      order.snap_token &&
+      (order.snap_token.startsWith("http://") || order.snap_token.startsWith("https://"))
+    ) {
       console.log("⚡ Returning existing cached Mayar checkout URL for order:", orderId);
       return res.json({
         success: true,
@@ -4485,10 +4979,9 @@ export const regeneratePaymentToken = async (req: Request, res: Response) => {
     }
 
     // Fetch order items to create a fresh invoice if needed
-    const [itemRows] = await connection.execute(
-      "SELECT * FROM order_items WHERE order_id = ?",
-      [orderId]
-    );
+    const [itemRows] = await connection.execute("SELECT * FROM order_items WHERE order_id = ?", [
+      orderId,
+    ]);
     const items = itemRows as any[];
 
     const mayarItems = items.map((item: any) => ({
@@ -4498,10 +4991,18 @@ export const regeneratePaymentToken = async (req: Request, res: Response) => {
     }));
 
     if (Number(order.shipping_cost) > 0) {
-      mayarItems.push({ description: "Ongkos Kirim", quantity: 1, rate: Number(order.shipping_cost) });
+      mayarItems.push({
+        description: "Ongkos Kirim",
+        quantity: 1,
+        rate: Number(order.shipping_cost),
+      });
     }
     if (Number(order.service_fee) > 0) {
-      mayarItems.push({ description: "Biaya Layanan", quantity: 1, rate: Number(order.service_fee) });
+      mayarItems.push({
+        description: "Biaya Layanan",
+        quantity: 1,
+        rate: Number(order.service_fee),
+      });
     }
 
     const origin = req.get("origin") || req.get("referer") || "";
@@ -4538,13 +5039,16 @@ export const regeneratePaymentToken = async (req: Request, res: Response) => {
       mayarResponse = await fetch(`${config.mayar.apiUrl}/invoice/create`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${config.mayar.apiKey}`,
+          Authorization: `Bearer ${config.mayar.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify(mayarPayload),
       });
     } catch (e: any) {
-      if (order.snap_token && (order.snap_token.startsWith("http://") || order.snap_token.startsWith("https://"))) {
+      if (
+        order.snap_token &&
+        (order.snap_token.startsWith("http://") || order.snap_token.startsWith("https://"))
+      ) {
         return res.json({ success: true, token: order.snap_token, checkoutUrl: order.snap_token });
       }
       throw e;
@@ -4568,7 +5072,7 @@ export const regeneratePaymentToken = async (req: Request, res: Response) => {
       throw new Error(
         mayarResponse.status === 429
           ? "Terlalu banyak permintaan pembayaran dalam waktu singkat. Silakan tunggu 1-2 menit lalu coba lagi."
-          : `Gagal membuat invoice Mayar: ${mayarResponse.status}`
+          : `Gagal membuat invoice Mayar: ${mayarResponse.status}`,
       );
     }
 
@@ -4583,7 +5087,7 @@ export const regeneratePaymentToken = async (req: Request, res: Response) => {
     // Update order with new Mayar checkout URL
     await connection.execute(
       "UPDATE orders SET snap_token = ?, payment_type = 'mayar' WHERE order_id = ?",
-      [checkoutUrl, orderId]
+      [checkoutUrl, orderId],
     );
 
     return res.json({
@@ -4606,8 +5110,8 @@ export const regeneratePaymentToken = async (req: Request, res: Response) => {
 // Get unified orders summary for dashboard (sales, products, variants, sizes, buyers)
 export const getOrdersSummary = async (req: Request, res: Response) => {
   try {
-    const days = req.query.days as string || "30";
-    const batch = (req.query.batch as string || "all").trim();
+    const days = (req.query.days as string) || "30";
+    const batch = ((req.query.batch as string) || "all").trim();
 
     let dateConstraint = "o.created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)";
 
@@ -4625,7 +5129,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
 
     // Fetch active/past campaigns for batch filtering and breakdown
     const campaigns = await query<any>(
-      "SELECT id, batch_name, start_date, end_date, extended_end_date FROM pre_order_campaigns ORDER BY id ASC"
+      "SELECT id, batch_name, start_date, end_date, extended_end_date FROM pre_order_campaigns ORDER BY id ASC",
     );
 
     const formatSqlDate = (d: any) => {
@@ -4645,18 +5149,22 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
     if (batch && batch !== "all") {
       if (batch === "ready_stock") {
         if (campaigns.length > 0) {
-          const campRanges = campaigns.map((c: any) => {
-            const startD = formatSqlDate(c.start_date);
-            const endD = formatSqlDate(c.extended_end_date || c.end_date);
-            return `(o.created_at >= '${startD}' AND o.created_at <= '${endD}')`;
-          }).join(" OR ");
+          const campRanges = campaigns
+            .map((c: any) => {
+              const startD = formatSqlDate(c.start_date);
+              const endD = formatSqlDate(c.extended_end_date || c.end_date);
+              return `(o.created_at >= '${startD}' AND o.created_at <= '${endD}')`;
+            })
+            .join(" OR ");
           batchConstraint = `(o.pre_order_campaign_id IS NULL AND NOT (${campRanges}))`;
         } else {
           batchConstraint = "o.pre_order_campaign_id IS NULL";
         }
       } else {
         // Specific campaign ID or name
-        const matchedCamp = campaigns.find((c: any) => String(c.id) === batch || c.batch_name.toLowerCase() === batch.toLowerCase());
+        const matchedCamp = campaigns.find(
+          (c: any) => String(c.id) === batch || c.batch_name.toLowerCase() === batch.toLowerCase(),
+        );
         if (matchedCamp) {
           const startD = formatSqlDate(matchedCamp.start_date);
           const endD = formatSqlDate(matchedCamp.extended_end_date || matchedCamp.end_date);
@@ -4668,7 +5176,8 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
     }
 
     // Valid paid condition matching transactions.tsx
-    const validPaidCondition = "(o.payment_status = 'paid' OR o.order_status IN ('completed', 'settlement', 'capture')) AND o.order_status NOT IN ('cancelled', 'cancel')";
+    const validPaidCondition =
+      "(o.payment_status = 'paid' OR o.order_status IN ('completed', 'settlement', 'capture')) AND o.order_status NOT IN ('cancelled', 'cancel')";
 
     // 1. General financial and order summary
     const summary = await queryOne<any>(
@@ -4683,7 +5192,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         COALESCE(SUM(CASE WHEN ${validPaidCondition} THEN o.tax_amount ELSE 0 END), 0) AS total_tax,
         COALESCE(SUM(CASE WHEN ${validPaidCondition} THEN o.subtotal ELSE 0 END), 0) AS total_subtotal
        FROM orders o
-       WHERE ${dateConstraint} AND ${batchConstraint}`
+       WHERE ${dateConstraint} AND ${batchConstraint}`,
     );
 
     // 2. Product and Variant Sales Breakdown
@@ -4700,7 +5209,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
        JOIN orders o ON o.order_id = oi.order_id
        WHERE ${validPaidCondition} AND ${dateConstraint} AND ${batchConstraint}
        GROUP BY oi.product_id, oi.product_name, oi.variant_id, oi.size, oi.color
-       ORDER BY total_quantity DESC`
+       ORDER BY total_quantity DESC`,
     );
 
     // Group product breakdown in JavaScript
@@ -4715,7 +5224,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
           total_revenue: 0,
           variants: [],
           sizes: {},
-          colors: {}
+          colors: {},
         });
       }
       const prod = productMap.get(pid);
@@ -4727,7 +5236,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         size: row.size,
         color: row.color || "Default",
         quantity: Number(row.total_quantity),
-        revenue: Number(row.total_revenue)
+        revenue: Number(row.total_revenue),
       });
 
       if (row.size) {
@@ -4751,7 +5260,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
        FROM orders o
        WHERE ${validPaidCondition} AND ${dateConstraint} AND ${batchConstraint}
        GROUP BY o.customer_email, o.customer_name, o.customer_phone, o.customer_nim
-       ORDER BY total_spent DESC`
+       ORDER BY total_spent DESC`,
     );
 
     const buyerItemRows = await query<any>(
@@ -4766,7 +5275,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
        FROM orders o
        JOIN order_items oi ON o.order_id = oi.order_id
        WHERE ${validPaidCondition} AND ${dateConstraint} AND ${batchConstraint}
-       GROUP BY o.customer_email, o.customer_name, oi.product_name, oi.size, oi.color`
+       GROUP BY o.customer_email, o.customer_name, oi.product_name, oi.size, oi.color`,
     );
 
     const buyerMap = new Map();
@@ -4781,7 +5290,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         customer_nim: row.customer_nim,
         total_orders: Number(row.total_orders),
         total_spent: Number(row.total_spent),
-        items: []
+        items: [],
       });
     }
 
@@ -4795,7 +5304,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
           size: row.size,
           color: row.color,
           quantity: Number(row.total_quantity),
-          total_spent: Number(row.total_spent)
+          total_spent: Number(row.total_spent),
         });
       }
     }
@@ -4813,7 +5322,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
          FROM orders o
          WHERE ${validPaidCondition} AND o.created_at >= CURDATE() AND ${batchConstraint}
          GROUP BY HOUR(o.created_at), DATE_FORMAT(o.created_at, '%H:00')
-         ORDER BY hour ASC`
+         ORDER BY hour ASC`,
       );
     } else {
       trendRows = await query<any>(
@@ -4825,12 +5334,15 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
          FROM orders o
          WHERE ${validPaidCondition} AND ${dateConstraint} AND ${batchConstraint}
          GROUP BY DATE(o.created_at), DATE_FORMAT(o.created_at, '%d %b')
-         ORDER BY date ASC`
+         ORDER BY date ASC`,
       );
     }
 
     // 5. Calculate Batch / Campaign Distribution breakdown across all paid orders
-    const batchBreakdownMap: Record<string, { id: string | number; name: string; revenue: number; orders: number; items: number }> = {};
+    const batchBreakdownMap: Record<
+      string,
+      { id: string | number; name: string; revenue: number; orders: number; items: number }
+    > = {};
 
     // Initialize entries for all campaigns
     for (const c of campaigns) {
@@ -4839,7 +5351,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         name: c.batch_name || `Batch #${c.id}`,
         revenue: 0,
         orders: 0,
-        items: 0
+        items: 0,
       };
     }
     batchBreakdownMap["ready_stock"] = {
@@ -4847,7 +5359,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
       name: "Ready Stock / Outside PO",
       revenue: 0,
       orders: 0,
-      items: 0
+      items: 0,
     };
 
     // Fetch overall paid orders with item counts to compute campaign share
@@ -4860,7 +5372,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         o.gross_amount,
         COALESCE((SELECT SUM(quantity) FROM order_items WHERE order_id = o.order_id), 0) as items_qty
        FROM orders o
-       WHERE ${validPaidCondition} AND ${dateConstraint}`
+       WHERE ${validPaidCondition} AND ${dateConstraint}`,
     );
 
     for (const ord of allPaidOrders) {
@@ -4889,14 +5401,25 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
     }
 
     const campaignsBreakdown = Object.values(batchBreakdownMap);
-    const civitasCount = buyerRows.filter((b: any) => b.customer_nim && String(b.customer_nim).trim() !== "").length;
+    const civitasCount = buyerRows.filter(
+      (b: any) => b.customer_nim && String(b.customer_nim).trim() !== "",
+    ).length;
 
     // Fetch Visitor Analytics
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split("T")[0];
     const totalVisitorsRow = await queryOne<any>("SELECT COUNT(*) as count FROM page_views", []);
-    const uniqueVisitorsTotalRow = await queryOne<any>("SELECT COUNT(DISTINCT ip_address) as count FROM page_views", []);
-    const uniqueVisitorsTodayRow = await queryOne<any>("SELECT COUNT(DISTINCT ip_address) as count FROM page_views WHERE DATE(created_at) = ?", [todayStr]);
-    const recentVisitors = await query<any>("SELECT * FROM page_views ORDER BY created_at DESC LIMIT 100", []);
+    const uniqueVisitorsTotalRow = await queryOne<any>(
+      "SELECT COUNT(DISTINCT ip_address) as count FROM page_views",
+      [],
+    );
+    const uniqueVisitorsTodayRow = await queryOne<any>(
+      "SELECT COUNT(DISTINCT ip_address) as count FROM page_views WHERE DATE(created_at) = ?",
+      [todayStr],
+    );
+    const recentVisitors = await query<any>(
+      "SELECT * FROM page_views ORDER BY created_at DESC LIMIT 100",
+      [],
+    );
 
     return res.json({
       success: true,
@@ -4910,7 +5433,7 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
         total_discount: Number(summary?.total_discount || 0),
         total_tax: Number(summary?.total_tax || 0),
         total_subtotal: Number(summary?.total_subtotal || 0),
-        civitas_count: civitasCount
+        civitas_count: civitasCount,
       },
       visitors: {
         total: totalVisitorsRow?.count || 0,
@@ -4925,8 +5448,8 @@ export const getOrdersSummary = async (req: Request, res: Response) => {
       sales_trend: trendRows.map((r: any) => ({
         label: r.label,
         revenue: Number(r.revenue),
-        orders_count: Number(r.orders_count)
-      }))
+        orders_count: Number(r.orders_count),
+      })),
     });
   } catch (error: any) {
     console.error("Error fetching orders summary:", error);
@@ -4948,7 +5471,9 @@ const isJacketProduct = (productName?: string | null): boolean => {
 };
 
 const getJacketUpsizeSurcharge = (productName?: string | null, sizeStr?: string | null): number => {
-  const s = String(sizeStr || "").toUpperCase().trim();
+  const s = String(sizeStr || "")
+    .toUpperCase()
+    .trim();
   const n = String(productName || "").toLowerCase();
 
   if (s === "XXL" || s === "2XL") {
@@ -4978,7 +5503,7 @@ const getJacketDefaultNormalDpPrice = (productName?: string | null): number => {
 export const repairHistoricalPelunasanOrders = async () => {
   try {
     const lnsOrders = await query<any>(
-      "SELECT * FROM orders WHERE order_id LIKE 'LNS-%' OR notes LIKE '%Pelunasan untuk Order:%'"
+      "SELECT * FROM orders WHERE order_id LIKE 'LNS-%' OR notes LIKE '%Pelunasan untuk Order:%'",
     );
     for (const lns of lnsOrders) {
       let origId = "";
@@ -5014,23 +5539,28 @@ export const repairHistoricalPelunasanOrders = async () => {
       }
 
       if (correctSisa > 0 && Number(lns.gross_amount) !== correctSisa) {
-        console.log(`[Self-Healing] Updating LNS order ${lns.order_id} from ${lns.gross_amount} to ${correctSisa}`);
-        await execute(
-          "UPDATE orders SET subtotal = ?, gross_amount = ? WHERE order_id = ?",
-          [correctSisa, correctSisa, lns.order_id]
+        console.log(
+          `[Self-Healing] Updating LNS order ${lns.order_id} from ${lns.gross_amount} to ${correctSisa}`,
         );
-        const lnsItems = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [lns.order_id]);
+        await execute("UPDATE orders SET subtotal = ?, gross_amount = ? WHERE order_id = ?", [
+          correctSisa,
+          correctSisa,
+          lns.order_id,
+        ]);
+        const lnsItems = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [
+          lns.order_id,
+        ]);
         for (const li of lnsItems) {
           if (isJacketProduct(li.product_name)) {
-            await execute(
-              "UPDATE order_items SET unit_price = ?, subtotal = ? WHERE id = ?",
-              [correctSisa, correctSisa, li.id]
-            );
+            await execute("UPDATE order_items SET unit_price = ?, subtotal = ? WHERE id = ?", [
+              correctSisa,
+              correctSisa,
+              li.id,
+            ]);
           } else {
-            await execute(
-              "UPDATE order_items SET unit_price = 0, subtotal = 0 WHERE id = ?",
-              [li.id]
-            );
+            await execute("UPDATE order_items SET unit_price = 0, subtotal = 0 WHERE id = ?", [
+              li.id,
+            ]);
           }
         }
       }
@@ -5059,13 +5589,13 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
     // Check if pelunasan order already exists (not cancelled)
     const existingPelunasan = await queryOne<any>(
       "SELECT order_id FROM orders WHERE notes LIKE ? AND order_status != 'cancelled' LIMIT 1",
-      [`%Pelunasan untuk Order: ${id}%`]
+      [`%Pelunasan untuk Order: ${id}%`],
     );
     if (existingPelunasan) {
       return res.json({
         success: true,
         orderId: existingPelunasan.order_id,
-        isExisting: true
+        isExisting: true,
       });
     }
 
@@ -5082,7 +5612,9 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
     for (const item of originalItems) {
       const product = await queryOne<any>("SELECT * FROM products WHERE id = ?", [item.product_id]);
       if (!product) {
-        return res.status(404).json({ success: false, error: `Produk ID ${item.product_id} tidak ditemukan` });
+        return res
+          .status(404)
+          .json({ success: false, error: `Produk ID ${item.product_id} tidak ditemukan` });
       }
 
       // Check if it is a bundle component item
@@ -5090,13 +5622,13 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
         const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
         let lunasVariant = await queryOne<any>(
           "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
-          [item.product_id, item.size, lunasColor]
+          [item.product_id, item.size, lunasColor],
         );
 
         if (!lunasVariant) {
           lunasVariant = await queryOne<any>(
             "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
-            [item.product_id, item.size]
+            [item.product_id, item.size],
           );
         }
 
@@ -5113,11 +5645,16 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       // Check if it is the main Bundle product item
       if (product.product_type === "bundle") {
         let bundleSisa = 0;
-        const componentItems = originalItems.filter((oi: any) => oi.product_name && oi.product_name.includes("[KOMPONEN BUNDLE]"));
+        const componentItems = originalItems.filter(
+          (oi: any) => oi.product_name && oi.product_name.includes("[KOMPONEN BUNDLE]"),
+        );
 
         for (const comp of componentItems) {
           // Only jacket components paid via DP qualify for pelunasan
-          if (isJacketProduct(comp.product_name) && (comp.color || "").toUpperCase().includes("DP")) {
+          if (
+            isJacketProduct(comp.product_name) &&
+            (comp.color || "").toUpperCase().includes("DP")
+          ) {
             let compBase = 0;
             const cn = String(comp.product_name || "").toLowerCase();
             if (cn.includes("work jacket")) compBase = 124500;
@@ -5144,7 +5681,8 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       const itemColor = String(item.color || "").toUpperCase();
       const itemSize = String(item.size || "").toUpperCase();
       const itemName = String(item.product_name || "").toUpperCase();
-      const isItemDp = itemColor.includes("DP") || itemSize.includes("DP") || itemName.includes("DP");
+      const isItemDp =
+        itemColor.includes("DP") || itemSize.includes("DP") || itemName.includes("DP");
       const isItemJacket = isJacketProduct(item.product_name);
 
       // Only jacket DP items have pelunasan. Non-jacket items or non-DP items have sisa = 0.
@@ -5162,13 +5700,13 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
       const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
       let lunasVariant = await queryOne<any>(
         "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
-        [item.product_id, item.size, lunasColor]
+        [item.product_id, item.size, lunasColor],
       );
 
       if (!lunasVariant) {
         lunasVariant = await queryOne<any>(
           "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND is_active = 1 LIMIT 1",
-          [item.product_id, item.size]
+          [item.product_id, item.size],
         );
       }
 
@@ -5225,7 +5763,7 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
         calculatedSubtotal,
         calculatedSubtotal, // gross_amount
         `Pelunasan untuk Order: ${id}`,
-      ]
+      ],
     );
 
     // 6. Insert order items
@@ -5245,15 +5783,17 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
           resItem.lunasColor,
           orig.quantity,
           resItem.sisa,
-          resItem.subtotal
-        ]
+          resItem.subtotal,
+        ],
       );
     }
 
     return res.json({ success: true, orderId: newOrderId });
   } catch (error: any) {
     console.error("Error creating pelunasan order:", error);
-    return res.status(500).json({ success: false, error: error.message || "Failed to create pelunasan order" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Failed to create pelunasan order" });
   }
 };
 
@@ -5264,15 +5804,17 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
     // 1. Check if pelunasan order ALREADY exists in database
     const existingPelunasan = await queryOne<any>(
       "SELECT * FROM orders WHERE notes LIKE ? AND order_status != 'cancelled' LIMIT 1",
-      [`%Pelunasan untuk Order: ${id}%`]
+      [`%Pelunasan untuk Order: ${id}%`],
     );
     if (existingPelunasan) {
-      const items = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [existingPelunasan.order_id]);
+      const items = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [
+        existingPelunasan.order_id,
+      ]);
       return res.json({
         success: true,
         isExisting: true,
         order: existingPelunasan,
-        items: items || []
+        items: items || [],
       });
     }
 
@@ -5300,12 +5842,12 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
         const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
         let lunasVariant = await queryOne<any>(
           "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
-          [item.product_id, item.size, lunasColor]
+          [item.product_id, item.size, lunasColor],
         );
         if (!lunasVariant) {
           lunasVariant = await queryOne<any>(
             "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color LIKE '%Lunas%' AND is_active = 1 LIMIT 1",
-            [item.product_id, item.size]
+            [item.product_id, item.size],
           );
         }
 
@@ -5317,7 +5859,7 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
           color: lunasVariant ? lunasVariant.color : lunasColor,
           quantity: item.quantity,
           unit_price: 0,
-          subtotal: 0
+          subtotal: 0,
         });
         continue;
       }
@@ -5325,9 +5867,14 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
       // Check if it is the main Bundle product item
       if (product.product_type === "bundle") {
         let bundleSisa = 0;
-        const componentItems = originalItems.filter((oi: any) => oi.product_name && oi.product_name.includes("[KOMPONEN BUNDLE]"));
+        const componentItems = originalItems.filter(
+          (oi: any) => oi.product_name && oi.product_name.includes("[KOMPONEN BUNDLE]"),
+        );
         for (const comp of componentItems) {
-          if (isJacketProduct(comp.product_name) && (comp.color || "").toUpperCase().includes("DP")) {
+          if (
+            isJacketProduct(comp.product_name) &&
+            (comp.color || "").toUpperCase().includes("DP")
+          ) {
             let compBase = 0;
             const cn = String(comp.product_name || "").toLowerCase();
             if (cn.includes("work jacket")) compBase = 124500;
@@ -5346,7 +5893,7 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
           color: item.color || "Default",
           quantity: item.quantity,
           unit_price: bundleSisa,
-          subtotal
+          subtotal,
         });
         continue;
       }
@@ -5355,7 +5902,8 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
       const itemColor = String(item.color || "").toUpperCase();
       const itemSize = String(item.size || "").toUpperCase();
       const itemName = String(item.product_name || "").toUpperCase();
-      const isItemDp = itemColor.includes("DP") || itemSize.includes("DP") || itemName.includes("DP");
+      const isItemDp =
+        itemColor.includes("DP") || itemSize.includes("DP") || itemName.includes("DP");
       const isItemJacket = isJacketProduct(item.product_name);
 
       // Only jacket DP items have pelunasan
@@ -5368,7 +5916,7 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
           color: item.color || "Default",
           quantity: item.quantity,
           unit_price: 0,
-          subtotal: 0
+          subtotal: 0,
         });
         continue;
       }
@@ -5376,12 +5924,12 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
       const lunasColor = (item.color || "").replace(/\bDP\b/i, "Lunas");
       let lunasVariant = await queryOne<any>(
         "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND color = ? AND is_active = 1 LIMIT 1",
-        [item.product_id, item.size, lunasColor]
+        [item.product_id, item.size, lunasColor],
       );
       if (!lunasVariant) {
         lunasVariant = await queryOne<any>(
           "SELECT * FROM product_variants WHERE product_id = ? AND size = ? AND is_active = 1 LIMIT 1",
-          [item.product_id, item.size]
+          [item.product_id, item.size],
         );
       }
 
@@ -5404,7 +5952,7 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
         color: lunasVariant ? lunasVariant.color : lunasColor,
         quantity: item.quantity,
         unit_price: sisa,
-        subtotal
+        subtotal,
       });
     }
 
@@ -5423,18 +5971,20 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
       gross_amount: calculatedSubtotal,
       subtotal: calculatedSubtotal,
       notes: `Pelunasan untuk Order: ${originalOrder.order_id}`,
-      is_preview: true
+      is_preview: true,
     };
 
     return res.json({
       success: true,
       isExisting: false,
       order: previewOrder,
-      items: previewItems
+      items: previewItems,
     });
   } catch (error: any) {
     console.error("Error getting pelunasan info:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal mendapatkan info pelunasan" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Gagal mendapatkan info pelunasan" });
   }
 };
 
@@ -5449,7 +5999,7 @@ export const getAllVouchers = async (req: Request, res: Response) => {
        FROM vouchers v
        LEFT JOIN orders o ON v.code COLLATE utf8mb4_general_ci = o.voucher_code COLLATE utf8mb4_general_ci
        GROUP BY v.id
-       ORDER BY v.id DESC`
+       ORDER BY v.id DESC`,
     );
     return res.json({ success: true, data: vouchers || [] });
   } catch (error: any) {
@@ -5460,15 +6010,32 @@ export const getAllVouchers = async (req: Request, res: Response) => {
 
 export const createVoucher = async (req: Request, res: Response) => {
   try {
-    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix, usage_limit_per_user } = req.body;
+    const {
+      code,
+      discount_amount,
+      min_purchase,
+      stock,
+      start_date,
+      end_date,
+      is_active,
+      discount_type,
+      max_discount,
+      target_nim_prefix,
+      usage_limit_per_user,
+    } = req.body;
     if (!code || discount_amount === undefined || !start_date || !end_date) {
-      return res.status(400).json({ success: false, error: "Kode, nominal diskon, tanggal mulai, dan tanggal selesai wajib diisi" });
+      return res.status(400).json({
+        success: false,
+        error: "Kode, nominal diskon, tanggal mulai, dan tanggal selesai wajib diisi",
+      });
     }
 
     const normalizedCode = String(code).trim().toUpperCase();
 
     // Check if code already exists
-    const existing = await queryOne<any>("SELECT id FROM vouchers WHERE code = ?", [normalizedCode]);
+    const existing = await queryOne<any>("SELECT id FROM vouchers WHERE code = ?", [
+      normalizedCode,
+    ]);
     if (existing) {
       return res.status(400).json({ success: false, error: "Kode voucher sudah digunakan" });
     }
@@ -5487,11 +6054,15 @@ export const createVoucher = async (req: Request, res: Response) => {
         discount_type || "fixed",
         max_discount !== undefined && max_discount !== null ? Number(max_discount) : null,
         target_nim_prefix ? String(target_nim_prefix).trim() : null,
-        usage_limit_per_user !== undefined ? Number(usage_limit_per_user) : 1
-      ]
+        usage_limit_per_user !== undefined ? Number(usage_limit_per_user) : 1,
+      ],
     );
 
-    return res.json({ success: true, id: (result as any).insertId, message: "Voucher berhasil dibuat" });
+    return res.json({
+      success: true,
+      id: (result as any).insertId,
+      message: "Voucher berhasil dibuat",
+    });
   } catch (error: any) {
     console.error("Error creating voucher:", error);
     return res.status(500).json({ success: false, error: error.message });
@@ -5501,18 +6072,38 @@ export const createVoucher = async (req: Request, res: Response) => {
 export const updateVoucher = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { code, discount_amount, min_purchase, stock, start_date, end_date, is_active, discount_type, max_discount, target_nim_prefix, usage_limit_per_user } = req.body;
+    const {
+      code,
+      discount_amount,
+      min_purchase,
+      stock,
+      start_date,
+      end_date,
+      is_active,
+      discount_type,
+      max_discount,
+      target_nim_prefix,
+      usage_limit_per_user,
+    } = req.body;
 
     if (!code || discount_amount === undefined || !start_date || !end_date) {
-      return res.status(400).json({ success: false, error: "Kode, nominal diskon, tanggal mulai, dan tanggal selesai wajib diisi" });
+      return res.status(400).json({
+        success: false,
+        error: "Kode, nominal diskon, tanggal mulai, dan tanggal selesai wajib diisi",
+      });
     }
 
     const normalizedCode = String(code).trim().toUpperCase();
 
     // Check if code already exists in other rows
-    const existing = await queryOne<any>("SELECT id FROM vouchers WHERE code = ? AND id != ?", [normalizedCode, id]);
+    const existing = await queryOne<any>("SELECT id FROM vouchers WHERE code = ? AND id != ?", [
+      normalizedCode,
+      id,
+    ]);
     if (existing) {
-      return res.status(400).json({ success: false, error: "Kode voucher sudah digunakan oleh voucher lain" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Kode voucher sudah digunakan oleh voucher lain" });
     }
 
     await execute(
@@ -5531,8 +6122,8 @@ export const updateVoucher = async (req: Request, res: Response) => {
         max_discount !== undefined && max_discount !== null ? Number(max_discount) : null,
         target_nim_prefix ? String(target_nim_prefix).trim() : null,
         usage_limit_per_user !== undefined ? Number(usage_limit_per_user) : 1,
-        id
-      ]
+        id,
+      ],
     );
 
     return res.json({ success: true, message: "Voucher berhasil diperbarui" });
@@ -5565,7 +6156,9 @@ export const validateVoucher = async (req: Request, res: Response) => {
 
     const voucher = await queryOne<any>("SELECT * FROM vouchers WHERE code = ?", [normalizedCode]);
     if (!voucher) {
-      return res.status(404).json({ success: false, error: "Kode voucher tidak valid atau tidak ditemukan" });
+      return res
+        .status(404)
+        .json({ success: false, error: "Kode voucher tidak valid atau tidak ditemukan" });
     }
 
     if (voucher.is_active !== 1) {
@@ -5591,7 +6184,7 @@ export const validateVoucher = async (req: Request, res: Response) => {
     if (orderSubtotal < voucher.min_purchase) {
       return res.status(400).json({
         success: false,
-        error: `Minimal pembelian untuk menggunakan voucher ini adalah Rp ${voucher.min_purchase.toLocaleString("id-ID")}`
+        error: `Minimal pembelian untuk menggunakan voucher ini adalah Rp ${voucher.min_purchase.toLocaleString("id-ID")}`,
       });
     }
 
@@ -5599,19 +6192,27 @@ export const validateVoucher = async (req: Request, res: Response) => {
     if (voucher.target_nim_prefix) {
       const userId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
       if (!userId) {
-        return res.status(401).json({ success: false, error: "Silakan login terlebih dahulu untuk menggunakan voucher khusus ini" });
+        return res.status(401).json({
+          success: false,
+          error: "Silakan login terlebih dahulu untuk menggunakan voucher khusus ini",
+        });
       }
 
-      const user = await queryOne<any>("SELECT is_filkom_verified, nim FROM users WHERE id = ?", [userId]);
+      const user = await queryOne<any>("SELECT is_filkom_verified, nim FROM users WHERE id = ?", [
+        userId,
+      ]);
       if (!user || user.is_filkom_verified !== 1) {
-        return res.status(400).json({ success: false, error: "Voucher ini khusus untuk mahasiswa FILKOM yang sudah terverifikasi" });
+        return res.status(400).json({
+          success: false,
+          error: "Voucher ini khusus untuk mahasiswa FILKOM yang sudah terverifikasi",
+        });
       }
 
       const cleanNim = (user.nim || "").trim();
       if (!cleanNim.startsWith(voucher.target_nim_prefix)) {
         return res.status(400).json({
           success: false,
-          error: `Voucher ini hanya berlaku untuk mahasiswa angkatan 20${voucher.target_nim_prefix}`
+          error: `Voucher ini hanya berlaku untuk mahasiswa angkatan 20${voucher.target_nim_prefix}`,
         });
       }
     }
@@ -5622,13 +6223,13 @@ export const validateVoucher = async (req: Request, res: Response) => {
       if (userId) {
         const usageRow = await queryOne<any>(
           "SELECT COUNT(*) AS count FROM orders WHERE user_id = ? AND voucher_code = ? AND order_status != 'cancelled'",
-          [userId, voucher.code]
+          [userId, voucher.code],
         );
         const usageCount = usageRow?.count || 0;
         if (usageCount >= voucher.usage_limit_per_user) {
           return res.status(400).json({
             success: false,
-            error: `Anda sudah melebihi batas penggunaan voucher ini (Maks ${voucher.usage_limit_per_user} kali)`
+            error: `Anda sudah melebihi batas penggunaan voucher ini (Maks ${voucher.usage_limit_per_user} kali)`,
           });
         }
       }
@@ -5644,8 +6245,8 @@ export const validateVoucher = async (req: Request, res: Response) => {
         discount_type: voucher.discount_type,
         max_discount: voucher.max_discount,
         target_nim_prefix: voucher.target_nim_prefix,
-        usage_limit_per_user: voucher.usage_limit_per_user
-      }
+        usage_limit_per_user: voucher.usage_limit_per_user,
+      },
     });
   } catch (error: any) {
     console.error("Error validating voucher:", error);
@@ -5667,7 +6268,7 @@ export const getVoucherHistory = async (req: Request, res: Response) => {
        FROM orders o
        WHERE o.voucher_code = ?
        ORDER BY o.created_at DESC`,
-      [voucher.code]
+      [voucher.code],
     );
 
     return res.json({ success: true, data: usages || [] });
@@ -5681,22 +6282,22 @@ export const getVoucherHistory = async (req: Request, res: Response) => {
 const ensureOrderColumns = async () => {
   try {
     await execute("ALTER TABLE orders ADD COLUMN fulfillment_proof_url VARCHAR(500) NULL");
-  } catch { }
+  } catch {}
   try {
     await execute("ALTER TABLE product_reviews ADD COLUMN media_url VARCHAR(500) NULL");
-  } catch { }
+  } catch {}
   try {
     await execute("ALTER TABLE orders ADD COLUMN is_complained TINYINT(1) DEFAULT 0");
-  } catch { }
+  } catch {}
   try {
     await execute("ALTER TABLE orders ADD COLUMN complaint_notes TEXT NULL");
-  } catch { }
+  } catch {}
   try {
     await execute("ALTER TABLE orders ADD COLUMN complaint_media_urls TEXT NULL");
-  } catch { }
+  } catch {}
   try {
     await execute("ALTER TABLE orders ADD COLUMN completed_at TIMESTAMP NULL");
-  } catch { }
+  } catch {}
 };
 ensureOrderColumns();
 
@@ -5709,12 +6310,12 @@ export const confirmOrderCompletion = async (req: Request, res: Response) => {
     if (fulfillment_proof_url) {
       await execute(
         "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed', fulfillment_proof_url = ?, completed_at = NOW() WHERE order_id = ? OR notes LIKE ?",
-        [fulfillment_proof_url, id, `%Pelunasan untuk Order: ${id}%`]
+        [fulfillment_proof_url, id, `%Pelunasan untuk Order: ${id}%`],
       );
     } else {
       await execute(
         "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed', completed_at = NOW() WHERE order_id = ? OR notes LIKE ?",
-        [id, `%Pelunasan untuk Order: ${id}%`]
+        [id, `%Pelunasan untuk Order: ${id}%`],
       );
     }
     return res.json({ success: true, message: "Pesanan telah dikonfirmasi selesai." });
@@ -5739,13 +6340,18 @@ export const submitOrderComplaint = async (req: Request, res: Response) => {
     }
 
     if (order.order_status === "completed") {
-      const completedTime = order.completed_at ? new Date(order.completed_at).getTime() : (order.updated_at ? new Date(order.updated_at).getTime() : null);
+      const completedTime = order.completed_at
+        ? new Date(order.completed_at).getTime()
+        : order.updated_at
+          ? new Date(order.updated_at).getTime()
+          : null;
       if (completedTime) {
         const threeDaysMs = 3 * 24 * 60 * 60 * 1000;
         if (Date.now() - completedTime > threeDaysMs) {
           return res.status(400).json({
             success: false,
-            error: "Batas waktu pengajuan komplain (maksimal 3 hari / H+3 setelah pesanan selesai) telah berakhir.",
+            error:
+              "Batas waktu pengajuan komplain (maksimal 3 hari / H+3 setelah pesanan selesai) telah berakhir.",
           });
         }
       }
@@ -5753,9 +6359,12 @@ export const submitOrderComplaint = async (req: Request, res: Response) => {
 
     await execute(
       "UPDATE orders SET is_complained = 1, complaint_notes = ?, complaint_media_urls = ? WHERE order_id = ? OR notes LIKE ?",
-      [complaintText, mediaUrlsStr, id, `%Pelunasan untuk Order: ${id}%`]
+      [complaintText, mediaUrlsStr, id, `%Pelunasan untuk Order: ${id}%`],
     );
-    return res.json({ success: true, message: "Komplain berhasil dicatat. Tim admin akan segera menindaklanjuti." });
+    return res.json({
+      success: true,
+      message: "Komplain berhasil dicatat. Tim admin akan segera menindaklanjuti.",
+    });
   } catch (error: any) {
     console.error("Error submitting order complaint:", error);
     return res.status(500).json({ success: false, error: "Gagal mengajukan komplain" });
@@ -5774,30 +6383,33 @@ export const createProductReview = async (req: Request, res: Response) => {
     // Verify order exists
     let orderRows;
     if (userId) {
-      orderRows = await query<any>(
-        "SELECT * FROM orders WHERE order_id = ? AND user_id = ?",
-        [orderId, userId]
-      );
+      orderRows = await query<any>("SELECT * FROM orders WHERE order_id = ? AND user_id = ?", [
+        orderId,
+        userId,
+      ]);
     } else {
       // For guest checkout (user_id is null) or if no user is provided, just check orderId
-      orderRows = await query<any>(
-        "SELECT * FROM orders WHERE order_id = ?",
-        [orderId]
-      );
+      orderRows = await query<any>("SELECT * FROM orders WHERE order_id = ?", [orderId]);
     }
 
     if (orderRows.length === 0) {
-      return res.status(403).json({ success: false, error: "Pesanan tidak ditemukan atau bukan milik Anda" });
+      return res
+        .status(403)
+        .json({ success: false, error: "Pesanan tidak ditemukan atau bukan milik Anda" });
     }
 
     const currentOrder = orderRows[0];
-    const orderStatus = (currentOrder.order_status || currentOrder.transaction_status || "").toLowerCase();
+    const orderStatus = (
+      currentOrder.order_status ||
+      currentOrder.transaction_status ||
+      ""
+    ).toLowerCase();
 
     // If not completed yet, automatically mark order as completed upon receiving review
     if (orderStatus !== "completed") {
       await execute(
         "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed' WHERE order_id = ?",
-        [orderId]
+        [orderId],
       );
     }
 
@@ -5806,13 +6418,24 @@ export const createProductReview = async (req: Request, res: Response) => {
       `INSERT INTO product_reviews (product_id, order_id, user_id, rating, comment, variant, user_name, media_url)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), variant = VALUES(variant), user_name = VALUES(user_name), media_url = VALUES(media_url), created_at = NOW()`,
-      [productId, orderId, userId || null, rating, comment || "", variant || "", userName || currentOrder.customer_name || "Pembeli FILKOM", mediaUrl || null]
+      [
+        productId,
+        orderId,
+        userId || null,
+        rating,
+        comment || "",
+        variant || "",
+        userName || currentOrder.customer_name || "Pembeli FILKOM",
+        mediaUrl || null,
+      ],
     );
 
     return res.json({ success: true, message: "Ulasan berhasil dikirim!" });
   } catch (error: any) {
     console.error("Error creating product review:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal mengirim ulasan" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Gagal mengirim ulasan" });
   }
 };
 
@@ -5826,7 +6449,7 @@ export const getProductReviews = async (req: Request, res: Response) => {
        LEFT JOIN users u ON u.id = pr.user_id
        WHERE pr.product_id = ?
        ORDER BY pr.created_at DESC`,
-      [productId]
+      [productId],
     );
 
     const formattedReviews = reviews.map((r: any) => {
@@ -5845,16 +6468,21 @@ export const getProductReviews = async (req: Request, res: Response) => {
     });
 
     const totalReviews = formattedReviews.length;
-    const avgRating = totalReviews > 0
-      ? Number((formattedReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews).toFixed(1))
-      : 0;
+    const avgRating =
+      totalReviews > 0
+        ? Number(
+            (
+              formattedReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / totalReviews
+            ).toFixed(1),
+          )
+        : 0;
 
     const buyersQuery = await query<any>(
       `SELECT COALESCE(SUM(oi.quantity), 0) as total_buyers 
        FROM order_items oi 
        JOIN orders o ON oi.order_id = o.order_id 
        WHERE oi.product_id = ? AND o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed')`,
-      [productId]
+      [productId],
     );
     const totalBuyers = Number(buyersQuery[0]?.total_buyers || 0);
 
@@ -5870,7 +6498,6 @@ export const getProductReviews = async (req: Request, res: Response) => {
     return res.status(500).json({ success: false, reviews: [], totalReviews: 0, avgRating: 0 });
   }
 };
-
 
 // ============ VENDORS & VENDORING FEATURE CONTROLLERS ============
 
@@ -5894,7 +6521,7 @@ export const createVendor = async (req: Request, res: Response) => {
     }
     const result = await execute(
       "INSERT INTO vendors (name, contact_person, phone, email, notes) VALUES (?, ?, ?, ?, ?)",
-      [name.trim(), contact_person || null, phone || null, email || null, notes || null]
+      [name.trim(), contact_person || null, phone || null, email || null, notes || null],
     );
     return res.json({ success: true, id: result.insertId, message: "Vendor berhasil ditambahkan" });
   } catch (error: any) {
@@ -5910,7 +6537,7 @@ export const updateVendor = async (req: Request, res: Response) => {
     const { name, contact_person, phone, email, notes } = req.body;
     await execute(
       "UPDATE vendors SET name = ?, contact_person = ?, phone = ?, email = ?, notes = ? WHERE id = ?",
-      [name, contact_person || null, phone || null, email || null, notes || null, id]
+      [name, contact_person || null, phone || null, email || null, notes || null, id],
     );
     return res.json({ success: true, message: "Vendor berhasil diperbarui" });
   } catch (error: any) {
@@ -5944,10 +6571,13 @@ export const getProductionSummary = async (req: Request, res: Response) => {
       `SELECT bi.bundle_product_id, bi.component_product_id, COALESCE(bi.quantity, 1) as comp_qty,
               bp.name as bundle_name
        FROM bundle_items bi
-       JOIN products bp ON bi.bundle_product_id = bp.id`
+       JOIN products bp ON bi.bundle_product_id = bp.id`,
     );
 
-    const bundleComponentsMap: Record<number, Array<{ component_product_id: number; comp_qty: number; bundle_name: string }>> = {};
+    const bundleComponentsMap: Record<
+      number,
+      Array<{ component_product_id: number; comp_qty: number; bundle_name: string }>
+    > = {};
     for (const bi of bundleItemsRows) {
       const bId = Number(bi.bundle_product_id);
       if (!bundleComponentsMap[bId]) bundleComponentsMap[bId] = [];
@@ -5958,16 +6588,26 @@ export const getProductionSummary = async (req: Request, res: Response) => {
       });
     }
 
-    let whereClause = "WHERE o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed') AND o.order_id NOT LIKE 'LNS%'";
+    let whereClause =
+      "WHERE o.order_status != 'cancelled' AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed') AND o.order_id NOT LIKE 'LNS%'";
     const queryParams: any[] = [];
     if (batchFilter !== "all") {
       if (batchFilter === "none") {
         whereClause += " AND (o.pre_order_campaign_id IS NULL OR o.pre_order_campaign_id = 0)";
       } else {
         const selectedC = campaigns.find((c) => Number(c.id) === Number(batchFilter));
-        if (selectedC && selectedC.start_date && (selectedC.extended_end_date || selectedC.end_date)) {
-          whereClause += " AND (o.pre_order_campaign_id = ? OR (o.created_at >= ? AND o.created_at <= ?))";
-          queryParams.push(batchFilter, selectedC.start_date, selectedC.extended_end_date || selectedC.end_date);
+        if (
+          selectedC &&
+          selectedC.start_date &&
+          (selectedC.extended_end_date || selectedC.end_date)
+        ) {
+          whereClause +=
+            " AND (o.pre_order_campaign_id = ? OR (o.created_at >= ? AND o.created_at <= ?))";
+          queryParams.push(
+            batchFilter,
+            selectedC.start_date,
+            selectedC.extended_end_date || selectedC.end_date,
+          );
         } else {
           whereClause += " AND o.pre_order_campaign_id = ?";
           queryParams.push(batchFilter);
@@ -5990,13 +6630,22 @@ export const getProductionSummary = async (req: Request, res: Response) => {
        LEFT JOIN pre_order_campaigns c ON o.pre_order_campaign_id = c.id
        ${whereClause}
        ORDER BY product_name ASC, size ASC`,
-      queryParams
+      queryParams,
     );
 
     const formatVariantKey = (rawSize?: string, rawColor?: string) => {
       const parts = [rawSize, rawColor]
         .map((s) => (s || "").trim())
-        .filter((s) => s && s !== "-" && s !== "Default" && s !== "One Size" && s !== "All Size" && s !== "Standard" && s !== "Ukuran Tidak Diisi");
+        .filter(
+          (s) =>
+            s &&
+            s !== "-" &&
+            s !== "Default" &&
+            s !== "One Size" &&
+            s !== "All Size" &&
+            s !== "Standard" &&
+            s !== "Ukuran Tidak Diisi",
+        );
       return parts.join(" / ") || "Standard";
     };
 
@@ -6052,7 +6701,7 @@ export const getProductionSummary = async (req: Request, res: Response) => {
             i.order_id === r.order_id &&
             ((i.raw_product_name && i.raw_product_name.includes("[KOMPONEN BUNDLE]")) ||
               (i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")) ||
-              Number(i.unit_price || i.price) === 0)
+              Number(i.unit_price || i.price) === 0),
         );
 
         if (!hasComponentRows) {
@@ -6060,22 +6709,30 @@ export const getProductionSummary = async (req: Request, res: Response) => {
           if (comps && comps.length > 0) {
             for (const comp of comps) {
               const cid = comp.component_product_id;
-              const compProductRows = await query<any>("SELECT name FROM products WHERE id = ?", [cid]);
+              const compProductRows = await query<any>("SELECT name FROM products WHERE id = ?", [
+                cid,
+              ]);
               const compName = compProductRows[0]?.name || `Product #${cid}`;
               const addedQty = Number(r.quantity || 1) * comp.comp_qty;
 
               const targetGroup = getOrCreateGroup(cid, compName);
-              targetGroup.variants_breakdown[varKey] = (targetGroup.variants_breakdown[varKey] || 0) + addedQty;
-              targetGroup.batch_breakdown[bName] = (targetGroup.batch_breakdown[bName] || 0) + addedQty;
+              targetGroup.variants_breakdown[varKey] =
+                (targetGroup.variants_breakdown[varKey] || 0) + addedQty;
+              targetGroup.batch_breakdown[bName] =
+                (targetGroup.batch_breakdown[bName] || 0) + addedQty;
               targetGroup.total_qty += addedQty;
             }
           }
         }
       } else {
-        const cleanName = pName.replace(/^\[KOMPONEN BUNDLE\]\s*/i, "").replace(/^Pelunasan\s*—\s*/i, "");
+        const cleanName = pName
+          .replace(/^\[KOMPONEN BUNDLE\]\s*/i, "")
+          .replace(/^Pelunasan\s*—\s*/i, "");
         const targetGroup = getOrCreateGroup(pId, cleanName);
-        targetGroup.variants_breakdown[varKey] = (targetGroup.variants_breakdown[varKey] || 0) + Number(r.quantity || 1);
-        targetGroup.batch_breakdown[bName] = (targetGroup.batch_breakdown[bName] || 0) + Number(r.quantity || 1);
+        targetGroup.variants_breakdown[varKey] =
+          (targetGroup.variants_breakdown[varKey] || 0) + Number(r.quantity || 1);
+        targetGroup.batch_breakdown[bName] =
+          (targetGroup.batch_breakdown[bName] || 0) + Number(r.quantity || 1);
         targetGroup.total_qty += Number(r.quantity || 1);
       }
     }
@@ -6095,7 +6752,7 @@ export const getVendorOrders = async (req: Request, res: Response) => {
       `SELECT vo.*, v.name as vendor_name, v.phone as vendor_phone, v.contact_person
        FROM vendor_orders vo
        JOIN vendors v ON vo.vendor_id = v.id
-       ORDER BY vo.id DESC`
+       ORDER BY vo.id DESC`,
     );
 
     for (const o of orders) {
@@ -6104,22 +6761,27 @@ export const getVendorOrders = async (req: Request, res: Response) => {
          FROM vendor_order_items voi
          LEFT JOIN products p ON voi.product_id = p.id
          WHERE voi.vendor_order_id = ?`,
-        [o.id]
+        [o.id],
       );
       o.items = items;
 
       const payments = await query<any>(
         "SELECT * FROM vendor_order_payments WHERE vendor_order_id = ? ORDER BY payment_date ASC, id ASC",
-        [o.id]
+        [o.id],
       );
       o.payments = payments || [];
 
-      const totalPaid = (payments || []).reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+      const totalPaid = (payments || []).reduce(
+        (sum: number, p: any) => sum + Number(p.amount || 0),
+        0,
+      );
       const totalCost = Number(o.total_cost || 0);
       o.total_paid = totalPaid;
       o.remaining_cost = Math.max(0, totalCost - totalPaid);
-      o.payment_progress_pct = totalCost > 0 ? Math.min(100, Math.round((totalPaid / totalCost) * 100)) : 0;
-      o.payment_status = totalPaid >= totalCost && totalCost > 0 ? "paid" : totalPaid > 0 ? "partial" : "unpaid";
+      o.payment_progress_pct =
+        totalCost > 0 ? Math.min(100, Math.round((totalPaid / totalCost) * 100)) : 0;
+      o.payment_status =
+        totalPaid >= totalCost && totalCost > 0 ? "paid" : totalPaid > 0 ? "partial" : "unpaid";
     }
 
     return res.json({ success: true, data: orders });
@@ -6135,7 +6797,7 @@ export const getVendorOrderPayments = async (req: Request, res: Response) => {
     const { id } = req.params;
     const payments = await query<any>(
       "SELECT * FROM vendor_order_payments WHERE vendor_order_id = ? ORDER BY payment_date ASC, id ASC",
-      [id]
+      [id],
     );
     return res.json({ success: true, data: payments });
   } catch (error: any) {
@@ -6159,7 +6821,14 @@ export const createVendorOrderPayment = async (req: Request, res: Response) => {
 
     await query(
       "INSERT INTO vendor_order_payments (vendor_order_id, term_name, amount, payment_date, proof_image, notes) VALUES (?, ?, ?, ?, ?, ?)",
-      [id, String(term_name).trim(), Number(amount), payment_date, proof_image || null, notes || null]
+      [
+        id,
+        String(term_name).trim(),
+        Number(amount),
+        payment_date,
+        proof_image || null,
+        notes || null,
+      ],
     );
 
     return res.json({ success: true, message: "Pembayaran termin vendor berhasil dicatat" });
@@ -6173,8 +6842,14 @@ export const createVendorOrderPayment = async (req: Request, res: Response) => {
 export const deleteVendorOrderPayment = async (req: Request, res: Response) => {
   try {
     const { id, paymentId } = req.params;
-    await query("DELETE FROM vendor_order_payments WHERE id = ? AND vendor_order_id = ?", [paymentId, id]);
-    return res.json({ success: true, message: "Catatan pembayaran termin vendor berhasil dihapus" });
+    await query("DELETE FROM vendor_order_payments WHERE id = ? AND vendor_order_id = ?", [
+      paymentId,
+      id,
+    ]);
+    return res.json({
+      success: true,
+      message: "Catatan pembayaran termin vendor berhasil dihapus",
+    });
   } catch (error: any) {
     console.error("Error deleting vendor order payment:", error);
     return res.status(500).json({ success: false, error: error.message });
@@ -6187,7 +6862,9 @@ export const createVendorOrder = async (req: Request, res: Response) => {
   try {
     const { vendor_id, deadline, notes, items } = req.body;
     if (!vendor_id || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, error: "Vendor ID dan minimal 1 item pesanan wajib diisi" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Vendor ID dan minimal 1 item pesanan wajib diisi" });
     }
 
     await connection.beginTransaction();
@@ -6198,11 +6875,11 @@ export const createVendorOrder = async (req: Request, res: Response) => {
 
     const [existingPoRows] = await connection.query(
       "SELECT po_number FROM vendor_orders WHERE po_number LIKE ? FOR UPDATE",
-      [`${prefix}%`]
+      [`${prefix}%`],
     );
 
     let maxSeq = 0;
-    for (const r of (existingPoRows as any[])) {
+    for (const r of existingPoRows as any[]) {
       const match = String(r.po_number || "").match(/^VO-\d{4}-(\d+)$/);
       if (match) {
         const seq = parseInt(match[1], 10);
@@ -6220,7 +6897,7 @@ export const createVendorOrder = async (req: Request, res: Response) => {
     while (!isUnique && attempts < 1000) {
       const [checkRows] = await connection.query(
         "SELECT id FROM vendor_orders WHERE po_number = ? LIMIT 1",
-        [poNumber]
+        [poNumber],
       );
       if ((checkRows as any[]).length === 0) {
         isUnique = true;
@@ -6238,7 +6915,7 @@ export const createVendorOrder = async (req: Request, res: Response) => {
 
     const [voRes] = await connection.query(
       "INSERT INTO vendor_orders (po_number, vendor_id, status, total_cost, notes, deadline) VALUES (?, ?, 'draft', ?, ?, ?)",
-      [poNumber, vendor_id, totalCost, notes || null, deadline || null]
+      [poNumber, vendor_id, totalCost, notes || null, deadline || null],
     );
     const vendorOrderId = (voRes as any).insertId;
 
@@ -6248,12 +6925,26 @@ export const createVendorOrder = async (req: Request, res: Response) => {
       const sub = uCost * qty;
       await connection.query(
         "INSERT INTO vendor_order_items (vendor_order_id, product_id, size, color, quantity, unit_cost, subtotal_cost, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        [vendorOrderId, item.product_id, item.size || null, item.color || null, qty, uCost, sub, item.notes || null]
+        [
+          vendorOrderId,
+          item.product_id,
+          item.size || null,
+          item.color || null,
+          qty,
+          uCost,
+          sub,
+          item.notes || null,
+        ],
       );
     }
 
     await connection.commit();
-    return res.json({ success: true, id: vendorOrderId, po_number: poNumber, message: "Purchase Order berhasil diterbitkan" });
+    return res.json({
+      success: true,
+      id: vendorOrderId,
+      po_number: poNumber,
+      message: "Purchase Order berhasil diterbitkan",
+    });
   } catch (error: any) {
     await connection.rollback();
     console.error("Error creating vendor order:", error);
@@ -6271,7 +6962,9 @@ export const updateVendorOrder = async (req: Request, res: Response) => {
     const { vendor_id, deadline, notes, status, items } = req.body;
 
     if (!vendor_id || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ success: false, error: "Vendor ID dan minimal 1 item pesanan wajib diisi" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Vendor ID dan minimal 1 item pesanan wajib diisi" });
     }
 
     await connection.beginTransaction();
@@ -6281,7 +6974,12 @@ export const updateVendorOrder = async (req: Request, res: Response) => {
       totalCost += (Number(item.unit_cost) || 0) * (Number(item.quantity) || 0);
     }
 
-    const updateHeaderFields: string[] = ["vendor_id = ?", "total_cost = ?", "notes = ?", "deadline = ?"];
+    const updateHeaderFields: string[] = [
+      "vendor_id = ?",
+      "total_cost = ?",
+      "notes = ?",
+      "deadline = ?",
+    ];
     const updateHeaderParams: any[] = [vendor_id, totalCost, notes || null, deadline || null];
 
     if (status) {
@@ -6292,7 +6990,7 @@ export const updateVendorOrder = async (req: Request, res: Response) => {
     updateHeaderParams.push(id);
     await connection.execute(
       `UPDATE vendor_orders SET ${updateHeaderFields.join(", ")} WHERE id = ?`,
-      updateHeaderParams
+      updateHeaderParams,
     );
 
     // Delete existing vendor_order_items and re-insert updated items
@@ -6304,7 +7002,16 @@ export const updateVendorOrder = async (req: Request, res: Response) => {
       const sub = uCost * qty;
       await connection.query(
         "INSERT INTO vendor_order_items (vendor_order_id, product_id, size, color, quantity, unit_cost, subtotal_cost, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        [id, item.product_id, item.size || null, item.color || null, qty, uCost, sub, item.notes || null]
+        [
+          id,
+          item.product_id,
+          item.size || null,
+          item.color || null,
+          qty,
+          uCost,
+          sub,
+          item.notes || null,
+        ],
       );
     }
 
@@ -6338,6 +7045,189 @@ export const updateVendorOrderStatus = async (req: Request, res: Response) => {
   }
 };
 
+// Inbound Vendor Order (Penerimaan Barang & Sinkronisasi Stok Website)
+export const inboundVendorOrder = async (req: Request, res: Response) => {
+  const connection = await getConnection();
+  try {
+    const { id } = req.params;
+    const { items, inbound_notes, update_status_completed = true } = req.body;
+
+    const actorId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
+    const actorName = req.header("x-user-name") || "Admin";
+    const actorRole = req.header("x-user-role") || "admin";
+    const ipAddress = req.ip || req.socket.remoteAddress || null;
+    const userAgent = req.get("user-agent") || null;
+
+    await connection.beginTransaction();
+
+    // 1. Fetch Vendor Order
+    const [orders] = await connection.query<any[]>(
+      "SELECT * FROM vendor_orders WHERE id = ? FOR UPDATE",
+      [id],
+    );
+
+    if (!orders || orders.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, error: "PO Vendor tidak ditemukan" });
+    }
+
+    const order = orders[0];
+
+    if (!Array.isArray(items) || items.length === 0) {
+      await connection.rollback();
+      return res
+        .status(400)
+        .json({ success: false, error: "Daftar item penerimaan barang tidak boleh kosong" });
+    }
+
+    let totalReceivedUnits = 0;
+    let totalDefectUnits = 0;
+    const inboundSummary: string[] = [];
+
+    // 2. Loop through received items and update variant stocks
+    for (const item of items) {
+      const itemId = item.item_id || item.id;
+      const productId = item.product_id;
+      const targetSize = (item.size || "").trim();
+      const targetColor = (item.color || "").trim();
+      const receivedQty = Math.max(0, parseInt(item.received_quantity) || 0);
+      const defectQty = Math.max(0, parseInt(item.defect_quantity) || 0);
+      const itemNote = item.notes ? String(item.notes).trim() : null;
+
+      totalReceivedUnits += receivedQty;
+      totalDefectUnits += defectQty;
+
+      // Update vendor_order_items record
+      if (itemId) {
+        await connection.query(
+          "UPDATE vendor_order_items SET received_quantity = ?, defect_quantity = ?, notes = COALESCE(?, notes) WHERE id = ? AND vendor_order_id = ?",
+          [receivedQty, defectQty, itemNote, itemId, id],
+        );
+      }
+
+      // If good units were received, update product_variant stock and record stock movement
+      if (receivedQty > 0) {
+        // 1. Exact match on product_id, size, and color
+        let [variants] = await connection.query<any[]>(
+          "SELECT id, stock, size, color FROM product_variants WHERE product_id = ? AND TRIM(size) = ? AND TRIM(COALESCE(color, '')) = ? AND is_active = 1 LIMIT 1 FOR UPDATE",
+          [productId, targetSize, targetColor],
+        );
+
+        // 2. Flexible size/color match if not found
+        if (!variants || variants.length === 0) {
+          [variants] = await connection.query<any[]>(
+            "SELECT id, stock, size, color FROM product_variants WHERE product_id = ? AND (TRIM(size) = ? OR TRIM(COALESCE(color, '')) = ?) AND is_active = 1 LIMIT 1 FOR UPDATE",
+            [productId, targetSize, targetColor],
+          );
+        }
+
+        // 3. Fallback: single active variant for product
+        if (!variants || variants.length === 0) {
+          [variants] = await connection.query<any[]>(
+            "SELECT id, stock, size, color FROM product_variants WHERE product_id = ? AND is_active = 1 ORDER BY id ASC LIMIT 1 FOR UPDATE",
+            [productId],
+          );
+        }
+
+        let variantId: number;
+        let stockBefore = 0;
+        let stockAfter = 0;
+
+        if (variants && variants.length > 0) {
+          const varObj = variants[0];
+          variantId = varObj.id;
+          stockBefore = Number(varObj.stock || 0);
+          stockAfter = stockBefore + receivedQty;
+
+          await connection.query("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [
+            receivedQty,
+            variantId,
+          ]);
+        } else {
+          // If no variant exists, auto-insert new active variant
+          const [insertVar] = await connection.query<any>(
+            "INSERT INTO product_variants (product_id, size, color, stock, is_active) VALUES (?, ?, ?, ?, 1)",
+            [productId, targetSize || "All Size", targetColor || null, receivedQty],
+          );
+          variantId = insertVar.insertId;
+          stockBefore = 0;
+          stockAfter = receivedQty;
+        }
+
+        // Record stock movement (movement_type = 'restock', reference_type = 'purchase')
+        await connection.query(
+          `INSERT INTO stock_movements (
+            variant_id, movement_type, quantity_change, stock_before, stock_after,
+            reference_type, reference_id, created_by, notes
+          ) VALUES (?, 'restock', ?, ?, ?, 'purchase', ?, ?, ?)`,
+          [
+            variantId,
+            receivedQty,
+            stockBefore,
+            stockAfter,
+            order.po_number,
+            actorId,
+            `Inbound Restock Vendor PO #${order.po_number}${itemNote ? ` (${itemNote})` : ""}${defectQty > 0 ? ` [${defectQty} reject]` : ""}`,
+          ],
+        );
+
+        inboundSummary.push(
+          `${item.catalog_product_name || `Produk #${productId}`} (${[targetSize, targetColor].filter(Boolean).join("/") || "Standar"}): +${receivedQty} pcs`,
+        );
+      }
+    }
+
+    // 3. Update Vendor Order header
+    let statusSql = "";
+    const updateParams: any[] = [actorName, inbound_notes ? String(inbound_notes).trim() : null];
+
+    if (update_status_completed) {
+      statusSql = ", status = 'completed', completed_at = COALESCE(completed_at, NOW())";
+    }
+
+    updateParams.push(id);
+
+    await connection.query(
+      `UPDATE vendor_orders SET is_inbounded = 1, inbounded_at = NOW(), inbounded_by = ?, inbound_notes = ? ${statusSql} WHERE id = ?`,
+      updateParams,
+    );
+
+    await connection.commit();
+
+    try {
+      await logActivity(
+        actorId,
+        actorName,
+        actorRole,
+        "inbound_vendor_order",
+        "vendor_order",
+        Number(id),
+        `Penerimaan Barang PO #${order.po_number}: ${totalReceivedUnits} pcs masuk stok website, ${totalDefectUnits} pcs reject. Petugas: ${actorName}`,
+        ipAddress,
+        userAgent,
+      );
+    } catch (logErr) {
+      console.warn("Failed to write activity log for inbound:", logErr);
+    }
+
+    return res.json({
+      success: true,
+      message: `Berhasil menerima barang dan menambahkan ${totalReceivedUnits} pcs ke stok website!`,
+      data: {
+        total_received: totalReceivedUnits,
+        total_defect: totalDefectUnits,
+        summary: inboundSummary,
+      },
+    });
+  } catch (error: any) {
+    await connection.rollback();
+    console.error("Error processing inbound vendor order:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  } finally {
+    connection.release();
+  }
+};
+
 // Delete Vendor Order
 export const deleteVendorOrder = async (req: Request, res: Response) => {
   try {
@@ -6355,16 +7245,21 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
   try {
     const batchFilter = (req.query.batch as string) || "all";
 
-    let orderWhere = "WHERE o.order_status NOT IN ('cancelled', 'cancel') AND (o.payment_status IN ('paid', 'settlement') OR o.order_status IN ('completed', 'settlement', 'capture'))";
+    let orderWhere =
+      "WHERE o.order_status NOT IN ('cancelled', 'cancel') AND (o.payment_status IN ('paid', 'settlement') OR o.order_status IN ('completed', 'settlement', 'capture'))";
     const orderParams: any[] = [];
 
     if (batchFilter !== "all") {
-      const campaigns = await query<any>("SELECT id, start_date, end_date FROM pre_order_campaigns WHERE id = ?", [batchFilter]);
+      const campaigns = await query<any>(
+        "SELECT id, start_date, end_date FROM pre_order_campaigns WHERE id = ?",
+        [batchFilter],
+      );
       const matchedCamp = campaigns[0];
       if (matchedCamp && matchedCamp.start_date && matchedCamp.end_date) {
         const startD = new Date(matchedCamp.start_date).toISOString().split("T")[0];
         const endD = new Date(matchedCamp.end_date).toISOString().split("T")[0] + " 23:59:59";
-        orderWhere += " AND (o.pre_order_campaign_id = ? OR (o.pre_order_campaign_id IS NULL AND o.created_at >= ? AND o.created_at <= ?))";
+        orderWhere +=
+          " AND (o.pre_order_campaign_id = ? OR (o.pre_order_campaign_id IS NULL AND o.created_at >= ? AND o.created_at <= ?))";
         orderParams.push(batchFilter, startD, endD);
       } else {
         orderWhere += " AND o.pre_order_campaign_id = ?";
@@ -6375,7 +7270,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
     // 1. Total Revenue from paid/settled orders
     const revRows = await query<any>(
       `SELECT COALESCE(SUM(COALESCE(o.gross_amount, o.subtotal, 0)), 0) as total_rev FROM orders o ${orderWhere}`,
-      orderParams
+      orderParams,
     );
     const totalRevenue = Number(revRows[0]?.total_rev || 0);
 
@@ -6385,10 +7280,13 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
               p.name as bundle_name, p_comp.name as component_name, p_comp.vendor_cost as comp_vendor_cost, p_comp.filkom_price as comp_price
        FROM bundle_items bi
        JOIN products p ON bi.bundle_product_id = p.id
-       JOIN products p_comp ON bi.component_product_id = p_comp.id`
+       JOIN products p_comp ON bi.component_product_id = p_comp.id`,
     );
 
-    const bundleComponentsMap: Record<number, Array<{ component_product_id: number; comp_qty: number; comp_price: number }>> = {};
+    const bundleComponentsMap: Record<
+      number,
+      Array<{ component_product_id: number; comp_qty: number; comp_price: number }>
+    > = {};
     const bundleProductIds = new Set<number>();
     for (const bi of bundleItemsRows) {
       const bId = Number(bi.bundle_product_id);
@@ -6402,7 +7300,9 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
     }
 
     // Also get all products for fallback name matching
-    const allProducts = await query<any>("SELECT id, name, product_type, vendor_cost, cost_price FROM products");
+    const allProducts = await query<any>(
+      "SELECT id, name, product_type, vendor_cost, cost_price FROM products",
+    );
     const productsById: Record<number, any> = {};
     const productsByName: Record<string, any> = {};
     for (const p of allProducts) {
@@ -6429,7 +7329,9 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
         if (!str) return "";
         let s = str.trim();
         s = s.replace(/\s*\(?(dp\s*50%|dp|lunas|pelunasan)\)?/gi, "").trim();
-        if (/^(dp|lunas|pelunasan|default|all size|one size|standard|-|ukuran tidak diisi)$/i.test(s)) {
+        if (
+          /^(dp|lunas|pelunasan|default|all size|one size|standard|-|ukuran tidak diisi)$/i.test(s)
+        ) {
           return "";
         }
         return s;
@@ -6447,7 +7349,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
       `SELECT vop.*, vo.id as vo_id, vo.total_cost as vo_total_cost
        FROM vendor_order_payments vop
        JOIN vendor_orders vo ON vop.vendor_order_id = vo.id
-       WHERE vo.status != 'cancelled'`
+       WHERE vo.status != 'cancelled'`,
     );
 
     const poPaymentsMap: Record<number, number> = {};
@@ -6475,38 +7377,45 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
        JOIN vendor_orders vo ON voi.vendor_order_id = vo.id
        LEFT JOIN vendors v ON vo.vendor_id = v.id
        LEFT JOIN products p ON voi.product_id = p.id
-       WHERE vo.status != 'cancelled'`
+       WHERE vo.status != 'cancelled'`,
     );
 
     // Total Committed COGS from all active Vendor Orders contracts
     const cogsRows = await query<any>(
-      "SELECT COALESCE(SUM(total_cost), 0) as total_cogs FROM vendor_orders WHERE status != 'cancelled'"
+      "SELECT COALESCE(SUM(total_cost), 0) as total_cogs FROM vendor_orders WHERE status != 'cancelled'",
     );
     const totalCommittedCogs = Number(cogsRows[0]?.total_cogs || 0);
 
     // Primary COGS displayed is Realized COGS (Kas Keluar Vendor yang sudah ditransfer)
     const totalCogs = totalPaidCogs;
     const grossMargin = totalRevenue - totalCogs;
-    const marginPercent = totalRevenue > 0 ? Number(((grossMargin / totalRevenue) * 100).toFixed(1)) : 0;
+    const marginPercent =
+      totalRevenue > 0 ? Number(((grossMargin / totalRevenue) * 100).toFixed(1)) : 0;
 
     // Build map of vendor PO items by product_id
-    const vendorPoMap: Record<number, {
-      total_po_qty: number;
-      total_po_cost: number;
-      total_paid_cost: number;
-      vendors: Set<string>;
-      pos: Set<string>;
-      variants: Record<string, {
-        size: string;
-        color: string;
-        quantity: number;
-        unit_cost: number;
-        subtotal_cost: number;
-        paid_cost: number;
-        vendor_name: string;
-        po_number: string;
-      }>;
-    }> = {};
+    const vendorPoMap: Record<
+      number,
+      {
+        total_po_qty: number;
+        total_po_cost: number;
+        total_paid_cost: number;
+        vendors: Set<string>;
+        pos: Set<string>;
+        variants: Record<
+          string,
+          {
+            size: string;
+            color: string;
+            quantity: number;
+            unit_cost: number;
+            subtotal_cost: number;
+            paid_cost: number;
+            vendor_name: string;
+            po_number: string;
+          }
+        >;
+      }
+    > = {};
 
     for (const item of vendorPoRows) {
       const pid = item.product_id || 0;
@@ -6521,8 +7430,8 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
         };
       }
       const qty = Number(item.quantity || 0);
-      const sub = Number(item.subtotal_cost || (item.unit_cost * qty) || 0);
-      
+      const sub = Number(item.subtotal_cost || item.unit_cost * qty || 0);
+
       const voId = Number(item.vendor_order_id);
       const voTotal = Number(item.vo_total_cost || 0);
       const voPaid = poPaymentsMap[voId] || 0;
@@ -6556,7 +7465,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
 
     // Find all linked LNS (pelunasan) orders to know which DP orders are already settled
     const lnsOrderRows = await query<any>(
-      `SELECT o.order_id, o.notes FROM orders o WHERE (o.order_id LIKE 'LNS%' OR o.notes LIKE '%Pelunasan untuk Order:%') AND o.order_status NOT IN ('cancelled', 'cancel') AND (o.payment_status IN ('paid', 'settlement') OR o.order_status IN ('completed', 'settlement', 'capture'))`
+      `SELECT o.order_id, o.notes FROM orders o WHERE (o.order_id LIKE 'LNS%' OR o.notes LIKE '%Pelunasan untuk Order:%') AND o.order_status NOT IN ('cancelled', 'cancel') AND (o.payment_status IN ('paid', 'settlement') OR o.order_status IN ('completed', 'settlement', 'capture'))`,
     );
     const settledParentOrderIds = new Set<string>();
     for (const l of lnsOrderRows) {
@@ -6584,21 +7493,36 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
        LEFT JOIN products p ON oi.product_id = p.id
        ${orderWhere}
        ORDER BY product_name ASC`,
-      orderParams
+      orderParams,
     );
 
     // Group sales by individual product (dissolving bundles)
-    const productSalesMap: Record<number, {
-      product_id: number;
-      product_name: string;
-      qty_sold: number;
-      revenue: number;
-      expected_revenue: number;
-      base_vendor_cost: number;
-      variants_sold: Record<string, { size: string; color: string; qty: number; revenue: number; expected_revenue: number }>;
-    }> = {};
+    const productSalesMap: Record<
+      number,
+      {
+        product_id: number;
+        product_name: string;
+        qty_sold: number;
+        revenue: number;
+        expected_revenue: number;
+        base_vendor_cost: number;
+        variants_sold: Record<
+          string,
+          { size: string; color: string; qty: number; revenue: number; expected_revenue: number }
+        >;
+      }
+    > = {};
 
-    const addSalesToProduct = (pId: number, rawName: string, size: string, color: string, qty: number, rev: number, expRev: number, baseCost: number) => {
+    const addSalesToProduct = (
+      pId: number,
+      rawName: string,
+      size: string,
+      color: string,
+      qty: number,
+      rev: number,
+      expRev: number,
+      baseCost: number,
+    ) => {
       if (!pId) return;
       if (!productSalesMap[pId]) {
         const matchedCatalog = productsById[pId];
@@ -6609,7 +7533,9 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
           qty_sold: 0,
           revenue: 0,
           expected_revenue: 0,
-          base_vendor_cost: Number(baseCost || matchedCatalog?.vendor_cost || matchedCatalog?.cost_price || 0),
+          base_vendor_cost: Number(
+            baseCost || matchedCatalog?.vendor_cost || matchedCatalog?.cost_price || 0,
+          ),
           variants_sold: {},
         };
       }
@@ -6650,15 +7576,27 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
       const rev = Number(r.subtotal || (r.unit_price || r.price || 0) * q || 0);
 
       // Check if this is an unsettled DP item
-      const isDp = String(r.color || "").toUpperCase().includes("DP") ||
-                   String(r.size || "").toUpperCase().includes("DP") ||
-                   String(rawName).toUpperCase().includes("DP 50%") ||
-                   String(r.order_notes || "").toUpperCase().includes("DP");
+      const isDp =
+        String(r.color || "")
+          .toUpperCase()
+          .includes("DP") ||
+        String(r.size || "")
+          .toUpperCase()
+          .includes("DP") ||
+        String(rawName).toUpperCase().includes("DP 50%") ||
+        String(r.order_notes || "")
+          .toUpperCase()
+          .includes("DP");
 
-      const isLunas = String(r.color || "").toUpperCase().includes("LUNAS") ||
-                      String(r.size || "").toUpperCase().includes("LUNAS") ||
-                      String(rawName).toUpperCase().includes("LUNAS") ||
-                      String(r.order_id || "").startsWith("LNS");
+      const isLunas =
+        String(r.color || "")
+          .toUpperCase()
+          .includes("LUNAS") ||
+        String(r.size || "")
+          .toUpperCase()
+          .includes("LUNAS") ||
+        String(rawName).toUpperCase().includes("LUNAS") ||
+        String(r.order_id || "").startsWith("LNS");
 
       let remainingDp = 0;
       if (isDp && !isLunas && !settledParentOrderIds.has(r.order_id)) {
@@ -6674,7 +7612,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
           (i: any) =>
             i.order_id === r.order_id &&
             ((i.raw_product_name && i.raw_product_name.includes("[KOMPONEN BUNDLE]")) ||
-              (i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")))
+              (i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]"))),
         );
 
         if (hasComponentRows) {
@@ -6683,7 +7621,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
             (i: any) =>
               i.order_id === r.order_id &&
               ((i.raw_product_name && i.raw_product_name.includes("[KOMPONEN BUNDLE]")) ||
-                (i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]")))
+                (i.product_name && i.product_name.includes("[KOMPONEN BUNDLE]"))),
           );
           if (orderComponentRows.length > 0 && rev > 0) {
             const revenuePerComp = Math.round(rev / orderComponentRows.length);
@@ -6712,7 +7650,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
                 compQty,
                 revPerComp,
                 expRevPerComp,
-                Number(compP?.vendor_cost || compP?.cost_price || 0)
+                Number(compP?.vendor_cost || compP?.cost_price || 0),
               );
             }
           }
@@ -6729,7 +7667,7 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
         q,
         rev,
         expRev,
-        Number(r.base_vendor_cost || r.base_cost_price || 0)
+        Number(r.base_vendor_cost || r.base_cost_price || 0),
       );
     }
 
@@ -6759,10 +7697,18 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
         // Total COGS for this product: Realized Kas Keluar Vendor
         const totalCogsProd = paidCogsProd;
         const margin = revenue - totalCogsProd;
-        const marginPct = revenue > 0 ? Number(((margin / revenue) * 100).toFixed(1)) : (totalCogsProd > 0 ? -100 : 0);
+        const marginPct =
+          revenue > 0
+            ? Number(((margin / revenue) * 100).toFixed(1))
+            : totalCogsProd > 0
+              ? -100
+              : 0;
 
         const expMargin = expectedRevenueProd - poTotalCost;
-        const expMarginPct = expectedRevenueProd > 0 ? Number(((expMargin / expectedRevenueProd) * 100).toFixed(1)) : 0;
+        const expMarginPct =
+          expectedRevenueProd > 0
+            ? Number(((expMargin / expectedRevenueProd) * 100).toFixed(1))
+            : 0;
 
         // Unit COGS determination based on contract or paid
         let unitCogs = 0;
@@ -6786,13 +7732,30 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
           paid_cost: number;
         }> = [];
 
-        const varKeyMap: Record<string, { size: string; color: string; qty_sold: number; qty_po: number; unit_cost: number; paid_cost: number }> = {};
+        const varKeyMap: Record<
+          string,
+          {
+            size: string;
+            color: string;
+            qty_sold: number;
+            qty_po: number;
+            unit_cost: number;
+            paid_cost: number;
+          }
+        > = {};
 
         if (vendorData?.variants) {
           for (const [key, v] of Object.entries(vendorData.variants)) {
             const cleanKey = cleanVariantKey(v.size, v.color);
             if (!varKeyMap[cleanKey]) {
-              varKeyMap[cleanKey] = { size: v.size, color: v.color, qty_sold: 0, qty_po: 0, unit_cost: v.unit_cost, paid_cost: 0 };
+              varKeyMap[cleanKey] = {
+                size: v.size,
+                color: v.color,
+                qty_sold: 0,
+                qty_po: 0,
+                unit_cost: v.unit_cost,
+                paid_cost: 0,
+              };
             }
             varKeyMap[cleanKey].qty_po += v.quantity;
             varKeyMap[cleanKey].paid_cost += v.paid_cost;
@@ -6804,7 +7767,14 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
           for (const [key, v] of Object.entries(sales.variants_sold)) {
             const cleanKey = cleanVariantKey(v.size, v.color);
             if (!varKeyMap[cleanKey]) {
-              varKeyMap[cleanKey] = { size: v.size, color: v.color, qty_sold: 0, qty_po: 0, unit_cost: unitCogs, paid_cost: 0 };
+              varKeyMap[cleanKey] = {
+                size: v.size,
+                color: v.color,
+                qty_sold: 0,
+                qty_po: 0,
+                unit_cost: unitCogs,
+                paid_cost: 0,
+              };
             }
             varKeyMap[cleanKey].qty_sold += v.qty;
           }
@@ -6824,7 +7794,17 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
         }
 
         // Sort variant details naturally (S, M, L, XL, XXL or alphabetical)
-        const sizeOrder: Record<string, number> = { xs: 1, s: 2, m: 3, l: 4, xl: 5, xxl: 6, "2xl": 6, xxxl: 7, "3xl": 7 };
+        const sizeOrder: Record<string, number> = {
+          xs: 1,
+          s: 2,
+          m: 3,
+          l: 4,
+          xl: 5,
+          xxl: 6,
+          "2xl": 6,
+          xxxl: 7,
+          "3xl": 7,
+        };
         variantDetails.sort((a, b) => {
           const aKey = a.variant.toLowerCase().trim();
           const bKey = b.variant.toLowerCase().trim();
@@ -6860,10 +7840,12 @@ export const getFinancialOverview = async (req: Request, res: Response) => {
 
     const expectedRevenue = totalRevenue + totalExpectedRemaining;
     const realCashMargin = totalRevenue - totalPaidCogs;
-    const realCashMarginPercent = totalRevenue > 0 ? Number(((realCashMargin / totalRevenue) * 100).toFixed(1)) : 0;
+    const realCashMarginPercent =
+      totalRevenue > 0 ? Number(((realCashMargin / totalRevenue) * 100).toFixed(1)) : 0;
     const netCashMarginVsPO = totalRevenue - totalCommittedCogs;
     const expectedMargin = expectedRevenue - totalCommittedCogs;
-    const expectedMarginPercent = expectedRevenue > 0 ? Number(((expectedMargin / expectedRevenue) * 100).toFixed(1)) : 0;
+    const expectedMarginPercent =
+      expectedRevenue > 0 ? Number(((expectedMargin / expectedRevenue) * 100).toFixed(1)) : 0;
 
     return res.json({
       success: true,
@@ -6904,7 +7886,7 @@ export const deleteImportedOrders = async (req: Request, res: Response) => {
 
     const [rows] = await connection.query(
       "SELECT order_id FROM orders WHERE pre_order_campaign_id = ? AND batch_source = 'csv_import'",
-      [campaignId]
+      [campaignId],
     );
     const orders = rows as any[];
 
@@ -6916,7 +7898,10 @@ export const deleteImportedOrders = async (req: Request, res: Response) => {
     }
 
     await connection.commit();
-    return res.json({ success: true, message: `Berhasil menghapus ${orders.length} pesanan import.` });
+    return res.json({
+      success: true,
+      message: `Berhasil menghapus ${orders.length} pesanan import.`,
+    });
   } catch (error: any) {
     await connection.rollback();
     console.error("Error deleting imported orders:", error);
@@ -6932,7 +7917,9 @@ export const importOrders = async (req: Request, res: Response) => {
   try {
     const { campaignId, cleanReimport, rows } = req.body;
     if (!campaignId || !Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json({ success: false, error: "Campaign ID dan data pesanan CSV wajib diisi!" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Campaign ID dan data pesanan CSV wajib diisi!" });
     }
 
     await connection.beginTransaction();
@@ -6940,12 +7927,15 @@ export const importOrders = async (req: Request, res: Response) => {
     if (cleanReimport) {
       const oldOrders = await query<any>(
         "SELECT order_id FROM orders WHERE pre_order_campaign_id = ? AND batch_source = 'csv_import'",
-        [campaignId]
+        [campaignId],
       );
       if (oldOrders.length > 0) {
         const oldIds = oldOrders.map((o) => o.order_id);
         const placeholders = oldIds.map(() => "?").join(",");
-        await connection.query(`DELETE FROM order_items WHERE order_id IN (${placeholders})`, oldIds);
+        await connection.query(
+          `DELETE FROM order_items WHERE order_id IN (${placeholders})`,
+          oldIds,
+        );
         await connection.query(`DELETE FROM orders WHERE order_id IN (${placeholders})`, oldIds);
       }
     }
@@ -6980,11 +7970,25 @@ export const importOrders = async (req: Request, res: Response) => {
       }
 
       const customerName =
-        row.customer_name || row["Nama Pembeli"] || row.nama_pembeli || row["Nama"] || "Pembeli CSV";
+        row.customer_name ||
+        row["Nama Pembeli"] ||
+        row.nama_pembeli ||
+        row["Nama"] ||
+        "Pembeli CSV";
       const customerEmail =
-        row.customer_email || row["Email Pembeli"] || row.email_pembeli || row["Email"] || row.email || "";
+        row.customer_email ||
+        row["Email Pembeli"] ||
+        row.email_pembeli ||
+        row["Email"] ||
+        row.email ||
+        "";
       const customerPhone =
-        row.customer_phone || row["No HP Pembeli"] || row.no_hp_pembeli || row["No HP"] || row.no_hp || "";
+        row.customer_phone ||
+        row["No HP Pembeli"] ||
+        row.no_hp_pembeli ||
+        row["No HP"] ||
+        row.no_hp ||
+        "";
       const customerNim =
         row.customer_nim || row["NIM Pembeli"] || row.nim_pembeli || row["NIM"] || row.nim || "";
       const itemsStr =
@@ -6994,30 +7998,40 @@ export const importOrders = async (req: Request, res: Response) => {
         row["Rincian Produk"] ||
         "";
       const rawPaymentStatus = String(
-        row.payment_status || row["Status Pembayaran"] || row.status_pembayaran || "settlement"
+        row.payment_status || row["Status Pembayaran"] || row.status_pembayaran || "settlement",
       ).toLowerCase();
       const rawOrderStatus = String(
-        row.order_status || row["Status Pesanan"] || row.status_pesanan || "processing"
+        row.order_status || row["Status Pesanan"] || row.status_pesanan || "processing",
       ).toLowerCase();
       const grandTotal =
         parseInt(
           String(
-            row.grand_total || row["Total Bayar (Rp)"] || row.total_bayar || row["Total Bayar"] || "0"
+            row.grand_total ||
+              row["Total Bayar (Rp)"] ||
+              row.total_bayar ||
+              row["Total Bayar"] ||
+              "0",
           ).replace(/\D/g, ""),
-          10
+          10,
         ) || 0;
 
       const paymentStatus =
-        rawPaymentStatus.includes("paid") || rawPaymentStatus.includes("settlement") || rawPaymentStatus.includes("lunas")
+        rawPaymentStatus.includes("paid") ||
+        rawPaymentStatus.includes("settlement") ||
+        rawPaymentStatus.includes("lunas")
           ? "paid"
           : "unpaid";
 
       const orderStatus =
         rawOrderStatus.includes("completed") || rawOrderStatus.includes("selesai")
           ? "completed"
-          : rawOrderStatus.includes("processing") || rawOrderStatus.includes("proses") || rawOrderStatus.includes("dikemas")
+          : rawOrderStatus.includes("processing") ||
+              rawOrderStatus.includes("proses") ||
+              rawOrderStatus.includes("dikemas")
             ? "processing"
-            : rawOrderStatus.includes("ready") || rawOrderStatus.includes("siap") || rawOrderStatus.includes("pickup")
+            : rawOrderStatus.includes("ready") ||
+                rawOrderStatus.includes("siap") ||
+                rawOrderStatus.includes("pickup")
               ? "ready_for_pickup"
               : rawOrderStatus.includes("shipped") || rawOrderStatus.includes("kirim")
                 ? "shipped"
@@ -7056,7 +8070,7 @@ export const importOrders = async (req: Request, res: Response) => {
           orderStatus === "completed" ? "completed" : "unfulfilled",
           campaignId,
           formattedDate,
-        ]
+        ],
       );
 
       await connection.query("DELETE FROM order_items WHERE order_id = ?", [orderId]);
@@ -7078,7 +8092,7 @@ export const importOrders = async (req: Request, res: Response) => {
               (p) =>
                 p.name.toLowerCase() === rawProdName.toLowerCase() ||
                 rawProdName.toLowerCase().includes(p.name.toLowerCase()) ||
-                p.name.toLowerCase().includes(rawProdName.toLowerCase())
+                p.name.toLowerCase().includes(rawProdName.toLowerCase()),
             );
 
             let size = "Standard";
@@ -7090,7 +8104,13 @@ export const importOrders = async (req: Request, res: Response) => {
             }
 
             let itemPrice = matchedProd
-              ? Number(matchedProd.filkom_price && Number(matchedProd.filkom_price) > 0 ? matchedProd.filkom_price : (matchedProd.promo_price && Number(matchedProd.promo_price) > 0 ? matchedProd.promo_price : matchedProd.price))
+              ? Number(
+                  matchedProd.filkom_price && Number(matchedProd.filkom_price) > 0
+                    ? matchedProd.filkom_price
+                    : matchedProd.promo_price && Number(matchedProd.promo_price) > 0
+                      ? matchedProd.promo_price
+                      : matchedProd.price,
+                )
               : Math.round(grandTotal / (itemTokens.length || 1));
 
             const itemSubtotal = itemPrice * qty;
@@ -7108,7 +8128,7 @@ export const importOrders = async (req: Request, res: Response) => {
                 qty,
                 itemPrice,
                 itemSubtotal,
-              ]
+              ],
             );
           }
         }
@@ -7126,7 +8146,9 @@ export const importOrders = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback();
     console.error("Error importing orders CSV:", error);
-    return res.status(500).json({ success: false, error: error.message || "Gagal meng-import data CSV" });
+    return res
+      .status(500)
+      .json({ success: false, error: error.message || "Gagal meng-import data CSV" });
   } finally {
     connection.release();
   }
@@ -7153,7 +8175,9 @@ export const claimSearch = async (req: Request, res: Response) => {
 
     const searchConditions: string[] = [];
     if (email && String(email).trim()) {
-      searchConditions.push(`(customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?)))`);
+      searchConditions.push(
+        `(customer_email IS NOT NULL AND LOWER(TRIM(customer_email)) = LOWER(TRIM(?)))`,
+      );
       params.push(String(email).trim());
     }
     if (nim && String(nim).trim()) {
@@ -7163,7 +8187,9 @@ export const claimSearch = async (req: Request, res: Response) => {
     if (phone && String(phone).trim()) {
       const p = String(phone).trim();
       const altP = p.startsWith("62") ? p.substring(2) : p.startsWith("0") ? p.substring(1) : p;
-      searchConditions.push(`(customer_phone = ? OR customer_phone = CONCAT('0', ?) OR customer_phone = CONCAT('62', ?))`);
+      searchConditions.push(
+        `(customer_phone = ? OR customer_phone = CONCAT('0', ?) OR customer_phone = CONCAT('62', ?))`,
+      );
       params.push(p, altP, altP);
     }
 
@@ -7185,32 +8211,36 @@ export const claimSearch = async (req: Request, res: Response) => {
          FROM order_items oi
          LEFT JOIN products p ON p.id = oi.product_id
          WHERE oi.order_id = ?`,
-        [order.order_id]
+        [order.order_id],
       );
 
       // Masking the name for privacy
       let maskedName = order.customer_name;
       if (maskedName) {
-        const parts = maskedName.split(' ');
-        maskedName = parts.map((part: string) => {
-          if (part.length > 2) {
-            return part.substring(0, 2) + '*'.repeat(part.length - 2);
-          }
-          return part;
-        }).join(' ');
+        const parts = maskedName.split(" ");
+        maskedName = parts
+          .map((part: string) => {
+            if (part.length > 2) {
+              return part.substring(0, 2) + "*".repeat(part.length - 2);
+            }
+            return part;
+          })
+          .join(" ");
       }
 
       finalOrders.push({
         ...order,
         customer_name: maskedName,
-        items: items
+        items: items,
       });
     }
 
     return res.json({ success: true, orders: finalOrders });
   } catch (error: any) {
     console.error("Error in claimSearch:", error);
-    return res.status(500).json({ success: false, error: "Terjadi kesalahan sistem saat mencari pesanan" });
+    return res
+      .status(500)
+      .json({ success: false, error: "Terjadi kesalahan sistem saat mencari pesanan" });
   }
 };
 
@@ -7229,12 +8259,15 @@ export const submitClaim = async (req: Request, res: Response) => {
     if (!userId || isNaN(Number(userId)) || Number(userId) <= 0) {
       return res.status(401).json({
         success: false,
-        error: "Sesi login Anda tidak valid atau telah kedaluwarsa. Silakan logout lalu login kembali ke akun Anda.",
+        error:
+          "Sesi login Anda tidak valid atau telah kedaluwarsa. Silakan logout lalu login kembali ke akun Anda.",
       });
     }
 
     // Check if user exists in database
-    const user = await queryOne<any>("SELECT id, name, email FROM users WHERE id = ?", [Number(userId)]);
+    const user = await queryOne<any>("SELECT id, name, email FROM users WHERE id = ?", [
+      Number(userId),
+    ]);
     if (!user) {
       return res.status(401).json({
         success: false,
@@ -7243,10 +8276,7 @@ export const submitClaim = async (req: Request, res: Response) => {
     }
 
     // Check if order exists
-    const order = await queryOne<any>(
-      "SELECT * FROM orders WHERE order_id = ?",
-      [orderId]
-    );
+    const order = await queryOne<any>("SELECT * FROM orders WHERE order_id = ?", [orderId]);
 
     if (!order) {
       return res.status(404).json({
@@ -7260,12 +8290,14 @@ export const submitClaim = async (req: Request, res: Response) => {
       if (Number(order.user_id) === Number(userId)) {
         return res.status(400).json({
           success: false,
-          error: "Pesanan ini sudah berhasil terhubung dengan akun Anda saat ini. Cek di halaman 'Pesanan Saya'.",
+          error:
+            "Pesanan ini sudah berhasil terhubung dengan akun Anda saat ini. Cek di halaman 'Pesanan Saya'.",
         });
       } else {
         return res.status(400).json({
           success: false,
-          error: "Pesanan ini sudah terhubung dan diklaim oleh akun pengguna lain. Silakan hubungi admin jika ini pesanan Anda.",
+          error:
+            "Pesanan ini sudah terhubung dan diklaim oleh akun pengguna lain. Silakan hubungi admin jika ini pesanan Anda.",
         });
       }
     }
@@ -7273,14 +8305,15 @@ export const submitClaim = async (req: Request, res: Response) => {
     // Check existing claims for this user and order
     const existingThisUser = await queryOne<any>(
       "SELECT * FROM order_claims WHERE user_id = ? AND order_id = ?",
-      [Number(userId), orderId]
+      [Number(userId), orderId],
     );
 
     if (existingThisUser) {
       if (existingThisUser.status === "pending") {
         return res.status(400).json({
           success: false,
-          error: "Anda sudah mengajukan klaim untuk pesanan ini dan saat ini sedang menunggu verifikasi admin. Silakan pantau di tab 'Riwayat Klaim'.",
+          error:
+            "Anda sudah mengajukan klaim untuk pesanan ini dan saat ini sedang menunggu verifikasi admin. Silakan pantau di tab 'Riwayat Klaim'.",
         });
       } else if (existingThisUser.status === "approved") {
         return res.status(400).json({
@@ -7290,8 +8323,9 @@ export const submitClaim = async (req: Request, res: Response) => {
       } else if (existingThisUser.status === "rejected") {
         return res.status(400).json({
           success: false,
-          error: `Pengajuan klaim pesanan ini sebelumnya ditolak oleh admin${existingThisUser.admin_note ? `: "${existingThisUser.admin_note}"` : ""
-            }. Silakan hubungi admin FILKOM Merch jika terdapat kekeliruan.`,
+          error: `Pengajuan klaim pesanan ini sebelumnya ditolak oleh admin${
+            existingThisUser.admin_note ? `: "${existingThisUser.admin_note}"` : ""
+          }. Silakan hubungi admin FILKOM Merch jika terdapat kekeliruan.`,
         });
       }
     }
@@ -7299,21 +8333,22 @@ export const submitClaim = async (req: Request, res: Response) => {
     // Check if another user currently has a pending claim for this order
     const existingOtherUser = await queryOne<any>(
       "SELECT * FROM order_claims WHERE order_id = ? AND status = 'pending'",
-      [orderId]
+      [orderId],
     );
 
     if (existingOtherUser) {
       return res.status(400).json({
         success: false,
-        error: "Pesanan ini sedang dalam proses peninjauan klaim oleh pengguna lain. Silakan hubungi admin untuk verifikasi manual.",
+        error:
+          "Pesanan ini sedang dalam proses peninjauan klaim oleh pengguna lain. Silakan hubungi admin untuk verifikasi manual.",
       });
     }
 
     // Insert new claim
-    await execute(
-      "INSERT INTO order_claims (user_id, order_id, status) VALUES (?, ?, 'pending')",
-      [Number(userId), orderId]
-    );
+    await execute("INSERT INTO order_claims (user_id, order_id, status) VALUES (?, ?, 'pending')", [
+      Number(userId),
+      orderId,
+    ]);
 
     return res.json({
       success: true,
@@ -7340,7 +8375,7 @@ export const getAllClaims = async (req: Request, res: Response) => {
        FROM order_claims c
        JOIN users u ON c.user_id = u.id
        JOIN orders o ON c.order_id = o.order_id
-       ORDER BY c.created_at DESC`
+       ORDER BY c.created_at DESC`,
     );
     return res.json({ success: true, claims });
   } catch (error: any) {
@@ -7365,7 +8400,7 @@ export const approveClaim = async (req: Request, res: Response) => {
 
     const [claims] = await connection.execute(
       "SELECT * FROM order_claims WHERE id = ? FOR UPDATE",
-      [claimId]
+      [claimId],
     );
     const claim = (claims as any[])[0];
 
@@ -7374,7 +8409,7 @@ export const approveClaim = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: "Klaim tidak ditemukan" });
     }
 
-    if (claim.status !== 'pending') {
+    if (claim.status !== "pending") {
       await connection.rollback();
       return res.status(400).json({ success: false, error: "Klaim ini sudah diproses sebelumnya" });
     }
@@ -7382,19 +8417,21 @@ export const approveClaim = async (req: Request, res: Response) => {
     // Check if order is still unassigned
     const [orders] = await connection.execute(
       "SELECT * FROM orders WHERE order_id = ? FOR UPDATE",
-      [claim.order_id]
+      [claim.order_id],
     );
     const order = (orders as any[])[0];
 
     if (order.user_id) {
       await connection.rollback();
-      return res.status(400).json({ success: false, error: "Pesanan ini sudah dihubungkan ke akun lain" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Pesanan ini sudah dihubungkan ke akun lain" });
     }
 
     // Get the user data
     const [users] = await connection.execute(
       "SELECT name, email, phone, nim FROM users WHERE id = ?",
-      [claim.user_id]
+      [claim.user_id],
     );
     const user = (users as any[])[0];
 
@@ -7408,13 +8445,13 @@ export const approveClaim = async (req: Request, res: Response) => {
       customer_name: order.customer_name,
       customer_email: order.customer_email,
       customer_phone: order.customer_phone,
-      customer_nim: order.customer_nim
+      customer_nim: order.customer_nim,
     });
 
     // 2. Update claim status, admin_note, and original_csv_data
     await connection.execute(
       "UPDATE order_claims SET status = 'approved', admin_note = ?, original_csv_data = ? WHERE id = ?",
-      [adminNote || null, originalCsvData, claimId]
+      [adminNote || null, originalCsvData, claimId],
     );
 
     // 3. Update order: set user_id and overwrite buyer details, fallback to order's original data if user's data is null
@@ -7426,29 +8463,25 @@ export const approveClaim = async (req: Request, res: Response) => {
         user.email || order.customer_email,
         user.phone || order.customer_phone,
         user.nim || order.customer_nim,
-        claim.order_id
-      ]
+        claim.order_id,
+      ],
     );
 
     // 3. Reject other pending claims for this same order
     await connection.execute(
       "UPDATE order_claims SET status = 'rejected' WHERE order_id = ? AND id != ?",
-      [claim.order_id, claimId]
+      [claim.order_id, claimId],
     );
 
     await connection.commit();
 
     // 4. Send Push Notification to User
     try {
-      await sendPushToUser(
-        connection,
-        claim.user_id,
-        {
-          title: "🎉 Klaim Pesanan Berhasil!",
-          body: `Pesanan dengan ID ${claim.order_id} berhasil dihubungkan ke akunmu. Kamu sekarang bisa melacaknya!`,
-          url: `/orders`,
-        }
-      );
+      await sendPushToUser(connection, claim.user_id, {
+        title: "🎉 Klaim Pesanan Berhasil!",
+        body: `Pesanan dengan ID ${claim.order_id} berhasil dihubungkan ke akunmu. Kamu sekarang bisa melacaknya!`,
+        url: `/orders`,
+      });
     } catch (pushErr) {
       console.error("Failed to send push on claim approve:", pushErr);
       // Don't fail the request if push fails
@@ -7472,10 +8505,10 @@ export const rejectClaim = async (req: Request, res: Response) => {
     const claimId = req.params.id;
     const { adminNote } = req.body;
 
-    await execute(
-      "UPDATE order_claims SET status = 'rejected', admin_note = ? WHERE id = ?",
-      [adminNote || null, claimId]
-    );
+    await execute("UPDATE order_claims SET status = 'rejected', admin_note = ? WHERE id = ?", [
+      adminNote || null,
+      claimId,
+    ]);
 
     return res.json({ success: true, message: "Klaim berhasil ditolak" });
   } catch (error: any) {
@@ -7496,7 +8529,7 @@ export const annulClaim = async (req: Request, res: Response) => {
 
     const [claims] = await connection.execute(
       "SELECT * FROM order_claims WHERE id = ? FOR UPDATE",
-      [claimId]
+      [claimId],
     );
     const claim = (claims as any[])[0];
 
@@ -7505,13 +8538,13 @@ export const annulClaim = async (req: Request, res: Response) => {
       return res.status(404).json({ success: false, error: "Klaim tidak ditemukan" });
     }
 
-    if (claim.status === 'pending') {
+    if (claim.status === "pending") {
       await connection.rollback();
       return res.status(400).json({ success: false, error: "Klaim masih berstatus pending" });
     }
 
     // If it was approved, we need to revert the order changes
-    if (claim.status === 'approved') {
+    if (claim.status === "approved") {
       let csvData: any = {};
       try {
         if (claim.original_csv_data) {
@@ -7529,21 +8562,24 @@ export const annulClaim = async (req: Request, res: Response) => {
       // Unassign user_id from order and restore CSV data if available
       await connection.execute(
         "UPDATE orders SET user_id = NULL, customer_name = COALESCE(?, customer_name), customer_email = COALESCE(?, customer_email), customer_phone = COALESCE(?, customer_phone), customer_nim = COALESCE(?, customer_nim) WHERE order_id = ?",
-        [c_name, c_email, c_phone, c_nim, claim.order_id]
+        [c_name, c_email, c_phone, c_nim, claim.order_id],
       );
     }
 
     // Set claim back to pending
     await connection.execute(
       "UPDATE order_claims SET status = 'pending', admin_note = NULL WHERE id = ?",
-      [claimId]
+      [claimId],
     );
 
     // If we are annulling an approved claim, what about the other claims for the same order that were rejected?
     // Let's leave them rejected for now, or the admin can annul them individually.
 
     await connection.commit();
-    return res.json({ success: true, message: "Klaim berhasil dianulir dan dikembalikan ke status Pending" });
+    return res.json({
+      success: true,
+      message: "Klaim berhasil dianulir dan dikembalikan ke status Pending",
+    });
   } catch (error: any) {
     await connection.rollback();
     console.error("Error in annulClaim:", error);
@@ -7565,7 +8601,7 @@ export const getUserClaims = async (req: Request, res: Response) => {
 
     const claims = await query<any>(
       "SELECT c.*, o.gross_amount, o.customer_name FROM order_claims c JOIN orders o ON c.order_id = o.order_id WHERE c.user_id = ? ORDER BY c.created_at DESC",
-      [userId]
+      [userId],
     );
 
     const enrichedClaims = await Promise.all(
@@ -7577,10 +8613,10 @@ export const getUserClaims = async (req: Request, res: Response) => {
            FROM order_items oi
            LEFT JOIN products p ON p.id = oi.product_id
            WHERE oi.order_id = ?`,
-          [claim.order_id]
+          [claim.order_id],
         );
         return { ...claim, items };
-      })
+      }),
     );
 
     return res.json({ success: true, claims: enrichedClaims });
@@ -7595,7 +8631,12 @@ export const trackVisit = async (req: Request, res: Response) => {
   try {
     const { path } = req.body;
     // Get IP Address safely, falling back to general request IP
-    const ip_address = req.headers["x-forwarded-for"] || req.connection?.remoteAddress || req.socket?.remoteAddress || req.ip || "unknown";
+    const ip_address =
+      req.headers["x-forwarded-for"] ||
+      req.connection?.remoteAddress ||
+      req.socket?.remoteAddress ||
+      req.ip ||
+      "unknown";
     const user_agent = req.headers["user-agent"] || "unknown";
     const user_id = req.headers["x-user-id"] ? parseInt(req.headers["x-user-id"] as string) : null;
     const user_name = req.headers["x-user-name"] ? String(req.headers["x-user-name"]) : null;
@@ -7608,8 +8649,8 @@ export const trackVisit = async (req: Request, res: Response) => {
         user_agent,
         path || "/",
         user_id,
-        user_name
-      ]
+        user_name,
+      ],
     );
 
     return res.json({ success: true });
@@ -7628,7 +8669,7 @@ export const updateOrderItemPickupStatus = async (req: Request, res: Response) =
   try {
     const { orderId } = req.params;
     const { items, notes, proof_url } = req.body; // items: Array<{ id: number, status: 'pending' | 'ready' | 'picked_up', proof_url?: string }>
-    
+
     const actorId = req.header("x-user-id") ? parseInt(req.header("x-user-id")!) : null;
     const actorName = req.header("x-user-name") || "Admin/Kasir";
     const actorRole = req.header("x-user-role") || "admin";
@@ -7650,7 +8691,7 @@ export const updateOrderItemPickupStatus = async (req: Request, res: Response) =
       // Get current item status
       const [currentRows] = await connection.query<any[]>(
         "SELECT id, order_id, product_name, pickup_status, pickup_proof_url FROM order_items WHERE id = ? AND order_id = ?",
-        [itemId, orderId]
+        [itemId, orderId],
       );
 
       if (!currentRows || currentRows.length === 0) continue;
@@ -7679,7 +8720,7 @@ export const updateOrderItemPickupStatus = async (req: Request, res: Response) =
              picked_up_by_name = ?,
              pickup_proof_url = ?
          WHERE id = ? AND order_id = ?`,
-        [newStatus, pickedUpAt, pickedUpBy, pickedUpByName, finalProofUrl, itemId, orderId]
+        [newStatus, pickedUpAt, pickedUpBy, pickedUpByName, finalProofUrl, itemId, orderId],
       );
 
       // Insert audit log
@@ -7687,14 +8728,24 @@ export const updateOrderItemPickupStatus = async (req: Request, res: Response) =
         `INSERT INTO order_item_pickup_logs 
          (order_id, order_item_id, previous_status, new_status, actor_id, actor_name, actor_role, notes, proof_url) 
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [orderId, itemId, prevStatus, newStatus, actorId, actorName, actorRole, notes || `Status diubah dari ${prevStatus} menjadi ${newStatus}`, finalProofUrl]
+        [
+          orderId,
+          itemId,
+          prevStatus,
+          newStatus,
+          actorId,
+          actorName,
+          actorRole,
+          notes || `Status diubah dari ${prevStatus} menjadi ${newStatus}`,
+          finalProofUrl,
+        ],
       );
     }
 
     // Check if all items in this order are now picked_up
     const [itemSummaryRows] = await connection.query<any[]>(
       "SELECT COUNT(*) as total_items, SUM(CASE WHEN pickup_status = 'picked_up' THEN 1 ELSE 0 END) as picked_items FROM order_items WHERE order_id = ?",
-      [orderId]
+      [orderId],
     );
     const totalItems = Number(itemSummaryRows[0]?.total_items || 0);
     const pickedItems = Number(itemSummaryRows[0]?.picked_items || 0);
@@ -7704,7 +8755,7 @@ export const updateOrderItemPickupStatus = async (req: Request, res: Response) =
       isWholeOrderCompleted = true;
       await connection.query(
         "UPDATE orders SET order_status = 'completed', fulfillment_status = 'completed', completed_at = COALESCE(completed_at, NOW()), fulfillment_proof_url = COALESCE(?, fulfillment_proof_url) WHERE order_id = ? OR notes LIKE ?",
-        [proof_url || null, orderId, `%Pelunasan untuk Order: ${orderId}%`]
+        [proof_url || null, orderId, `%Pelunasan untuk Order: ${orderId}%`],
       );
     }
 
@@ -7716,7 +8767,7 @@ export const updateOrderItemPickupStatus = async (req: Request, res: Response) =
        FROM order_items oi 
        LEFT JOIN products p ON p.id = oi.product_id 
        WHERE oi.order_id = ?`,
-      [orderId]
+      [orderId],
     );
 
     return res.json({
@@ -7730,7 +8781,9 @@ export const updateOrderItemPickupStatus = async (req: Request, res: Response) =
   } catch (error: any) {
     await connection.rollback();
     console.error("Error updating order item pickup status:", error);
-    return res.status(500).json({ success: false, error: "Gagal memperbarui status pengambilan: " + error.message });
+    return res
+      .status(500)
+      .json({ success: false, error: "Gagal memperbarui status pengambilan: " + error.message });
   } finally {
     connection.release();
   }
@@ -7746,7 +8799,7 @@ export const getOrderItemPickupLogs = async (req: Request, res: Response) => {
        LEFT JOIN order_items oi ON oi.id = l.order_item_id
        WHERE l.order_id = ?
        ORDER BY l.created_at DESC`,
-      [orderId]
+      [orderId],
     );
 
     return res.json({ success: true, logs: logs || [] });
@@ -7770,7 +8823,7 @@ export const notifyPartialPickup = async (req: Request, res: Response) => {
     // Get order details
     const order = await queryOne<any>(
       "SELECT user_id, customer_name, customer_email, customer_phone FROM orders WHERE order_id = ?",
-      [orderId]
+      [orderId],
     );
 
     if (!order) {
@@ -7784,20 +8837,20 @@ export const notifyPartialPickup = async (req: Request, res: Response) => {
       for (const itemId of readyItemIds) {
         const [rows] = await connection.query<any[]>(
           "SELECT id, pickup_status FROM order_items WHERE id = ? AND order_id = ?",
-          [itemId, orderId]
+          [itemId, orderId],
         );
         if (rows && rows.length > 0) {
           const prevStatus = rows[0].pickup_status || "pending";
           if (prevStatus === "pending") {
             await connection.query(
               "UPDATE order_items SET pickup_status = 'ready' WHERE id = ? AND order_id = ?",
-              [itemId, orderId]
+              [itemId, orderId],
             );
             await connection.query(
               `INSERT INTO order_item_pickup_logs 
                (order_id, order_item_id, previous_status, new_status, actor_id, actor_name, actor_role, notes) 
                VALUES (?, ?, ?, 'ready', ?, ?, ?, 'Notifikasi kesiapan barang dikirim')`,
-              [orderId, itemId, prevStatus, actorId, actorName, actorRole]
+              [orderId, itemId, prevStatus, actorId, actorName, actorRole],
             );
           }
         }
@@ -7829,7 +8882,7 @@ export const notifyPartialPickup = async (req: Request, res: Response) => {
        FROM order_items oi 
        LEFT JOIN products p ON p.id = oi.product_id 
        WHERE oi.order_id = ?`,
-      [orderId]
+      [orderId],
     );
 
     return res.json({
@@ -7841,7 +8894,9 @@ export const notifyPartialPickup = async (req: Request, res: Response) => {
   } catch (error: any) {
     await connection.rollback();
     console.error("Error notifying partial pickup:", error);
-    return res.status(500).json({ success: false, error: "Gagal mengirim notifikasi: " + error.message });
+    return res
+      .status(500)
+      .json({ success: false, error: "Gagal mengirim notifikasi: " + error.message });
   } finally {
     connection.release();
   }
@@ -7854,11 +8909,19 @@ export const notifyPartialPickup = async (req: Request, res: Response) => {
 const isJacketName = (name?: string | null): boolean => {
   if (!name) return false;
   const n = String(name).toLowerCase();
-  return n.includes("varsity") || n.includes("work jacket") || n.includes("half zip") || n.includes("halfzip") || n.includes("half-zip");
+  return (
+    n.includes("varsity") ||
+    n.includes("work jacket") ||
+    n.includes("half zip") ||
+    n.includes("halfzip") ||
+    n.includes("half-zip")
+  );
 };
 
 const getJacketUpsize = (productName?: string | null, sizeStr?: string | null): number => {
-  const s = String(sizeStr || "").toUpperCase().trim();
+  const s = String(sizeStr || "")
+    .toUpperCase()
+    .trim();
   const n = String(productName || "").toLowerCase();
   if (s === "XXL" || s === "2XL") return 10000;
   if (s === "XXXL" || s === "3XL") return n.includes("varsity") ? 20000 : 15000;
@@ -7892,7 +8955,8 @@ const calculateBackendPelunasan = (order: any, items: any[], linkedLns?: any): n
     const c = String(it.color || "").toUpperCase();
     const s = String(it.size || "").toUpperCase();
     const n = String(it.product_name || "").toUpperCase();
-    const isExplicitLunas = c.includes("LUNAS") || s.includes("LUNAS") || c.includes("FULL") || s.includes("FULL");
+    const isExplicitLunas =
+      c.includes("LUNAS") || s.includes("LUNAS") || c.includes("FULL") || s.includes("FULL");
     if (isExplicitLunas) continue;
     const isDp = c.includes("DP") || s.includes("DP") || n.includes("DP");
     if (!isDp) continue;
@@ -7916,7 +8980,7 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
 
     // 1. Fetch campaigns
     const campaigns = await query<any>(
-      "SELECT id, batch_name, start_date, end_date, extended_end_date, is_active FROM pre_order_campaigns ORDER BY id ASC"
+      "SELECT id, batch_name, start_date, end_date, extended_end_date, is_active FROM pre_order_campaigns ORDER BY id ASC",
     );
 
     // 2. Fetch all valid orders
@@ -7963,7 +9027,7 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
            FROM order_items oi
            LEFT JOIN products p ON oi.product_id = p.id
            WHERE oi.order_id IN (${placeholders})`,
-          slice
+          slice,
         );
         for (const row of itemsRows) {
           if (!orderItemsMap[row.order_id]) orderItemsMap[row.order_id] = [];
@@ -7975,7 +9039,10 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
     // 4. Build map of LNS pelunasan orders
     const dpPelunasanMap: Record<string, any> = {};
     for (const o of allOrders) {
-      if (String(o.order_id || "").startsWith("LNS") || (o.notes && o.notes.includes("Pelunasan untuk Order:"))) {
+      if (
+        String(o.order_id || "").startsWith("LNS") ||
+        (o.notes && o.notes.includes("Pelunasan untuk Order:"))
+      ) {
         const match = o.notes && o.notes.match(/Pelunasan untuk Order:\s*([A-Za-z0-9-]+)/);
         if (match && match[1]) {
           dpPelunasanMap[match[1]] = o;
@@ -8068,7 +9135,9 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
         const hasLunasVariant = items.some((i: any) => {
           const c = String(i?.color || "").toUpperCase();
           const s = String(i?.size || "").toUpperCase();
-          return c.includes("LUNAS") || s.includes("LUNAS") || c.includes("FULL") || s.includes("FULL");
+          return (
+            c.includes("LUNAS") || s.includes("LUNAS") || c.includes("FULL") || s.includes("FULL")
+          );
         });
         if (hasLunasVariant) return false;
         const hasDp = items.some((i: any) => {
@@ -8083,7 +9152,9 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
 
     // Process non-LNS orders
     for (const o of allOrders) {
-      const isLns = String(o.order_id || "").startsWith("LNS") || (o.notes && o.notes.includes("Pelunasan untuk Order:"));
+      const isLns =
+        String(o.order_id || "").startsWith("LNS") ||
+        (o.notes && o.notes.includes("Pelunasan untuk Order:"));
       if (isLns) continue; // Will be accounted for through parent DP order
 
       const items = orderItemsMap[o.order_id] || [];
@@ -8117,11 +9188,11 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
         o.order_status === "processing";
 
       const linkedLns = dpPelunasanMap[o.order_id];
-      const isLnsPaid = linkedLns && (
-        linkedLns.payment_status === "paid" ||
-        linkedLns.transaction_status === "settlement" ||
-        linkedLns.order_status === "completed"
-      );
+      const isLnsPaid =
+        linkedLns &&
+        (linkedLns.payment_status === "paid" ||
+          linkedLns.transaction_status === "settlement" ||
+          linkedLns.order_status === "completed");
 
       const isDp = checkIsDp(o, items);
       const grossAmount = Number(o.gross_amount || o.subtotal || 0);
@@ -8187,10 +9258,15 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
 
       // Collect Unpaid Orders List (Requirement 2)
       if (orderUnpaidRemaining > 0) {
-        const itemsSummary = (items || []).map((it: any) => {
-          const v = [it.size, it.color].filter(Boolean).join("/");
-          return `${it.product_name}${v ? ` (${v})` : ""} x${it.quantity}`;
-        }).join(", ") || o.notes || "Pesanan";
+        const itemsSummary =
+          (items || [])
+            .map((it: any) => {
+              const v = [it.size, it.color].filter(Boolean).join("/");
+              return `${it.product_name}${v ? ` (${v})` : ""} x${it.quantity}`;
+            })
+            .join(", ") ||
+          o.notes ||
+          "Pesanan";
 
         let cleanPhone = String(o.customer_phone || "").replace(/\D/g, "");
         if (cleanPhone.startsWith("0")) {
@@ -8200,7 +9276,7 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
         }
 
         const reminderMsg = encodeURIComponent(
-          `Halo Kak ${o.customer_name || ""}, kami dari Admin FILKOM Merch ingin mengonfirmasi status tagihan pesanan #${o.order_id} sebesar Rp ${orderUnpaidRemaining.toLocaleString("id-ID")}. Silakan konfirmasi untuk proses pelunasan ya. Terima kasih! 🙏`
+          `Halo Kak ${o.customer_name || ""}, kami dari Admin FILKOM Merch ingin mengonfirmasi status tagihan pesanan #${o.order_id} sebesar Rp ${orderUnpaidRemaining.toLocaleString("id-ID")}. Silakan konfirmasi untuk proses pelunasan ya. Terima kasih! 🙏`,
         );
         const waLink = cleanPhone ? `https://wa.me/${cleanPhone}?text=${reminderMsg}` : null;
 
@@ -8215,7 +9291,8 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
           batch_id: matchedKey,
           batch_name: summary.name,
           type: orderType,
-          type_label: orderType === "dp_unpaid" ? "DP Lunas (Kurang Pelunasan)" : "Belum Bayar (Pending)",
+          type_label:
+            orderType === "dp_unpaid" ? "DP Lunas (Kurang Pelunasan)" : "Belum Bayar (Pending)",
           total_order_amount: orderPaidAmount + orderUnpaidRemaining,
           paid_amount: orderPaidAmount,
           unpaid_amount: orderUnpaidRemaining,
@@ -8238,7 +9315,11 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
         let isFilkomItem = false;
         if (isCivitas) {
           isFilkomItem = true;
-        } else if (filkomPrice > 0 && unitPrice <= filkomPrice && (normalPrice <= 0 || unitPrice < normalPrice)) {
+        } else if (
+          filkomPrice > 0 &&
+          unitPrice <= filkomPrice &&
+          (normalPrice <= 0 || unitPrice < normalPrice)
+        ) {
           isFilkomItem = true;
         }
 
@@ -8262,10 +9343,10 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
             product_name: prodName,
             filkom_qty: 0,
             filkom_revenue: 0,
-            filkom_unit_price: filkomPrice > 0 ? filkomPrice : (isFilkomItem ? unitPrice : 0),
+            filkom_unit_price: filkomPrice > 0 ? filkomPrice : isFilkomItem ? unitPrice : 0,
             umum_qty: 0,
             umum_revenue: 0,
-            umum_unit_price: normalPrice > 0 ? normalPrice : (!isFilkomItem ? unitPrice : 0),
+            umum_unit_price: normalPrice > 0 ? normalPrice : !isFilkomItem ? unitPrice : 0,
             total_qty: 0,
             total_revenue: 0,
             subsidy_total: 0,
@@ -8321,7 +9402,10 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
       }
 
       if (verifiedNominal > 0 && diff > 0) {
-        if (aiStatus === "OVERPAID" || (verifiedNominal > invoiceExpected && aiStatus !== "MATCH")) {
+        if (
+          aiStatus === "OVERPAID" ||
+          (verifiedNominal > invoiceExpected && aiStatus !== "MATCH")
+        ) {
           totalOverpaidAmount += diff;
           totalOverpaidCount += 1;
           aiDiscrepancyList.push({
@@ -8341,7 +9425,10 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
             resolution_status: o.refund_status || "pending",
             created_at: o.created_at,
           });
-        } else if (aiStatus === "UNDERPAID" || (verifiedNominal < invoiceExpected && aiStatus !== "MATCH")) {
+        } else if (
+          aiStatus === "UNDERPAID" ||
+          (verifiedNominal < invoiceExpected && aiStatus !== "MATCH")
+        ) {
           totalUnderpaidAmount += diff;
           totalUnderpaidCount += 1;
           aiDiscrepancyList.push({
@@ -8367,14 +9454,23 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
 
     // Sort business breakdowns
     unpaidOrdersList.sort((a, b) => b.unpaid_amount - a.unpaid_amount);
-    const productPriceList = Object.values(productPriceMap).sort((a, b) => b.total_revenue - a.total_revenue);
-    const voucherList = Object.values(vouchersMap).sort((a, b) => b.total_discount - a.total_discount);
-    aiDiscrepancyList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    const productPriceList = Object.values(productPriceMap).sort(
+      (a, b) => b.total_revenue - a.total_revenue,
+    );
+    const voucherList = Object.values(vouchersMap).sort(
+      (a, b) => b.total_discount - a.total_discount,
+    );
+    aiDiscrepancyList.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
 
     // Compute settlement rates
     for (const key of Object.keys(batchSummaries)) {
       const s = batchSummaries[key];
-      s.settlement_rate = s.potential_revenue > 0 ? Number(((s.realized_revenue / s.potential_revenue) * 100).toFixed(1)) : 0;
+      s.settlement_rate =
+        s.potential_revenue > 0
+          ? Number(((s.realized_revenue / s.potential_revenue) * 100).toFixed(1))
+          : 0;
     }
 
     // 6. Fetch Vendor Orders & Payments (COGS)
@@ -8432,7 +9528,10 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
     const expenseCategories = Object.entries(expenseCategoriesMap).map(([name, amount]) => ({
       category: name,
       amount,
-      percentage: totalOperationalExpenses > 0 ? Number(((amount / totalOperationalExpenses) * 100).toFixed(1)) : 0,
+      percentage:
+        totalOperationalExpenses > 0
+          ? Number(((amount / totalOperationalExpenses) * 100).toFixed(1))
+          : 0,
     }));
     expenseCategories.sort((a, b) => b.amount - a.amount);
 
@@ -8453,8 +9552,14 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
     // Net balance
     const currentNetCash = grandRealizedRevenue - totalRealizedExpense;
     const projectedNetProfit = grandPotentialRevenue - totalCommittedExpense;
-    const projectedProfitMargin = grandPotentialRevenue > 0 ? Number(((projectedNetProfit / grandPotentialRevenue) * 100).toFixed(1)) : 0;
-    const currentCashMargin = grandRealizedRevenue > 0 ? Number(((currentNetCash / grandRealizedRevenue) * 100).toFixed(1)) : 0;
+    const projectedProfitMargin =
+      grandPotentialRevenue > 0
+        ? Number(((projectedNetProfit / grandPotentialRevenue) * 100).toFixed(1))
+        : 0;
+    const currentCashMargin =
+      grandRealizedRevenue > 0
+        ? Number(((currentNetCash / grandRealizedRevenue) * 100).toFixed(1))
+        : 0;
 
     // 9. Vendor Stock Projections & Break-Even Point (BEP) Analysis
     const vendorOrderItems = await query<any>(`
@@ -8469,19 +9574,24 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
     `);
 
     // Group vendor items by product
-    const productVendorMap: Record<string, {
-      product_id: number | null;
-      product_name: string;
-      ordered_qty: number;
-      total_vendor_cost: number;
-      filkom_price: number;
-      umum_price: number;
-      catalog_vendor_cost: number;
-    }> = {};
+    const productVendorMap: Record<
+      string,
+      {
+        product_id: number | null;
+        product_name: string;
+        ordered_qty: number;
+        total_vendor_cost: number;
+        filkom_price: number;
+        umum_price: number;
+        catalog_vendor_cost: number;
+      }
+    > = {};
 
     for (const voi of vendorOrderItems) {
       const pId = voi.product_id ? Number(voi.product_id) : null;
-      const pName = String(voi.catalog_name || voi.notes || `Produk #${voi.product_id || voi.id}`).trim();
+      const pName = String(
+        voi.catalog_name || voi.notes || `Produk #${voi.product_id || voi.id}`,
+      ).trim();
       const key = pId ? `id_${pId}` : `name_${pName.toLowerCase()}`;
 
       if (!productVendorMap[key]) {
@@ -8559,12 +9669,15 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
 
       const orderedQty = item.ordered_qty;
       const totalCost = item.total_vendor_cost;
-      const avgUnitCost = orderedQty > 0 ? Math.round(totalCost / orderedQty) : item.catalog_vendor_cost;
+      const avgUnitCost =
+        orderedQty > 0 ? Math.round(totalCost / orderedQty) : item.catalog_vendor_cost;
 
       let filkomPrice = item.filkom_price;
       let umumPrice = item.umum_price;
-      if (filkomPrice <= 0 && matchedSales?.filkom_unit_price > 0) filkomPrice = matchedSales.filkom_unit_price;
-      if (umumPrice <= 0 && matchedSales?.umum_unit_price > 0) umumPrice = matchedSales.umum_unit_price;
+      if (filkomPrice <= 0 && matchedSales?.filkom_unit_price > 0)
+        filkomPrice = matchedSales.filkom_unit_price;
+      if (umumPrice <= 0 && matchedSales?.umum_unit_price > 0)
+        umumPrice = matchedSales.umum_unit_price;
       if (filkomPrice <= 0 && umumPrice > 0) filkomPrice = umumPrice;
       if (umumPrice <= 0 && filkomPrice > 0) umumPrice = filkomPrice;
 
@@ -8574,12 +9687,26 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
       const soldRevenue = matchedSales ? Number(matchedSales.total_revenue || 0) : 0;
 
       const remainingQty = Math.max(0, orderedQty - soldQty);
-      const sellThroughPct = orderedQty > 0 ? Math.min(100, Math.round((soldQty / orderedQty) * 100)) : 100;
+      const sellThroughPct =
+        orderedQty > 0 ? Math.min(100, Math.round((soldQty / orderedQty) * 100)) : 100;
 
       // BEP in units (conservative calculation based on filkom_price)
-      const targetSellingPrice = filkomPrice > 0 ? filkomPrice : (umumPrice > 0 ? umumPrice : (avgUnitCost > 0 ? avgUnitCost : 1));
-      const bepUnits = totalCost > 0 && targetSellingPrice > 0 ? Math.ceil(totalCost / targetSellingPrice) : 0;
-      const bepProgressPct = bepUnits > 0 ? Math.min(100, Math.round((soldQty / bepUnits) * 100)) : (soldQty > 0 ? 100 : 0);
+      const targetSellingPrice =
+        filkomPrice > 0
+          ? filkomPrice
+          : umumPrice > 0
+            ? umumPrice
+            : avgUnitCost > 0
+              ? avgUnitCost
+              : 1;
+      const bepUnits =
+        totalCost > 0 && targetSellingPrice > 0 ? Math.ceil(totalCost / targetSellingPrice) : 0;
+      const bepProgressPct =
+        bepUnits > 0
+          ? Math.min(100, Math.round((soldQty / bepUnits) * 100))
+          : soldQty > 0
+            ? 100
+            : 0;
       const isBepReached = bepUnits > 0 ? soldQty >= bepUnits : true;
       const bepShortageUnits = Math.max(0, bepUnits - soldQty);
       const bepSurplusUnits = Math.max(0, soldQty - bepUnits);
@@ -8587,7 +9714,10 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
       // Conservative Projection (100% stock sold at Harga FILKOM)
       const projRevConservative = orderedQty * filkomPrice;
       const projGrossProfitConservative = projRevConservative - totalCost;
-      const projGrossMarginConservative = projRevConservative > 0 ? Number(((projGrossProfitConservative / projRevConservative) * 100).toFixed(1)) : 0;
+      const projGrossMarginConservative =
+        projRevConservative > 0
+          ? Number(((projGrossProfitConservative / projRevConservative) * 100).toFixed(1))
+          : 0;
 
       // Upside Bonus (Price difference if sold at Harga Umum instead of FILKOM)
       const unitUpsideBonus = Math.max(0, umumPrice - filkomPrice);
@@ -8596,7 +9726,8 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
       // Max Projection (100% stock sold at Harga Umum)
       const projRevMax = orderedQty * umumPrice;
       const projGrossProfitMax = projRevMax - totalCost;
-      const projGrossMarginMax = projRevMax > 0 ? Number(((projGrossProfitMax / projRevMax) * 100).toFixed(1)) : 0;
+      const projGrossMarginMax =
+        projRevMax > 0 ? Number(((projGrossProfitMax / projRevMax) * 100).toFixed(1)) : 0;
 
       // Idle Capital in unsold inventory
       const idleCapitalCost = remainingQty * avgUnitCost;
@@ -8604,9 +9735,11 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
 
       // Unit Margin
       const unitMarginFilkom = filkomPrice - avgUnitCost;
-      const unitMarginFilkomPct = filkomPrice > 0 ? Number(((unitMarginFilkom / filkomPrice) * 100).toFixed(1)) : 0;
+      const unitMarginFilkomPct =
+        filkomPrice > 0 ? Number(((unitMarginFilkom / filkomPrice) * 100).toFixed(1)) : 0;
       const unitMarginUmum = umumPrice - avgUnitCost;
-      const unitMarginUmumPct = umumPrice > 0 ? Number(((unitMarginUmum / umumPrice) * 100).toFixed(1)) : 0;
+      const unitMarginUmumPct =
+        umumPrice > 0 ? Number(((unitMarginUmum / umumPrice) * 100).toFixed(1)) : 0;
 
       // Accumulate totals
       totalVendorStockUnits += orderedQty;
@@ -8655,32 +9788,48 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
     }
 
     // Sort by total_vendor_cost descending or ordered_qty descending
-    productProjectionsList.sort((a, b) => b.total_vendor_cost - a.total_vendor_cost || b.ordered_qty - a.ordered_qty);
+    productProjectionsList.sort(
+      (a, b) => b.total_vendor_cost - a.total_vendor_cost || b.ordered_qty - a.ordered_qty,
+    );
 
     // Summary calculations
     const totalVendorCostOverall = totalVendorContract;
-    const totalProjNetProfitConservative = totalConservativeRevenue - totalVendorCostOverall - totalOperationalExpenses;
-    const totalProjNetMarginConservative = totalConservativeRevenue > 0 ? Number(((totalProjNetProfitConservative / totalConservativeRevenue) * 100).toFixed(1)) : 0;
-    const totalProjNetProfitMax = totalMaxRevenue - totalVendorCostOverall - totalOperationalExpenses;
-    const totalProjNetMarginMax = totalMaxRevenue > 0 ? Number(((totalProjNetProfitMax / totalMaxRevenue) * 100).toFixed(1)) : 0;
+    const totalProjNetProfitConservative =
+      totalConservativeRevenue - totalVendorCostOverall - totalOperationalExpenses;
+    const totalProjNetMarginConservative =
+      totalConservativeRevenue > 0
+        ? Number(((totalProjNetProfitConservative / totalConservativeRevenue) * 100).toFixed(1))
+        : 0;
+    const totalProjNetProfitMax =
+      totalMaxRevenue - totalVendorCostOverall - totalOperationalExpenses;
+    const totalProjNetMarginMax =
+      totalMaxRevenue > 0
+        ? Number(((totalProjNetProfitMax / totalMaxRevenue) * 100).toFixed(1))
+        : 0;
 
-    const overallBepProgressPct = totalBepRequiredUnits > 0 ? Math.min(100, Math.round((totalSoldUnits / totalBepRequiredUnits) * 100)) : 100;
+    const overallBepProgressPct =
+      totalBepRequiredUnits > 0
+        ? Math.min(100, Math.round((totalSoldUnits / totalBepRequiredUnits) * 100))
+        : 100;
     const overallIsBepReached = totalSoldUnits >= totalBepRequiredUnits;
     const overallBepShortage = Math.max(0, totalBepRequiredUnits - totalSoldUnits);
 
     // Cash Liquidity & Solvency against unpaid vendor liability
     const netCashRunway = currentNetCash - totalVendorUnpaid;
     const isSolvent = netCashRunway >= 0;
-    const cashCoverageRatio = totalVendorUnpaid > 0 ? Number(((currentNetCash / totalVendorUnpaid) * 100).toFixed(1)) : 100;
+    const cashCoverageRatio =
+      totalVendorUnpaid > 0 ? Number(((currentNetCash / totalVendorUnpaid) * 100).toFixed(1)) : 100;
 
     let solvencyStatus = "SURPLUS_SAFE";
     let solvencyTitle = "Likuiditas Aman (Surplus Kas)";
-    let solvencyMessage = "Saldo kas riil saat ini cukup untuk melunasi seluruh sisa hutang vendor tanpa harus menunggu piutang pembeli tertagih.";
+    let solvencyMessage =
+      "Saldo kas riil saat ini cukup untuk melunasi seluruh sisa hutang vendor tanpa harus menunggu piutang pembeli tertagih.";
 
     if (totalVendorUnpaid === 0) {
       solvencyStatus = "DEBT_FREE";
       solvencyTitle = "Bebas Hutang Vendor (100% Lunas)";
-      solvencyMessage = "Seluruh tagihan produksi vendor telah lunas dibayar. Arus kas toko bebas dari kewajiban kontraktual vendor.";
+      solvencyMessage =
+        "Seluruh tagihan produksi vendor telah lunas dibayar. Arus kas toko bebas dari kewajiban kontraktual vendor.";
     } else if (!isSolvent) {
       solvencyStatus = "DEFICIT_WARNING";
       solvencyTitle = "Peringatan Likuiditas (Defisit Kas)";
@@ -8694,7 +9843,10 @@ export const getFinancialBalanceSheet = async (req: Request, res: Response) => {
           potential_revenue: grandPotentialRevenue,
           realized_revenue: grandRealizedRevenue,
           unpaid_remaining: grandUnpaidRemaining,
-          settlement_rate: grandPotentialRevenue > 0 ? Number(((grandRealizedRevenue / grandPotentialRevenue) * 100).toFixed(1)) : 0,
+          settlement_rate:
+            grandPotentialRevenue > 0
+              ? Number(((grandRealizedRevenue / grandPotentialRevenue) * 100).toFixed(1))
+              : 0,
           total_orders: grandTotalOrders,
           paid_full_orders: grandPaidFullOrders,
           dp_unpaid_orders: grandDpUnpaidOrders,
@@ -8837,9 +9989,12 @@ export const getOperationalExpenses = async (req: Request, res: Response) => {
 
 export const createOperationalExpense = async (req: Request, res: Response) => {
   try {
-    const { title, category, amount, expense_date, batch_id, notes, receipt_url, created_by } = req.body;
+    const { title, category, amount, expense_date, batch_id, notes, receipt_url, created_by } =
+      req.body;
     if (!title || !category || !amount || !expense_date) {
-      return res.status(400).json({ success: false, error: "Judul, kategori, nominal, dan tanggal wajib diisi" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Judul, kategori, nominal, dan tanggal wajib diisi" });
     }
 
     const result = await execute(
@@ -8854,7 +10009,7 @@ export const createOperationalExpense = async (req: Request, res: Response) => {
         notes || null,
         receipt_url || null,
         created_by || "Admin",
-      ]
+      ],
     );
 
     return res.json({
@@ -8873,7 +10028,9 @@ export const updateOperationalExpense = async (req: Request, res: Response) => {
     const { id } = req.params;
     const { title, category, amount, expense_date, batch_id, notes, receipt_url } = req.body;
     if (!title || !category || !amount || !expense_date) {
-      return res.status(400).json({ success: false, error: "Judul, kategori, nominal, dan tanggal wajib diisi" });
+      return res
+        .status(400)
+        .json({ success: false, error: "Judul, kategori, nominal, dan tanggal wajib diisi" });
     }
 
     await execute(
@@ -8889,7 +10046,7 @@ export const updateOperationalExpense = async (req: Request, res: Response) => {
         notes || null,
         receipt_url || null,
         id,
-      ]
+      ],
     );
 
     return res.json({ success: true, message: "Pengeluaran operasional berhasil diperbarui" });

@@ -1,6 +1,20 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, useRef } from "react";
-import { Plus, Pencil, Trash2, FolderPlus, X, Check, Star, Crop } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  FolderPlus,
+  X,
+  Check,
+  Star,
+  Crop,
+  History,
+  ArrowUpRight,
+  ArrowDownLeft,
+  RefreshCw,
+  Filter,
+} from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@frontend/components/ui/button";
@@ -35,9 +49,11 @@ import {
   uploadSingleImageServerAction,
   getActivePreOrderCampaignServerAction,
   getPreOrderCampaignsServerAction,
+  getProductStockMovementsServerAction,
   type ProductWithVariants,
   type Category,
   type PreOrderCampaign,
+  type StockMovement,
 } from "@backend/server-actions";
 import { useQuery } from "@tanstack/react-query";
 import { resolveImageUrl } from "@/lib/image-resolver";
@@ -73,7 +89,13 @@ interface ProductForm {
   aplikasi: string;
   size_chart_url: string;
   images: string[];
-  variants: Array<{ size: string; color: string; stock: string; filkom_price: string; image_url?: string }>;
+  variants: Array<{
+    size: string;
+    color: string;
+    stock: string;
+    filkom_price: string;
+    image_url?: string;
+  }>;
   component_ids: number[];
   is_active: boolean;
 }
@@ -139,16 +161,24 @@ function AdminProductsPage() {
   const [newSizeVal, setNewSizeVal] = useState("");
   const [newColorVal, setNewColorVal] = useState("");
 
-  const generateVariantsFromOptions = (sizes: string[], colors: string[], currentVariants: any[], forceVariantsActive = false) => {
+  const generateVariantsFromOptions = (
+    sizes: string[],
+    colors: string[],
+    currentVariants: any[],
+    forceVariantsActive = false,
+  ) => {
     const isVarActive = forceVariantsActive;
     if (!isVarActive) {
-      const prevDefault = currentVariants.find(v => v.size === "One Size" && !v.color) || currentVariants[0];
-      return [{
-        size: "One Size",
-        color: "",
-        stock: prevDefault ? String(prevDefault.stock) : "0",
-        filkom_price: prevDefault ? String(prevDefault.filkom_price) : "",
-      }];
+      const prevDefault =
+        currentVariants.find((v) => v.size === "One Size" && !v.color) || currentVariants[0];
+      return [
+        {
+          size: "One Size",
+          color: "",
+          stock: prevDefault ? String(prevDefault.stock) : "0",
+          filkom_price: prevDefault ? String(prevDefault.filkom_price) : "",
+        },
+      ];
     }
 
     const newVariants: any[] = [];
@@ -158,14 +188,14 @@ function AdminProductsPage() {
     for (const size of sizesToUse) {
       for (const color of colorsToUse) {
         const existing = currentVariants.find(
-          (v) => (v.size || "") === size && (v.color || "") === color
+          (v) => (v.size || "") === size && (v.color || "") === color,
         );
         newVariants.push({
           size,
           color,
           stock: existing ? String(existing.stock) : "0",
           filkom_price: existing ? String(existing.filkom_price) : "",
-          image_url: existing ? (existing.image_url || "") : "",
+          image_url: existing ? existing.image_url || "" : "",
         });
       }
     }
@@ -249,6 +279,33 @@ function AdminProductsPage() {
   });
   const allPoCampaigns: PreOrderCampaign[] = allPoRes?.data || [];
 
+  // Stock Movement History Modal State
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [selectedProductForHistory, setSelectedProductForHistory] =
+    useState<ProductWithVariants | null>(null);
+  const [historyVariantFilter, setHistoryVariantFilter] = useState<string>("all");
+  const [historyTypeFilter, setHistoryTypeFilter] = useState<string>("all");
+
+  const {
+    data: stockHistoryRes,
+    isLoading: isLoadingStockHistory,
+    refetch: refetchStockHistory,
+  } = useQuery({
+    queryKey: ["productStockMovements", selectedProductForHistory?.id],
+    queryFn: () =>
+      selectedProductForHistory
+        ? getProductStockMovementsServerAction({ data: { id: selectedProductForHistory.id } })
+        : Promise.resolve({ success: false, data: { product: null, variants: [], movements: [] } }),
+    enabled: !!selectedProductForHistory && isHistoryOpen,
+  });
+
+  const openStockHistory = (product: ProductWithVariants) => {
+    setSelectedProductForHistory(product);
+    setHistoryVariantFilter("all");
+    setHistoryTypeFilter("all");
+    setIsHistoryOpen(true);
+  };
+
   const handleOpenCropper = (idx: number) => {
     const imgUrl = form.images[idx];
     if (!imgUrl) return;
@@ -301,7 +358,9 @@ function AdminProductsPage() {
     try {
       toast.loading("Mengunggah foto hasil crop 1:1...");
       const dataUrl = await optimizeImageFile(croppedFile, 1600, 0.9);
-      const res = await uploadSingleImageServerAction({ data: { dataUrl, name: croppedFile.name } });
+      const res = await uploadSingleImageServerAction({
+        data: { dataUrl, name: croppedFile.name },
+      });
 
       toast.dismiss();
 
@@ -405,9 +464,25 @@ function AdminProductsPage() {
       image_url: v.image_url || "",
     }));
 
-    const isMultiple = editVariants.length > 1 || (editVariants.length === 1 && editVariants[0].size !== "One Size" && editVariants[0].size !== "All Size" && editVariants[0].size !== "" && editVariants[0].size !== undefined);
-    const sizes = Array.from(new Set(editVariants.map(v => v.size).filter(s => s && s !== "One Size" && s !== "All Size")));
-    const colors = Array.from(new Set(editVariants.map(v => v.color).filter(c => c && c !== "" && c !== "Default" && c !== "All Color")));
+    const isMultiple =
+      editVariants.length > 1 ||
+      (editVariants.length === 1 &&
+        editVariants[0].size !== "One Size" &&
+        editVariants[0].size !== "All Size" &&
+        editVariants[0].size !== "" &&
+        editVariants[0].size !== undefined);
+    const sizes = Array.from(
+      new Set(
+        editVariants.map((v) => v.size).filter((s) => s && s !== "One Size" && s !== "All Size"),
+      ),
+    );
+    const colors = Array.from(
+      new Set(
+        editVariants
+          .map((v) => v.color)
+          .filter((c) => c && c !== "" && c !== "Default" && c !== "All Color"),
+      ),
+    );
 
     setHasVariants(isMultiple);
     setSizeOptions(sizes);
@@ -477,7 +552,7 @@ function AdminProductsPage() {
               }
             },
             "image/jpeg",
-            0.88
+            0.88,
           );
         };
         img.onerror = () => resolve(file);
@@ -529,7 +604,7 @@ function AdminProductsPage() {
         Array.from(files).map(async (f) => {
           const dataUrl = await optimizeImageFile(f, 2000, 0.88);
           return { dataUrl, name: f.name };
-        })
+        }),
       );
 
       // Call TanStack server action
@@ -655,7 +730,7 @@ function AdminProductsPage() {
       variants: form.variants.map((v) => ({
         size: v.size || "",
         color: v.color || "",
-        stock: form.sale_type === "pre_order" ? 999 : (parseInt(v.stock) || 0),
+        stock: form.sale_type === "pre_order" ? 999 : parseInt(v.stock) || 0,
         filkom_price: v.filkom_price ? parseFloat(v.filkom_price) : null,
         image_url: v.image_url || null,
       })),
@@ -718,8 +793,10 @@ function AdminProductsPage() {
             stock: v.stock,
             filkom_price: v.filkom_price,
           })),
-          component_ids: product.bundle_components ? product.bundle_components.map((c) => c.id) : [],
-        }
+          component_ids: product.bundle_components
+            ? product.bundle_components.map((c) => c.id)
+            : [],
+        },
       });
       toast.dismiss(tid);
       if (result.success) {
@@ -953,13 +1030,23 @@ function AdminProductsPage() {
                         {/* Harga Promo Khusus jika ada */}
                         {product.promo_price != null && Number(product.promo_price) > 0 && (
                           <div className="inline-flex items-center gap-1 text-[9px] text-red-600 font-bold bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
-                            <span>Promo: Rp {Number(product.promo_price).toLocaleString("id-ID")}</span>
+                            <span>
+                              Promo: Rp {Number(product.promo_price).toLocaleString("id-ID")}
+                            </span>
                           </div>
                         )}
                       </div>
                     </td>
-                    <td className="p-3 text-right font-bold text-brand-blue">
-                      {totalStock(product)}
+                    <td className="p-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openStockHistory(product)}
+                        className="inline-flex items-center gap-1.5 font-bold font-mono text-brand-blue hover:text-brand-orange hover:bg-brand-blue/10 px-2 py-1 rounded-md transition-all cursor-pointer group"
+                        title="Klik untuk melihat riwayat mutasi & restock produk"
+                      >
+                        <span>{totalStock(product)}</span>
+                        <History className="h-3.5 w-3.5 opacity-40 group-hover:opacity-100 transition-opacity" />
+                      </button>
                     </td>
                     <td className="p-3 text-center">
                       <button
@@ -970,33 +1057,52 @@ function AdminProductsPage() {
                             ? "bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
                             : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
                         }`}
-                        title={isCashier ? undefined : (product.is_active ? "Klik untuk sembunyikan produk" : "Klik untuk tampilkan produk")}
+                        title={
+                          isCashier
+                            ? undefined
+                            : product.is_active
+                              ? "Klik untuk sembunyikan produk"
+                              : "Klik untuk tampilkan produk"
+                        }
                       >
                         {product.is_active ? "Aktif" : "Nonaktif"}
                       </button>
                     </td>
-                    {!isCashier && (
-                      <td className="p-3 text-right">
-                        <div className="flex justify-end gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => openEdit(product)}
-                            className="hover:bg-muted text-ink"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive hover:bg-red-50"
-                            onClick={() => void handleDelete(product.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    )}
+                    <td className="p-3 text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openStockHistory(product)}
+                          className="hover:bg-blue-50 text-brand-blue hover:text-blue-800"
+                          title="Riwayat Mutasi Stok Produk"
+                        >
+                          <History className="h-4 w-4" />
+                        </Button>
+                        {!isCashier && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEdit(product)}
+                              className="hover:bg-muted text-ink"
+                              title="Edit Produk"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:bg-red-50"
+                              onClick={() => void handleDelete(product.id)}
+                              title="Hapus Produk"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1006,7 +1112,7 @@ function AdminProductsPage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent 
+        <DialogContent
           onPointerDownOutside={(e) => e.preventDefault()}
           className="max-w-4xl sm:max-w-4xl w-full max-h-[92vh] overflow-y-auto p-6 sm:p-8 border-2 border-ink rounded-2xl shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] bg-background"
         >
@@ -1020,13 +1126,20 @@ function AdminProductsPage() {
             {/* Top Toggle: Status Aktif (Tampilkan Produk) */}
             <div className="flex items-center justify-between border-2 border-ink p-4 rounded-xl bg-cream/40 shadow-xs">
               <div className="flex items-center gap-3">
-                <div className={`w-3.5 h-3.5 rounded-full ${form.is_active ? 'bg-emerald-500 animate-pulse' : 'bg-neutral-400'}`} />
+                <div
+                  className={`w-3.5 h-3.5 rounded-full ${form.is_active ? "bg-emerald-500 animate-pulse" : "bg-neutral-400"}`}
+                />
                 <div>
-                  <Label htmlFor="top_is_active_toggle" className="text-xs font-black text-ink uppercase tracking-wider cursor-pointer flex items-center gap-2">
+                  <Label
+                    htmlFor="top_is_active_toggle"
+                    className="text-xs font-black text-ink uppercase tracking-wider cursor-pointer flex items-center gap-2"
+                  >
                     TAMPILKAN PRODUK (STATUS AKTIF)
                   </Label>
                   <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
-                    {form.is_active ? "Produk aktif dan ditampilkan di beranda, katalog, serta POS kasir." : "Produk disembunyikan dari beranda, katalog, dan kasir POS."}
+                    {form.is_active
+                      ? "Produk aktif dan ditampilkan di beranda, katalog, serta POS kasir."
+                      : "Produk disembunyikan dari beranda, katalog, dan kasir POS."}
                   </p>
                 </div>
               </div>
@@ -1073,7 +1186,9 @@ function AdminProductsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="font-extrabold text-xs uppercase text-ink">Format / Tipe Item</Label>
+                <Label className="font-extrabold text-xs uppercase text-ink">
+                  Format / Tipe Item
+                </Label>
                 <Select
                   value={form.product_type}
                   onValueChange={(v) => setForm({ ...form, product_type: v })}
@@ -1099,7 +1214,9 @@ function AdminProductsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ready_stock">Ready Stock (Normal On-Sale)</SelectItem>
-                    <SelectItem value="pre_order">Pre-Order Campaign (Tampil di Katalog PO)</SelectItem>
+                    <SelectItem value="pre_order">
+                      Pre-Order Campaign (Tampil di Katalog PO)
+                    </SelectItem>
                     <SelectItem value="limited_drop">Limited Edition Drop</SelectItem>
                   </SelectContent>
                 </Select>
@@ -1206,13 +1323,18 @@ function AdminProductsPage() {
                   🔥 INFORMASI SKEMA PRE-ORDER
                 </h4>
                 <p className="text-[11px] text-ink font-medium leading-relaxed">
-                  Produk ini diset menggunakan skema <strong>Pre-Order</strong>. Seluruh transaksi pesanan untuk produk ber-skema Pre-Order pada rentang waktu Batch Pre-Order akan secara otomatis terakumulasi dalam <strong>Laporan Analitik Batch Pre-Order</strong>.
+                  Produk ini diset menggunakan skema <strong>Pre-Order</strong>. Seluruh transaksi
+                  pesanan untuk produk ber-skema Pre-Order pada rentang waktu Batch Pre-Order akan
+                  secara otomatis terakumulasi dalam{" "}
+                  <strong>Laporan Analitik Batch Pre-Order</strong>.
                 </p>
                 {activePoCampaign && (
                   <div className="bg-white border border-brand-orange/40 rounded-lg p-2.5 mt-2 flex items-center justify-between text-[11px]">
                     <div>
                       <span className="font-bold text-ink">Batch Aktif Saat Ini: </span>
-                      <strong className="text-brand-orange font-extrabold">{activePoCampaign.batch_name}</strong>
+                      <strong className="text-brand-orange font-extrabold">
+                        {activePoCampaign.batch_name}
+                      </strong>
                     </div>
                     <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black rounded uppercase">
                       BERJALAN
@@ -1251,7 +1373,10 @@ function AdminProductsPage() {
                             className="h-4 w-4 rounded border-2 border-ink accent-brand-orange"
                           />
                           <span>
-                            {p.name} — <strong className="text-brand-orange">Rp {Number(p.price).toLocaleString("id-ID")}</strong>
+                            {p.name} —{" "}
+                            <strong className="text-brand-orange">
+                              Rp {Number(p.price).toLocaleString("id-ID")}
+                            </strong>
                           </span>
                         </label>
                       );
@@ -1298,10 +1423,16 @@ function AdminProductsPage() {
                         <div
                           key={idx}
                           className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all group bg-cream flex flex-col justify-between ${
-                            isMainCover ? "border-brand-orange ring-4 ring-brand-orange/30 shadow-md" : "border-ink/40"
+                            isMainCover
+                              ? "border-brand-orange ring-4 ring-brand-orange/30 shadow-md"
+                              : "border-ink/40"
                           }`}
                         >
-                          <img src={resolveImageUrl(img)} alt="preview" className="w-full h-full object-cover" />
+                          <img
+                            src={resolveImageUrl(img)}
+                            alt="preview"
+                            className="w-full h-full object-cover"
+                          />
 
                           {/* Hover Action Overlay with 3 Icon Buttons */}
                           <div className="absolute inset-0 bg-ink/70 backdrop-blur-[2px] flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-200 p-2 z-10">
@@ -1335,7 +1466,9 @@ function AdminProductsPage() {
                                   : "bg-white/90 hover:bg-amber-400 hover:text-ink text-ink"
                               }`}
                             >
-                              <Star className={`w-4 h-4 ${isMainCover ? "fill-ink text-ink" : ""}`} />
+                              <Star
+                                className={`w-4 h-4 ${isMainCover ? "fill-ink text-ink" : ""}`}
+                              />
                             </button>
 
                             {/* Option 3: Hapus */}
@@ -1347,7 +1480,12 @@ function AdminProductsPage() {
                                 setForm({
                                   ...form,
                                   images: newImages,
-                                  image_url: newImages.length > 0 ? (isMainCover ? newImages[0] : form.image_url) : "",
+                                  image_url:
+                                    newImages.length > 0
+                                      ? isMainCover
+                                        ? newImages[0]
+                                        : form.image_url
+                                      : "",
                                 });
                                 toast.success("Foto dihapus");
                               }}
@@ -1375,7 +1513,9 @@ function AdminProductsPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-extrabold uppercase text-ink">Bahan Kain / Material</Label>
+                  <Label className="text-xs font-extrabold uppercase text-ink">
+                    Bahan Kain / Material
+                  </Label>
                   <Input
                     placeholder="Contoh: Heavyweight Cotton 330GSM"
                     value={form.bahan}
@@ -1385,7 +1525,9 @@ function AdminProductsPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-extrabold uppercase text-ink">Aplikasi Sablon / Bordir</Label>
+                  <Label className="text-xs font-extrabold uppercase text-ink">
+                    Aplikasi Sablon / Bordir
+                  </Label>
                   <Input
                     placeholder="Contoh: High Precision Bordir Timbul"
                     value={form.aplikasi}
@@ -1396,7 +1538,9 @@ function AdminProductsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label className="font-extrabold text-xs uppercase text-ink">Foto Size Chart (Unggah)</Label>
+                <Label className="font-extrabold text-xs uppercase text-ink">
+                  Foto Size Chart (Unggah)
+                </Label>
                 <div className="flex flex-col gap-2">
                   <input
                     type="file"
@@ -1427,7 +1571,9 @@ function AdminProductsPage() {
 
             {/* Description */}
             <div className="space-y-2">
-              <Label className="font-extrabold text-xs uppercase text-ink">Deskripsi Lengkap Produk</Label>
+              <Label className="font-extrabold text-xs uppercase text-ink">
+                Deskripsi Lengkap Produk
+              </Label>
               <Textarea
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
@@ -1444,13 +1590,16 @@ function AdminProductsPage() {
                   🏷️ PENGATURAN VARIAN &amp; STOK PRODUK
                 </h4>
                 <p className="text-[10px] text-muted-foreground font-medium mt-0.5">
-                  Tentukan apakah produk ini memiliki beberapa opsi pilihan (seperti ukuran, warna) atau hanya item tunggal.
+                  Tentukan apakah produk ini memiliki beberapa opsi pilihan (seperti ukuran, warna)
+                  atau hanya item tunggal.
                 </p>
               </div>
 
               {/* Step 1: Toggle Varian */}
               <div className="space-y-2">
-                <Label className="text-xs font-black uppercase text-ink">Apakah produk ini memiliki varian?</Label>
+                <Label className="text-xs font-black uppercase text-ink">
+                  Apakah produk ini memiliki varian?
+                </Label>
                 <div className="flex gap-3">
                   <button
                     type="button"
@@ -1481,11 +1630,14 @@ function AdminProductsPage() {
                 /* Single Item Simple Form */
                 <div className="bg-cream/20 p-4 rounded-xl border border-ink/20 space-y-3">
                   <p className="text-[10px] text-muted-foreground font-semibold">
-                    Produk ini dijual sebagai item tunggal tanpa pilihan varian. Silakan tentukan stoknya di bawah ini:
+                    Produk ini dijual sebagai item tunggal tanpa pilihan varian. Silakan tentukan
+                    stoknya di bawah ini:
                   </p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase text-ink">Stok Ready (Pcs)</Label>
+                      <Label className="text-[10px] font-black uppercase text-ink">
+                        Stok Ready (Pcs)
+                      </Label>
                       {form.sale_type === "pre_order" ? (
                         <div className="text-xs font-black text-brand-orange bg-brand-orange/10 border-2 border-dashed border-brand-orange/30 rounded-lg p-2 text-center uppercase">
                           ⚡ Unlimited (Pre-Order)
@@ -1496,12 +1648,14 @@ function AdminProductsPage() {
                           placeholder="0"
                           value={form.variants[0]?.stock || "0"}
                           onChange={(e) => {
-                            const variants = [{
-                              size: "One Size",
-                              color: "",
-                              stock: e.target.value,
-                              filkom_price: form.variants[0]?.filkom_price || "",
-                            }];
+                            const variants = [
+                              {
+                                size: "One Size",
+                                color: "",
+                                stock: e.target.value,
+                                filkom_price: form.variants[0]?.filkom_price || "",
+                              },
+                            ];
                             setForm({ ...form, variants });
                           }}
                           className="text-xs border-ink/30 font-extrabold"
@@ -1509,18 +1663,22 @@ function AdminProductsPage() {
                       )}
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-[10px] font-black uppercase text-ink">Harga Khusus / Add-on (Rp)</Label>
+                      <Label className="text-[10px] font-black uppercase text-ink">
+                        Harga Khusus / Add-on (Rp)
+                      </Label>
                       <Input
                         type="number"
                         placeholder="+0"
                         value={form.variants[0]?.filkom_price || ""}
                         onChange={(e) => {
-                          const variants = [{
-                            size: "One Size",
-                            color: "",
-                            stock: form.variants[0]?.stock || "0",
-                            filkom_price: e.target.value,
-                          }];
+                          const variants = [
+                            {
+                              size: "One Size",
+                              color: "",
+                              stock: form.variants[0]?.stock || "0",
+                              filkom_price: e.target.value,
+                            },
+                          ];
                           setForm({ ...form, variants });
                         }}
                         className="text-xs border-ink/30 font-bold"
@@ -1534,7 +1692,9 @@ function AdminProductsPage() {
                   {/* Step 2: Define Options (Sizes) */}
                   <div className="bg-cream/10 p-4 rounded-xl border border-ink/10 space-y-3">
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase text-ink">Opsi Ukuran (Size)</Label>
+                      <Label className="text-[10px] font-black uppercase text-ink">
+                        Opsi Ukuran (Size)
+                      </Label>
                       <div className="flex gap-2">
                         <Input
                           placeholder="Contoh: S, M, L, XL, atau All Size"
@@ -1559,7 +1719,9 @@ function AdminProductsPage() {
                       {/* Badge options list */}
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         {sizeOptions.length === 0 ? (
-                          <span className="text-[9px] text-muted-foreground font-semibold italic">Belum ada pilihan ukuran. Tambahkan minimal 1 ukuran.</span>
+                          <span className="text-[9px] text-muted-foreground font-semibold italic">
+                            Belum ada pilihan ukuran. Tambahkan minimal 1 ukuran.
+                          </span>
                         ) : (
                           sizeOptions.map((sz, idx) => (
                             <span
@@ -1582,7 +1744,9 @@ function AdminProductsPage() {
 
                     {/* Step 2: Define Options (Colors) */}
                     <div className="space-y-2 pt-3 border-t border-ink/10">
-                      <Label className="text-[10px] font-black uppercase text-ink">Opsi Warna (Color)</Label>
+                      <Label className="text-[10px] font-black uppercase text-ink">
+                        Opsi Warna (Color)
+                      </Label>
                       <div className="flex gap-2">
                         <Input
                           placeholder="Contoh: Putih, Hitam, Merah, Navy"
@@ -1607,7 +1771,9 @@ function AdminProductsPage() {
                       {/* Badge options list */}
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         {colorOptions.length === 0 ? (
-                          <span className="text-[9px] text-muted-foreground font-semibold italic">Belum ada pilihan warna.</span>
+                          <span className="text-[9px] text-muted-foreground font-semibold italic">
+                            Belum ada pilihan warna.
+                          </span>
                         ) : (
                           colorOptions.map((col, idx) => (
                             <span
@@ -1634,7 +1800,7 @@ function AdminProductsPage() {
                     <Label className="text-[10px] font-black uppercase text-ink block">
                       📋 TABEL KOMBINASI VARIAN &amp; STOK ({form.variants.length} Kombinasi)
                     </Label>
-                    
+
                     <div className="grid grid-cols-12 gap-2 text-[9px] font-black uppercase text-muted-foreground px-1 border-b pb-1">
                       <div className="col-span-2">Ukuran</div>
                       <div className="col-span-2">Warna</div>
@@ -1646,12 +1812,19 @@ function AdminProductsPage() {
 
                     <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
                       {form.variants.map((v, i) => (
-                        <div key={i} className="grid grid-cols-12 gap-2 items-center bg-cream/10 p-2 rounded-xl border border-ink/20">
+                        <div
+                          key={i}
+                          className="grid grid-cols-12 gap-2 items-center bg-cream/10 p-2 rounded-xl border border-ink/20"
+                        >
                           <div className="col-span-2">
-                            <span className="text-xs font-black uppercase text-ink">{v.size || "-"}</span>
+                            <span className="text-xs font-black uppercase text-ink">
+                              {v.size || "-"}
+                            </span>
                           </div>
                           <div className="col-span-2">
-                            <span className="text-xs font-bold text-muted-foreground uppercase">{v.color || "-"}</span>
+                            <span className="text-xs font-bold text-muted-foreground uppercase">
+                              {v.color || "-"}
+                            </span>
                           </div>
                           <div className="col-span-2 flex justify-center">
                             <button
@@ -1661,9 +1834,15 @@ function AdminProductsPage() {
                               title="Pilih foto untuk varian ini"
                             >
                               {v.image_url ? (
-                                <img src={resolveImageUrl(v.image_url)} className="w-full h-full object-cover" alt="varian" />
+                                <img
+                                  src={resolveImageUrl(v.image_url)}
+                                  className="w-full h-full object-cover"
+                                  alt="varian"
+                                />
                               ) : (
-                                <span className="text-[10px] text-muted-foreground font-extrabold group-hover:text-brand-orange">+ Foto</span>
+                                <span className="text-[10px] text-muted-foreground font-extrabold group-hover:text-brand-orange">
+                                  + Foto
+                                </span>
                               )}
                             </button>
                           </div>
@@ -1692,10 +1871,10 @@ function AdminProductsPage() {
                               placeholder="+0"
                               value={v.filkom_price}
                               onChange={(e) => {
-                                  const variants = [...form.variants];
-                                  variants[i] = { ...variants[i], filkom_price: e.target.value };
-                                  setForm({ ...form, variants });
-                                }}
+                                const variants = [...form.variants];
+                                variants[i] = { ...variants[i], filkom_price: e.target.value };
+                                setForm({ ...form, variants });
+                              }}
                               className="text-xs border-ink/30 font-bold"
                             />
                           </div>
@@ -1709,7 +1888,10 @@ function AdminProductsPage() {
                                 const variants = form.variants.filter((_, idx) => idx !== i);
                                 setForm({
                                   ...form,
-                                  variants: variants.length > 0 ? variants : [{ size: "", color: "", stock: "0", filkom_price: "" }],
+                                  variants:
+                                    variants.length > 0
+                                      ? variants
+                                      : [{ size: "", color: "", stock: "0", filkom_price: "" }],
                                 });
                               }}
                             >
@@ -1732,8 +1914,8 @@ function AdminProductsPage() {
                             ...form,
                             variants: [
                               ...form.variants,
-                              { size: "", color: "", stock: "0", filkom_price: "" }
-                            ]
+                              { size: "", color: "", stock: "0", filkom_price: "" },
+                            ],
                           });
                         }}
                         className="text-[9px] font-black uppercase text-brand-orange hover:bg-brand-orange/10 px-2 py-1 h-auto cursor-pointer"
@@ -1851,71 +2033,406 @@ function AdminProductsPage() {
             </DialogTitle>
           </DialogHeader>
 
-          {activeImagePickerIndex !== null && (() => {
-            const availableImages = Array.from(new Set([form.image_url, ...form.images].filter(Boolean) as string[]));
-            return (
-              <div className="space-y-4 pt-2">
-                {availableImages.length === 0 ? (
-                  <div className="text-center py-6">
-                    <p className="text-xs text-muted-foreground italic font-medium">Belum ada foto produk yang diunggah.</p>
-                    <p className="text-[10px] text-muted-foreground/80 mt-1">Silakan unggah foto di bagian galeri/foto utama produk terlebih dahulu.</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-4 gap-2.5 max-h-[220px] overflow-y-auto p-1">
-                    {availableImages.map((imgUrl, idx) => (
+          {activeImagePickerIndex !== null &&
+            (() => {
+              const availableImages = Array.from(
+                new Set([form.image_url, ...form.images].filter(Boolean) as string[]),
+              );
+              return (
+                <div className="space-y-4 pt-2">
+                  {availableImages.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className="text-xs text-muted-foreground italic font-medium">
+                        Belum ada foto produk yang diunggah.
+                      </p>
+                      <p className="text-[10px] text-muted-foreground/80 mt-1">
+                        Silakan unggah foto di bagian galeri/foto utama produk terlebih dahulu.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-2.5 max-h-[220px] overflow-y-auto p-1">
+                      {availableImages.map((imgUrl, idx) => (
+                        <button
+                          key={idx}
+                          type="button"
+                          onClick={() => {
+                            const variants = [...form.variants];
+                            variants[activeImagePickerIndex] = {
+                              ...variants[activeImagePickerIndex],
+                              image_url: imgUrl,
+                            };
+                            setForm({ ...form, variants });
+                            setActiveImagePickerIndex(null);
+                          }}
+                          className={`aspect-square border-2 rounded-xl overflow-hidden hover:border-brand-orange hover:scale-105 transition cursor-pointer ${
+                            form.variants[activeImagePickerIndex]?.image_url === imgUrl
+                              ? "border-brand-orange ring-4 ring-brand-orange/10 scale-95"
+                              : "border-ink/20"
+                          }`}
+                        >
+                          <img
+                            src={resolveImageUrl(imgUrl)}
+                            className="w-full h-full object-cover"
+                            alt="pilihan"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center pt-4 border-t border-ink/10 mt-3">
+                    {form.variants[activeImagePickerIndex]?.image_url && (
                       <button
-                        key={idx}
                         type="button"
                         onClick={() => {
                           const variants = [...form.variants];
                           variants[activeImagePickerIndex] = {
                             ...variants[activeImagePickerIndex],
-                            image_url: imgUrl
+                            image_url: "",
                           };
                           setForm({ ...form, variants });
                           setActiveImagePickerIndex(null);
                         }}
-                        className={`aspect-square border-2 rounded-xl overflow-hidden hover:border-brand-orange hover:scale-105 transition cursor-pointer ${
-                          form.variants[activeImagePickerIndex]?.image_url === imgUrl
-                            ? "border-brand-orange ring-4 ring-brand-orange/10 scale-95"
-                            : "border-ink/20"
-                        }`}
+                        className="text-xs font-bold text-red-600 hover:underline cursor-pointer"
                       >
-                        <img src={resolveImageUrl(imgUrl)} className="w-full h-full object-cover" alt="pilihan" />
+                        Hapus Foto Varian
                       </button>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex justify-between items-center pt-4 border-t border-ink/10 mt-3">
-                  {form.variants[activeImagePickerIndex]?.image_url && (
-                    <button
+                    )}
+                    <Button
                       type="button"
-                      onClick={() => {
-                        const variants = [...form.variants];
-                        variants[activeImagePickerIndex] = {
-                          ...variants[activeImagePickerIndex],
-                          image_url: ""
-                        };
-                        setForm({ ...form, variants });
-                        setActiveImagePickerIndex(null);
-                      }}
-                      className="text-xs font-bold text-red-600 hover:underline cursor-pointer"
+                      onClick={() => setActiveImagePickerIndex(null)}
+                      className="bg-ink hover:bg-brand-orange text-white border-2 border-ink text-xs font-bold uppercase py-1.5 px-4 ml-auto cursor-pointer"
                     >
-                      Hapus Foto Varian
-                    </button>
-                  )}
-                  <Button
-                    type="button"
-                    onClick={() => setActiveImagePickerIndex(null)}
-                    className="bg-ink hover:bg-brand-orange text-white border-2 border-ink text-xs font-bold uppercase py-1.5 px-4 ml-auto cursor-pointer"
-                  >
-                    Tutup
-                  </Button>
+                      Tutup
+                    </Button>
+                  </div>
+                </div>
+              );
+            })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* STOCK MOVEMENT HISTORY DIALOG */}
+      <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+        <DialogContent className="max-w-4xl sm:max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6 border-2 border-ink rounded-2xl shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] bg-cream">
+          <DialogHeader className="border-b border-ink/20 pb-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-brand-blue/10 border-2 border-brand-blue/30 rounded-xl text-brand-blue">
+                  <History className="w-6 h-6" />
+                </div>
+                <div>
+                  <DialogTitle className="text-xl font-black text-ink uppercase tracking-wide">
+                    Riwayat Mutasi Stok Produk
+                  </DialogTitle>
+                  <p className="text-xs font-bold text-muted-foreground mt-0.5">
+                    {selectedProductForHistory?.name} • Total Stok Saat Ini:{" "}
+                    <span className="text-brand-blue font-black font-mono">
+                      {selectedProductForHistory ? totalStock(selectedProductForHistory) : 0} pcs
+                    </span>
+                  </p>
                 </div>
               </div>
-            );
-          })()}
+            </div>
+          </DialogHeader>
+
+          {/* Product Header Card & Summary */}
+          {selectedProductForHistory && (
+            <div className="space-y-4 pt-1">
+              {/* Stat Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5">
+                <div className="bg-white border-2 border-ink p-3 rounded-xl shadow-2xs">
+                  <span className="text-[10px] font-extrabold uppercase text-muted-foreground">
+                    Total Stok Website
+                  </span>
+                  <p className="text-xl font-black font-mono text-brand-blue mt-0.5">
+                    {totalStock(selectedProductForHistory)}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">pcs</span>
+                  </p>
+                </div>
+
+                <div className="bg-emerald-50 border-2 border-emerald-600 p-3 rounded-xl shadow-2xs">
+                  <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
+                    <ArrowUpRight className="w-3 h-3 text-emerald-600" /> Restock / Masuk
+                  </span>
+                  <p className="text-xl font-black font-mono text-emerald-950 mt-0.5">
+                    +
+                    {(stockHistoryRes?.data?.movements || [])
+                      .filter((m) =>
+                        ["restock", "adjustment_in", "initial", "return", "refund"].includes(
+                          m.movement_type,
+                        ),
+                      )
+                      .reduce((sum, m) => sum + Math.abs(Number(m.quantity_change) || 0), 0)}{" "}
+                    <span className="text-xs font-normal text-emerald-800">pcs</span>
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 border-2 border-blue-600 p-3 rounded-xl shadow-2xs">
+                  <span className="text-[10px] font-black uppercase text-blue-800 flex items-center gap-1">
+                    <ArrowDownLeft className="w-3 h-3 text-blue-600" /> Terjual / Keluar
+                  </span>
+                  <p className="text-xl font-black font-mono text-blue-950 mt-0.5">
+                    -
+                    {(stockHistoryRes?.data?.movements || [])
+                      .filter((m) => ["sale", "adjustment_out"].includes(m.movement_type))
+                      .reduce((sum, m) => sum + Math.abs(Number(m.quantity_change) || 0), 0)}{" "}
+                    <span className="text-xs font-normal text-blue-800">pcs</span>
+                  </p>
+                </div>
+
+                <div className="bg-amber-50 border-2 border-amber-600 p-3 rounded-xl shadow-2xs">
+                  <span className="text-[10px] font-black uppercase text-amber-800 flex items-center gap-1">
+                    <RefreshCw className="w-3 h-3 text-amber-600" /> Total Transaksi
+                  </span>
+                  <p className="text-xl font-black font-mono text-amber-950 mt-0.5">
+                    {(stockHistoryRes?.data?.movements || []).length}{" "}
+                    <span className="text-xs font-normal text-amber-800">log</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Filters */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-white border-2 border-ink p-3 rounded-xl">
+                <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                  <Filter className="w-4 h-4 text-ink shrink-0" />
+                  <span className="text-xs font-black uppercase text-ink">Filter:</span>
+
+                  {/* Varian Filter */}
+                  <select
+                    value={historyVariantFilter}
+                    onChange={(e) => setHistoryVariantFilter(e.target.value)}
+                    className="px-2.5 py-1 border border-ink rounded-lg text-xs font-bold bg-cream/40 focus:outline-none cursor-pointer"
+                  >
+                    <option value="all">
+                      Semua Varian ({selectedProductForHistory.variants?.length || 0})
+                    </option>
+                    {(selectedProductForHistory.variants || []).map((v) => (
+                      <option key={v.id} value={String(v.id)}>
+                        {[v.size, v.color].filter(Boolean).join(" / ") || "Standar"} (Stok:{" "}
+                        {v.stock})
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Type Filter */}
+                  <select
+                    value={historyTypeFilter}
+                    onChange={(e) => setHistoryTypeFilter(e.target.value)}
+                    className="px-2.5 py-1 border border-ink rounded-lg text-xs font-bold bg-cream/40 focus:outline-none cursor-pointer"
+                  >
+                    <option value="all">Semua Jenis Mutasi</option>
+                    <option value="restock">📦 Restock Vendor PO</option>
+                    <option value="sale">🛒 Penjualan (Web / Kasir)</option>
+                    <option value="manual">✏️ Penyesuaian Manual / Stok Awal</option>
+                    <option value="return">↩️ Retur / Pengembalian</option>
+                  </select>
+                </div>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void refetchStockHistory()}
+                  disabled={isLoadingStockHistory}
+                  className="border-ink text-xs font-bold hover:bg-cream self-end sm:self-auto cursor-pointer"
+                >
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 mr-1 ${isLoadingStockHistory ? "animate-spin" : ""}`}
+                  />
+                  Segarkan
+                </Button>
+              </div>
+
+              {/* Movements Table */}
+              <div className="overflow-x-auto border-2 border-ink rounded-xl bg-white max-h-[50vh] overflow-y-auto">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 bg-cream border-b-2 border-ink text-ink font-black uppercase z-10 shadow-2xs">
+                    <tr>
+                      <th className="p-2.5">Waktu</th>
+                      <th className="p-2.5">Varian</th>
+                      <th className="p-2.5 text-center">Jenis Aktivitas</th>
+                      <th className="p-2.5 text-center">Perubahan</th>
+                      <th className="p-2.5 text-center">Stok (Sebelum &rarr; Sesudah)</th>
+                      <th className="p-2.5">Referensi</th>
+                      <th className="p-2.5">Catatan &amp; Petugas</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-ink/10">
+                    {isLoadingStockHistory ? (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-muted-foreground font-bold">
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-brand-blue" />
+                          Memuat riwayat mutasi stok...
+                        </td>
+                      </tr>
+                    ) : (
+                      (() => {
+                        const allMovements = stockHistoryRes?.data?.movements || [];
+                        const filtered = allMovements.filter((m) => {
+                          if (
+                            historyVariantFilter !== "all" &&
+                            String(m.variant_id) !== historyVariantFilter
+                          ) {
+                            return false;
+                          }
+                          if (historyTypeFilter === "restock" && m.movement_type !== "restock") {
+                            return false;
+                          }
+                          if (historyTypeFilter === "sale" && m.movement_type !== "sale") {
+                            return false;
+                          }
+                          if (
+                            historyTypeFilter === "manual" &&
+                            !["initial", "adjustment_in", "adjustment_out"].includes(
+                              m.movement_type,
+                            )
+                          ) {
+                            return false;
+                          }
+                          if (
+                            historyTypeFilter === "return" &&
+                            !["return", "refund"].includes(m.movement_type)
+                          ) {
+                            return false;
+                          }
+                          return true;
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <tr>
+                              <td colSpan={7} className="p-8 text-center text-muted-foreground">
+                                <History className="w-8 h-8 mx-auto mb-2 opacity-30 text-ink" />
+                                <p className="font-bold text-ink">
+                                  Belum ada riwayat mutasi stok yang tercatat
+                                </p>
+                                <p className="text-[11px] mt-0.5">
+                                  Riwayat akan otomatis tercatat setiap kali ada restock PO vendor,
+                                  penjualan, atau edit stok.
+                                </p>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return filtered.map((item) => {
+                          const isPositive = Number(item.quantity_change) > 0;
+                          const qtyNum = Math.abs(Number(item.quantity_change));
+
+                          return (
+                            <tr key={item.id} className="hover:bg-cream/25">
+                              <td className="p-2.5 whitespace-nowrap font-mono text-[11px] text-ink font-semibold">
+                                {new Date(item.created_at).toLocaleDateString("id-ID", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })}
+                                <div className="text-[10px] text-muted-foreground font-normal">
+                                  {new Date(item.created_at).toLocaleTimeString("id-ID", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </div>
+                              </td>
+
+                              <td className="p-2.5 font-bold text-ink whitespace-nowrap">
+                                {[item.variant_size, item.variant_color]
+                                  .filter(Boolean)
+                                  .join(" / ") || "Standar"}
+                              </td>
+
+                              <td className="p-2.5 text-center whitespace-nowrap">
+                                {item.movement_type === "restock" ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-900 border border-emerald-300">
+                                    Restock PO
+                                  </span>
+                                ) : item.movement_type === "sale" ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-blue-100 text-blue-900 border border-blue-300">
+                                    Penjualan
+                                  </span>
+                                ) : item.movement_type === "adjustment_in" ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-teal-100 text-teal-900 border border-teal-300">
+                                    Tambah Manual
+                                  </span>
+                                ) : item.movement_type === "adjustment_out" ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300">
+                                    Kurang Manual
+                                  </span>
+                                ) : item.movement_type === "initial" ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-neutral-200 text-neutral-800 border border-neutral-300">
+                                    Stok Awal
+                                  </span>
+                                ) : item.movement_type === "return" ||
+                                  item.movement_type === "refund" ? (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-purple-100 text-purple-900 border border-purple-300">
+                                    Retur
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-gray-100 text-gray-800 border border-gray-300">
+                                    {item.movement_type}
+                                  </span>
+                                )}
+                              </td>
+
+                              <td className="p-2.5 text-center font-mono font-black whitespace-nowrap">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-xs ${
+                                    isPositive
+                                      ? "bg-emerald-100 text-emerald-800 font-black"
+                                      : "bg-rose-100 text-rose-800 font-black"
+                                  }`}
+                                >
+                                  {isPositive ? `+${qtyNum}` : `-${qtyNum}`} pcs
+                                </span>
+                              </td>
+
+                              <td className="p-2.5 text-center font-mono text-xs whitespace-nowrap">
+                                <span className="text-muted-foreground">{item.stock_before}</span>
+                                <span className="mx-1 text-ink font-bold">&rarr;</span>
+                                <span className="font-black text-ink">{item.stock_after}</span>
+                              </td>
+
+                              <td className="p-2.5 font-mono text-[11px] whitespace-nowrap">
+                                {item.reference_id ? (
+                                  <span className="font-bold text-brand-orange bg-brand-orange/10 px-1.5 py-0.5 rounded border border-brand-orange/20">
+                                    {item.reference_id}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
+                              </td>
+
+                              <td className="p-2.5 text-xs">
+                                <p className="font-semibold text-ink leading-tight">
+                                  {item.notes || "-"}
+                                </p>
+                                {(item.actor_name || item.actor_username) && (
+                                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                                    Petugas: {item.actor_name || item.actor_username}
+                                  </p>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        });
+                      })()
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="pt-3 border-t border-ink/20 flex justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsHistoryOpen(false)}
+              className="border-2 border-ink rounded-xl font-bold bg-neutral-200 hover:bg-neutral-300 cursor-pointer text-xs"
+            >
+              Tutup
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

@@ -28,7 +28,7 @@ const port = process.env.PORT || 8080;
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
-  })
+  }),
 );
 
 // CORS — Konfigurasi fleksibel dan aman untuk dev & production origin
@@ -50,7 +50,13 @@ app.use(
   cors({
     origin: (origin, callback) => {
       // Izinkan request tanpa origin (Postman, curl, server-to-server, Midtrans webhook)
-      if (!origin || allowedOrigins.includes(origin) || origin.includes("localhost") || origin.includes("127.0.0.1") || origin.includes("filkommerch.com")) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.includes("localhost") ||
+        origin.includes("127.0.0.1") ||
+        origin.includes("filkommerch.com")
+      ) {
         callback(null, true);
       } else {
         console.warn(`[CORS] Blocked request from origin: ${origin}`);
@@ -66,10 +72,10 @@ app.use(
       "x-user-name",
       "ngrok-skip-browser-warning",
       "bypass-tunnel-reminder",
-      "Bypass-Tunnel-Reminder"
+      "Bypass-Tunnel-Reminder",
     ],
     credentials: true,
-  })
+  }),
 );
 
 // Body Parser Middleware (High limit for base64 image uploads)
@@ -171,10 +177,19 @@ const upload = multer({
   fileFilter: (req, file, cb) => {
     const ext = path.extname(file.originalname || "").toLowerCase();
     const isImageExt = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"].includes(ext);
-    if (!file.mimetype || ALLOWED_MIME_TYPES.includes(file.mimetype) || isImageExt || file.mimetype.startsWith("image/")) {
+    if (
+      !file.mimetype ||
+      ALLOWED_MIME_TYPES.includes(file.mimetype) ||
+      isImageExt ||
+      file.mimetype.startsWith("image/")
+    ) {
       cb(null, true);
     } else {
-      cb(new Error(`Tipe file tidak diizinkan: ${file.mimetype || 'unknown'}. Hanya gambar yang diperbolehkan.`));
+      cb(
+        new Error(
+          `Tipe file tidak diizinkan: ${file.mimetype || "unknown"}. Hanya gambar yang diperbolehkan.`,
+        ),
+      );
     }
   },
 });
@@ -196,7 +211,9 @@ app.post("/api/upload", (req, res) => {
   upload.single("file")(req, res, (err) => {
     if (err) {
       console.error("Single upload error:", err);
-      return res.status(400).json({ success: false, error: err.message || "Gagal mengunggah file" });
+      return res
+        .status(400)
+        .json({ success: false, error: err.message || "Gagal mengunggah file" });
     }
     try {
       if (!req.file) {
@@ -214,16 +231,16 @@ app.post("/api/upload-multiple", (req, res) => {
   upload.array("files", 20)(req, res, (err) => {
     if (err) {
       console.error("Multiple upload error:", err);
-      return res.status(400).json({ success: false, error: err.message || "Gagal mengunggah beberapa file" });
+      return res
+        .status(400)
+        .json({ success: false, error: err.message || "Gagal mengunggah beberapa file" });
     }
     try {
       const files = req.files as Express.Multer.File[];
       if (!files || files.length === 0) {
         return res.status(400).json({ success: false, error: "Tidak ada file yang diunggah" });
       }
-      const urls = files.map(
-        (file) => `${getPublicHostUrl(req)}/uploads/${file.filename}`
-      );
+      const urls = files.map((file) => `${getPublicHostUrl(req)}/uploads/${file.filename}`);
       return res.json({ success: true, urls });
     } catch (error: any) {
       return res.status(500).json({ success: false, error: error.message });
@@ -326,14 +343,46 @@ app.get("/api/products/:slug", cacheMiddleware(60), apiControllers.getProductByS
 app.get("/api/db-check", apiControllers.checkDatabaseConnection);
 app.get("/api/payment-methods", cacheMiddleware(300), apiControllers.getPaymentMethods);
 
-
 app.get("/api/categories", apiControllers.getCategories);
-app.post("/api/categories", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.createCategory);
-app.put("/api/categories/:id", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.updateCategory);
-app.delete("/api/categories/:id", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.deleteCategory);
+app.post(
+  "/api/categories",
+  checkRole(["admin"]),
+  (req, res, next) => {
+    clearCache();
+    next();
+  },
+  apiControllers.createCategory,
+);
+app.put(
+  "/api/categories/:id",
+  checkRole(["admin"]),
+  (req, res, next) => {
+    clearCache();
+    next();
+  },
+  apiControllers.updateCategory,
+);
+app.delete(
+  "/api/categories/:id",
+  checkRole(["admin"]),
+  (req, res, next) => {
+    clearCache();
+    next();
+  },
+  apiControllers.deleteCategory,
+);
 
 // Order / Checkout online API Routes — dilindungi rate limiter + validasi Zod
-app.post("/api/orders", checkoutLimiter, validateBody(createOrderSchema), (req, res, next) => { clearCache("/api/products"); next(); }, apiControllers.createOrderAndPayment);
+app.post(
+  "/api/orders",
+  checkoutLimiter,
+  validateBody(createOrderSchema),
+  (req, res, next) => {
+    clearCache("/api/products");
+    next();
+  },
+  apiControllers.createOrderAndPayment,
+);
 app.get("/api/orders/:id", apiControllers.getOrderById);
 app.get("/api/orders/user/:userId", apiControllers.getUserOrders);
 app.post("/api/orders/:id/payment-proof", apiControllers.submitPaymentProof);
@@ -350,7 +399,14 @@ app.get("/api/products/:productId/reviews", apiControllers.getProductReviews);
 app.post("/api/reviews", apiControllers.createProductReview);
 
 // Offline POS Sales API Routes
-app.post("/api/sales", (req, res, next) => { clearCache("/api/products"); next(); }, apiControllers.createSale);
+app.post(
+  "/api/sales",
+  (req, res, next) => {
+    clearCache("/api/products");
+    next();
+  },
+  apiControllers.createSale,
+);
 app.get("/api/sales", apiControllers.getOfflineSales);
 app.get("/api/sales/:id", apiControllers.getOfflineSaleById);
 app.put("/api/sales/:id", checkRole(["admin", "cashier"]), apiControllers.updateOfflineSale);
@@ -358,28 +414,101 @@ app.delete("/api/sales/:id", checkRole(["admin"]), apiControllers.deleteOfflineS
 
 // Admin Specific API Routes
 app.get("/api/admin/products", checkRole(["admin", "cashier"]), apiControllers.getAllProductsAdmin);
-app.post("/api/admin/products", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.createProduct);
-app.put("/api/admin/products", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.updateProduct);
-app.delete("/api/admin/products/:id", checkRole(["admin"]), (req, res, next) => { clearCache(); next(); }, apiControllers.deleteProduct);
+app.get(
+  "/api/admin/products/:id/stock-movements",
+  checkRole(["admin", "cashier"]),
+  apiControllers.getProductStockMovements,
+);
+app.post(
+  "/api/admin/products",
+  checkRole(["admin"]),
+  (req, res, next) => {
+    clearCache();
+    next();
+  },
+  apiControllers.createProduct,
+);
+app.put(
+  "/api/admin/products",
+  checkRole(["admin"]),
+  (req, res, next) => {
+    clearCache();
+    next();
+  },
+  apiControllers.updateProduct,
+);
+app.delete(
+  "/api/admin/products/:id",
+  checkRole(["admin"]),
+  (req, res, next) => {
+    clearCache();
+    next();
+  },
+  apiControllers.deleteProduct,
+);
 app.get("/api/admin/orders", checkRole(["admin", "cashier"]), apiControllers.getOnlineOrders);
-app.post("/api/admin/orders/scan-all-proofs", checkRole(["admin", "cashier"]), apiControllers.scanAllPaymentProofs);
-app.put("/api/admin/orders/:id/status", checkRole(["admin", "cashier"]), apiControllers.updateOrderStatus);
-app.put("/api/admin/orders/:id/verify-payment", checkRole(["admin", "cashier"]), apiControllers.verifyPaymentProof);
-app.post("/api/admin/orders/:id/complete-refund", checkRole(["admin", "cashier"]), apiControllers.adminCompleteRefund);
-app.post("/api/admin/orders/:id/verify-shortage", checkRole(["admin", "cashier"]), apiControllers.adminVerifyShortage);
-app.post("/api/admin/orders/:id/analyze-proof", checkRole(["admin", "cashier"]), apiControllers.analyzePaymentProof);
+app.post(
+  "/api/admin/orders/scan-all-proofs",
+  checkRole(["admin", "cashier"]),
+  apiControllers.scanAllPaymentProofs,
+);
+app.put(
+  "/api/admin/orders/:id/status",
+  checkRole(["admin", "cashier"]),
+  apiControllers.updateOrderStatus,
+);
+app.put(
+  "/api/admin/orders/:id/verify-payment",
+  checkRole(["admin", "cashier"]),
+  apiControllers.verifyPaymentProof,
+);
+app.post(
+  "/api/admin/orders/:id/complete-refund",
+  checkRole(["admin", "cashier"]),
+  apiControllers.adminCompleteRefund,
+);
+app.post(
+  "/api/admin/orders/:id/verify-shortage",
+  checkRole(["admin", "cashier"]),
+  apiControllers.adminVerifyShortage,
+);
+app.post(
+  "/api/admin/orders/:id/analyze-proof",
+  checkRole(["admin", "cashier"]),
+  apiControllers.analyzePaymentProof,
+);
 app.delete("/api/admin/orders/:id", checkRole(["admin"]), apiControllers.deleteOrder);
-app.put("/api/admin/orders/:orderId/items/pickup-status", checkRole(["admin", "cashier"]), apiControllers.updateOrderItemPickupStatus);
-app.get("/api/admin/orders/:orderId/pickup-logs", checkRole(["admin", "cashier"]), apiControllers.getOrderItemPickupLogs);
-app.post("/api/admin/orders/:orderId/notify-pickup", checkRole(["admin", "cashier"]), apiControllers.notifyPartialPickup);
-app.get("/api/admin/activity-logs", checkRole(["admin", "cashier"]), apiControllers.getActivityLogs);
+app.put(
+  "/api/admin/orders/:orderId/items/pickup-status",
+  checkRole(["admin", "cashier"]),
+  apiControllers.updateOrderItemPickupStatus,
+);
+app.get(
+  "/api/admin/orders/:orderId/pickup-logs",
+  checkRole(["admin", "cashier"]),
+  apiControllers.getOrderItemPickupLogs,
+);
+app.post(
+  "/api/admin/orders/:orderId/notify-pickup",
+  checkRole(["admin", "cashier"]),
+  apiControllers.notifyPartialPickup,
+);
+app.get(
+  "/api/admin/activity-logs",
+  checkRole(["admin", "cashier"]),
+  apiControllers.getActivityLogs,
+);
 
 // Admin Voucher API Routes
 app.get("/api/admin/vouchers", checkRole(["admin", "cashier"]), apiControllers.getAllVouchers);
 app.post("/api/admin/vouchers", checkRole(["admin"]), apiControllers.createVoucher);
 app.put("/api/admin/vouchers/:id", checkRole(["admin"]), apiControllers.updateVoucher);
 app.delete("/api/admin/vouchers/:id", checkRole(["admin"]), apiControllers.deleteVoucher);
-app.get("/api/admin/vouchers/:id/history", checkRole(["admin", "cashier"]), apiControllers.getVoucherHistory);
+app.get(
+  "/api/admin/vouchers/:id/history",
+  checkRole(["admin", "cashier"]),
+  apiControllers.getVoucherHistory,
+);
 
 // Order Claims API Routes
 app.post("/api/orders/claim-search", apiControllers.claimSearch);
@@ -392,29 +521,69 @@ app.post("/api/admin/order-claims/:id/annul", checkRole(["admin"]), apiControlle
 
 // Admin User CRUD API Routes
 app.get("/api/admin/users", checkRole(["admin", "cashier"]), apiControllers.getAllUsersAdmin);
-app.get("/api/admin/users/:id/orders", checkRole(["admin", "cashier"]), apiControllers.getUserTransactionsAdmin);
+app.get(
+  "/api/admin/users/:id/orders",
+  checkRole(["admin", "cashier"]),
+  apiControllers.getUserTransactionsAdmin,
+);
 app.post("/api/admin/users", checkRole(["admin"]), apiControllers.createUser);
 app.put("/api/admin/users", checkRole(["admin"]), apiControllers.updateUser);
 app.delete("/api/admin/users/:id", checkRole(["admin"]), apiControllers.deleteUser);
 
 // Store Settings API Routes
 app.get("/api/settings", cacheMiddleware(120), apiControllers.getStoreSettings);
-app.post("/api/settings", checkRole(["admin"]), (req, res, next) => { clearCache("/api/settings"); next(); }, apiControllers.updateStoreSettings);
+app.post(
+  "/api/settings",
+  checkRole(["admin"]),
+  (req, res, next) => {
+    clearCache("/api/settings");
+    next();
+  },
+  apiControllers.updateStoreSettings,
+);
 
 // Pre-Order Campaign API Routes
 app.get("/api/pre-order-campaigns/active", apiControllers.getActivePreOrderCampaign);
 app.get("/api/pre-order-campaigns", apiControllers.getAllPreOrderCampaigns);
-app.get("/api/pre-order-campaigns/:id/stats", checkRole(["admin"]), apiControllers.getPreOrderCampaignStats);
+app.get(
+  "/api/pre-order-campaigns/:id/stats",
+  checkRole(["admin"]),
+  apiControllers.getPreOrderCampaignStats,
+);
 app.post("/api/pre-order-campaigns", checkRole(["admin"]), apiControllers.createPreOrderCampaign);
-app.put("/api/pre-order-campaigns/:id", checkRole(["admin"]), apiControllers.updatePreOrderCampaign);
-app.patch("/api/pre-order-campaigns/:id/toggle-active", checkRole(["admin"]), apiControllers.togglePreOrderCampaignActive);
-app.delete("/api/pre-order-campaigns/:id", checkRole(["admin"]), apiControllers.deletePreOrderCampaign);
+app.put(
+  "/api/pre-order-campaigns/:id",
+  checkRole(["admin"]),
+  apiControllers.updatePreOrderCampaign,
+);
+app.patch(
+  "/api/pre-order-campaigns/:id/toggle-active",
+  checkRole(["admin"]),
+  apiControllers.togglePreOrderCampaignActive,
+);
+app.delete(
+  "/api/pre-order-campaigns/:id",
+  checkRole(["admin"]),
+  apiControllers.deletePreOrderCampaign,
+);
 
 // Analytics API Routes
-app.get("/api/analytics/daily", checkRole(["admin", "cashier"]), apiControllers.getDailySalesSummary);
-app.get("/api/analytics/top-products", checkRole(["admin", "cashier"]), apiControllers.getTopProducts);
+app.get(
+  "/api/analytics/daily",
+  checkRole(["admin", "cashier"]),
+  apiControllers.getDailySalesSummary,
+);
+app.get(
+  "/api/analytics/top-products",
+  checkRole(["admin", "cashier"]),
+  apiControllers.getTopProducts,
+);
 app.get("/api/analytics/inventory", checkRole(["admin", "cashier"]), apiControllers.getInventory);
-app.get("/api/analytics/orders-summary", checkRole(["admin", "cashier"]), apiControllers.getOrdersSummary);
+app.get(
+  "/api/analytics/orders-summary",
+  checkRole(["admin", "cashier"]),
+  apiControllers.getOrdersSummary,
+);
 app.post("/api/analytics/track-visit", apiControllers.trackVisit);
 
 // Vendoring & Vendor Mitra API Routes
@@ -427,23 +596,72 @@ app.get("/api/admin/vendoring/summary", checkRole(["admin"]), apiControllers.get
 app.get("/api/admin/vendoring/orders", checkRole(["admin"]), apiControllers.getVendorOrders);
 app.post("/api/admin/vendoring/orders", checkRole(["admin"]), apiControllers.createVendorOrder);
 app.put("/api/admin/vendoring/orders/:id", checkRole(["admin"]), apiControllers.updateVendorOrder);
-app.put("/api/admin/vendoring/orders/:id/status", checkRole(["admin"]), apiControllers.updateVendorOrderStatus);
-app.delete("/api/admin/vendoring/orders/:id", checkRole(["admin"]), apiControllers.deleteVendorOrder);
-app.get("/api/admin/vendoring/orders/:id/payments", checkRole(["admin"]), apiControllers.getVendorOrderPayments);
-app.post("/api/admin/vendoring/orders/:id/payments", checkRole(["admin"]), apiControllers.createVendorOrderPayment);
-app.delete("/api/admin/vendoring/orders/:id/payments/:paymentId", checkRole(["admin"]), apiControllers.deleteVendorOrderPayment);
-app.get("/api/admin/vendoring/financials", checkRole(["admin"]), apiControllers.getFinancialOverview);
+app.put(
+  "/api/admin/vendoring/orders/:id/status",
+  checkRole(["admin"]),
+  apiControllers.updateVendorOrderStatus,
+);
+app.post(
+  "/api/admin/vendoring/orders/:id/inbound",
+  checkRole(["admin"]),
+  apiControllers.inboundVendorOrder,
+);
+app.delete(
+  "/api/admin/vendoring/orders/:id",
+  checkRole(["admin"]),
+  apiControllers.deleteVendorOrder,
+);
+app.get(
+  "/api/admin/vendoring/orders/:id/payments",
+  checkRole(["admin"]),
+  apiControllers.getVendorOrderPayments,
+);
+app.post(
+  "/api/admin/vendoring/orders/:id/payments",
+  checkRole(["admin"]),
+  apiControllers.createVendorOrderPayment,
+);
+app.delete(
+  "/api/admin/vendoring/orders/:id/payments/:paymentId",
+  checkRole(["admin"]),
+  apiControllers.deleteVendorOrderPayment,
+);
+app.get(
+  "/api/admin/vendoring/financials",
+  checkRole(["admin"]),
+  apiControllers.getFinancialOverview,
+);
 
 // Financial Balance Sheet & Operational Expenses
-app.get("/api/admin/finance/overview", checkRole(["admin"]), apiControllers.getFinancialBalanceSheet);
+app.get(
+  "/api/admin/finance/overview",
+  checkRole(["admin"]),
+  apiControllers.getFinancialBalanceSheet,
+);
 app.get("/api/admin/finance/expenses", checkRole(["admin"]), apiControllers.getOperationalExpenses);
-app.post("/api/admin/finance/expenses", checkRole(["admin"]), apiControllers.createOperationalExpense);
-app.put("/api/admin/finance/expenses/:id", checkRole(["admin"]), apiControllers.updateOperationalExpense);
-app.delete("/api/admin/finance/expenses/:id", checkRole(["admin"]), apiControllers.deleteOperationalExpense);
+app.post(
+  "/api/admin/finance/expenses",
+  checkRole(["admin"]),
+  apiControllers.createOperationalExpense,
+);
+app.put(
+  "/api/admin/finance/expenses/:id",
+  checkRole(["admin"]),
+  apiControllers.updateOperationalExpense,
+);
+app.delete(
+  "/api/admin/finance/expenses/:id",
+  checkRole(["admin"]),
+  apiControllers.deleteOperationalExpense,
+);
 
 // CSV Import API Route
 app.post("/api/admin/import/orders", checkRole(["admin"]), apiControllers.importOrders);
-app.delete("/api/admin/import/orders/:campaignId", checkRole(["admin"]), apiControllers.deleteImportedOrders);
+app.delete(
+  "/api/admin/import/orders/:campaignId",
+  checkRole(["admin"]),
+  apiControllers.deleteImportedOrders,
+);
 
 // Notification API Routes
 app.get("/api/notifications/vapid-key", notificationControllers.getVapidKey);
@@ -451,11 +669,31 @@ app.post("/api/notifications/subscribe", notificationControllers.subscribePush);
 app.post("/api/notifications/test", notificationControllers.testPushNotification);
 app.get("/api/notifications", notificationControllers.getUserNotifications);
 app.put("/api/notifications/:id/read", notificationControllers.markAsRead);
-app.post("/api/admin/notifications/send", checkRole(["admin", "cashier"]), notificationControllers.adminSendNotification);
-app.post("/api/admin/notifications/broadcast", checkRole(["admin"]), notificationControllers.adminBroadcastNotification);
-app.get("/api/admin/notifications/history", checkRole(["admin"]), notificationControllers.adminGetSentNotifications);
-app.delete("/api/admin/notifications/:id", checkRole(["admin"]), notificationControllers.adminDeleteNotification);
-app.post("/api/admin/notifications/delete-batch", checkRole(["admin"]), notificationControllers.adminDeleteBroadcastBatch);
+app.post(
+  "/api/admin/notifications/send",
+  checkRole(["admin", "cashier"]),
+  notificationControllers.adminSendNotification,
+);
+app.post(
+  "/api/admin/notifications/broadcast",
+  checkRole(["admin"]),
+  notificationControllers.adminBroadcastNotification,
+);
+app.get(
+  "/api/admin/notifications/history",
+  checkRole(["admin"]),
+  notificationControllers.adminGetSentNotifications,
+);
+app.delete(
+  "/api/admin/notifications/:id",
+  checkRole(["admin"]),
+  notificationControllers.adminDeleteNotification,
+);
+app.post(
+  "/api/admin/notifications/delete-batch",
+  checkRole(["admin"]),
+  notificationControllers.adminDeleteBroadcastBatch,
+);
 app.get("/api/admin/notifications/debug", notificationControllers.debugPushStatus);
 
 // Error handling middleware

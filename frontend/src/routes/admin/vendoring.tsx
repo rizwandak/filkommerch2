@@ -31,6 +31,7 @@ import {
   Eye,
   Image as ImageIcon,
   Camera,
+  PackageCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -43,6 +44,7 @@ import {
   createVendorOrderServerAction,
   updateVendorOrderServerAction,
   updateVendorOrderStatusServerAction,
+  inboundVendorOrderServerAction,
   deleteVendorOrderServerAction,
   getVendorOrderPaymentsServerAction,
   createVendorOrderPaymentServerAction,
@@ -52,6 +54,7 @@ import {
   getAllProductsAdmin,
   type Vendor,
   type VendorOrder,
+  type VendorOrderItem,
   type VendorOrderPayment,
   type PreOrderCampaign,
 } from "@backend/server-actions";
@@ -64,7 +67,9 @@ export const Route = createFileRoute("/admin/vendoring")({
 
 function AdminVendoringPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"summary" | "vendors" | "orders" | "financials">("summary");
+  const [activeTab, setActiveTab] = useState<"summary" | "vendors" | "orders" | "financials">(
+    "summary",
+  );
   const [selectedBatchFilter, setSelectedBatchFilter] = useState<string>("all");
 
   // Vendor Modal State
@@ -82,7 +87,9 @@ function AdminVendoringPage() {
   const [selectedVendorId, setSelectedVendorId] = useState<number | "">("");
   const [poDeadline, setPoDeadline] = useState("");
   const [poNotes, setPoNotes] = useState("");
-  const [poItems, setPoItems] = useState<Array<{ product_id: number; size: string; color: string; quantity: number; unit_cost: number }>>([]);
+  const [poItems, setPoItems] = useState<
+    Array<{ product_id: number; size: string; color: string; quantity: number; unit_cost: number }>
+  >([]);
 
   // Vendor PO Payment / Termin Modal State
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -103,6 +110,48 @@ function AdminVendoringPage() {
   const [spkSignerName, setSpkSignerName] = useState<string>("Manajemen FILKOM Merch UB");
   const [spkSignatureImg, setSpkSignatureImg] = useState<string | null>(null);
   const [expandedFinancialRows, setExpandedFinancialRows] = useState<Record<number, boolean>>({});
+
+  // Inbound / Penerimaan Barang & Sinkronisasi Stok Modal State
+  const [isInboundModalOpen, setIsInboundModalOpen] = useState(false);
+  const [selectedInboundPo, setSelectedInboundPo] = useState<VendorOrder | null>(null);
+  const [inboundItems, setInboundItems] = useState<
+    Array<{
+      item_id: number;
+      product_id: number;
+      catalog_product_name: string;
+      size: string;
+      color: string;
+      ordered_quantity: number;
+      received_quantity: number;
+      defect_quantity: number;
+      notes: string;
+    }>
+  >([]);
+  const [inboundNotes, setInboundNotes] = useState("");
+  const [inboundMarkCompleted, setInboundMarkCompleted] = useState(true);
+
+  const openInboundModal = (po: VendorOrder) => {
+    setSelectedInboundPo(po);
+    setInboundNotes(po.inbound_notes || "");
+    setInboundMarkCompleted(po.status !== "completed");
+    setInboundItems(
+      (po.items || []).map((it) => ({
+        item_id: it.id || 0,
+        product_id: it.product_id,
+        catalog_product_name: it.catalog_product_name || "Produk",
+        size: it.size || "",
+        color: it.color || "",
+        ordered_quantity: Number(it.quantity) || 0,
+        received_quantity:
+          it.received_quantity !== null && it.received_quantity !== undefined
+            ? Number(it.received_quantity)
+            : Number(it.quantity) || 0,
+        defect_quantity: Number(it.defect_quantity) || 0,
+        notes: it.notes || "",
+      })),
+    );
+    setIsInboundModalOpen(true);
+  };
 
   const openSpkModal = (po: VendorOrder) => {
     setSelectedSpkPo(po);
@@ -146,15 +195,31 @@ function AdminVendoringPage() {
     if (!selectedSpkPo) return;
 
     const items = selectedSpkPo.items || [];
-    const totalQty = items.reduce((acc: number, item: any) => acc + (Number(item.quantity) || 0), 0);
-    const totalCost = items.reduce((acc: number, item: any) => acc + (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0), 0);
+    const totalQty = items.reduce(
+      (acc: number, item: any) => acc + (Number(item.quantity) || 0),
+      0,
+    );
+    const totalCost = items.reduce(
+      (acc: number, item: any) =>
+        acc + (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0),
+      0,
+    );
 
     const createdDate = selectedSpkPo.created_at
-      ? new Date(selectedSpkPo.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })
+      ? new Date(selectedSpkPo.created_at).toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
       : "-";
 
     const deadlineDate = selectedSpkPo.deadline
-      ? new Date(selectedSpkPo.deadline).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" })
+      ? new Date(selectedSpkPo.deadline).toLocaleDateString("id-ID", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        })
       : "Sesuai Kesepakatan Khusus";
 
     let paymentHtml = "";
@@ -208,10 +273,22 @@ function AdminVendoringPage() {
       `;
     }
 
-    const itemsRows = items.map((item: any, idx: number) => {
-      const sub = (item.quantity || 0) * (item.unit_cost || 0);
-      const spec = [item.size, item.color].filter(s => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(" / ") || "Standard";
-      return `
+    const itemsRows = items
+      .map((item: any, idx: number) => {
+        const sub = (item.quantity || 0) * (item.unit_cost || 0);
+        const spec =
+          [item.size, item.color]
+            .filter(
+              (s) =>
+                s &&
+                s !== "One Size" &&
+                s !== "All Size" &&
+                s !== "Standard" &&
+                s !== "Default" &&
+                s !== "-",
+            )
+            .join(" / ") || "Standard";
+        return `
         <tr>
           <td style="text-align: center; border: 1px solid #1b1b1b; padding: 6px;">${idx + 1}</td>
           <td style="font-weight: bold; border: 1px solid #1b1b1b; padding: 6px;">${item.catalog_product_name || `Produk #${item.product_id}`}</td>
@@ -221,7 +298,8 @@ function AdminVendoringPage() {
           <td style="text-align: right; font-weight: bold; border: 1px solid #1b1b1b; padding: 6px;">Rp ${Number(sub).toLocaleString("id-ID")}</td>
         </tr>
       `;
-    }).join("");
+      })
+      .join("");
 
     const wordDocHtml = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office'
@@ -365,7 +443,7 @@ function AdminVendoringPage() {
       </html>
     `;
 
-    const blob = new Blob(['\ufeff', wordDocHtml], { type: 'application/msword' });
+    const blob = new Blob(["\ufeff", wordDocHtml], { type: "application/msword" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -390,19 +468,31 @@ function AdminVendoringPage() {
   });
   const vendors: Vendor[] = vendorsRes?.data || [];
 
-  const { data: summaryRes, isLoading: isSummaryLoading, refetch: refetchSummary } = useQuery({
+  const {
+    data: summaryRes,
+    isLoading: isSummaryLoading,
+    refetch: refetchSummary,
+  } = useQuery({
     queryKey: ["productionSummary", selectedBatchFilter],
     queryFn: () => getProductionSummaryServerAction({ data: { batch: selectedBatchFilter } }),
   });
   const summaryList = summaryRes?.data || [];
 
-  const { data: vendorOrdersRes, isLoading: isOrdersLoading, refetch: refetchOrders } = useQuery({
+  const {
+    data: vendorOrdersRes,
+    isLoading: isOrdersLoading,
+    refetch: refetchOrders,
+  } = useQuery({
     queryKey: ["adminVendorOrders"],
     queryFn: () => getVendorOrdersServerAction(),
   });
   const vendorOrders: VendorOrder[] = vendorOrdersRes?.data || [];
 
-  const { data: financialRes, isLoading: isFinancialLoading, refetch: refetchFinancials } = useQuery({
+  const {
+    data: financialRes,
+    isLoading: isFinancialLoading,
+    refetch: refetchFinancials,
+  } = useQuery({
     queryKey: ["financialOverview", selectedBatchFilter],
     queryFn: () => getFinancialOverviewServerAction({ data: { batch: selectedBatchFilter } }),
   });
@@ -499,6 +589,40 @@ function AdminVendoringPage() {
     },
   });
 
+  const inboundMutation = useMutation({
+    mutationFn: (data: {
+      id: number;
+      inbound_notes?: string | null;
+      update_status_completed?: boolean;
+      items: Array<{
+        item_id: number;
+        product_id: number;
+        size: string;
+        color: string;
+        received_quantity: number;
+        defect_quantity: number;
+        notes: string;
+      }>;
+    }) => inboundVendorOrderServerAction({ data }),
+    onSuccess: (res: any) => {
+      if (res?.success) {
+        toast.success(
+          res.message || "Barang berhasil diterima & stok website berhasil disinkronkan!",
+        );
+        queryClient.invalidateQueries({ queryKey: ["adminVendorOrders"] });
+        queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
+        queryClient.invalidateQueries({ queryKey: ["financialOverview"] });
+        setIsInboundModalOpen(false);
+        setSelectedInboundPo(null);
+      } else {
+        toast.error("Gagal memproses penerimaan barang: " + (res?.error || ""));
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Terjadi kesalahan saat memproses penerimaan barang");
+    },
+  });
+
   const deletePoMutation = useMutation({
     mutationFn: (id: number) => deleteVendorOrderServerAction({ data: { id } }),
     onSuccess: (res: any) => {
@@ -514,8 +638,14 @@ function AdminVendoringPage() {
 
   // Vendor Payment Mutations
   const createPaymentMutation = useMutation({
-    mutationFn: (data: { id: number; term_name: string; amount: number; payment_date: string; proof_image?: string | null; notes?: string | null }) =>
-      createVendorOrderPaymentServerAction({ data }),
+    mutationFn: (data: {
+      id: number;
+      term_name: string;
+      amount: number;
+      payment_date: string;
+      proof_image?: string | null;
+      notes?: string | null;
+    }) => createVendorOrderPaymentServerAction({ data }),
     onSuccess: (res: any) => {
       if (res?.success) {
         toast.success(res.message || "Pembayaran termin vendor berhasil dicatat!");
@@ -690,8 +820,12 @@ function AdminVendoringPage() {
     const rawSizes = activeVars.map((v: any) => cleanVariantText(v.size)).filter(Boolean);
     const rawColors = activeVars.map((v: any) => cleanVariantText(v.color)).filter(Boolean);
 
-    const distinctSizes = Array.from(new Set(rawSizes)).filter((s: any) => s.toLowerCase() !== "default");
-    const distinctColors = Array.from(new Set(rawColors)).filter((c: any) => c.toLowerCase() !== "default");
+    const distinctSizes = Array.from(new Set(rawSizes)).filter(
+      (s: any) => s.toLowerCase() !== "default",
+    );
+    const distinctColors = Array.from(new Set(rawColors)).filter(
+      (c: any) => c.toLowerCase() !== "default",
+    );
 
     return {
       hasSize: distinctSizes.length > 0,
@@ -706,7 +840,7 @@ function AdminVendoringPage() {
       return { product_id: 1, size: "All Size", color: "", quantity: 10, unit_cost: 50000 };
     }
     const { hasSize, hasColor, sizes, colors } = getProductVariantOptions(prod);
-    const defaultSize = hasSize ? sizes[0] : (hasColor ? "" : "All Size");
+    const defaultSize = hasSize ? sizes[0] : hasColor ? "" : "All Size";
     const defaultColor = hasColor ? colors[0] : "";
     const defaultCost = prod.vendor_cost || prod.cost_price || 50000;
     return {
@@ -740,11 +874,7 @@ function AdminVendoringPage() {
       quantity: it.quantity,
       unit_cost: it.unit_cost,
     }));
-    setPoItems(
-      mappedItems.length > 0
-        ? mappedItems
-        : [getDefaultItemForProduct(productsList[0])]
-    );
+    setPoItems(mappedItems.length > 0 ? mappedItems : [getDefaultItemForProduct(productsList[0])]);
     setIsPoModalOpen(true);
   };
 
@@ -755,10 +885,7 @@ function AdminVendoringPage() {
 
   const handleAddPoItemRow = () => {
     const defaultProd = productsList[0];
-    setPoItems((prev) => [
-      ...prev,
-      getDefaultItemForProduct(defaultProd),
-    ]);
+    setPoItems((prev) => [...prev, getDefaultItemForProduct(defaultProd)]);
   };
 
   const handleRemovePoItemRow = (idx: number) => {
@@ -794,7 +921,15 @@ function AdminVendoringPage() {
   };
 
   const handleExportPoCSV = (po: VendorOrder) => {
-    const headers = ["PO Number", "Vendor", "Produk", "Ukuran/Warna", "Qty Dipesan", "Harga Satuan Vendor (Rp)", "Subtotal Cost (Rp)"];
+    const headers = [
+      "PO Number",
+      "Vendor",
+      "Produk",
+      "Ukuran/Warna",
+      "Qty Dipesan",
+      "Harga Satuan Vendor (Rp)",
+      "Subtotal Cost (Rp)",
+    ];
     const rows = (po.items || []).map((item) => [
       `"${po.po_number}"`,
       `"${po.vendor_name || ""}"`,
@@ -818,17 +953,41 @@ function AdminVendoringPage() {
   const statusBadge = (st: string) => {
     switch (st) {
       case "draft":
-        return <span className="bg-neutral-200 text-neutral-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-ink/20">Draft</span>;
+        return (
+          <span className="bg-neutral-200 text-neutral-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-ink/20">
+            Draft
+          </span>
+        );
       case "sent":
-        return <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-blue-300">Sent to Vendor</span>;
+        return (
+          <span className="bg-blue-100 text-blue-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-blue-300">
+            Sent to Vendor
+          </span>
+        );
       case "in_production":
-        return <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-amber-300 animate-pulse">In Production</span>;
+        return (
+          <span className="bg-amber-100 text-amber-900 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-amber-300 animate-pulse">
+            In Production
+          </span>
+        );
       case "completed":
-        return <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-emerald-300">Completed</span>;
+        return (
+          <span className="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-emerald-300">
+            Completed
+          </span>
+        );
       case "cancelled":
-        return <span className="bg-rose-100 text-rose-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-rose-300">Cancelled</span>;
+        return (
+          <span className="bg-rose-100 text-rose-800 text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase border border-rose-300">
+            Cancelled
+          </span>
+        );
       default:
-        return <span className="bg-neutral-100 text-neutral-700 text-[10px] font-bold px-2 py-0.5 rounded">{st}</span>;
+        return (
+          <span className="bg-neutral-100 text-neutral-700 text-[10px] font-bold px-2 py-0.5 rounded">
+            {st}
+          </span>
+        );
     }
   };
 
@@ -837,817 +996,1067 @@ function AdminVendoringPage() {
       {/* Outer wrapper hidden during print to isolate SPK document modal */}
       <div className="space-y-6 print:hidden">
         {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-ink pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="px-2.5 py-0.5 bg-brand-orange text-cream text-[10px] font-black rounded uppercase tracking-wider">
-              FITUR VENDORING V4
-            </span>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b-2 border-ink pb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 bg-brand-orange text-cream text-[10px] font-black rounded uppercase tracking-wider">
+                FITUR VENDORING V4
+              </span>
+            </div>
+            <h1 className="display text-3xl text-ink tracking-wider mt-1">
+              Manajemen Vendor &amp; Produksi
+            </h1>
+            <p className="text-[11px] text-muted-foreground font-medium">
+              Agregasi Pre-Order, SPK Produksi Vendor (PO), HPP/COGS, &amp; Laporan Keuangan Margin.
+            </p>
           </div>
-          <h1 className="display text-3xl text-ink tracking-wider mt-1">Manajemen Vendor &amp; Produksi</h1>
-          <p className="text-[11px] text-muted-foreground font-medium">
-            Agregasi Pre-Order, SPK Produksi Vendor (PO), HPP/COGS, &amp; Laporan Keuangan Margin.
-          </p>
+
+          {/* Global Batch Filter Dropdown */}
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-bold text-ink uppercase shrink-0">Filter Batch:</label>
+            <select
+              value={selectedBatchFilter}
+              onChange={(e) => setSelectedBatchFilter(e.target.value)}
+              className="px-3.5 py-2 border-2 border-ink rounded-xl text-xs font-bold bg-white text-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer focus:outline-none"
+            >
+              <option value="all">Semua Batch PO</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.batch_name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Global Batch Filter Dropdown */}
-        <div className="flex items-center gap-3">
-          <label className="text-xs font-bold text-ink uppercase shrink-0">Filter Batch:</label>
-          <select
-            value={selectedBatchFilter}
-            onChange={(e) => setSelectedBatchFilter(e.target.value)}
-            className="px-3.5 py-2 border-2 border-ink rounded-xl text-xs font-bold bg-white text-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] cursor-pointer focus:outline-none"
+        {/* Tabs Bar */}
+        <div className="flex flex-wrap gap-2 border-b-2 border-ink pb-2">
+          <button
+            onClick={() => setActiveTab("summary")}
+            className={`px-4 py-2.5 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "summary"
+                ? "bg-brand-orange text-cream border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]"
+                : "bg-white text-ink border-ink/30 hover:border-ink hover:bg-cream/40"
+            }`}
           >
-            <option value="all">Semua Batch PO</option>
-            {campaigns.map((c) => (
-              <option key={c.id} value={String(c.id)}>
-                {c.batch_name}
-              </option>
-            ))}
-          </select>
+            <BarChart3 className="w-4 h-4" /> 1. Production Summary
+          </button>
+
+          <button
+            onClick={() => setActiveTab("vendors")}
+            className={`px-4 py-2.5 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "vendors"
+                ? "bg-brand-orange text-cream border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]"
+                : "bg-white text-ink border-ink/30 hover:border-ink hover:bg-cream/40"
+            }`}
+          >
+            <Building className="w-4 h-4" /> 2. Vendors Mitra
+          </button>
+
+          <button
+            onClick={() => setActiveTab("orders")}
+            className={`px-4 py-2.5 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "orders"
+                ? "bg-brand-orange text-cream border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]"
+                : "bg-white text-ink border-ink/30 hover:border-ink hover:bg-cream/40"
+            }`}
+          >
+            <Package className="w-4 h-4" /> 3. Vendor Orders (PO)
+          </button>
+
+          <button
+            onClick={() => setActiveTab("financials")}
+            className={`px-4 py-2.5 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
+              activeTab === "financials"
+                ? "bg-brand-orange text-cream border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]"
+                : "bg-white text-ink border-ink/30 hover:border-ink hover:bg-cream/40"
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" /> 4. Financial Overview
+          </button>
         </div>
-      </div>
 
-      {/* Tabs Bar */}
-      <div className="flex flex-wrap gap-2 border-b-2 border-ink pb-2">
-        <button
-          onClick={() => setActiveTab("summary")}
-          className={`px-4 py-2.5 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
-            activeTab === "summary"
-              ? "bg-brand-orange text-cream border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]"
-              : "bg-white text-ink border-ink/30 hover:border-ink hover:bg-cream/40"
-          }`}
-        >
-          <BarChart3 className="w-4 h-4" /> 1. Production Summary
-        </button>
-
-        <button
-          onClick={() => setActiveTab("vendors")}
-          className={`px-4 py-2.5 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
-            activeTab === "vendors"
-              ? "bg-brand-orange text-cream border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]"
-              : "bg-white text-ink border-ink/30 hover:border-ink hover:bg-cream/40"
-          }`}
-        >
-          <Building className="w-4 h-4" /> 2. Vendors Mitra
-        </button>
-
-        <button
-          onClick={() => setActiveTab("orders")}
-          className={`px-4 py-2.5 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
-            activeTab === "orders"
-              ? "bg-brand-orange text-cream border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]"
-              : "bg-white text-ink border-ink/30 hover:border-ink hover:bg-cream/40"
-          }`}
-        >
-          <Package className="w-4 h-4" /> 3. Vendor Orders (PO)
-        </button>
-
-        <button
-          onClick={() => setActiveTab("financials")}
-          className={`px-4 py-2.5 rounded-xl border-2 font-black text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-2 ${
-            activeTab === "financials"
-              ? "bg-brand-orange text-cream border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]"
-              : "bg-white text-ink border-ink/30 hover:border-ink hover:bg-cream/40"
-          }`}
-        >
-          <TrendingUp className="w-4 h-4" /> 4. Financial Overview
-        </button>
-      </div>
-
-      {/* TAB 1: PRODUCTION SUMMARY */}
-      {activeTab === "summary" && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="bg-cream/40 border-2 border-ink p-4 rounded-xl flex items-center justify-between">
-            <div>
-              <h3 className="font-extrabold text-sm text-ink uppercase">Kumulasi Kuantitas Pesanan Pre-Order</h3>
-              <p className="text-xs text-muted-foreground font-medium mt-0.5">
-                Total unit produk yang wajib diproduksi berdasarkan pesanan buyer.
-              </p>
-            </div>
-            <button
-              onClick={() => refetchSummary()}
-              className="p-2 border-2 border-ink bg-white hover:bg-neutral-200 rounded-lg text-ink font-bold transition-all cursor-pointer shadow-xs"
-              title="Refresh Summary"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="bg-background border-2 border-ink rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
-            {isSummaryLoading ? (
-              <div className="p-12 text-center text-xs font-bold text-muted-foreground animate-pulse">
-                Memuat data ringkasan produksi...
+        {/* TAB 1: PRODUCTION SUMMARY */}
+        {activeTab === "summary" && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="bg-cream/40 border-2 border-ink p-4 rounded-xl flex items-center justify-between">
+              <div>
+                <h3 className="font-extrabold text-sm text-ink uppercase">
+                  Kumulasi Kuantitas Pesanan Pre-Order
+                </h3>
+                <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                  Total unit produk yang wajib diproduksi berdasarkan pesanan buyer.
+                </p>
               </div>
-            ) : summaryList.length === 0 ? (
-              <div className="p-12 text-center text-xs font-bold text-muted-foreground space-y-2">
-                <Package className="w-8 h-8 text-brand-orange mx-auto opacity-50" />
-                <p>Belum ada data pesanan pre-order untuk batch yang dipilih.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse text-xs">
-                  <thead>
-                    <tr className="bg-secondary/40 border-b-2 border-ink text-ink font-extrabold uppercase">
-                      <th className="p-3.5">Produk</th>
-                      <th className="p-3.5">Ukuran / Warna</th>
-                      <th className="p-3.5 text-center">Rincian Per-Batch</th>
-                      <th className="p-3.5 text-right font-black">TOTAL UNIT Wajib Produksi</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-ink/10">
-                    {summaryList.map((row: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-cream/30 transition-colors">
-                        <td className="p-3.5 font-extrabold text-ink text-sm">{row.product_name}</td>
-                        <td className="p-3.5 font-bold">
-                          <div className="flex flex-wrap gap-1.5">
-                            {row.variants_breakdown &&
-                            Object.keys(row.variants_breakdown).length === 1 &&
-                            ["Standard", "One Size", "Default", "All Size"].includes(Object.keys(row.variants_breakdown)[0]) ? (
-                              <span className="text-muted-foreground italic font-mono text-xs font-bold px-1.5">-</span>
-                            ) : row.variants_breakdown && Object.keys(row.variants_breakdown).length > 0 ? (
-                              Object.entries(row.variants_breakdown).map(([vName, vQty]) => (
-                                <span
-                                  key={vName}
-                                  className="bg-cream border-2 border-ink/30 px-2 py-0.5 rounded font-mono font-bold text-xs text-ink shadow-2xs"
-                                >
-                                  {vName}: <strong className="text-brand-orange">{String(vQty)} pcs</strong>
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-muted-foreground italic font-mono text-xs font-bold px-1.5">-</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="p-3.5 text-center">
-                          <div className="flex flex-wrap gap-1.5 justify-center">
-                            {Object.entries(row.batch_breakdown || {}).map(([bName, qty]) => (
-                              <span key={bName} className="bg-blue-50 text-blue-900 border border-blue-200 px-2 py-0.5 rounded text-[10px] font-extrabold">
-                                {bName}: {qty as number} pcs
-                              </span>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="p-3.5 text-right font-black text-sm text-brand-orange">
-                          {row.total_qty} pcs
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: VENDORS MITRA */}
-      {activeTab === "vendors" && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="flex items-center justify-between border-b-2 border-ink pb-4">
-            <div>
-              <h3 className="font-extrabold text-base text-ink uppercase">Daftar Vendor &amp; Konveksi Mitra</h3>
-              <p className="text-xs text-muted-foreground font-medium">Master data penyedia jasa produksi FILKOM Merchandise.</p>
-            </div>
-            <button
-              onClick={openCreateVendorModal}
-              className="px-4 py-2.5 bg-brand-orange hover:bg-ink text-cream font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" /> TAMBAH VENDOR MITRA
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {vendors.map((v) => (
-              <div
-                key={v.id}
-                className="bg-white border-2 border-ink rounded-2xl p-5 space-y-4 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] relative"
+              <button
+                onClick={() => refetchSummary()}
+                className="p-2 border-2 border-ink bg-white hover:bg-neutral-200 rounded-lg text-ink font-bold transition-all cursor-pointer shadow-xs"
+                title="Refresh Summary"
               >
-                <div className="flex items-start justify-between border-b border-ink/10 pb-3">
-                  <div>
-                    <span className="text-[10px] font-black text-brand-orange uppercase">MITRA VENDOR</span>
-                    <h4 className="font-extrabold text-base text-ink leading-tight">{v.name}</h4>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => openEditVendorModal(v)}
-                      className="p-1.5 rounded-lg border border-ink bg-cream hover:bg-brand-orange hover:text-cream transition-all cursor-pointer"
-                      title="Edit Vendor"
-                    >
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Hapus vendor "${v.name}"?`)) {
-                          deleteVendorMutation.mutate(v.id);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg border border-ink bg-rose-100 text-rose-800 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
-                      title="Hapus Vendor"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-2 text-xs text-ink/90 font-medium">
-                  {v.contact_person && (
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-muted-foreground w-20">PIC / Contact:</span>
-                      <span className="font-bold text-ink">{v.contact_person}</span>
-                    </div>
-                  )}
-                  {v.phone && (
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-muted-foreground w-20">No HP / WA:</span>
-                      <span className="font-bold text-ink font-mono">{v.phone}</span>
-                    </div>
-                  )}
-                  {v.email && (
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-muted-foreground w-20">Email:</span>
-                      <span className="font-medium text-ink font-mono text-[11px]">{v.email}</span>
-                    </div>
-                  )}
-                  {v.notes && (
-                    <div className="mt-2 p-2 bg-cream/50 rounded-lg border border-ink/10 text-[11px] italic">
-                      "{v.notes}"
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: VENDOR ORDERS (PO) */}
-      {activeTab === "orders" && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="flex items-center justify-between border-b-2 border-ink pb-4">
-            <div>
-              <h3 className="font-extrabold text-base text-ink uppercase">Surat Perintah Kerja / PO Vendor</h3>
-              <p className="text-xs text-muted-foreground font-medium">Penerbitan dan pelacakan status Purchase Order ke vendor mitra.</p>
+                <RefreshCw className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              onClick={openCreatePoModal}
-              className="px-4 py-2.5 bg-brand-orange hover:bg-ink text-cream font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" /> BUAT PO VENDOR BARU
-            </button>
-          </div>
 
-          <div className="space-y-4">
-            {isOrdersLoading ? (
-              <div className="p-12 text-center text-xs font-bold text-muted-foreground animate-pulse">
-                Memuat data Purchase Order Vendor...
-              </div>
-            ) : vendorOrders.length === 0 ? (
-              <div className="p-12 text-center text-xs font-bold text-muted-foreground space-y-2 border-2 border-dashed border-ink/30 rounded-2xl">
-                <FileText className="w-8 h-8 text-brand-orange mx-auto opacity-50" />
-                <p>Belum ada Purchase Order vendor yang dibuat.</p>
-              </div>
-            ) : (
-              vendorOrders.map((po) => {
-                const totalCost = Number(po.total_cost || 0);
-                const totalPaid = Number(po.total_paid || 0);
-                const remainingCost = Math.max(0, totalCost - totalPaid);
-                const progressPct = po.payment_progress_pct || 0;
-
-                return (
-                  <div
-                    key={po.id}
-                    className="bg-white border-2 border-ink rounded-2xl p-5 space-y-4 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-ink/10 pb-3">
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono text-sm font-black text-ink">{po.po_number}</span>
-                          {statusBadge(po.status)}
-
-                          {/* Payment Status Badge */}
-                          {po.payment_status === "paid" ? (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Lunas (100%)
-                            </span>
-                          ) : po.payment_status === "partial" ? (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
-                              <Clock className="w-3 h-3 text-amber-700" /> DP / Sebagian ({progressPct}%)
-                            </span>
-                          ) : (
-                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3 text-rose-600" /> Belum Bayar (0%)
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs font-extrabold text-brand-orange mt-0.5">
-                          Vendor: {po.vendor_name} {po.vendor_phone ? `(${po.vendor_phone})` : ""}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <select
-                          value={po.status}
-                          onChange={(e) =>
-                            updatePoStatusMutation.mutate({ id: po.id, status: e.target.value })
-                          }
-                          className="px-2.5 py-1.5 border border-ink rounded-lg text-xs font-bold bg-cream/50 cursor-pointer"
-                        >
-                          <option value="draft">Draft</option>
-                          <option value="sent">Sent to Vendor</option>
-                          <option value="in_production">In Production</option>
-                          <option value="completed">Completed</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
-
-                        {/* Payment / Termin Button */}
-                        <button
-                          onClick={() => openPaymentModal(po)}
-                          className="px-3 py-1.5 bg-emerald-50 text-emerald-950 border-2 border-emerald-700 rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-emerald-100 shadow-2xs cursor-pointer transition-all"
-                          title="Kelola Skema Pembayaran & Bukti Transfer Vendor"
-                        >
-                          <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
-                          Termin &amp; Bukti Transfer {po.payments && po.payments.length > 0 ? `(${po.payments.length})` : ""}
-                        </button>
-
-                        <button
-                          onClick={() => openEditPoModal(po)}
-                          className="px-3 py-1.5 bg-white text-ink border-2 border-ink rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-cream shadow-2xs cursor-pointer transition-all"
-                          title="Edit Rincian SPK / PO Vendor"
-                        >
-                          <Edit2 className="w-3.5 h-3.5 text-brand-blue" /> Edit SPK
-                        </button>
-
-                        <button
-                          onClick={() => openSpkModal(po)}
-                          className="px-3 py-1.5 bg-brand-orange text-cream border-2 border-ink rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-ink shadow-2xs cursor-pointer transition-all"
-                          title="Cetak Surat Perintah Kerja (SPK) Vendor"
-                        >
-                          <FileText className="w-3.5 h-3.5" /> Cetak SPK
-                        </button>
-
-                        <button
-                          onClick={() => handleExportPoCSV(po)}
-                          className="px-3 py-1.5 bg-secondary text-ink border border-ink rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-neutral-200 cursor-pointer"
-                          title="Export PO CSV"
-                        >
-                          <Download className="w-3.5 h-3.5" /> CSV
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            if (confirm(`Hapus PO "${po.po_number}"?`)) {
-                              deletePoMutation.mutate(po.id);
-                            }
-                          }}
-                          className="p-1.5 bg-rose-100 text-rose-800 border border-ink rounded-lg hover:bg-rose-600 hover:text-white cursor-pointer"
-                          title="Hapus PO"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Items List Table */}
-                    <div className="overflow-x-auto border border-ink/20 rounded-xl">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="bg-cream/60 border-b border-ink/20 text-ink font-bold">
-                            <th className="p-2.5">Produk</th>
-                            <th className="p-2.5">Ukuran/Warna</th>
-                            <th className="p-2.5 text-center">Qty Dipesan</th>
-                            <th className="p-2.5 text-right">Harga Satuan Vendor</th>
-                            <th className="p-2.5 text-right font-black">Subtotal Cost</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-ink/10">
-                          {(po.items || []).map((item, idx) => (
-                            <tr key={idx}>
-                              <td className="p-2.5 font-bold text-ink">{item.catalog_product_name}</td>
-                              <td className="p-2.5 font-semibold text-muted-foreground">
-                                {[item.size, item.color].filter(Boolean).join(" / ") || "-"}
-                              </td>
-                              <td className="p-2.5 text-center font-black">{item.quantity} pcs</td>
-                              <td className="p-2.5 text-right font-mono">
-                                Rp {Number(item.unit_cost || 0).toLocaleString("id-ID")}
-                              </td>
-                              <td className="p-2.5 text-right font-mono font-black text-brand-orange">
-                                Rp {Number(item.subtotal_cost || (item.unit_cost * item.quantity)).toLocaleString("id-ID")}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Progress Pembayaran & Transfer Tracker */}
-                    <div className="bg-cream/30 border border-ink/20 p-3.5 rounded-xl space-y-2.5">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-2">
-                          <CreditCard className="w-4 h-4 text-emerald-700" />
-                          <span className="font-extrabold uppercase text-ink">Progress Pembayaran Vendor:</span>
-                          <span className="font-bold font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded text-[11px]">
-                            {progressPct}% Ditransfer
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-xs font-mono">
-                          <span className="text-muted-foreground">
-                            Sudah Transfer: <b className="text-emerald-700">Rp {totalPaid.toLocaleString("id-ID")}</b>
-                          </span>
-                          <span className="text-muted-foreground">
-                            Sisa Tagihan: <b className="text-rose-600">Rp {remainingCost.toLocaleString("id-ID")}</b>
-                          </span>
-                          <span className="text-ink font-black">
-                            Total Kontrak: <b className="text-brand-orange">Rp {totalCost.toLocaleString("id-ID")}</b>
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Visual Progress Bar */}
-                      <div className="w-full bg-neutral-200 h-2.5 rounded-full overflow-hidden border border-ink/20">
-                        <div
-                          className="bg-emerald-600 h-full transition-all duration-500"
-                          style={{ width: `${progressPct}%` }}
-                        />
-                      </div>
-
-                      {/* Riwayat Termin Pills if any */}
-                      {po.payments && po.payments.length > 0 && (
-                        <div className="pt-1 flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[10px] font-black uppercase text-muted-foreground">Riwayat Transfer:</span>
-                          {po.payments.map((pmt, pIdx) => (
-                            <div
-                              key={pIdx}
-                              className="inline-flex items-center gap-1.5 bg-white border border-ink/30 px-2 py-1 rounded-lg text-[10px] font-bold shadow-2xs"
-                            >
-                              <span className="font-black text-ink">{pmt.term_name}:</span>
-                              <span className="font-mono text-emerald-700">Rp {Number(pmt.amount).toLocaleString("id-ID")}</span>
-                              <span className="text-muted-foreground text-[9px]">({new Date(pmt.payment_date).toLocaleDateString("id-ID")})</span>
-                              {pmt.proof_image && (
-                                <button
-                                  type="button"
-                                  onClick={() => setZoomProofImage(pmt.proof_image || null)}
-                                  className="text-brand-blue hover:text-brand-orange cursor-pointer ml-0.5"
-                                  title="Lihat Bukti Foto Transfer"
-                                >
-                                  <Eye className="w-3 h-3" />
-                                </button>
+            <div className="bg-background border-2 border-ink rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]">
+              {isSummaryLoading ? (
+                <div className="p-12 text-center text-xs font-bold text-muted-foreground animate-pulse">
+                  Memuat data ringkasan produksi...
+                </div>
+              ) : summaryList.length === 0 ? (
+                <div className="p-12 text-center text-xs font-bold text-muted-foreground space-y-2">
+                  <Package className="w-8 h-8 text-brand-orange mx-auto opacity-50" />
+                  <p>Belum ada data pesanan pre-order untuk batch yang dipilih.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="bg-secondary/40 border-b-2 border-ink text-ink font-extrabold uppercase">
+                        <th className="p-3.5">Produk</th>
+                        <th className="p-3.5">Ukuran / Warna</th>
+                        <th className="p-3.5 text-center">Rincian Per-Batch</th>
+                        <th className="p-3.5 text-right font-black">TOTAL UNIT Wajib Produksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-ink/10">
+                      {summaryList.map((row: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-cream/30 transition-colors">
+                          <td className="p-3.5 font-extrabold text-ink text-sm">
+                            {row.product_name}
+                          </td>
+                          <td className="p-3.5 font-bold">
+                            <div className="flex flex-wrap gap-1.5">
+                              {row.variants_breakdown &&
+                              Object.keys(row.variants_breakdown).length === 1 &&
+                              ["Standard", "One Size", "Default", "All Size"].includes(
+                                Object.keys(row.variants_breakdown)[0],
+                              ) ? (
+                                <span className="text-muted-foreground italic font-mono text-xs font-bold px-1.5">
+                                  -
+                                </span>
+                              ) : row.variants_breakdown &&
+                                Object.keys(row.variants_breakdown).length > 0 ? (
+                                Object.entries(row.variants_breakdown).map(([vName, vQty]) => (
+                                  <span
+                                    key={vName}
+                                    className="bg-cream border-2 border-ink/30 px-2 py-0.5 rounded font-mono font-bold text-xs text-ink shadow-2xs"
+                                  >
+                                    {vName}:{" "}
+                                    <strong className="text-brand-orange">
+                                      {String(vQty)} pcs
+                                    </strong>
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-muted-foreground italic font-mono text-xs font-bold px-1.5">
+                                  -
+                                </span>
                               )}
                             </div>
-                          ))}
+                          </td>
+                          <td className="p-3.5 text-center">
+                            <div className="flex flex-wrap gap-1.5 justify-center">
+                              {Object.entries(row.batch_breakdown || {}).map(([bName, qty]) => (
+                                <span
+                                  key={bName}
+                                  className="bg-blue-50 text-blue-900 border border-blue-200 px-2 py-0.5 rounded text-[10px] font-extrabold"
+                                >
+                                  {bName}: {qty as number} pcs
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="p-3.5 text-right font-black text-sm text-brand-orange">
+                            {row.total_qty} pcs
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: VENDORS MITRA */}
+        {activeTab === "vendors" && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between border-b-2 border-ink pb-4">
+              <div>
+                <h3 className="font-extrabold text-base text-ink uppercase">
+                  Daftar Vendor &amp; Konveksi Mitra
+                </h3>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Master data penyedia jasa produksi FILKOM Merchandise.
+                </p>
+              </div>
+              <button
+                onClick={openCreateVendorModal}
+                className="px-4 py-2.5 bg-brand-orange hover:bg-ink text-cream font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> TAMBAH VENDOR MITRA
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {vendors.map((v) => (
+                <div
+                  key={v.id}
+                  className="bg-white border-2 border-ink rounded-2xl p-5 space-y-4 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] relative"
+                >
+                  <div className="flex items-start justify-between border-b border-ink/10 pb-3">
+                    <div>
+                      <span className="text-[10px] font-black text-brand-orange uppercase">
+                        MITRA VENDOR
+                      </span>
+                      <h4 className="font-extrabold text-base text-ink leading-tight">{v.name}</h4>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openEditVendorModal(v)}
+                        className="p-1.5 rounded-lg border border-ink bg-cream hover:bg-brand-orange hover:text-cream transition-all cursor-pointer"
+                        title="Edit Vendor"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Hapus vendor "${v.name}"?`)) {
+                            deleteVendorMutation.mutate(v.id);
+                          }
+                        }}
+                        className="p-1.5 rounded-lg border border-ink bg-rose-100 text-rose-800 hover:bg-rose-600 hover:text-white transition-all cursor-pointer"
+                        title="Hapus Vendor"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs text-ink/90 font-medium">
+                    {v.contact_person && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-muted-foreground w-20">PIC / Contact:</span>
+                        <span className="font-bold text-ink">{v.contact_person}</span>
+                      </div>
+                    )}
+                    {v.phone && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-muted-foreground w-20">No HP / WA:</span>
+                        <span className="font-bold text-ink font-mono">{v.phone}</span>
+                      </div>
+                    )}
+                    {v.email && (
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-muted-foreground w-20">Email:</span>
+                        <span className="font-medium text-ink font-mono text-[11px]">
+                          {v.email}
+                        </span>
+                      </div>
+                    )}
+                    {v.notes && (
+                      <div className="mt-2 p-2 bg-cream/50 rounded-lg border border-ink/10 text-[11px] italic">
+                        "{v.notes}"
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: VENDOR ORDERS (PO) */}
+        {activeTab === "orders" && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between border-b-2 border-ink pb-4">
+              <div>
+                <h3 className="font-extrabold text-base text-ink uppercase">
+                  Surat Perintah Kerja / PO Vendor
+                </h3>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Penerbitan dan pelacakan status Purchase Order ke vendor mitra.
+                </p>
+              </div>
+              <button
+                onClick={openCreatePoModal}
+                className="px-4 py-2.5 bg-brand-orange hover:bg-ink text-cream font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> BUAT PO VENDOR BARU
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {isOrdersLoading ? (
+                <div className="p-12 text-center text-xs font-bold text-muted-foreground animate-pulse">
+                  Memuat data Purchase Order Vendor...
+                </div>
+              ) : vendorOrders.length === 0 ? (
+                <div className="p-12 text-center text-xs font-bold text-muted-foreground space-y-2 border-2 border-dashed border-ink/30 rounded-2xl">
+                  <FileText className="w-8 h-8 text-brand-orange mx-auto opacity-50" />
+                  <p>Belum ada Purchase Order vendor yang dibuat.</p>
+                </div>
+              ) : (
+                vendorOrders.map((po) => {
+                  const totalCost = Number(po.total_cost || 0);
+                  const totalPaid = Number(po.total_paid || 0);
+                  const remainingCost = Math.max(0, totalCost - totalPaid);
+                  const progressPct = po.payment_progress_pct || 0;
+
+                  return (
+                    <div
+                      key={po.id}
+                      className="bg-white border-2 border-ink rounded-2xl p-5 space-y-4 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)]"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-ink/10 pb-3">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono text-sm font-black text-ink">
+                              {po.po_number}
+                            </span>
+                            {statusBadge(po.status)}
+
+                            {/* Inbound Status Badge */}
+                            {po.is_inbounded ? (
+                              <span
+                                className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-teal-100 text-teal-900 border border-teal-300 flex items-center gap-1"
+                                title={
+                                  po.inbounded_at
+                                    ? `Di-inbound pada: ${new Date(po.inbounded_at).toLocaleString("id-ID")}`
+                                    : "Stok sudah disinkronkan ke website"
+                                }
+                              >
+                                <PackageCheck className="w-3 h-3 text-teal-700" />
+                                Stok Masuk Web
+                              </span>
+                            ) : (
+                              <span
+                                className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1"
+                                title="Barang fisik belum diverifikasi masuk ke stok website"
+                              >
+                                <AlertCircle className="w-3 h-3 text-amber-700" />
+                                Belum Inbound
+                              </span>
+                            )}
+
+                            {/* Payment Status Badge */}
+                            {po.payment_status === "paid" ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                                <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Lunas (100%)
+                              </span>
+                            ) : po.payment_status === "partial" ? (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-amber-700" /> DP / Sebagian (
+                                {progressPct}%)
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                                <AlertCircle className="w-3 h-3 text-rose-600" /> Belum Bayar (0%)
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-extrabold text-brand-orange mt-0.5">
+                            Vendor: {po.vendor_name} {po.vendor_phone ? `(${po.vendor_phone})` : ""}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <select
+                            value={po.status}
+                            onChange={(e) => {
+                              const nextStatus = e.target.value;
+                              if (nextStatus === "completed" && !po.is_inbounded) {
+                                if (
+                                  confirm(
+                                    `Status PO diubah ke "Completed". Apakah Anda ingin sekalian memverifikasi penerimaan barang fisik & memasukkannya ke stok website sekarang?`,
+                                  )
+                                ) {
+                                  openInboundModal(po);
+                                  return;
+                                }
+                              }
+                              updatePoStatusMutation.mutate({ id: po.id, status: nextStatus });
+                            }}
+                            className="px-2.5 py-1.5 border border-ink rounded-lg text-xs font-bold bg-cream/50 cursor-pointer"
+                          >
+                            <option value="draft">Draft</option>
+                            <option value="sent">Sent to Vendor</option>
+                            <option value="in_production">In Production</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+
+                          {/* Inbound / Terima Barang Button */}
+                          <button
+                            onClick={() => openInboundModal(po)}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-black flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all border-2 ${
+                              po.is_inbounded
+                                ? "bg-teal-50 text-teal-950 border-teal-700 hover:bg-teal-100"
+                                : "bg-blue-600 text-white border-blue-900 hover:bg-blue-700"
+                            }`}
+                            title="Penerimaan Barang Fisik & Sinkronkan Otomatis ke Stok Website"
+                          >
+                            <PackageCheck className="w-3.5 h-3.5" />
+                            {po.is_inbounded ? "Rincian Inbound Stok" : "Terima & Masuk Stok"}
+                          </button>
+
+                          {/* Payment / Termin Button */}
+                          <button
+                            onClick={() => openPaymentModal(po)}
+                            className="px-3 py-1.5 bg-emerald-50 text-emerald-950 border-2 border-emerald-700 rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-emerald-100 shadow-2xs cursor-pointer transition-all"
+                            title="Kelola Skema Pembayaran & Bukti Transfer Vendor"
+                          >
+                            <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
+                            Termin &amp; Bukti Transfer{" "}
+                            {po.payments && po.payments.length > 0 ? `(${po.payments.length})` : ""}
+                          </button>
+
+                          <button
+                            onClick={() => openEditPoModal(po)}
+                            className="px-3 py-1.5 bg-white text-ink border-2 border-ink rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-cream shadow-2xs cursor-pointer transition-all"
+                            title="Edit Rincian SPK / PO Vendor"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-brand-blue" /> Edit SPK
+                          </button>
+
+                          <button
+                            onClick={() => openSpkModal(po)}
+                            className="px-3 py-1.5 bg-brand-orange text-cream border-2 border-ink rounded-lg text-xs font-black flex items-center gap-1.5 hover:bg-ink shadow-2xs cursor-pointer transition-all"
+                            title="Cetak Surat Perintah Kerja (SPK) Vendor"
+                          >
+                            <FileText className="w-3.5 h-3.5" /> Cetak SPK
+                          </button>
+
+                          <button
+                            onClick={() => handleExportPoCSV(po)}
+                            className="px-3 py-1.5 bg-secondary text-ink border border-ink rounded-lg text-xs font-bold flex items-center gap-1 hover:bg-neutral-200 cursor-pointer"
+                            title="Export PO CSV"
+                          >
+                            <Download className="w-3.5 h-3.5" /> CSV
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (confirm(`Hapus PO "${po.po_number}"?`)) {
+                                deletePoMutation.mutate(po.id);
+                              }
+                            }}
+                            className="p-1.5 bg-rose-100 text-rose-800 border border-ink rounded-lg hover:bg-rose-600 hover:text-white cursor-pointer"
+                            title="Hapus PO"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Items List Table */}
+                      <div className="overflow-x-auto border border-ink/20 rounded-xl">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="bg-cream/60 border-b border-ink/20 text-ink font-bold">
+                              <th className="p-2.5">Produk</th>
+                              <th className="p-2.5">Ukuran/Warna</th>
+                              <th className="p-2.5 text-center">Qty Dipesan</th>
+                              {po.is_inbounded && (
+                                <>
+                                  <th className="p-2.5 text-center bg-teal-50/50 text-teal-900">
+                                    Masuk Stok Web
+                                  </th>
+                                  <th className="p-2.5 text-center bg-rose-50/50 text-rose-900">
+                                    Cacat/Reject
+                                  </th>
+                                </>
+                              )}
+                              <th className="p-2.5 text-right">Harga Satuan Vendor</th>
+                              <th className="p-2.5 text-right font-black">Subtotal Cost</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-ink/10">
+                            {(po.items || []).map((item, idx) => (
+                              <tr key={idx}>
+                                <td className="p-2.5 font-bold text-ink">
+                                  <div>{item.catalog_product_name}</div>
+                                  {item.notes && (
+                                    <div className="text-[10px] text-muted-foreground font-normal italic">
+                                      Catatan: {item.notes}
+                                    </div>
+                                  )}
+                                </td>
+                                <td className="p-2.5 font-semibold text-muted-foreground">
+                                  {[item.size, item.color].filter(Boolean).join(" / ") || "-"}
+                                </td>
+                                <td className="p-2.5 text-center font-black">
+                                  {item.quantity} pcs
+                                </td>
+                                {po.is_inbounded && (
+                                  <>
+                                    <td className="p-2.5 text-center font-mono font-black text-teal-800 bg-teal-50/30">
+                                      +
+                                      {item.received_quantity !== null &&
+                                      item.received_quantity !== undefined
+                                        ? item.received_quantity
+                                        : item.quantity}{" "}
+                                      pcs
+                                    </td>
+                                    <td className="p-2.5 text-center font-mono font-bold text-rose-700 bg-rose-50/30">
+                                      {item.defect_quantity && item.defect_quantity > 0
+                                        ? `${item.defect_quantity} pcs`
+                                        : "-"}
+                                    </td>
+                                  </>
+                                )}
+                                <td className="p-2.5 text-right font-mono">
+                                  Rp {Number(item.unit_cost || 0).toLocaleString("id-ID")}
+                                </td>
+                                <td className="p-2.5 text-right font-mono font-black text-brand-orange">
+                                  Rp{" "}
+                                  {Number(
+                                    item.subtotal_cost || item.unit_cost * item.quantity,
+                                  ).toLocaleString("id-ID")}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Inbound Info Note (if inbounded) */}
+                      {po.is_inbounded ? (
+                        <div className="bg-teal-50/70 border border-teal-300 p-3 rounded-xl text-xs text-teal-950 flex items-start gap-2.5">
+                          <PackageCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <p className="font-extrabold text-teal-900">
+                              Stok Fisik PO Telah Masuk ke Sistem Website
+                              {po.inbounded_at && (
+                                <span className="font-normal text-teal-800 ml-1.5">
+                                  •{" "}
+                                  {new Date(po.inbounded_at).toLocaleDateString("id-ID", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                  {po.inbounded_by ? ` (oleh ${po.inbounded_by})` : ""}
+                                </span>
+                              )}
+                            </p>
+                            {po.inbound_notes && (
+                              <p className="text-[11px] text-teal-900/90 italic">
+                                &ldquo;{po.inbound_notes}&rdquo;
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-amber-50/70 border border-amber-300 p-2.5 rounded-xl text-xs text-amber-900 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                            <span className="text-[11px] font-bold">
+                              Barang PO ini belum di-inbound ke website. Klik tombol{" "}
+                              <strong>&quot;Terima &amp; Masuk Stok&quot;</strong> saat barang tiba
+                              agar stok website otomatis terupdate.
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => openInboundModal(po)}
+                            className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] uppercase rounded-lg shrink-0 cursor-pointer"
+                          >
+                            Inbound Sekarang
+                          </button>
                         </div>
                       )}
+
+                      {/* Progress Pembayaran & Transfer Tracker */}
+                      <div className="bg-cream/30 border border-ink/20 p-3.5 rounded-xl space-y-2.5">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="w-4 h-4 text-emerald-700" />
+                            <span className="font-extrabold uppercase text-ink">
+                              Progress Pembayaran Vendor:
+                            </span>
+                            <span className="font-bold font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded text-[11px]">
+                              {progressPct}% Ditransfer
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs font-mono">
+                            <span className="text-muted-foreground">
+                              Sudah Transfer:{" "}
+                              <b className="text-emerald-700">
+                                Rp {totalPaid.toLocaleString("id-ID")}
+                              </b>
+                            </span>
+                            <span className="text-muted-foreground">
+                              Sisa Tagihan:{" "}
+                              <b className="text-rose-600">
+                                Rp {remainingCost.toLocaleString("id-ID")}
+                              </b>
+                            </span>
+                            <span className="text-ink font-black">
+                              Total Kontrak:{" "}
+                              <b className="text-brand-orange">
+                                Rp {totalCost.toLocaleString("id-ID")}
+                              </b>
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Visual Progress Bar */}
+                        <div className="w-full bg-neutral-200 h-2.5 rounded-full overflow-hidden border border-ink/20">
+                          <div
+                            className="bg-emerald-600 h-full transition-all duration-500"
+                            style={{ width: `${progressPct}%` }}
+                          />
+                        </div>
+
+                        {/* Riwayat Termin Pills if any */}
+                        {po.payments && po.payments.length > 0 && (
+                          <div className="pt-1 flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[10px] font-black uppercase text-muted-foreground">
+                              Riwayat Transfer:
+                            </span>
+                            {po.payments.map((pmt, pIdx) => (
+                              <div
+                                key={pIdx}
+                                className="inline-flex items-center gap-1.5 bg-white border border-ink/30 px-2 py-1 rounded-lg text-[10px] font-bold shadow-2xs"
+                              >
+                                <span className="font-black text-ink">{pmt.term_name}:</span>
+                                <span className="font-mono text-emerald-700">
+                                  Rp {Number(pmt.amount).toLocaleString("id-ID")}
+                                </span>
+                                <span className="text-muted-foreground text-[9px]">
+                                  ({new Date(pmt.payment_date).toLocaleDateString("id-ID")})
+                                </span>
+                                {pmt.proof_image && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setZoomProofImage(pmt.proof_image || null)}
+                                    className="text-brand-blue hover:text-brand-orange cursor-pointer ml-0.5"
+                                    title="Lihat Bukti Foto Transfer"
+                                  >
+                                    <Eye className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs pt-1 font-bold border-t border-ink/10">
+                        <span className="text-muted-foreground">
+                          Deadline:{" "}
+                          {po.deadline ? new Date(po.deadline).toLocaleDateString("id-ID") : "-"}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {po.notes ? `Catatan: "${po.notes}"` : ""}
+                        </span>
+                      </div>
                     </div>
-
-                    <div className="flex items-center justify-between text-xs pt-1 font-bold border-t border-ink/10">
-                      <span className="text-muted-foreground">
-                        Deadline: {po.deadline ? new Date(po.deadline).toLocaleDateString("id-ID") : "-"}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {po.notes ? `Catatan: "${po.notes}"` : ""}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* TAB 4: FINANCIAL OVERVIEW */}
-      {activeTab === "financials" && (
-        <div className="space-y-6 animate-fade-in">
-          <div className="flex items-center justify-between border-b-2 border-ink pb-4">
-            <div>
-              <h3 className="font-extrabold text-base text-ink uppercase">Analisis Margin &amp; Laporan Keuangan</h3>
-              <p className="text-xs text-muted-foreground font-medium">Perbandingan Omset Penjualan vs Realisasi Kas Keluar &amp; Komitmen Kontrak Vendor.</p>
+                  );
+                })
+              )}
             </div>
-            <button
-              onClick={() => refetchFinancials()}
-              className="p-2 border-2 border-ink bg-white hover:bg-neutral-200 rounded-lg text-ink font-bold transition-all cursor-pointer shadow-xs"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
           </div>
+        )}
 
-          {isFinancialLoading ? (
-            <div className="p-12 text-center text-xs font-bold text-muted-foreground animate-pulse">
-              Memuat laporan keuangan...
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {/* 6 Comprehensive Financial Summary Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* 1. Total Revenue Asli Sekarang */}
-                <div className="bg-orange-50/80 border-2 border-brand-orange p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(234,88,12,0.4)] relative overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-brand-orange tracking-wider">
-                      1. TOTAL REVENUE SEKARANG
-                    </span>
-                    <span className="text-[9px] font-extrabold bg-amber-200/60 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
-                      Kas Masuk
-                    </span>
-                  </div>
-                  <div className="text-2xl font-black text-ink font-mono">
-                    Rp {Number(financialData?.totalRevenue || 0).toLocaleString("id-ID")}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">
-                    Uang riil yang sudah masuk dari transaksi pelanggan (DP + Lunas)
-                  </p>
-                </div>
-
-                {/* 2. Total Revenue Expected Jika Lunas Semua */}
-                <div className="bg-blue-50/80 border-2 border-blue-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(37,99,235,0.4)] relative overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-blue-800 tracking-wider">
-                      2. EXPECTED REVENUE (LUNAS 100%)
-                    </span>
-                    <span className="text-[9px] font-extrabold bg-blue-200/60 text-blue-900 px-1.5 py-0.5 rounded border border-blue-300">
-                      Proyeksi Omset
-                    </span>
-                  </div>
-                  <div className="text-2xl font-black text-blue-950 font-mono">
-                    Rp {Number(financialData?.expectedRevenue || financialData?.totalRevenue || 0).toLocaleString("id-ID")}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground font-medium flex items-center justify-between">
-                    <span>Termasuk sisa pelunasan DP:</span>
-                    <b className="text-blue-700 font-mono">+Rp {Number(financialData?.unsettledDpRemaining || 0).toLocaleString("id-ID")}</b>
-                  </p>
-                </div>
-
-                {/* 3. Total COGS ke Vendor (Kontrak PO) */}
-                <div className="bg-purple-50/80 border-2 border-purple-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(147,51,234,0.4)] relative overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-purple-800 tracking-wider">
-                      3. TOTAL COGS VENDOR (KONTRAK PO)
-                    </span>
-                    <span className="text-[9px] font-extrabold bg-purple-200/60 text-purple-900 px-1.5 py-0.5 rounded border border-purple-300">
-                      Total Kewajiban
-                    </span>
-                  </div>
-                  <div className="text-2xl font-black text-ink font-mono">
-                    Rp {Number(financialData?.totalCommittedCogs || 0).toLocaleString("id-ID")}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">
-                    Total nilai seluruh SPK/PO vendor yang diterbitkan
-                  </p>
-                </div>
-
-                {/* 4. Total yang Sudah Ditransfer ke Vendor */}
-                <div className="bg-rose-50/80 border-2 border-rose-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(225,29,72,0.4)] relative overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-rose-700 tracking-wider">
-                      4. SUDAH DITRANSFER KE VENDOR
-                    </span>
-                    <span className="text-[9px] font-extrabold bg-rose-200/60 text-rose-900 px-1.5 py-0.5 rounded border border-rose-300">
-                      Kas Keluar Riil
-                    </span>
-                  </div>
-                  <div className="text-2xl font-black text-rose-900 font-mono">
-                    Rp {Number(financialData?.totalPaidCogs || 0).toLocaleString("id-ID")}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground font-medium flex items-center justify-between">
-                    <span>Sisa hutang PO vendor:</span>
-                    <b className="text-rose-700 font-mono">
-                      Rp {Math.max(0, Number(financialData?.totalCommittedCogs || 0) - Number(financialData?.totalPaidCogs || 0)).toLocaleString("id-ID")}
-                    </b>
-                  </p>
-                </div>
-
-                {/* 5. Total Margin Real Sekarang */}
-                <div className="bg-emerald-50/80 border-2 border-emerald-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(16,185,129,0.4)] relative overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider">
-                      5. MARGIN REAL SEKARANG (KAS)
-                    </span>
-                    <span className="text-[9px] font-extrabold bg-emerald-200/70 text-emerald-900 px-1.5 py-0.5 rounded border border-emerald-300">
-                      {financialData?.realCashMarginPercent ?? financialData?.marginPercent ?? 0}%
-                    </span>
-                  </div>
-                  <div className={`text-2xl font-black font-mono ${(financialData?.realCashMargin ?? financialData?.grossMargin ?? 0) >= 0 ? "text-emerald-800" : "text-rose-700"}`}>
-                    Rp {Number(financialData?.realCashMargin ?? financialData?.grossMargin ?? 0).toLocaleString("id-ID")}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground font-medium flex items-center justify-between">
-                    <span>Net vs Total Kontrak PO:</span>
-                    <b className={`font-mono ${(financialData?.netCashMarginVsPO ?? 0) >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                      Rp {Number(financialData?.netCashMarginVsPO || 0).toLocaleString("id-ID")}
-                    </b>
-                  </p>
-                </div>
-
-                {/* 6. Total Margin Expected Jika Lunas Semua */}
-                <div className="bg-teal-50/80 border-2 border-teal-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(13,148,136,0.4)] relative overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-teal-800 tracking-wider">
-                      6. EXPECTED MARGIN (LUNAS SEMUA)
-                    </span>
-                    <span className="text-[9px] font-extrabold bg-teal-200/70 text-teal-900 px-1.5 py-0.5 rounded border border-teal-300">
-                      {financialData?.expectedMarginPercent || 0}%
-                    </span>
-                  </div>
-                  <div className={`text-2xl font-black font-mono ${(financialData?.expectedMargin || 0) >= 0 ? "text-teal-900" : "text-rose-700"}`}>
-                    Rp {Number(financialData?.expectedMargin || 0).toLocaleString("id-ID")}
-                  </div>
-                  <p className="text-[10px] text-muted-foreground font-medium">
-                    Proyeksi Laba Bersih Akhir (Revenue Expected - Total Kontrak PO)
-                  </p>
-                </div>
+        {/* TAB 4: FINANCIAL OVERVIEW */}
+        {activeTab === "financials" && (
+          <div className="space-y-6 animate-fade-in">
+            <div className="flex items-center justify-between border-b-2 border-ink pb-4">
+              <div>
+                <h3 className="font-extrabold text-base text-ink uppercase">
+                  Analisis Margin &amp; Laporan Keuangan
+                </h3>
+                <p className="text-xs text-muted-foreground font-medium">
+                  Perbandingan Omset Penjualan vs Realisasi Kas Keluar &amp; Komitmen Kontrak
+                  Vendor.
+                </p>
               </div>
+              <button
+                onClick={() => refetchFinancials()}
+                className="p-2 border-2 border-ink bg-white hover:bg-neutral-200 rounded-lg text-ink font-bold transition-all cursor-pointer shadow-xs"
+              >
+                <RefreshCw className="w-4 h-4" />
+              </button>
+            </div>
 
-              {/* Product Breakdown Table */}
-              <div className="bg-background border-2 border-ink rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-3 p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <h4 className="font-black text-sm text-ink uppercase tracking-wide flex items-center gap-2">
-                      <Package className="w-4 h-4 text-brand-orange" />
-                      Rincian Revenue &amp; Margin Per Produk
-                    </h4>
-                    <p className="text-[11px] text-muted-foreground font-medium">
-                      Laporan terpadu penjualan produk, realisasi kas masuk vs kas keluar, dan proyeksi margin jika lunas semua.
+            {isFinancialLoading ? (
+              <div className="p-12 text-center text-xs font-bold text-muted-foreground animate-pulse">
+                Memuat laporan keuangan...
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* 6 Comprehensive Financial Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* 1. Total Revenue Asli Sekarang */}
+                  <div className="bg-orange-50/80 border-2 border-brand-orange p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(234,88,12,0.4)] relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-brand-orange tracking-wider">
+                        1. TOTAL REVENUE SEKARANG
+                      </span>
+                      <span className="text-[9px] font-extrabold bg-amber-200/60 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
+                        Kas Masuk
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-ink font-mono">
+                      Rp {Number(financialData?.totalRevenue || 0).toLocaleString("id-ID")}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium">
+                      Uang riil yang sudah masuk dari transaksi pelanggan (DP + Lunas)
+                    </p>
+                  </div>
+
+                  {/* 2. Total Revenue Expected Jika Lunas Semua */}
+                  <div className="bg-blue-50/80 border-2 border-blue-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(37,99,235,0.4)] relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-blue-800 tracking-wider">
+                        2. EXPECTED REVENUE (LUNAS 100%)
+                      </span>
+                      <span className="text-[9px] font-extrabold bg-blue-200/60 text-blue-900 px-1.5 py-0.5 rounded border border-blue-300">
+                        Proyeksi Omset
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-blue-950 font-mono">
+                      Rp{" "}
+                      {Number(
+                        financialData?.expectedRevenue || financialData?.totalRevenue || 0,
+                      ).toLocaleString("id-ID")}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium flex items-center justify-between">
+                      <span>Termasuk sisa pelunasan DP:</span>
+                      <b className="text-blue-700 font-mono">
+                        +Rp{" "}
+                        {Number(financialData?.unsettledDpRemaining || 0).toLocaleString("id-ID")}
+                      </b>
+                    </p>
+                  </div>
+
+                  {/* 3. Total COGS ke Vendor (Kontrak PO) */}
+                  <div className="bg-purple-50/80 border-2 border-purple-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(147,51,234,0.4)] relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-purple-800 tracking-wider">
+                        3. TOTAL COGS VENDOR (KONTRAK PO)
+                      </span>
+                      <span className="text-[9px] font-extrabold bg-purple-200/60 text-purple-900 px-1.5 py-0.5 rounded border border-purple-300">
+                        Total Kewajiban
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-ink font-mono">
+                      Rp {Number(financialData?.totalCommittedCogs || 0).toLocaleString("id-ID")}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium">
+                      Total nilai seluruh SPK/PO vendor yang diterbitkan
+                    </p>
+                  </div>
+
+                  {/* 4. Total yang Sudah Ditransfer ke Vendor */}
+                  <div className="bg-rose-50/80 border-2 border-rose-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(225,29,72,0.4)] relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-rose-700 tracking-wider">
+                        4. SUDAH DITRANSFER KE VENDOR
+                      </span>
+                      <span className="text-[9px] font-extrabold bg-rose-200/60 text-rose-900 px-1.5 py-0.5 rounded border border-rose-300">
+                        Kas Keluar Riil
+                      </span>
+                    </div>
+                    <div className="text-2xl font-black text-rose-900 font-mono">
+                      Rp {Number(financialData?.totalPaidCogs || 0).toLocaleString("id-ID")}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium flex items-center justify-between">
+                      <span>Sisa hutang PO vendor:</span>
+                      <b className="text-rose-700 font-mono">
+                        Rp{" "}
+                        {Math.max(
+                          0,
+                          Number(financialData?.totalCommittedCogs || 0) -
+                            Number(financialData?.totalPaidCogs || 0),
+                        ).toLocaleString("id-ID")}
+                      </b>
+                    </p>
+                  </div>
+
+                  {/* 5. Total Margin Real Sekarang */}
+                  <div className="bg-emerald-50/80 border-2 border-emerald-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(16,185,129,0.4)] relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider">
+                        5. MARGIN REAL SEKARANG (KAS)
+                      </span>
+                      <span className="text-[9px] font-extrabold bg-emerald-200/70 text-emerald-900 px-1.5 py-0.5 rounded border border-emerald-300">
+                        {financialData?.realCashMarginPercent ?? financialData?.marginPercent ?? 0}%
+                      </span>
+                    </div>
+                    <div
+                      className={`text-2xl font-black font-mono ${(financialData?.realCashMargin ?? financialData?.grossMargin ?? 0) >= 0 ? "text-emerald-800" : "text-rose-700"}`}
+                    >
+                      Rp{" "}
+                      {Number(
+                        financialData?.realCashMargin ?? financialData?.grossMargin ?? 0,
+                      ).toLocaleString("id-ID")}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium flex items-center justify-between">
+                      <span>Net vs Total Kontrak PO:</span>
+                      <b
+                        className={`font-mono ${(financialData?.netCashMarginVsPO ?? 0) >= 0 ? "text-emerald-700" : "text-rose-600"}`}
+                      >
+                        Rp {Number(financialData?.netCashMarginVsPO || 0).toLocaleString("id-ID")}
+                      </b>
+                    </p>
+                  </div>
+
+                  {/* 6. Total Margin Expected Jika Lunas Semua */}
+                  <div className="bg-teal-50/80 border-2 border-teal-600 p-4.5 rounded-2xl space-y-1.5 shadow-[3px_3px_0px_0px_rgba(13,148,136,0.4)] relative overflow-hidden">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black uppercase text-teal-800 tracking-wider">
+                        6. EXPECTED MARGIN (LUNAS SEMUA)
+                      </span>
+                      <span className="text-[9px] font-extrabold bg-teal-200/70 text-teal-900 px-1.5 py-0.5 rounded border border-teal-300">
+                        {financialData?.expectedMarginPercent || 0}%
+                      </span>
+                    </div>
+                    <div
+                      className={`text-2xl font-black font-mono ${(financialData?.expectedMargin || 0) >= 0 ? "text-teal-900" : "text-rose-700"}`}
+                    >
+                      Rp {Number(financialData?.expectedMargin || 0).toLocaleString("id-ID")}
+                    </div>
+                    <p className="text-[10px] text-muted-foreground font-medium">
+                      Proyeksi Laba Bersih Akhir (Revenue Expected - Total Kontrak PO)
                     </p>
                   </div>
                 </div>
 
-                <div className="overflow-x-auto border-2 border-ink/20 rounded-xl">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-cream border-b-2 border-ink text-ink font-extrabold uppercase">
-                        <th className="p-3">Nama Produk &amp; Detail Varian</th>
-                        <th className="p-3 text-center">Qty Terjual / PO</th>
-                        <th className="p-3 text-right">Revenue Saat Ini (vs Expected)</th>
-                        <th className="p-3 text-right">HPP PO Satuan</th>
-                        <th className="p-3 text-right">COGS Ditransfer (vs Kontrak PO)</th>
-                        <th className="p-3 text-right font-black">Margin Kas (vs Expected)</th>
-                        <th className="p-3 text-right font-black">Margin Expected %</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ink/10">
-                      {(financialData?.productBreakdown || []).length === 0 ? (
-                        <tr>
-                          <td colSpan={7} className="p-8 text-center text-muted-foreground font-bold">
-                            Belum ada data penjualan atau PO Vendor untuk batch ini.
-                          </td>
+                {/* Product Breakdown Table */}
+                <div className="bg-background border-2 border-ink rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-3 p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="font-black text-sm text-ink uppercase tracking-wide flex items-center gap-2">
+                        <Package className="w-4 h-4 text-brand-orange" />
+                        Rincian Revenue &amp; Margin Per Produk
+                      </h4>
+                      <p className="text-[11px] text-muted-foreground font-medium">
+                        Laporan terpadu penjualan produk, realisasi kas masuk vs kas keluar, dan
+                        proyeksi margin jika lunas semua.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto border-2 border-ink/20 rounded-xl">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-cream border-b-2 border-ink text-ink font-extrabold uppercase">
+                          <th className="p-3">Nama Produk &amp; Detail Varian</th>
+                          <th className="p-3 text-center">Qty Terjual / PO</th>
+                          <th className="p-3 text-right">Revenue Saat Ini (vs Expected)</th>
+                          <th className="p-3 text-right">HPP PO Satuan</th>
+                          <th className="p-3 text-right">COGS Ditransfer (vs Kontrak PO)</th>
+                          <th className="p-3 text-right font-black">Margin Kas (vs Expected)</th>
+                          <th className="p-3 text-right font-black">Margin Expected %</th>
                         </tr>
-                      ) : (
-                        (financialData?.productBreakdown || []).map((row: any) => {
-                          const hasVariants = row.variants_detail && row.variants_detail.length > 0;
-                          const isExpanded = expandedFinancialRows[row.product_id] ?? true;
+                      </thead>
+                      <tbody className="divide-y divide-ink/10">
+                        {(financialData?.productBreakdown || []).length === 0 ? (
+                          <tr>
+                            <td
+                              colSpan={7}
+                              className="p-8 text-center text-muted-foreground font-bold"
+                            >
+                              Belum ada data penjualan atau PO Vendor untuk batch ini.
+                            </td>
+                          </tr>
+                        ) : (
+                          (financialData?.productBreakdown || []).map((row: any) => {
+                            const hasVariants =
+                              row.variants_detail && row.variants_detail.length > 0;
+                            const isExpanded = expandedFinancialRows[row.product_id] ?? true;
 
-                          return (
-                            <tr key={row.product_id} className="hover:bg-cream/20 align-top transition-colors">
-                              <td className="p-3.5 space-y-2">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-black text-sm text-ink">{row.product_name}</span>
-                                  {row.po_numbers && row.po_numbers.length > 0 && (
-                                    <span className="text-[9px] font-bold font-mono bg-blue-100 text-blue-800 border border-blue-300 px-1.5 py-0.5 rounded">
-                                      PO: {row.po_numbers.join(", ")}
+                            return (
+                              <tr
+                                key={row.product_id}
+                                className="hover:bg-cream/20 align-top transition-colors"
+                              >
+                                <td className="p-3.5 space-y-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <span className="font-black text-sm text-ink">
+                                      {row.product_name}
                                     </span>
-                                  )}
-                                </div>
-
-                                {row.vendor_names && row.vendor_names.length > 0 && (
-                                  <div className="text-[10px] font-bold text-brand-orange flex items-center gap-1">
-                                    <Building className="w-3 h-3" /> Mitra: {row.vendor_names.join(", ")}
-                                  </div>
-                                )}
-
-                                {/* Detail Varian */}
-                                {hasVariants && (
-                                  <div className="pt-1 space-y-1">
-                                    <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-muted-foreground">
-                                      <span className="flex items-center gap-1">
-                                        <Layers className="w-3 h-3 text-ink/70" /> Detail Varian ({row.variants_detail.length}):
+                                    {row.po_numbers && row.po_numbers.length > 0 && (
+                                      <span className="text-[9px] font-bold font-mono bg-blue-100 text-blue-800 border border-blue-300 px-1.5 py-0.5 rounded">
+                                        PO: {row.po_numbers.join(", ")}
                                       </span>
-                                      {row.variants_detail.length > 4 && (
-                                        <button
-                                          type="button"
-                                          onClick={() =>
-                                            setExpandedFinancialRows((prev) => ({
-                                              ...prev,
-                                              [row.product_id]: !isExpanded,
-                                            }))
-                                          }
-                                          className="text-brand-blue hover:underline cursor-pointer flex items-center gap-0.5 text-[9px] font-bold"
-                                        >
-                                          {isExpanded ? "Sembunyikan" : `Lihat Semua (${row.variants_detail.length})`}
-                                          {isExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
-                                        </button>
-                                      )}
-                                    </div>
+                                    )}
+                                  </div>
 
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {(isExpanded ? row.variants_detail : row.variants_detail.slice(0, 4)).map((v: any, vIdx: number) => (
-                                        <div
-                                          key={vIdx}
-                                          className="bg-white border border-ink/30 rounded-lg px-2 py-1 text-[10px] shadow-2xs space-y-0.5"
-                                        >
-                                          <div className="font-black text-ink">{v.variant || "Standard"}</div>
-                                          <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono flex-wrap">
-                                            <span className="font-bold text-ink">
-                                              Terjual: <span className="text-brand-orange">{v.qty_sold} pcs</span>
-                                            </span>
-                                            {v.qty_po > 0 && (
-                                              <span className="text-neutral-500 font-semibold">
-                                                PO: {v.qty_po} pcs
-                                              </span>
+                                  {row.vendor_names && row.vendor_names.length > 0 && (
+                                    <div className="text-[10px] font-bold text-brand-orange flex items-center gap-1">
+                                      <Building className="w-3 h-3" /> Mitra:{" "}
+                                      {row.vendor_names.join(", ")}
+                                    </div>
+                                  )}
+
+                                  {/* Detail Varian */}
+                                  {hasVariants && (
+                                    <div className="pt-1 space-y-1">
+                                      <div className="flex items-center justify-between text-[10px] font-extrabold uppercase text-muted-foreground">
+                                        <span className="flex items-center gap-1">
+                                          <Layers className="w-3 h-3 text-ink/70" /> Detail Varian (
+                                          {row.variants_detail.length}):
+                                        </span>
+                                        {row.variants_detail.length > 4 && (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setExpandedFinancialRows((prev) => ({
+                                                ...prev,
+                                                [row.product_id]: !isExpanded,
+                                              }))
+                                            }
+                                            className="text-brand-blue hover:underline cursor-pointer flex items-center gap-0.5 text-[9px] font-bold"
+                                          >
+                                            {isExpanded
+                                              ? "Sembunyikan"
+                                              : `Lihat Semua (${row.variants_detail.length})`}
+                                            {isExpanded ? (
+                                              <ChevronUp className="w-2.5 h-2.5" />
+                                            ) : (
+                                              <ChevronDown className="w-2.5 h-2.5" />
                                             )}
-                                            {v.unit_cost > 0 && (
-                                              <span className="text-neutral-700 font-semibold">
-                                                HPP: Rp {Number(v.unit_cost).toLocaleString("id-ID")}
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {(isExpanded
+                                          ? row.variants_detail
+                                          : row.variants_detail.slice(0, 4)
+                                        ).map((v: any, vIdx: number) => (
+                                          <div
+                                            key={vIdx}
+                                            className="bg-white border border-ink/30 rounded-lg px-2 py-1 text-[10px] shadow-2xs space-y-0.5"
+                                          >
+                                            <div className="font-black text-ink">
+                                              {v.variant || "Standard"}
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[9px] text-muted-foreground font-mono flex-wrap">
+                                              <span className="font-bold text-ink">
+                                                Terjual:{" "}
+                                                <span className="text-brand-orange">
+                                                  {v.qty_sold} pcs
+                                                </span>
                                               </span>
-                                            )}
-                                            {v.paid_cost > 0 && (
-                                              <span className="text-rose-700 font-bold bg-rose-50 px-1 rounded">
-                                                Ditransfer: Rp {Number(v.paid_cost).toLocaleString("id-ID")}
-                                              </span>
-                                            )}
+                                              {v.qty_po > 0 && (
+                                                <span className="text-neutral-500 font-semibold">
+                                                  PO: {v.qty_po} pcs
+                                                </span>
+                                              )}
+                                              {v.unit_cost > 0 && (
+                                                <span className="text-neutral-700 font-semibold">
+                                                  HPP: Rp{" "}
+                                                  {Number(v.unit_cost).toLocaleString("id-ID")}
+                                                </span>
+                                              )}
+                                              {v.paid_cost > 0 && (
+                                                <span className="text-rose-700 font-bold bg-rose-50 px-1 rounded">
+                                                  Ditransfer: Rp{" "}
+                                                  {Number(v.paid_cost).toLocaleString("id-ID")}
+                                                </span>
+                                              )}
+                                            </div>
                                           </div>
-                                        </div>
-                                      ))}
+                                        ))}
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
-                              </td>
+                                  )}
+                                </td>
 
-                              <td className="p-3.5 text-center font-mono">
-                                <div className="font-black text-xs text-ink">{row.qty_sold} pcs</div>
-                                {row.qty_po > 0 && (
-                                  <div className="text-[10px] text-muted-foreground font-semibold">
-                                    (PO: {row.qty_po} pcs)
+                                <td className="p-3.5 text-center font-mono">
+                                  <div className="font-black text-xs text-ink">
+                                    {row.qty_sold} pcs
                                   </div>
-                                )}
-                              </td>
+                                  {row.qty_po > 0 && (
+                                    <div className="text-[10px] text-muted-foreground font-semibold">
+                                      (PO: {row.qty_po} pcs)
+                                    </div>
+                                  )}
+                                </td>
 
-                              <td className="p-3.5 text-right font-mono">
-                                <div className="font-black text-xs text-ink">
-                                  Rp {Number(row.revenue).toLocaleString("id-ID")}
-                                </div>
-                                {row.expected_revenue && row.expected_revenue !== row.revenue && (
-                                  <div className="text-[9px] text-blue-700 font-bold">
-                                    Exp: Rp {Number(row.expected_revenue).toLocaleString("id-ID")}
+                                <td className="p-3.5 text-right font-mono">
+                                  <div className="font-black text-xs text-ink">
+                                    Rp {Number(row.revenue).toLocaleString("id-ID")}
                                   </div>
-                                )}
-                              </td>
+                                  {row.expected_revenue && row.expected_revenue !== row.revenue && (
+                                    <div className="text-[9px] text-blue-700 font-bold">
+                                      Exp: Rp {Number(row.expected_revenue).toLocaleString("id-ID")}
+                                    </div>
+                                  )}
+                                </td>
 
-                              <td className="p-3.5 text-right font-mono">
-                                <div className="font-bold text-xs text-muted-foreground">
-                                  Rp {Number(row.unit_cogs).toLocaleString("id-ID")}
-                                </div>
-                                {row.qty_po > 0 && (
-                                  <div className="text-[9px] text-brand-orange font-bold">
-                                    kesepakatan PO
+                                <td className="p-3.5 text-right font-mono">
+                                  <div className="font-bold text-xs text-muted-foreground">
+                                    Rp {Number(row.unit_cogs).toLocaleString("id-ID")}
                                   </div>
-                                )}
-                              </td>
+                                  {row.qty_po > 0 && (
+                                    <div className="text-[9px] text-brand-orange font-bold">
+                                      kesepakatan PO
+                                    </div>
+                                  )}
+                                </td>
 
-                              <td className="p-3.5 text-right font-mono">
-                                <div className="font-black text-xs text-rose-700">
-                                  Rp {Number(row.paid_cogs || row.total_cogs || 0).toLocaleString("id-ID")}
-                                </div>
-                                {row.po_total_cost > 0 && (
-                                  <div className="text-[9px] text-muted-foreground font-semibold">
-                                    Kontrak: Rp {Number(row.po_total_cost).toLocaleString("id-ID")}
+                                <td className="p-3.5 text-right font-mono">
+                                  <div className="font-black text-xs text-rose-700">
+                                    Rp{" "}
+                                    {Number(row.paid_cogs || row.total_cogs || 0).toLocaleString(
+                                      "id-ID",
+                                    )}
                                   </div>
-                                )}
-                              </td>
+                                  {row.po_total_cost > 0 && (
+                                    <div className="text-[9px] text-muted-foreground font-semibold">
+                                      Kontrak: Rp{" "}
+                                      {Number(row.po_total_cost).toLocaleString("id-ID")}
+                                    </div>
+                                  )}
+                                </td>
 
-                              <td className="p-3.5 text-right font-mono">
-                                <div className={`font-black text-xs ${row.margin >= 0 ? "text-emerald-700" : "text-rose-600"}`}>
-                                  Rp {Number(row.margin).toLocaleString("id-ID")}
-                                </div>
-                                {row.expected_margin !== undefined && (
-                                  <div className={`text-[9px] font-bold ${row.expected_margin >= 0 ? "text-teal-700" : "text-rose-600"}`}>
-                                    Exp: Rp {Number(row.expected_margin).toLocaleString("id-ID")}
+                                <td className="p-3.5 text-right font-mono">
+                                  <div
+                                    className={`font-black text-xs ${row.margin >= 0 ? "text-emerald-700" : "text-rose-600"}`}
+                                  >
+                                    Rp {Number(row.margin).toLocaleString("id-ID")}
                                   </div>
-                                )}
-                              </td>
+                                  {row.expected_margin !== undefined && (
+                                    <div
+                                      className={`text-[9px] font-bold ${row.expected_margin >= 0 ? "text-teal-700" : "text-rose-600"}`}
+                                    >
+                                      Exp: Rp {Number(row.expected_margin).toLocaleString("id-ID")}
+                                    </div>
+                                  )}
+                                </td>
 
-                              <td className="p-3.5 text-right">
-                                <span
-                                  className={`inline-block px-2 py-1 rounded-md font-black text-[11px] font-mono border ${
-                                    (row.expected_margin_percent ?? row.margin_percent) >= 0
-                                      ? "bg-teal-100 text-teal-900 border-teal-300"
-                                      : "bg-rose-100 text-rose-800 border-rose-300"
-                                  }`}
-                                >
-                                  {(row.expected_margin_percent ?? row.margin_percent) > 0
-                                    ? `+${row.expected_margin_percent ?? row.margin_percent}%`
-                                    : `${row.expected_margin_percent ?? row.margin_percent}%`}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
+                                <td className="p-3.5 text-right">
+                                  <span
+                                    className={`inline-block px-2 py-1 rounded-md font-black text-[11px] font-mono border ${
+                                      (row.expected_margin_percent ?? row.margin_percent) >= 0
+                                        ? "bg-teal-100 text-teal-900 border-teal-300"
+                                        : "bg-rose-100 text-rose-800 border-rose-300"
+                                    }`}
+                                  >
+                                    {(row.expected_margin_percent ?? row.margin_percent) > 0
+                                      ? `+${row.expected_margin_percent ?? row.margin_percent}%`
+                                      : `${row.expected_margin_percent ?? row.margin_percent}%`}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        )}
       </div>
 
       {/* VENDOR MODAL */}
@@ -1660,7 +2069,9 @@ function AdminVendoringPage() {
 
             <form onSubmit={handleVendorSubmit} className="space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-ink uppercase mb-1">Nama Vendor / Konveksi *</label>
+                <label className="block font-bold text-ink uppercase mb-1">
+                  Nama Vendor / Konveksi *
+                </label>
                 <input
                   type="text"
                   value={vendorName}
@@ -1672,7 +2083,9 @@ function AdminVendoringPage() {
               </div>
 
               <div>
-                <label className="block font-bold text-ink uppercase mb-1">PIC / Contact Person</label>
+                <label className="block font-bold text-ink uppercase mb-1">
+                  PIC / Contact Person
+                </label>
                 <input
                   type="text"
                   value={vendorContact}
@@ -1741,7 +2154,11 @@ function AdminVendoringPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/75 backdrop-blur-xs overflow-y-auto">
           <div className="bg-background border-4 border-ink rounded-2xl w-full max-w-3xl my-8 p-6 space-y-4 shadow-[10px_10px_0px_0px_rgba(27,27,27,1)] relative max-h-[90vh] overflow-y-auto">
             <h2 className="text-lg font-black text-ink uppercase tracking-wide border-b-2 border-ink pb-2 flex items-center justify-between">
-              <span>{editingPo ? `Edit Surat Perintah Kerja (SPK) — ${editingPo.po_number}` : "Buat Purchase Order (PO) Vendor Baru"}</span>
+              <span>
+                {editingPo
+                  ? `Edit Surat Perintah Kerja (SPK) — ${editingPo.po_number}`
+                  : "Buat Purchase Order (PO) Vendor Baru"}
+              </span>
               {editingPo && (
                 <span className="text-[10px] bg-brand-blue/10 text-brand-blue border border-brand-blue/30 px-2 py-0.5 rounded font-mono">
                   MODE EDIT
@@ -1752,10 +2169,14 @@ function AdminVendoringPage() {
             <form onSubmit={handlePoSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block font-bold text-ink uppercase mb-1">Pilih Vendor Mitra *</label>
+                  <label className="block font-bold text-ink uppercase mb-1">
+                    Pilih Vendor Mitra *
+                  </label>
                   <select
                     value={selectedVendorId}
-                    onChange={(e) => setSelectedVendorId(e.target.value ? Number(e.target.value) : "")}
+                    onChange={(e) =>
+                      setSelectedVendorId(e.target.value ? Number(e.target.value) : "")
+                    }
                     className="w-full px-3 py-2 border-2 border-ink rounded-xl font-bold bg-cream/30 focus:outline-none"
                     required
                   >
@@ -1769,7 +2190,9 @@ function AdminVendoringPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-ink uppercase mb-1">Deadline Penyelesaian</label>
+                  <label className="block font-bold text-ink uppercase mb-1">
+                    Deadline Penyelesaian
+                  </label>
                   <input
                     type="date"
                     value={poDeadline}
@@ -1794,7 +2217,8 @@ function AdminVendoringPage() {
 
                 {poItems.map((item, idx) => {
                   const currentProd = productsList.find((p) => p.id === item.product_id);
-                  const { hasSize, hasColor, sizes, colors } = getProductVariantOptions(currentProd);
+                  const { hasSize, hasColor, sizes, colors } =
+                    getProductVariantOptions(currentProd);
 
                   const isTwoVariants = hasSize && hasColor;
                   const isOneVariant = (hasSize && !hasColor) || (!hasSize && hasColor);
@@ -1806,8 +2230,14 @@ function AdminVendoringPage() {
                       className="grid grid-cols-12 gap-2 items-center bg-white border border-ink/20 p-2.5 rounded-lg shadow-2xs"
                     >
                       {/* Product Selector */}
-                      <div className={isTwoVariants ? "col-span-3" : isOneVariant ? "col-span-4" : "col-span-4"}>
-                        <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Produk</label>
+                      <div
+                        className={
+                          isTwoVariants ? "col-span-3" : isOneVariant ? "col-span-4" : "col-span-4"
+                        }
+                      >
+                        <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">
+                          Produk
+                        </label>
                         <select
                           value={item.product_id}
                           onChange={(e) => {
@@ -1816,8 +2246,8 @@ function AdminVendoringPage() {
                             const defaults = getDefaultItemForProduct(matchedP);
                             setPoItems((prev) =>
                               prev.map((it, i) =>
-                                i === idx ? { ...it, ...defaults, quantity: it.quantity } : it
-                              )
+                                i === idx ? { ...it, ...defaults, quantity: it.quantity } : it,
+                              ),
                             );
                           }}
                           className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold bg-cream/10 focus:outline-none"
@@ -1834,12 +2264,16 @@ function AdminVendoringPage() {
                       {isTwoVariants && (
                         <>
                           <div className="col-span-2">
-                            <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Ukuran</label>
+                            <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">
+                              Ukuran
+                            </label>
                             <select
                               value={item.size}
                               onChange={(e) =>
                                 setPoItems((prev) =>
-                                  prev.map((it, i) => (i === idx ? { ...it, size: e.target.value } : it))
+                                  prev.map((it, i) =>
+                                    i === idx ? { ...it, size: e.target.value } : it,
+                                  ),
                                 )
                               }
                               className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold bg-white focus:outline-none"
@@ -1856,12 +2290,16 @@ function AdminVendoringPage() {
                           </div>
 
                           <div className="col-span-2">
-                            <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Warna / Desain</label>
+                            <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">
+                              Warna / Desain
+                            </label>
                             <select
                               value={item.color}
                               onChange={(e) =>
                                 setPoItems((prev) =>
-                                  prev.map((it, i) => (i === idx ? { ...it, color: e.target.value } : it))
+                                  prev.map((it, i) =>
+                                    i === idx ? { ...it, color: e.target.value } : it,
+                                  ),
                                 )
                               }
                               className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold bg-white focus:outline-none"
@@ -1886,7 +2324,7 @@ function AdminVendoringPage() {
                             {hasSize ? "Ukuran / Tipe" : "Varian / Desain"}
                           </label>
                           <select
-                            value={hasSize ? item.size : (item.color || item.size)}
+                            value={hasSize ? item.size : item.color || item.size}
                             onChange={(e) => {
                               const val = e.target.value;
                               setPoItems((prev) =>
@@ -1895,8 +2333,8 @@ function AdminVendoringPage() {
                                     ? hasSize
                                       ? { ...it, size: val }
                                       : { ...it, color: val, size: it.size || "All Size" }
-                                    : it
-                                )
+                                    : it,
+                                ),
                               );
                             }}
                             className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold bg-white focus:outline-none"
@@ -1906,11 +2344,14 @@ function AdminVendoringPage() {
                                 {v}
                               </option>
                             ))}
-                            {!(hasSize ? sizes : colors).includes(hasSize ? item.size : item.color) && (item.size || item.color) && (
-                              <option value={hasSize ? item.size : item.color}>
-                                {hasSize ? item.size : item.color}
-                              </option>
-                            )}
+                            {!(hasSize ? sizes : colors).includes(
+                              hasSize ? item.size : item.color,
+                            ) &&
+                              (item.size || item.color) && (
+                                <option value={hasSize ? item.size : item.color}>
+                                  {hasSize ? item.size : item.color}
+                                </option>
+                              )}
                           </select>
                         </div>
                       )}
@@ -1918,14 +2359,18 @@ function AdminVendoringPage() {
                       {/* 0 VARIANT: Standard / All Size */}
                       {isNoVariant && (
                         <div className="col-span-3">
-                          <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">Varian</label>
+                          <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5">
+                            Varian
+                          </label>
                           <input
                             type="text"
                             placeholder="All Size"
                             value={item.size || "All Size"}
                             onChange={(e) =>
                               setPoItems((prev) =>
-                                prev.map((it, i) => (i === idx ? { ...it, size: e.target.value } : it))
+                                prev.map((it, i) =>
+                                  i === idx ? { ...it, size: e.target.value } : it,
+                                ),
                               )
                             }
                             className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold bg-neutral-100/70 focus:outline-none"
@@ -1935,14 +2380,18 @@ function AdminVendoringPage() {
 
                       {/* Qty Input */}
                       <div className="col-span-2">
-                        <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5 text-center">Qty</label>
+                        <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5 text-center">
+                          Qty
+                        </label>
                         <input
                           type="number"
                           placeholder="Qty"
                           value={item.quantity}
                           onChange={(e) =>
                             setPoItems((prev) =>
-                              prev.map((it, i) => (i === idx ? { ...it, quantity: Number(e.target.value) } : it))
+                              prev.map((it, i) =>
+                                i === idx ? { ...it, quantity: Number(e.target.value) } : it,
+                              ),
                             )
                           }
                           className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-black text-center focus:outline-none"
@@ -1953,14 +2402,18 @@ function AdminVendoringPage() {
 
                       {/* Unit Cost Input */}
                       <div className="col-span-2">
-                        <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5 text-right">Harga Satuan (Rp)</label>
+                        <label className="block text-[9px] font-bold text-muted-foreground uppercase mb-0.5 text-right">
+                          Harga Satuan (Rp)
+                        </label>
                         <input
                           type="number"
                           placeholder="Harga Satuan (Rp)"
                           value={item.unit_cost}
                           onChange={(e) =>
                             setPoItems((prev) =>
-                              prev.map((it, i) => (i === idx ? { ...it, unit_cost: Number(e.target.value) } : it))
+                              prev.map((it, i) =>
+                                i === idx ? { ...it, unit_cost: Number(e.target.value) } : it,
+                              ),
                             )
                           }
                           className="w-full p-1.5 border border-ink/40 rounded text-[11px] font-bold font-mono text-right focus:outline-none"
@@ -1987,7 +2440,9 @@ function AdminVendoringPage() {
               </div>
 
               <div>
-                <label className="block font-bold text-ink uppercase mb-1">Catatan Instruksi PO</label>
+                <label className="block font-bold text-ink uppercase mb-1">
+                  Catatan Instruksi PO
+                </label>
                 <textarea
                   value={poNotes}
                   onChange={(e) => setPoNotes(e.target.value)}
@@ -2011,8 +2466,12 @@ function AdminVendoringPage() {
                   className="px-5 py-2 bg-brand-orange text-cream font-bold uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-ink cursor-pointer"
                 >
                   {editingPo
-                    ? (updatePoMutation.isPending ? "Menyimpan Perubahan..." : "Simpan Perubahan SPK")
-                    : (createPoMutation.isPending ? "Menerbitkan..." : "Terbitkan PO Vendor")}
+                    ? updatePoMutation.isPending
+                      ? "Menyimpan Perubahan..."
+                      : "Simpan Perubahan SPK"
+                    : createPoMutation.isPending
+                      ? "Menerbitkan..."
+                      : "Terbitkan PO Vendor"}
                 </button>
               </div>
             </form>
@@ -2021,9 +2480,14 @@ function AdminVendoringPage() {
       )}
 
       {/* SPK VENDOR PRINTABLE MODAL */}
-      {isSpkModalOpen && selectedSpkPo && createPortal(
-        <div id="spk-modal-root" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/70 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:static print:overflow-visible">
-          <style>{`
+      {isSpkModalOpen &&
+        selectedSpkPo &&
+        createPortal(
+          <div
+            id="spk-modal-root"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/70 backdrop-blur-xs overflow-y-auto print:p-0 print:bg-white print:static print:overflow-visible"
+          >
+            <style>{`
             @media print {
               @page {
                 size: A4 portrait;
@@ -2086,393 +2550,516 @@ function AdminVendoringPage() {
               }
             }
           `}</style>
-          <div
-            id="spk-printable-area"
-            data-keep-white="true"
-            className="bg-white border-4 border-ink rounded-2xl w-full max-w-3xl max-h-[88vh] flex flex-col shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] relative overflow-hidden print:max-h-none print:h-auto print:border-none print:shadow-none print:w-full print:p-0"
-          >
-            
-            {/* Top Action Bar (Fixed at top, Hidden during printing) */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-ink p-4 sm:p-5 bg-white shrink-0 gap-3 print:hidden">
-              <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-brand-orange" />
-                <h2 className="text-sm sm:text-base font-black text-ink uppercase tracking-wide">
-                  Surat Perintah Kerja (SPK) Vendor — {selectedSpkPo.po_number}
-                </h2>
+            <div
+              id="spk-printable-area"
+              data-keep-white="true"
+              className="bg-white border-4 border-ink rounded-2xl w-full max-w-3xl max-h-[88vh] flex flex-col shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] relative overflow-hidden print:max-h-none print:h-auto print:border-none print:shadow-none print:w-full print:p-0"
+            >
+              {/* Top Action Bar (Fixed at top, Hidden during printing) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b-2 border-ink p-4 sm:p-5 bg-white shrink-0 gap-3 print:hidden">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-brand-orange" />
+                  <h2 className="text-sm sm:text-base font-black text-ink uppercase tracking-wide">
+                    Surat Perintah Kerja (SPK) Vendor — {selectedSpkPo.po_number}
+                  </h2>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    onClick={() => {
+                      const currentPo = selectedSpkPo;
+                      closeSpkModal();
+                      if (currentPo) openEditPoModal(currentPo);
+                    }}
+                    className="px-3.5 py-2 bg-white text-ink font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-cream cursor-pointer transition-all flex items-center gap-1.5"
+                    title="Edit Data / Rincian SPK Ini"
+                  >
+                    <Edit2 className="w-4 h-4 text-brand-blue" /> Edit SPK
+                  </button>
+                  <button
+                    onClick={handleExportWordSpk}
+                    className="px-3.5 py-2 bg-blue-600 text-white font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-ink cursor-pointer transition-all flex items-center gap-1.5"
+                    title="Export Dokumen Edit Word (.doc)"
+                  >
+                    <Download className="w-4 h-4" /> Export Word (.doc)
+                  </button>
+                  <button
+                    onClick={handlePrintSpk}
+                    className="px-3.5 py-2 bg-brand-orange text-cream font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-ink cursor-pointer transition-all flex items-center gap-1.5"
+                    title="Cetak PDF / Printer"
+                  >
+                    <Printer className="w-4 h-4" /> Print SPK (PDF)
+                  </button>
+                  <button
+                    onClick={closeSpkModal}
+                    className="p-2 border-2 border-ink rounded-xl bg-cream hover:bg-neutral-200 text-ink cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={() => {
-                    const currentPo = selectedSpkPo;
-                    closeSpkModal();
-                    if (currentPo) openEditPoModal(currentPo);
-                  }}
-                  className="px-3.5 py-2 bg-white text-ink font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-cream cursor-pointer transition-all flex items-center gap-1.5"
-                  title="Edit Data / Rincian SPK Ini"
-                >
-                  <Edit2 className="w-4 h-4 text-brand-blue" /> Edit SPK
-                </button>
-                <button
-                  onClick={handleExportWordSpk}
-                  className="px-3.5 py-2 bg-blue-600 text-white font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-ink cursor-pointer transition-all flex items-center gap-1.5"
-                  title="Export Dokumen Edit Word (.doc)"
-                >
-                  <Download className="w-4 h-4" /> Export Word (.doc)
-                </button>
-                <button
-                  onClick={handlePrintSpk}
-                  className="px-3.5 py-2 bg-brand-orange text-cream font-bold text-xs uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:bg-ink cursor-pointer transition-all flex items-center gap-1.5"
-                  title="Cetak PDF / Printer"
-                >
-                  <Printer className="w-4 h-4" /> Print SPK (PDF)
-                </button>
-                <button
-                  onClick={closeSpkModal}
-                  className="p-2 border-2 border-ink rounded-xl bg-cream hover:bg-neutral-200 text-ink cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
 
-            {/* PAYMENT SCHEME, SIGNER NAME & SIGNATURE IMAGE CONTROLS (Hidden during printing) */}
-            <div className="flex flex-col gap-2.5 border-b-2 border-ink/20 py-3 px-4 sm:px-6 bg-cream/40 shrink-0 print:hidden text-xs">
-              {/* Baris 1: Skema Pembayaran */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <label className="font-bold text-ink uppercase shrink-0 sm:w-48">Skema Pembayaran:</label>
-                <select
-                  value={paymentScheme}
-                  onChange={(e) => setPaymentScheme(e.target.value)}
-                  className="px-3 py-1.5 border-2 border-ink rounded-xl font-bold bg-white text-ink cursor-pointer shadow-2xs flex-1 max-w-md"
-                >
-                  <option value="50_50">50% - 50% (DP 50% &amp; Pelunasan 50%)</option>
-                  <option value="30_20_50">30% - 20% - 50% (DP 30%, Progress 20%, Pelunasan 50%)</option>
-                  <option value="100_0">100% Lunas di Awal</option>
-                  <option value="custom">Custom / Catatan Khusus</option>
-                </select>
+              {/* PAYMENT SCHEME, SIGNER NAME & SIGNATURE IMAGE CONTROLS (Hidden during printing) */}
+              <div className="flex flex-col gap-2.5 border-b-2 border-ink/20 py-3 px-4 sm:px-6 bg-cream/40 shrink-0 print:hidden text-xs">
+                {/* Baris 1: Skema Pembayaran */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <label className="font-bold text-ink uppercase shrink-0 sm:w-48">
+                    Skema Pembayaran:
+                  </label>
+                  <select
+                    value={paymentScheme}
+                    onChange={(e) => setPaymentScheme(e.target.value)}
+                    className="px-3 py-1.5 border-2 border-ink rounded-xl font-bold bg-white text-ink cursor-pointer shadow-2xs flex-1 max-w-md"
+                  >
+                    <option value="50_50">50% - 50% (DP 50% &amp; Pelunasan 50%)</option>
+                    <option value="30_20_50">
+                      30% - 20% - 50% (DP 30%, Progress 20%, Pelunasan 50%)
+                    </option>
+                    <option value="100_0">100% Lunas di Awal</option>
+                    <option value="custom">Custom / Catatan Khusus</option>
+                  </select>
 
-                {paymentScheme === "custom" && (
+                  {paymentScheme === "custom" && (
+                    <input
+                      type="text"
+                      value={customPaymentNotes}
+                      onChange={(e) => setCustomPaymentNotes(e.target.value)}
+                      placeholder="Misal: DP 40% awal & Pelunasan 60%..."
+                      className="px-3 py-1.5 border-2 border-ink rounded-xl bg-white font-medium flex-1 max-w-md focus:outline-none"
+                    />
+                  )}
+                </div>
+
+                {/* Baris 2: Penandatangan Pihak 1 */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <label className="font-bold text-ink uppercase shrink-0 sm:w-48">
+                    Nama Penandatangan:
+                  </label>
                   <input
                     type="text"
-                    value={customPaymentNotes}
-                    onChange={(e) => setCustomPaymentNotes(e.target.value)}
-                    placeholder="Misal: DP 40% awal & Pelunasan 60%..."
-                    className="px-3 py-1.5 border-2 border-ink rounded-xl bg-white font-medium flex-1 max-w-md focus:outline-none"
+                    value={spkSignerName}
+                    onChange={(e) => setSpkSignerName(e.target.value)}
+                    placeholder="Nama Penandatangan Pihak 1..."
+                    className="px-3 py-1.5 border-2 border-ink rounded-xl font-bold text-ink focus:outline-none flex-1 max-w-md shadow-2xs"
                   />
-                )}
-              </div>
+                </div>
 
-              {/* Baris 2: Penandatangan Pihak 1 */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <label className="font-bold text-ink uppercase shrink-0 sm:w-48">Nama Penandatangan:</label>
-                <input
-                  type="text"
-                  value={spkSignerName}
-                  onChange={(e) => setSpkSignerName(e.target.value)}
-                  placeholder="Nama Penandatangan Pihak 1..."
-                  className="px-3 py-1.5 border-2 border-ink rounded-xl font-bold text-ink focus:outline-none flex-1 max-w-md shadow-2xs"
-                />
-              </div>
-
-              {/* Baris 3: Upload Gambar TTD (PNG) */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                <label className="font-bold text-ink uppercase shrink-0 sm:w-48">Upload TTD (PNG / Stempel):</label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <label className="px-3 py-1.5 bg-white border-2 border-ink rounded-xl font-bold text-ink cursor-pointer hover:bg-cream/80 transition-all flex items-center gap-1.5 shadow-2xs">
-                    <Upload className="w-3.5 h-3.5 text-brand-orange" />
-                    <span>{spkSignatureImg ? "Ganti Gambar TTD" : "Pilih File Gambar TTD (PNG)"}</span>
-                    <input
-                      type="file"
-                      accept="image/png, image/jpeg, image/webp"
-                      onChange={handleSignatureUpload}
-                      className="hidden"
-                    />
+                {/* Baris 3: Upload Gambar TTD (PNG) */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                  <label className="font-bold text-ink uppercase shrink-0 sm:w-48">
+                    Upload TTD (PNG / Stempel):
                   </label>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="px-3 py-1.5 bg-white border-2 border-ink rounded-xl font-bold text-ink cursor-pointer hover:bg-cream/80 transition-all flex items-center gap-1.5 shadow-2xs">
+                      <Upload className="w-3.5 h-3.5 text-brand-orange" />
+                      <span>
+                        {spkSignatureImg ? "Ganti Gambar TTD" : "Pilih File Gambar TTD (PNG)"}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/png, image/jpeg, image/webp"
+                        onChange={handleSignatureUpload}
+                        className="hidden"
+                      />
+                    </label>
 
-                  {spkSignatureImg && (
-                    <button
-                      type="button"
-                      onClick={() => setSpkSignatureImg(null)}
-                      className="px-2.5 py-1.5 bg-rose-100 text-rose-800 border-2 border-rose-400 rounded-xl font-bold hover:bg-rose-200 transition-all text-[11px] flex items-center gap-1 cursor-pointer"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" /> Hapus TTD
-                    </button>
-                  )}
+                    {spkSignatureImg && (
+                      <button
+                        type="button"
+                        onClick={() => setSpkSignatureImg(null)}
+                        className="px-2.5 py-1.5 bg-rose-100 text-rose-800 border-2 border-rose-400 rounded-xl font-bold hover:bg-rose-200 transition-all text-[11px] flex items-center gap-1 cursor-pointer"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Hapus TTD
+                      </button>
+                    )}
 
-                  <span className="text-[10px] text-muted-foreground font-medium">
-                    (Opsional, disarankan format PNG transparan)
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* PRINTABLE SPK DOCUMENT BODY (Scrollable inside modal) */}
-            <div id="spk-doc-body" className="p-4 sm:p-6 space-y-6 text-ink font-sans text-xs overflow-y-auto flex-1 print:overflow-visible print:pt-4 print:px-0 print:text-black">
-              {/* KOP SURAT & DOKUMEN TITLE */}
-              <div className="space-y-3 pb-3 border-b-2 border-ink">
-                {/* KOP SURAT / OFFICIAL HEADER */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img src={logoFm} alt="FILKOM Merch Logo" className="h-12 w-auto object-contain shrink-0" />
-                    <div>
-                      <h1 className="font-black text-lg text-ink uppercase tracking-wider">FILKOM MERCH UB</h1>
-                      <p className="text-[10px] text-neutral-600 font-bold">
-                        Fakultas Ilmu Komputer, Universitas Brawijaya
-                      </p>
-                      <p className="text-[10px] text-neutral-600 font-medium">
-                        Gedung F FILKOM UB, Jl. Veteran, Malang
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right space-y-1">
-                    <span className="px-2.5 py-0.5 bg-ink text-cream font-mono font-black text-[10px] uppercase rounded">
-                      DOKUMEN RESMI SPK
+                    <span className="text-[10px] text-muted-foreground font-medium">
+                      (Opsional, disarankan format PNG transparan)
                     </span>
-                    <div className="font-mono font-extrabold text-sm text-ink">{selectedSpkPo.po_number}</div>
-                    <div className="text-[10px] text-neutral-700 font-bold">
-                      Tanggal: {selectedSpkPo.created_at ? new Date(selectedSpkPo.created_at).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" }) : "-"}
+                  </div>
+                </div>
+              </div>
+
+              {/* PRINTABLE SPK DOCUMENT BODY (Scrollable inside modal) */}
+              <div
+                id="spk-doc-body"
+                className="p-4 sm:p-6 space-y-6 text-ink font-sans text-xs overflow-y-auto flex-1 print:overflow-visible print:pt-4 print:px-0 print:text-black"
+              >
+                {/* KOP SURAT & DOKUMEN TITLE */}
+                <div className="space-y-3 pb-3 border-b-2 border-ink">
+                  {/* KOP SURAT / OFFICIAL HEADER */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img
+                        src={logoFm}
+                        alt="FILKOM Merch Logo"
+                        className="h-12 w-auto object-contain shrink-0"
+                      />
+                      <div>
+                        <h1 className="font-black text-lg text-ink uppercase tracking-wider">
+                          FILKOM MERCH UB
+                        </h1>
+                        <p className="text-[10px] text-neutral-600 font-bold">
+                          Fakultas Ilmu Komputer, Universitas Brawijaya
+                        </p>
+                        <p className="text-[10px] text-neutral-600 font-medium">
+                          Gedung F FILKOM UB, Jl. Veteran, Malang
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right space-y-1">
+                      <span className="px-2.5 py-0.5 bg-ink text-cream font-mono font-black text-[10px] uppercase rounded">
+                        DOKUMEN RESMI SPK
+                      </span>
+                      <div className="font-mono font-extrabold text-sm text-ink">
+                        {selectedSpkPo.po_number}
+                      </div>
+                      <div className="text-[10px] text-neutral-700 font-bold">
+                        Tanggal:{" "}
+                        {selectedSpkPo.created_at
+                          ? new Date(selectedSpkPo.created_at).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })
+                          : "-"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* DOCUMENT TITLE */}
+                  <div className="text-center pt-2">
+                    <h2 className="font-black text-base text-ink uppercase tracking-wider underline">
+                      SURAT PERINTAH KERJA (SPK) PRODUKSI VENDOR
+                    </h2>
+                    <div className="text-xs font-black text-neutral-800 mt-1">
+                      Nomor Dokumen: SPK/{selectedSpkPo.po_number}/FM-UB/2026
                     </div>
                   </div>
                 </div>
 
-                {/* DOCUMENT TITLE */}
-                <div className="text-center pt-2">
-                  <h2 className="font-black text-base text-ink uppercase tracking-wider underline">
-                    SURAT PERINTAH KERJA (SPK) PRODUKSI VENDOR
-                  </h2>
-                  <div className="text-xs font-black text-neutral-800 mt-1">
-                    Nomor Dokumen: SPK/{selectedSpkPo.po_number}/FM-UB/2026
+                {/* PIHAK KERJASAMA */}
+                <div className="grid grid-cols-2 gap-4 border-2 border-ink p-4 rounded-xl bg-cream/30">
+                  <div className="space-y-1.5">
+                    <span className="font-black uppercase text-[10px] text-brand-orange tracking-wider">
+                      PIHAK PERTAMA (PEMBERI KERJA)
+                    </span>
+                    <div className="font-extrabold text-ink">FILKOM MERCH UB</div>
+                    <div className="text-[11px] text-neutral-700 leading-relaxed font-medium">
+                      Pengelola Merchandise Resmi FILKOM UB
+                      <br />
+                      Jl. Veteran, Lowokwaru, Malang, Jawa Timur
+                      <br />
+                      CP: Manajemen Operasional FILKOM Merch
+                    </div>
                   </div>
-                </div>
-              </div>
 
-              {/* PIHAK KERJASAMA */}
-              <div className="grid grid-cols-2 gap-4 border-2 border-ink p-4 rounded-xl bg-cream/30">
-                <div className="space-y-1.5">
-                  <span className="font-black uppercase text-[10px] text-brand-orange tracking-wider">
-                    PIHAK PERTAMA (PEMBERI KERJA)
-                  </span>
-                  <div className="font-extrabold text-ink">FILKOM MERCH UB</div>
-                  <div className="text-[11px] text-neutral-700 leading-relaxed font-medium">
-                    Pengelola Merchandise Resmi FILKOM UB<br />
-                    Jl. Veteran, Lowokwaru, Malang, Jawa Timur<br />
-                    CP: Manajemen Operasional FILKOM Merch
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <span className="font-black uppercase text-[10px] text-brand-orange tracking-wider">
-                    PIHAK KEDUA (PELAKSANA PEKERJAAN / VENDOR)
-                  </span>
-                  <div className="font-extrabold text-ink">{selectedSpkPo.vendor_name || "Vendor Mitra"}</div>
-                  <div className="text-[11px] text-neutral-700 leading-relaxed font-medium">
-                    PIC: {selectedSpkPo.contact_person || "-"}<br />
-                    No. Telepon / WA: {selectedSpkPo.vendor_phone || "-"}
-                  </div>
-                </div>
-              </div>
-
-              {/* DEADLINE & TARGET BATCH */}
-              <div className="bg-secondary/40 border-2 border-ink p-3 rounded-xl flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-brand-orange shrink-0" />
-                  <div>
-                    <span className="font-bold text-ink uppercase text-[10px]">Tenggat Waktu Selesai Produksi (Deadline):</span>
-                    <div className="font-black text-xs text-brand-orange">
-                      {selectedSpkPo.deadline ? new Date(selectedSpkPo.deadline).toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "Sesuai Kesepakatan Khusus"}
+                  <div className="space-y-1.5">
+                    <span className="font-black uppercase text-[10px] text-brand-orange tracking-wider">
+                      PIHAK KEDUA (PELAKSANA PEKERJAAN / VENDOR)
+                    </span>
+                    <div className="font-extrabold text-ink">
+                      {selectedSpkPo.vendor_name || "Vendor Mitra"}
+                    </div>
+                    <div className="text-[11px] text-neutral-700 leading-relaxed font-medium">
+                      PIC: {selectedSpkPo.contact_person || "-"}
+                      <br />
+                      No. Telepon / WA: {selectedSpkPo.vendor_phone || "-"}
                     </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-[10px] font-bold text-neutral-700 uppercase">Status PO:</span>
-                  <div className="font-black text-xs uppercase text-ink">{selectedSpkPo.status}</div>
-                </div>
-              </div>
 
-              {/* RINCIAN ITEM PRODUKSI */}
-              <div className="space-y-2">
-                <h3 className="font-black text-xs uppercase text-ink tracking-wider">
-                  RINCIAN PEKERJAAN &amp; SPESIFIKASI PRODUK:
-                </h3>
-                <div className="border-2 border-ink rounded-xl overflow-hidden">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-cream border-b-2 border-ink text-ink font-black uppercase">
-                        <th className="p-2.5 text-center w-10">No</th>
-                        <th className="p-2.5">Nama Produk</th>
-                        <th className="p-2.5">Ukuran / Varian Spesifikasi</th>
-                        <th className="p-2.5 text-center">Qty (Pcs)</th>
-                        <th className="p-2.5 text-right">Biaya Satuan (Rp)</th>
-                        <th className="p-2.5 text-right font-black">Total Biaya (Rp)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-ink/20 font-medium">
-                      {(selectedSpkPo.items || []).map((item: any, idx: number) => {
-                        const sub = (item.quantity || 0) * (item.unit_cost || 0);
-                        return (
-                          <tr key={idx} className="hover:bg-cream/20">
-                            <td className="p-2.5 text-center font-mono font-bold">{idx + 1}</td>
-                            <td className="p-2.5 font-bold text-ink">{item.catalog_product_name || `Produk #${item.product_id}`}</td>
-                            <td className="p-2.5 font-mono">
-                              {[item.size, item.color].filter(s => s && s !== 'One Size' && s !== 'All Size' && s !== 'Standard' && s !== 'Default' && s !== '-').join(" / ") || "Standard"}
-                            </td>
-                            <td className="p-2.5 text-center font-bold text-brand-orange">{item.quantity} pcs</td>
-                            <td className="p-2.5 text-right font-mono">Rp {Number(item.unit_cost || 0).toLocaleString("id-ID")}</td>
-                            <td className="p-2.5 text-right font-mono font-black text-ink">Rp {Number(sub).toLocaleString("id-ID")}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-cream border-t-2 border-ink font-black text-ink">
-                        <td colSpan={3} className="p-3 uppercase text-right">TOTAL KESELURUHAN BIAYA SPK PRODUKSI:</td>
-                        <td className="p-3 text-center text-brand-orange">
-                          {(selectedSpkPo.items || []).reduce((acc: number, item: any) => acc + (Number(item.quantity) || 0), 0)} pcs
-                        </td>
-                        <td colSpan={2} className="p-3 text-right text-base text-ink font-extrabold font-mono">
-                          Rp {(selectedSpkPo.items || []).reduce((acc: number, item: any) => acc + ((Number(item.quantity) || 0) * (Number(item.unit_cost) || 0)), 0).toLocaleString("id-ID")}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
+                {/* DEADLINE & TARGET BATCH */}
+                <div className="bg-secondary/40 border-2 border-ink p-3 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-brand-orange shrink-0" />
+                    <div>
+                      <span className="font-bold text-ink uppercase text-[10px]">
+                        Tenggat Waktu Selesai Produksi (Deadline):
+                      </span>
+                      <div className="font-black text-xs text-brand-orange">
+                        {selectedSpkPo.deadline
+                          ? new Date(selectedSpkPo.deadline).toLocaleDateString("id-ID", {
+                              weekday: "long",
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })
+                          : "Sesuai Kesepakatan Khusus"}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] font-bold text-neutral-700 uppercase">
+                      Status PO:
+                    </span>
+                    <div className="font-black text-xs uppercase text-ink">
+                      {selectedSpkPo.status}
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              {/* SKEMA & TERMIN PEMBAYARAN VENDOR */}
-              {(() => {
-                const totalCost = (selectedSpkPo.items || []).reduce(
-                  (acc: number, item: any) => acc + (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0),
-                  0
-                );
-                return (
-                  <div className="space-y-2">
-                    <h3 className="font-black text-xs uppercase text-ink tracking-wider">
-                      SKEMA &amp; TERMIN PEMBAYARAN VENDOR:
-                    </h3>
-                    <div className="border-2 border-ink rounded-xl p-3 bg-cream/30 space-y-2">
-                      {paymentScheme === "50_50" && (
-                        <div className="grid grid-cols-2 gap-3 text-xs font-bold">
-                          <div className="bg-white p-2.5 border border-ink/20 rounded-lg space-y-0.5">
-                            <span className="text-[10px] text-neutral-600 uppercase font-extrabold">Termin 1 (DP 50% Awal Saat SPK):</span>
-                            <div className="text-sm font-black text-brand-orange">
-                              Rp {Math.round(totalCost * 0.5).toLocaleString("id-ID")}
+                {/* RINCIAN ITEM PRODUKSI */}
+                <div className="space-y-2">
+                  <h3 className="font-black text-xs uppercase text-ink tracking-wider">
+                    RINCIAN PEKERJAAN &amp; SPESIFIKASI PRODUK:
+                  </h3>
+                  <div className="border-2 border-ink rounded-xl overflow-hidden">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="bg-cream border-b-2 border-ink text-ink font-black uppercase">
+                          <th className="p-2.5 text-center w-10">No</th>
+                          <th className="p-2.5">Nama Produk</th>
+                          <th className="p-2.5">Ukuran / Varian Spesifikasi</th>
+                          <th className="p-2.5 text-center">Qty (Pcs)</th>
+                          <th className="p-2.5 text-right">Biaya Satuan (Rp)</th>
+                          <th className="p-2.5 text-right font-black">Total Biaya (Rp)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-ink/20 font-medium">
+                        {(selectedSpkPo.items || []).map((item: any, idx: number) => {
+                          const sub = (item.quantity || 0) * (item.unit_cost || 0);
+                          return (
+                            <tr key={idx} className="hover:bg-cream/20">
+                              <td className="p-2.5 text-center font-mono font-bold">{idx + 1}</td>
+                              <td className="p-2.5 font-bold text-ink">
+                                {item.catalog_product_name || `Produk #${item.product_id}`}
+                              </td>
+                              <td className="p-2.5 font-mono">
+                                {[item.size, item.color]
+                                  .filter(
+                                    (s) =>
+                                      s &&
+                                      s !== "One Size" &&
+                                      s !== "All Size" &&
+                                      s !== "Standard" &&
+                                      s !== "Default" &&
+                                      s !== "-",
+                                  )
+                                  .join(" / ") || "Standard"}
+                              </td>
+                              <td className="p-2.5 text-center font-bold text-brand-orange">
+                                {item.quantity} pcs
+                              </td>
+                              <td className="p-2.5 text-right font-mono">
+                                Rp {Number(item.unit_cost || 0).toLocaleString("id-ID")}
+                              </td>
+                              <td className="p-2.5 text-right font-mono font-black text-ink">
+                                Rp {Number(sub).toLocaleString("id-ID")}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr className="bg-cream border-t-2 border-ink font-black text-ink">
+                          <td colSpan={3} className="p-3 uppercase text-right">
+                            TOTAL KESELURUHAN BIAYA SPK PRODUKSI:
+                          </td>
+                          <td className="p-3 text-center text-brand-orange">
+                            {(selectedSpkPo.items || []).reduce(
+                              (acc: number, item: any) => acc + (Number(item.quantity) || 0),
+                              0,
+                            )}{" "}
+                            pcs
+                          </td>
+                          <td
+                            colSpan={2}
+                            className="p-3 text-right text-base text-ink font-extrabold font-mono"
+                          >
+                            Rp{" "}
+                            {(selectedSpkPo.items || [])
+                              .reduce(
+                                (acc: number, item: any) =>
+                                  acc +
+                                  (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0),
+                                0,
+                              )
+                              .toLocaleString("id-ID")}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+
+                {/* SKEMA & TERMIN PEMBAYARAN VENDOR */}
+                {(() => {
+                  const totalCost = (selectedSpkPo.items || []).reduce(
+                    (acc: number, item: any) =>
+                      acc + (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0),
+                    0,
+                  );
+                  return (
+                    <div className="space-y-2">
+                      <h3 className="font-black text-xs uppercase text-ink tracking-wider">
+                        SKEMA &amp; TERMIN PEMBAYARAN VENDOR:
+                      </h3>
+                      <div className="border-2 border-ink rounded-xl p-3 bg-cream/30 space-y-2">
+                        {paymentScheme === "50_50" && (
+                          <div className="grid grid-cols-2 gap-3 text-xs font-bold">
+                            <div className="bg-white p-2.5 border border-ink/20 rounded-lg space-y-0.5">
+                              <span className="text-[10px] text-neutral-600 uppercase font-extrabold">
+                                Termin 1 (DP 50% Awal Saat SPK):
+                              </span>
+                              <div className="text-sm font-black text-brand-orange">
+                                Rp {Math.round(totalCost * 0.5).toLocaleString("id-ID")}
+                              </div>
+                            </div>
+                            <div className="bg-white p-2.5 border border-ink/20 rounded-lg space-y-0.5">
+                              <span className="text-[10px] text-neutral-600 uppercase font-extrabold">
+                                Termin 2 (Pelunasan 50% Saat Selesai):
+                              </span>
+                              <div className="text-sm font-black text-emerald-700">
+                                Rp {Math.round(totalCost * 0.5).toLocaleString("id-ID")}
+                              </div>
                             </div>
                           </div>
-                          <div className="bg-white p-2.5 border border-ink/20 rounded-lg space-y-0.5">
-                            <span className="text-[10px] text-neutral-600 uppercase font-extrabold">Termin 2 (Pelunasan 50% Saat Selesai):</span>
+                        )}
+
+                        {paymentScheme === "30_20_50" && (
+                          <div className="grid grid-cols-3 gap-2 text-xs font-bold">
+                            <div className="bg-white p-2 border border-ink/20 rounded-lg space-y-0.5">
+                              <span className="text-[9px] text-neutral-600 uppercase font-extrabold">
+                                Termin 1 (DP 30% Awal):
+                              </span>
+                              <div className="text-xs font-black text-brand-orange">
+                                Rp {Math.round(totalCost * 0.3).toLocaleString("id-ID")}
+                              </div>
+                            </div>
+                            <div className="bg-white p-2 border border-ink/20 rounded-lg space-y-0.5">
+                              <span className="text-[9px] text-neutral-600 uppercase font-extrabold">
+                                Termin 2 (Progress 20%):
+                              </span>
+                              <div className="text-xs font-black text-blue-700">
+                                Rp {Math.round(totalCost * 0.2).toLocaleString("id-ID")}
+                              </div>
+                            </div>
+                            <div className="bg-white p-2 border border-ink/20 rounded-lg space-y-0.5">
+                              <span className="text-[9px] text-neutral-600 uppercase font-extrabold">
+                                Termin 3 (Pelunasan 50%):
+                              </span>
+                              <div className="text-xs font-black text-emerald-700">
+                                Rp {Math.round(totalCost * 0.5).toLocaleString("id-ID")}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {paymentScheme === "100_0" && (
+                          <div className="bg-white p-2.5 border border-ink/20 rounded-lg text-xs font-bold">
+                            <span className="text-[10px] text-neutral-600 uppercase font-extrabold">
+                              Pembayaran 100% Lunas di Awal:
+                            </span>
                             <div className="text-sm font-black text-emerald-700">
-                              Rp {Math.round(totalCost * 0.5).toLocaleString("id-ID")}
+                              Rp {totalCost.toLocaleString("id-ID")}
                             </div>
                           </div>
-                        </div>
-                      )}
+                        )}
 
-                      {paymentScheme === "30_20_50" && (
-                        <div className="grid grid-cols-3 gap-2 text-xs font-bold">
-                          <div className="bg-white p-2 border border-ink/20 rounded-lg space-y-0.5">
-                            <span className="text-[9px] text-neutral-600 uppercase font-extrabold">Termin 1 (DP 30% Awal):</span>
-                            <div className="text-xs font-black text-brand-orange">
-                              Rp {Math.round(totalCost * 0.3).toLocaleString("id-ID")}
+                        {paymentScheme === "custom" && (
+                          <div className="bg-white p-2.5 border border-ink/20 rounded-lg text-xs font-bold">
+                            <span className="text-[10px] text-neutral-600 uppercase font-extrabold">
+                              Ketentuan Pembayaran Khusus:
+                            </span>
+                            <div className="text-xs font-black text-ink">
+                              {customPaymentNotes || "Sesuai Kesepakatan Khusus Antara Kedua Pihak"}
                             </div>
                           </div>
-                          <div className="bg-white p-2 border border-ink/20 rounded-lg space-y-0.5">
-                            <span className="text-[9px] text-neutral-600 uppercase font-extrabold">Termin 2 (Progress 20%):</span>
-                            <div className="text-xs font-black text-blue-700">
-                              Rp {Math.round(totalCost * 0.2).toLocaleString("id-ID")}
-                            </div>
-                          </div>
-                          <div className="bg-white p-2 border border-ink/20 rounded-lg space-y-0.5">
-                            <span className="text-[9px] text-neutral-600 uppercase font-extrabold">Termin 3 (Pelunasan 50%):</span>
-                            <div className="text-xs font-black text-emerald-700">
-                              Rp {Math.round(totalCost * 0.5).toLocaleString("id-ID")}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {paymentScheme === "100_0" && (
-                        <div className="bg-white p-2.5 border border-ink/20 rounded-lg text-xs font-bold">
-                          <span className="text-[10px] text-neutral-600 uppercase font-extrabold">Pembayaran 100% Lunas di Awal:</span>
-                          <div className="text-sm font-black text-emerald-700">
-                            Rp {totalCost.toLocaleString("id-ID")}
-                          </div>
-                        </div>
-                      )}
-
-                      {paymentScheme === "custom" && (
-                        <div className="bg-white p-2.5 border border-ink/20 rounded-lg text-xs font-bold">
-                          <span className="text-[10px] text-neutral-600 uppercase font-extrabold">Ketentuan Pembayaran Khusus:</span>
-                          <div className="text-xs font-black text-ink">
-                            {customPaymentNotes || "Sesuai Kesepakatan Khusus Antara Kedua Pihak"}
-                          </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
 
-              {/* SYARAT DAN KETENTUAN KERJASAMA */}
-              <div className="space-y-1.5 p-3.5 border-2 border-ink rounded-xl bg-slate-50">
-                <h4 className="font-black text-xs uppercase text-ink">KETENTUAN KERJASAMA &amp; GARANSI PRODUKSI:</h4>
-                <ol className="list-decimal list-inside text-[11px] text-ink/90 font-medium space-y-1 leading-relaxed">
-                  <li>Pelaksana Pekerjaan (Vendor) berkewajiban menyelesaikan pesanan sesuai spesifikasi bahan, desain, dan standar kualitas sampel yang disepakati.</li>
-                  <li>Seluruh hasil produksi diserahterimakan kepada FILKOM Merch UB paling lambat pada tanggal deadline yang telah ditentukan.</li>
-                  <li>Apabila terdapat cacat produksi (*defect*), kerusakan, atau ketidaksesuaian ukuran/kuantitas, Pihak Vendor berkewajiban melakukan perbaikan atau penggantian tanpa biaya tambahan.</li>
-                  {selectedSpkPo.notes && (
-                    <li className="font-bold text-brand-orange">Catatan Khusus SPK: "{selectedSpkPo.notes}"</li>
-                  )}
-                </ol>
-              </div>
-
-              {/* TANDA TANGAN 2 PIHAK */}
-              <div className="grid grid-cols-2 gap-8 pt-4 border-t-2 border-ink text-center print:break-inside-avoid">
-                <div className="flex flex-col items-center justify-between h-52">
-                  <div>
-                    <span className="font-bold text-[10px] uppercase text-neutral-700">PIHAK PERTAMA (PEMBERI KERJA)</span>
-                    <div className="font-black text-xs text-ink uppercase mt-0.5">FILKOM MERCH UB</div>
-                  </div>
-
-                  {/* Gambar TTD (PNG) atau Space Kosong */}
-                  <div className="my-auto flex items-center justify-center h-28 w-full relative">
-                    {spkSignatureImg ? (
-                      <img src={spkSignatureImg} alt="Tanda Tangan Pihak 1" className="max-h-28 max-w-[240px] object-contain mx-auto -mb-2" />
-                    ) : null}
-                  </div>
-
-                  <div className="w-56 text-center">
-                    <div className="font-extrabold text-xs text-ink border-b-2 border-ink pb-1 uppercase">
-                      {spkSignerName || "Manajemen FILKOM Merch UB"}
-                    </div>
-                    <div className="text-[10px] text-neutral-600 font-bold mt-1">Tanda Tangan &amp; Stempel Resmi</div>
-                  </div>
+                {/* SYARAT DAN KETENTUAN KERJASAMA */}
+                <div className="space-y-1.5 p-3.5 border-2 border-ink rounded-xl bg-slate-50">
+                  <h4 className="font-black text-xs uppercase text-ink">
+                    KETENTUAN KERJASAMA &amp; GARANSI PRODUKSI:
+                  </h4>
+                  <ol className="list-decimal list-inside text-[11px] text-ink/90 font-medium space-y-1 leading-relaxed">
+                    <li>
+                      Pelaksana Pekerjaan (Vendor) berkewajiban menyelesaikan pesanan sesuai
+                      spesifikasi bahan, desain, dan standar kualitas sampel yang disepakati.
+                    </li>
+                    <li>
+                      Seluruh hasil produksi diserahterimakan kepada FILKOM Merch UB paling lambat
+                      pada tanggal deadline yang telah ditentukan.
+                    </li>
+                    <li>
+                      Apabila terdapat cacat produksi (*defect*), kerusakan, atau ketidaksesuaian
+                      ukuran/kuantitas, Pihak Vendor berkewajiban melakukan perbaikan atau
+                      penggantian tanpa biaya tambahan.
+                    </li>
+                    {selectedSpkPo.notes && (
+                      <li className="font-bold text-brand-orange">
+                        Catatan Khusus SPK: "{selectedSpkPo.notes}"
+                      </li>
+                    )}
+                  </ol>
                 </div>
 
-                <div className="flex flex-col items-center justify-between h-52">
-                  <div>
-                    <span className="font-bold text-[10px] uppercase text-neutral-700">PIHAK KEDUA (PELAKSANA VENDOR)</span>
-                    <div className="font-black text-xs text-ink uppercase mt-0.5">{selectedSpkPo.vendor_name || "Vendor Mitra"}</div>
-                  </div>
-
-                  <div className="my-auto flex items-center justify-center h-28 w-full">
-                    {/* Space Kosong TTD Fisik Vendor */}
-                  </div>
-
-                  <div className="w-56 text-center">
-                    <div className="font-extrabold text-xs text-ink border-b-2 border-ink pb-1 uppercase">
-                      {selectedSpkPo.contact_person || "Pimpinan / Rep. Vendor"}
+                {/* TANDA TANGAN 2 PIHAK */}
+                <div className="grid grid-cols-2 gap-8 pt-4 border-t-2 border-ink text-center print:break-inside-avoid">
+                  <div className="flex flex-col items-center justify-between h-52">
+                    <div>
+                      <span className="font-bold text-[10px] uppercase text-neutral-700">
+                        PIHAK PERTAMA (PEMBERI KERJA)
+                      </span>
+                      <div className="font-black text-xs text-ink uppercase mt-0.5">
+                        FILKOM MERCH UB
+                      </div>
                     </div>
-                    <div className="text-[10px] text-neutral-600 font-bold mt-1">Tanda Tangan &amp; Stempel Vendor</div>
+
+                    {/* Gambar TTD (PNG) atau Space Kosong */}
+                    <div className="my-auto flex items-center justify-center h-28 w-full relative">
+                      {spkSignatureImg ? (
+                        <img
+                          src={spkSignatureImg}
+                          alt="Tanda Tangan Pihak 1"
+                          className="max-h-28 max-w-[240px] object-contain mx-auto -mb-2"
+                        />
+                      ) : null}
+                    </div>
+
+                    <div className="w-56 text-center">
+                      <div className="font-extrabold text-xs text-ink border-b-2 border-ink pb-1 uppercase">
+                        {spkSignerName || "Manajemen FILKOM Merch UB"}
+                      </div>
+                      <div className="text-[10px] text-neutral-600 font-bold mt-1">
+                        Tanda Tangan &amp; Stempel Resmi
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-center justify-between h-52">
+                    <div>
+                      <span className="font-bold text-[10px] uppercase text-neutral-700">
+                        PIHAK KEDUA (PELAKSANA VENDOR)
+                      </span>
+                      <div className="font-black text-xs text-ink uppercase mt-0.5">
+                        {selectedSpkPo.vendor_name || "Vendor Mitra"}
+                      </div>
+                    </div>
+
+                    <div className="my-auto flex items-center justify-center h-28 w-full">
+                      {/* Space Kosong TTD Fisik Vendor */}
+                    </div>
+
+                    <div className="w-56 text-center">
+                      <div className="font-extrabold text-xs text-ink border-b-2 border-ink pb-1 uppercase">
+                        {selectedSpkPo.contact_person || "Pimpinan / Rep. Vendor"}
+                      </div>
+                      <div className="text-[10px] text-neutral-600 font-bold mt-1">
+                        Tanda Tangan &amp; Stempel Vendor
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-
             </div>
-
-          </div>
-        </div>,
-        document.body
-      )}
+          </div>,
+          document.body,
+        )}
 
       {/* VENDOR ORDER PAYMENT & TERMIN MODAL */}
       {isPaymentModalOpen && selectedPaymentPo && (
@@ -2485,7 +3072,8 @@ function AdminVendoringPage() {
                   Skema Pembayaran &amp; Bukti Transfer Vendor
                 </h2>
                 <p className="text-xs text-muted-foreground font-semibold mt-0.5">
-                  PO: <b className="text-ink font-mono">{selectedPaymentPo.po_number}</b> • Vendor: <b className="text-brand-orange">{selectedPaymentPo.vendor_name}</b>
+                  PO: <b className="text-ink font-mono">{selectedPaymentPo.po_number}</b> • Vendor:{" "}
+                  <b className="text-brand-orange">{selectedPaymentPo.vendor_name}</b>
                 </p>
               </div>
               <button
@@ -2499,7 +3087,8 @@ function AdminVendoringPage() {
 
             {/* Financial Summary Card in Modal */}
             {(() => {
-              const livePo = vendorOrders.find((o) => o.id === selectedPaymentPo.id) || selectedPaymentPo;
+              const livePo =
+                vendorOrders.find((o) => o.id === selectedPaymentPo.id) || selectedPaymentPo;
               const totalCost = Number(livePo.total_cost || 0);
               const totalPaid = Number(livePo.total_paid || 0);
               const remaining = Math.max(0, totalCost - totalPaid);
@@ -2509,16 +3098,28 @@ function AdminVendoringPage() {
                 <div className="bg-emerald-50/70 border-2 border-emerald-700 p-4 rounded-xl space-y-3">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
                     <div className="bg-white p-2.5 rounded-lg border border-ink/20 shadow-2xs">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Total Kontrak PO</span>
-                      <div className="text-sm font-black text-ink">Rp {totalCost.toLocaleString("id-ID")}</div>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                        Total Kontrak PO
+                      </span>
+                      <div className="text-sm font-black text-ink">
+                        Rp {totalCost.toLocaleString("id-ID")}
+                      </div>
                     </div>
                     <div className="bg-white p-2.5 rounded-lg border border-ink/20 shadow-2xs">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Sudah Ditransfer</span>
-                      <div className="text-sm font-black text-emerald-700">Rp {totalPaid.toLocaleString("id-ID")}</div>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                        Sudah Ditransfer
+                      </span>
+                      <div className="text-sm font-black text-emerald-700">
+                        Rp {totalPaid.toLocaleString("id-ID")}
+                      </div>
                     </div>
                     <div className="bg-white p-2.5 rounded-lg border border-ink/20 shadow-2xs">
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Sisa Tagihan</span>
-                      <div className="text-sm font-black text-rose-700">Rp {remaining.toLocaleString("id-ID")}</div>
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                        Sisa Tagihan
+                      </span>
+                      <div className="text-sm font-black text-rose-700">
+                        Rp {remaining.toLocaleString("id-ID")}
+                      </div>
                     </div>
                   </div>
 
@@ -2528,7 +3129,10 @@ function AdminVendoringPage() {
                       <span className="text-emerald-800 font-mono">{progressPct}% Selesai</span>
                     </div>
                     <div className="w-full bg-neutral-200 h-2 rounded-full overflow-hidden border border-ink/20">
-                      <div className="bg-emerald-600 h-full transition-all" style={{ width: `${progressPct}%` }} />
+                      <div
+                        className="bg-emerald-600 h-full transition-all"
+                        style={{ width: `${progressPct}%` }}
+                      />
                     </div>
                   </div>
                 </div>
@@ -2537,19 +3141,23 @@ function AdminVendoringPage() {
 
             {/* Riwayat Pembayaran Termin */}
             {(() => {
-              const livePo = vendorOrders.find((o) => o.id === selectedPaymentPo.id) || selectedPaymentPo;
+              const livePo =
+                vendorOrders.find((o) => o.id === selectedPaymentPo.id) || selectedPaymentPo;
               const payments = livePo.payments || [];
 
               return (
                 <div className="space-y-3">
                   <h3 className="text-xs font-black uppercase text-ink flex items-center justify-between">
                     <span>Daftar Transfer / Termin Terbayar:</span>
-                    <span className="text-[10px] font-bold text-muted-foreground font-mono">{payments.length} transaksi</span>
+                    <span className="text-[10px] font-bold text-muted-foreground font-mono">
+                      {payments.length} transaksi
+                    </span>
                   </h3>
 
                   {payments.length === 0 ? (
                     <div className="p-5 text-center text-xs font-bold text-muted-foreground bg-cream/30 border-2 border-dashed border-ink/30 rounded-xl">
-                      Belum ada catatan transfer untuk PO ini. Silakan masukkan termin pembayaran di bawah.
+                      Belum ada catatan transfer untuk PO ini. Silakan masukkan termin pembayaran di
+                      bawah.
                     </div>
                   ) : (
                     <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
@@ -2569,7 +3177,9 @@ function AdminVendoringPage() {
                               Rp {Number(pmt.amount).toLocaleString("id-ID")}
                             </div>
                             {pmt.notes && (
-                              <p className="text-[10px] text-muted-foreground italic">"{pmt.notes}"</p>
+                              <p className="text-[10px] text-muted-foreground italic">
+                                "{pmt.notes}"
+                              </p>
                             )}
                           </div>
 
@@ -2584,14 +3194,23 @@ function AdminVendoringPage() {
                                 <Eye className="w-3.5 h-3.5" /> Bukti
                               </button>
                             ) : (
-                              <span className="text-[10px] text-muted-foreground italic px-2">Tanpa Bukti</span>
+                              <span className="text-[10px] text-muted-foreground italic px-2">
+                                Tanpa Bukti
+                              </span>
                             )}
 
                             <button
                               type="button"
                               onClick={() => {
-                                if (confirm(`Hapus catatan pembayaran "${pmt.term_name}" sebesar Rp ${Number(pmt.amount).toLocaleString("id-ID")}?`)) {
-                                  deletePaymentMutation.mutate({ id: livePo.id, paymentId: pmt.id });
+                                if (
+                                  confirm(
+                                    `Hapus catatan pembayaran "${pmt.term_name}" sebesar Rp ${Number(pmt.amount).toLocaleString("id-ID")}?`,
+                                  )
+                                ) {
+                                  deletePaymentMutation.mutate({
+                                    id: livePo.id,
+                                    paymentId: pmt.id,
+                                  });
                                 }
                               }}
                               className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg cursor-pointer transition-colors"
@@ -2609,7 +3228,10 @@ function AdminVendoringPage() {
             })()}
 
             {/* FORM TAMBAH TERMIN PEMBAYARAN BARU */}
-            <form onSubmit={handlePaymentSubmit} className="space-y-3 bg-cream/30 border-2 border-ink p-4 rounded-xl text-xs">
+            <form
+              onSubmit={handlePaymentSubmit}
+              className="space-y-3 bg-cream/30 border-2 border-ink p-4 rounded-xl text-xs"
+            >
               <div className="flex items-center justify-between border-b border-ink/20 pb-2">
                 <span className="font-black text-ink uppercase tracking-wide flex items-center gap-1.5">
                   <Plus className="w-4 h-4 text-brand-orange" />
@@ -2639,9 +3261,16 @@ function AdminVendoringPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const livePo = vendorOrders.find((o) => o.id === selectedPaymentPo.id) || selectedPaymentPo;
+                      const livePo =
+                        vendorOrders.find((o) => o.id === selectedPaymentPo.id) ||
+                        selectedPaymentPo;
                       setPaymentTermName("Pelunasan");
-                      setPaymentAmount(Math.max(0, Number(livePo.total_cost || 0) - Number(livePo.total_paid || 0)));
+                      setPaymentAmount(
+                        Math.max(
+                          0,
+                          Number(livePo.total_cost || 0) - Number(livePo.total_paid || 0),
+                        ),
+                      );
                     }}
                     className="px-2 py-0.5 bg-white hover:bg-cream border border-ink/40 rounded text-[10px] font-bold cursor-pointer"
                   >
@@ -2652,7 +3281,9 @@ function AdminVendoringPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-ink uppercase mb-1">Nama Termin / Skema *</label>
+                  <label className="block font-bold text-ink uppercase mb-1">
+                    Nama Termin / Skema *
+                  </label>
                   <input
                     type="text"
                     value={paymentTermName}
@@ -2664,11 +3295,15 @@ function AdminVendoringPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-ink uppercase mb-1">Nominal Transfer (Rp) *</label>
+                  <label className="block font-bold text-ink uppercase mb-1">
+                    Nominal Transfer (Rp) *
+                  </label>
                   <input
                     type="number"
                     value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value === "" ? "" : Number(e.target.value))}
+                    onChange={(e) =>
+                      setPaymentAmount(e.target.value === "" ? "" : Number(e.target.value))
+                    }
                     placeholder="Nominal transfer"
                     className="w-full px-3 py-2 border-2 border-ink rounded-xl bg-white font-black font-mono focus:outline-none"
                     min={1}
@@ -2679,7 +3314,9 @@ function AdminVendoringPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-ink uppercase mb-1">Tanggal Transfer *</label>
+                  <label className="block font-bold text-ink uppercase mb-1">
+                    Tanggal Transfer *
+                  </label>
                   <input
                     type="date"
                     value={paymentDate}
@@ -2690,11 +3327,19 @@ function AdminVendoringPage() {
                 </div>
 
                 <div>
-                  <label className="block font-bold text-ink uppercase mb-1">Foto Bukti Transfer (Opsional)</label>
+                  <label className="block font-bold text-ink uppercase mb-1">
+                    Foto Bukti Transfer (Opsional)
+                  </label>
                   <div className="flex items-center gap-2">
                     <label className="flex-1 cursor-pointer flex items-center justify-center gap-2 px-3 py-2 bg-white hover:bg-cream border-2 border-ink rounded-xl font-bold transition-all shadow-2xs">
                       <Upload className="w-3.5 h-3.5 text-brand-blue" />
-                      <span>{isUploadingProof ? "Mengunggah..." : paymentProofImg ? "Ganti Foto Bukti" : "Upload Bukti"}</span>
+                      <span>
+                        {isUploadingProof
+                          ? "Mengunggah..."
+                          : paymentProofImg
+                            ? "Ganti Foto Bukti"
+                            : "Upload Bukti"}
+                      </span>
                       <input
                         type="file"
                         accept="image/*"
@@ -2727,7 +3372,9 @@ function AdminVendoringPage() {
               </div>
 
               <div>
-                <label className="block font-bold text-ink uppercase mb-1">Catatan Tambahan (Opsional)</label>
+                <label className="block font-bold text-ink uppercase mb-1">
+                  Catatan Tambahan (Opsional)
+                </label>
                 <input
                   type="text"
                   value={paymentNotes}
@@ -2765,7 +3412,10 @@ function AdminVendoringPage() {
           className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-ink/80 backdrop-blur-sm cursor-pointer"
           onClick={() => setZoomProofImage(null)}
         >
-          <div className="relative max-w-xl max-h-[85vh] bg-white border-4 border-ink rounded-2xl p-2 shadow-[8px_8px_0px_0px_rgba(27,27,27,1)]" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="relative max-w-xl max-h-[85vh] bg-white border-4 border-ink rounded-2xl p-2 shadow-[8px_8px_0px_0px_rgba(27,27,27,1)]"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               type="button"
               onClick={() => setZoomProofImage(null)}
@@ -2773,11 +3423,271 @@ function AdminVendoringPage() {
             >
               <X className="w-4 h-4" />
             </button>
-            <img src={zoomProofImage} alt="Bukti Transfer Zoom" className="max-h-[80vh] w-auto object-contain rounded-xl mx-auto" />
+            <img
+              src={zoomProofImage}
+              alt="Bukti Transfer Zoom"
+              className="max-h-[80vh] w-auto object-contain rounded-xl mx-auto"
+            />
           </div>
         </div>
       )}
 
+      {/* INBOUND / PENERIMAAN BARANG & SINKRONISASI STOK MODAL */}
+      {isInboundModalOpen && selectedInboundPo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/70 backdrop-blur-xs overflow-y-auto">
+          <div className="relative w-full max-w-3xl bg-cream border-4 border-ink rounded-3xl p-6 shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] my-8 max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex items-center justify-between pb-4 border-b-2 border-ink">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-100 border-2 border-ink rounded-xl text-blue-800 shadow-2xs">
+                  <PackageCheck className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-ink uppercase">
+                    Penerimaan Barang &amp; Masuk Stok Website
+                  </h3>
+                  <p className="text-xs font-bold text-muted-foreground">
+                    PO #{selectedInboundPo.po_number} • Vendor: {selectedInboundPo.vendor_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsInboundModalOpen(false);
+                  setSelectedInboundPo(null);
+                }}
+                className="p-1.5 hover:bg-neutral-200 rounded-lg cursor-pointer transition-colors"
+              >
+                <X className="w-5 h-5 text-ink" />
+              </button>
+            </div>
+
+            {/* Info Notice Banner */}
+            <div className="mt-4 p-3 bg-blue-50 border-2 border-blue-600 rounded-xl text-xs text-blue-950 flex items-start gap-2.5">
+              <PackageCheck className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Otomasi Sinkronisasi Stok Website:</p>
+                <p className="mt-0.5 text-blue-900 leading-relaxed">
+                  Masukkan jumlah riil barang yang diterima dalam kondisi baik pada kolom{" "}
+                  <strong>&quot;Diterima Baik&quot;</strong>. Stok produk di website akan otomatis
+                  bertambah secara instan dan riwayat restock akan tercatat di log inventori.
+                </p>
+              </div>
+            </div>
+
+            {/* Items Table */}
+            <div className="mt-4 overflow-x-auto border-2 border-ink rounded-xl bg-white">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-cream border-b-2 border-ink text-ink font-black uppercase">
+                    <th className="p-3">Produk &amp; Varian</th>
+                    <th className="p-3 text-center w-20">Target PO</th>
+                    <th className="p-3 text-center w-36">Diterima Baik (Masuk Stok)</th>
+                    <th className="p-3 text-center w-24">Cacat/Reject</th>
+                    <th className="p-3">Catatan Item</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y border-ink/20">
+                  {inboundItems.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-cream/20">
+                      <td className="p-3">
+                        <p className="font-black text-ink">{item.catalog_product_name}</p>
+                        <p className="text-[11px] font-bold text-muted-foreground mt-0.5">
+                          {[item.size, item.color].filter(Boolean).join(" / ") ||
+                            "Standar / All Size"}
+                        </p>
+                      </td>
+                      <td className="p-3 text-center font-bold font-mono text-ink">
+                        {item.ordered_quantity} pcs
+                      </td>
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.received_quantity}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseInt(e.target.value) || 0);
+                              setInboundItems((prev) =>
+                                prev.map((it, i) =>
+                                  i === idx ? { ...it, received_quantity: val } : it,
+                                ),
+                              );
+                            }}
+                            className="w-18 px-2 py-1.5 border-2 border-ink rounded-lg font-black font-mono text-center text-xs bg-emerald-50 text-emerald-950 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <span className="text-[11px] font-bold text-muted-foreground">pcs</span>
+                        </div>
+                        {item.received_quantity !== item.ordered_quantity && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInboundItems((prev) =>
+                                prev.map((it, i) =>
+                                  i === idx
+                                    ? { ...it, received_quantity: it.ordered_quantity }
+                                    : it,
+                                ),
+                              );
+                            }}
+                            className="mt-1 text-[10px] text-blue-700 underline font-bold cursor-pointer"
+                          >
+                            Set ke {item.ordered_quantity}
+                          </button>
+                        )}
+                      </td>
+                      <td className="p-3 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            value={item.defect_quantity}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseInt(e.target.value) || 0);
+                              setInboundItems((prev) =>
+                                prev.map((it, i) =>
+                                  i === idx ? { ...it, defect_quantity: val } : it,
+                                ),
+                              );
+                            }}
+                            className="w-14 px-1.5 py-1.5 border border-ink/40 rounded-lg font-bold font-mono text-center text-xs bg-rose-50 text-rose-950 focus:outline-none"
+                          />
+                          <span className="text-[11px] font-bold text-muted-foreground">pcs</span>
+                        </div>
+                      </td>
+                      <td className="p-3">
+                        <input
+                          type="text"
+                          value={item.notes}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setInboundItems((prev) =>
+                              prev.map((it, i) => (i === idx ? { ...it, notes: val } : it)),
+                            );
+                          }}
+                          placeholder="Opsional (misal: cacat jahitan)"
+                          className="w-full px-2 py-1.5 border border-ink/30 rounded-lg text-xs bg-cream/30 focus:outline-none"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Inbound Summary Stats */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="bg-white border-2 border-ink p-3 rounded-xl">
+                <span className="text-[11px] font-bold text-muted-foreground uppercase">
+                  Total Target Dipesan
+                </span>
+                <p className="text-lg font-black font-mono text-ink mt-0.5">
+                  {inboundItems.reduce((acc, it) => acc + (Number(it.ordered_quantity) || 0), 0)}{" "}
+                  pcs
+                </p>
+              </div>
+
+              <div className="bg-emerald-50 border-2 border-emerald-700 p-3 rounded-xl">
+                <span className="text-[11px] font-black text-emerald-800 uppercase flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" /> Total Masuk Stok Web
+                </span>
+                <p className="text-lg font-black font-mono text-emerald-950 mt-0.5">
+                  +{inboundItems.reduce((acc, it) => acc + (Number(it.received_quantity) || 0), 0)}{" "}
+                  pcs
+                </p>
+              </div>
+
+              <div className="bg-rose-50 border-2 border-rose-300 p-3 rounded-xl">
+                <span className="text-[11px] font-bold text-rose-800 uppercase flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600" /> Total Cacat / Reject
+                </span>
+                <p className="text-lg font-black font-mono text-rose-950 mt-0.5">
+                  {inboundItems.reduce((acc, it) => acc + (Number(it.defect_quantity) || 0), 0)} pcs
+                </p>
+              </div>
+            </div>
+
+            {/* Notes & Options */}
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-black uppercase text-ink mb-1">
+                  Catatan Penerimaan / Surat Jalan Vendor (Opsional)
+                </label>
+                <textarea
+                  value={inboundNotes}
+                  onChange={(e) => setInboundNotes(e.target.value)}
+                  placeholder="Contoh: Barang tiba via kurir Lalamove jam 13.00, packing kardus aman dan sudah dicek fisik."
+                  rows={2}
+                  className="w-full px-3 py-2 border-2 border-ink rounded-xl bg-white text-xs font-medium focus:outline-none"
+                />
+              </div>
+
+              <label className="flex items-center gap-2.5 cursor-pointer bg-white border-2 border-ink p-3 rounded-xl">
+                <input
+                  type="checkbox"
+                  checked={inboundMarkCompleted}
+                  onChange={(e) => setInboundMarkCompleted(e.target.checked)}
+                  className="w-4 h-4 text-brand-orange rounded border-ink focus:ring-0 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-ink">
+                  Otomatis ubah status PO Vendor ini menjadi &quot;Completed&quot;
+                </span>
+              </label>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="mt-6 flex items-center justify-end gap-3 pt-3 border-t-2 border-ink">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsInboundModalOpen(false);
+                  setSelectedInboundPo(null);
+                }}
+                className="px-4 py-2 border-2 border-ink rounded-xl text-xs font-bold bg-neutral-200 hover:bg-neutral-300 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={inboundMutation.isPending}
+                onClick={() => {
+                  const totalRcv = inboundItems.reduce(
+                    (acc, it) => acc + (Number(it.received_quantity) || 0),
+                    0,
+                  );
+                  if (
+                    confirm(
+                      `Konfirmasi penerimaan barang?\n\nTotal +${totalRcv} pcs akan langsung ditambahkan ke stok produk di website dan status PO akan disinkronkan.`,
+                    )
+                  ) {
+                    inboundMutation.mutate({
+                      id: selectedInboundPo.id,
+                      inbound_notes: inboundNotes,
+                      update_status_completed: inboundMarkCompleted,
+                      items: inboundItems.map((it) => ({
+                        item_id: it.item_id,
+                        product_id: it.product_id,
+                        size: it.size,
+                        color: it.color,
+                        received_quantity: it.received_quantity,
+                        defect_quantity: it.defect_quantity,
+                        notes: it.notes,
+                      })),
+                    });
+                  }
+                }}
+                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <PackageCheck className="w-4 h-4" />
+                {inboundMutation.isPending
+                  ? "Menyimpan & Menambah Stok..."
+                  : "Konfirmasi Terima & Tambah ke Stok Website"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
