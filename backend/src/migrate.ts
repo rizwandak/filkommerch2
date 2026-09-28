@@ -449,6 +449,14 @@ export async function runMigration() {
         name: "vendor_order_items.defect_quantity",
         sql: "ALTER TABLE vendor_order_items ADD COLUMN defect_quantity INT DEFAULT 0",
       },
+      {
+        name: "vendor_order_items.po_quantity",
+        sql: "ALTER TABLE vendor_order_items ADD COLUMN po_quantity INT DEFAULT 0",
+      },
+      {
+        name: "vendor_order_items.ready_stock_quantity",
+        sql: "ALTER TABLE vendor_order_items ADD COLUMN ready_stock_quantity INT DEFAULT 0",
+      },
     ];
 
     for (const q of queries) {

@@ -6763,6 +6763,30 @@ export const getVendorOrders = async (req: Request, res: Response) => {
          WHERE voi.vendor_order_id = ?`,
         [o.id],
       );
+
+      for (const it of items) {
+        const targetSize = (it.size || "").trim();
+        const targetColor = (it.color || "").trim();
+        const sizeCond =
+          "AND (TRIM(COALESCE(oi.size, '')) = ? OR (? = '' AND (oi.size IS NULL OR oi.size = '-' OR oi.size = 'All Size' OR oi.size = 'Standard' OR oi.size = 'One Size')))";
+        const colorCond =
+          "AND (TRIM(COALESCE(oi.color, '')) = ? OR (? = '' AND oi.color IS NULL))";
+
+        const poDemandRows = await query<any>(
+          `SELECT COALESCE(SUM(oi.quantity), 0) as po_demand
+           FROM order_items oi
+           JOIN orders o ON oi.order_id = o.order_id
+           WHERE oi.product_id = ? 
+             ${sizeCond}
+             ${colorCond}
+             AND o.order_status != 'cancelled'
+             AND (o.payment_status IN ('paid', 'settlement') OR o.order_status = 'completed')
+             AND o.order_id NOT LIKE 'LNS%'`,
+          [it.product_id, targetSize, targetSize, targetColor, targetColor],
+        );
+        it.po_demand_qty = Number(poDemandRows?.[0]?.po_demand || 0);
+      }
+
       o.items = items;
 
       const payments = await query<any>(
@@ -7081,8 +7105,20 @@ export const inboundVendorOrder = async (req: Request, res: Response) => {
     }
 
     let totalReceivedUnits = 0;
+    let totalPoUnits = 0;
+    let totalReadyStockUnits = 0;
     let totalDefectUnits = 0;
     const inboundSummary: string[] = [];
+
+    // Fetch previous items to calculate delta if re-inbounding
+    const [prevItemRows] = await connection.query<any[]>(
+      "SELECT id, received_quantity, po_quantity, ready_stock_quantity FROM vendor_order_items WHERE vendor_order_id = ?",
+      [id],
+    );
+    const prevItemMap = new Map<number, any>();
+    for (const pit of prevItemRows) {
+      prevItemMap.set(pit.id, pit);
+    }
 
     // 2. Loop through received items and update variant stocks
     for (const item of items) {
@@ -7090,23 +7126,46 @@ export const inboundVendorOrder = async (req: Request, res: Response) => {
       const productId = item.product_id;
       const targetSize = (item.size || "").trim();
       const targetColor = (item.color || "").trim();
-      const receivedQty = Math.max(0, parseInt(item.received_quantity) || 0);
+      const poQty = Math.max(0, parseInt(item.po_quantity) || 0);
+      const readyStockQty = Math.max(0, parseInt(item.ready_stock_quantity) || 0);
       const defectQty = Math.max(0, parseInt(item.defect_quantity) || 0);
+      const receivedQty =
+        item.received_quantity !== undefined && item.received_quantity !== null
+          ? Math.max(0, parseInt(item.received_quantity) || 0)
+          : poQty + readyStockQty;
       const itemNote = item.notes ? String(item.notes).trim() : null;
 
       totalReceivedUnits += receivedQty;
+      totalPoUnits += poQty;
+      totalReadyStockUnits += readyStockQty;
       totalDefectUnits += defectQty;
 
-      // Update vendor_order_items record
+      // Update vendor_order_items record with separate PO and Ready Stock allocations
       if (itemId) {
         await connection.query(
-          "UPDATE vendor_order_items SET received_quantity = ?, defect_quantity = ?, notes = COALESCE(?, notes) WHERE id = ? AND vendor_order_id = ?",
-          [receivedQty, defectQty, itemNote, itemId, id],
+          "UPDATE vendor_order_items SET received_quantity = ?, po_quantity = ?, ready_stock_quantity = ?, defect_quantity = ?, notes = COALESCE(?, notes) WHERE id = ? AND vendor_order_id = ?",
+          [receivedQty, poQty, readyStockQty, defectQty, itemNote, itemId, id],
         );
       }
 
-      // If good units were received, update product_variant stock and record stock movement
-      if (receivedQty > 0) {
+      // Determine delta ready stock to apply to live website inventory (product_variants.stock)
+      let prevReadyStock = 0;
+      if (order.is_inbounded) {
+        const pit = itemId ? prevItemMap.get(itemId) : null;
+        if (pit) {
+          if (pit.ready_stock_quantity !== null && pit.ready_stock_quantity !== undefined) {
+            prevReadyStock = Number(pit.ready_stock_quantity) || 0;
+          } else {
+            // legacy: previously full received_quantity was assumed ready stock
+            prevReadyStock = Number(pit.received_quantity) || 0;
+          }
+        }
+      }
+
+      const deltaReadyStock = readyStockQty - prevReadyStock;
+
+      // If deltaReadyStock !== 0 OR (first inbound and readyStockQty > 0), adjust product_variants
+      if (deltaReadyStock !== 0 || (!order.is_inbounded && readyStockQty > 0)) {
         // 1. Exact match on product_id, size, and color
         let [variants] = await connection.query<any[]>(
           "SELECT id, stock, size, color FROM product_variants WHERE product_id = ? AND TRIM(size) = ? AND TRIM(COALESCE(color, '')) = ? AND is_active = 1 LIMIT 1 FOR UPDATE",
@@ -7132,47 +7191,62 @@ export const inboundVendorOrder = async (req: Request, res: Response) => {
         let variantId: number;
         let stockBefore = 0;
         let stockAfter = 0;
+        const changeQty = deltaReadyStock;
 
         if (variants && variants.length > 0) {
           const varObj = variants[0];
           variantId = varObj.id;
           stockBefore = Number(varObj.stock || 0);
-          stockAfter = stockBefore + receivedQty;
+          stockAfter = Math.max(0, stockBefore + changeQty);
 
-          await connection.query("UPDATE product_variants SET stock = stock + ? WHERE id = ?", [
-            receivedQty,
-            variantId,
-          ]);
-        } else {
+          await connection.query(
+            "UPDATE product_variants SET stock = GREATEST(0, stock + ?) WHERE id = ?",
+            [changeQty, variantId],
+          );
+        } else if (changeQty > 0) {
           // If no variant exists, auto-insert new active variant
           const [insertVar] = await connection.query<any>(
             "INSERT INTO product_variants (product_id, size, color, stock, is_active) VALUES (?, ?, ?, ?, 1)",
-            [productId, targetSize || "All Size", targetColor || null, receivedQty],
+            [productId, targetSize || "All Size", targetColor || null, changeQty],
           );
           variantId = insertVar.insertId;
           stockBefore = 0;
-          stockAfter = receivedQty;
+          stockAfter = changeQty;
         }
 
-        // Record stock movement (movement_type = 'restock', reference_type = 'purchase')
-        await connection.query(
-          `INSERT INTO stock_movements (
-            variant_id, movement_type, quantity_change, stock_before, stock_after,
-            reference_type, reference_id, created_by, notes
-          ) VALUES (?, 'restock', ?, ?, ?, 'purchase', ?, ?, ?)`,
-          [
-            variantId,
-            receivedQty,
-            stockBefore,
-            stockAfter,
-            order.po_number,
-            actorId,
-            `Inbound Restock Vendor PO #${order.po_number}${itemNote ? ` (${itemNote})` : ""}${defectQty > 0 ? ` [${defectQty} reject]` : ""}`,
-          ],
-        );
+        if (variantId! && changeQty !== 0) {
+          // Record stock movement (movement_type = 'restock', reference_type = 'purchase')
+          await connection.query(
+            `INSERT INTO stock_movements (
+              variant_id, movement_type, quantity_change, stock_before, stock_after,
+              reference_type, reference_id, created_by, notes
+            ) VALUES (?, 'restock', ?, ?, ?, 'purchase', ?, ?, ?)`,
+            [
+              variantId,
+              changeQty,
+              stockBefore,
+              stockAfter,
+              order.po_number,
+              actorId,
+              `Inbound Ready Stock Vendor PO #${order.po_number}: ${changeQty >= 0 ? "+" : ""}${changeQty} pcs ready stock web (${poQty} pcs pemenuhan pembeli PO)${itemNote ? ` (${itemNote})` : ""}${defectQty > 0 ? ` [${defectQty} reject]` : ""}`,
+            ],
+          );
+        }
+      }
 
+      const variantLabel = [targetSize, targetColor].filter(Boolean).join("/") || "Standar";
+      const prodLabel = item.catalog_product_name || `Produk #${productId}`;
+      if (readyStockQty > 0 && poQty > 0) {
         inboundSummary.push(
-          `${item.catalog_product_name || `Produk #${productId}`} (${[targetSize, targetColor].filter(Boolean).join("/") || "Standar"}): +${receivedQty} pcs`,
+          `${prodLabel} (${variantLabel}): ${poQty} pcs Pembeli PO • +${readyStockQty} pcs Ready Stock Web`,
+        );
+      } else if (readyStockQty > 0) {
+        inboundSummary.push(
+          `${prodLabel} (${variantLabel}): +${readyStockQty} pcs Ready Stock Web (0 pcs PO)`,
+        );
+      } else {
+        inboundSummary.push(
+          `${prodLabel} (${variantLabel}): ${poQty} pcs Pembeli PO (0 pcs Ready Stock)`,
         );
       }
     }
@@ -7202,7 +7276,7 @@ export const inboundVendorOrder = async (req: Request, res: Response) => {
         "inbound_vendor_order",
         "vendor_order",
         Number(id),
-        `Penerimaan Barang PO #${order.po_number}: ${totalReceivedUnits} pcs masuk stok website, ${totalDefectUnits} pcs reject. Petugas: ${actorName}`,
+        `Penerimaan Barang PO #${order.po_number}: ${totalReceivedUnits} pcs diterima (${totalPoUnits} pcs pembeli PO, ${totalReadyStockUnits} pcs masuk ready stock web, ${totalDefectUnits} pcs reject). Petugas: ${actorName}`,
         ipAddress,
         userAgent,
       );
@@ -7212,9 +7286,11 @@ export const inboundVendorOrder = async (req: Request, res: Response) => {
 
     return res.json({
       success: true,
-      message: `Berhasil menerima barang dan menambahkan ${totalReceivedUnits} pcs ke stok website!`,
+      message: `Berhasil menerima barang PO! ${totalPoUnits} pcs dialokasikan untuk pemenuhan pembeli PO, dan ${totalReadyStockUnits} pcs masuk ke stok website.`,
       data: {
         total_received: totalReceivedUnits,
+        total_po: totalPoUnits,
+        total_ready_stock: totalReadyStockUnits,
         total_defect: totalDefectUnits,
         summary: inboundSummary,
       },

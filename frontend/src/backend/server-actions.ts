@@ -2181,6 +2181,9 @@ export interface VendorOrderItem {
   color?: string;
   quantity: number;
   received_quantity?: number | null;
+  po_quantity?: number | null;
+  ready_stock_quantity?: number | null;
+  po_demand_qty?: number;
   defect_quantity?: number;
   unit_cost: number;
   subtotal_cost?: number;
@@ -2400,7 +2403,9 @@ export const inboundVendorOrderServerAction = createServerFn({ method: "POST" })
         catalog_product_name?: string;
         size?: string;
         color?: string;
-        received_quantity: number;
+        received_quantity?: number;
+        po_quantity?: number;
+        ready_stock_quantity?: number;
         defect_quantity?: number;
         notes?: string | null;
       }>;

@@ -123,6 +123,9 @@ function AdminVendoringPage() {
       color: string;
       ordered_quantity: number;
       received_quantity: number;
+      po_demand_qty: number;
+      po_quantity: number;
+      ready_stock_quantity: number;
       defect_quantity: number;
       notes: string;
     }>
@@ -135,20 +138,46 @@ function AdminVendoringPage() {
     setInboundNotes(po.inbound_notes || "");
     setInboundMarkCompleted(po.status !== "completed");
     setInboundItems(
-      (po.items || []).map((it) => ({
-        item_id: it.id || 0,
-        product_id: it.product_id,
-        catalog_product_name: it.catalog_product_name || "Produk",
-        size: it.size || "",
-        color: it.color || "",
-        ordered_quantity: Number(it.quantity) || 0,
-        received_quantity:
+      (po.items || []).map((it) => {
+        const ordered = Number(it.quantity) || 0;
+        const received =
           it.received_quantity !== null && it.received_quantity !== undefined
             ? Number(it.received_quantity)
-            : Number(it.quantity) || 0,
-        defect_quantity: Number(it.defect_quantity) || 0,
-        notes: it.notes || "",
-      })),
+            : ordered;
+        const poDemand = Number(it.po_demand_qty) || 0;
+
+        let initialPoQty = 0;
+        if (it.po_quantity !== null && it.po_quantity !== undefined) {
+          initialPoQty = Number(it.po_quantity);
+        } else if (poDemand > 0) {
+          initialPoQty = Math.min(received, poDemand);
+        } else {
+          // If no recorded PO demand, default to received count for PO buyers
+          initialPoQty = received;
+        }
+
+        let initialReadyStock = 0;
+        if (it.ready_stock_quantity !== null && it.ready_stock_quantity !== undefined) {
+          initialReadyStock = Number(it.ready_stock_quantity);
+        } else {
+          initialReadyStock = Math.max(0, received - initialPoQty);
+        }
+
+        return {
+          item_id: it.id || 0,
+          product_id: it.product_id,
+          catalog_product_name: it.catalog_product_name || "Produk",
+          size: it.size || "",
+          color: it.color || "",
+          ordered_quantity: ordered,
+          received_quantity: received,
+          po_demand_qty: poDemand,
+          po_quantity: initialPoQty,
+          ready_stock_quantity: initialReadyStock,
+          defect_quantity: Number(it.defect_quantity) || 0,
+          notes: it.notes || "",
+        };
+      }),
     );
     setIsInboundModalOpen(true);
   };
@@ -600,6 +629,8 @@ function AdminVendoringPage() {
         size: string;
         color: string;
         received_quantity: number;
+        po_quantity: number;
+        ready_stock_quantity: number;
         defect_quantity: number;
         notes: string;
       }>;
@@ -607,10 +638,11 @@ function AdminVendoringPage() {
     onSuccess: (res: any) => {
       if (res?.success) {
         toast.success(
-          res.message || "Barang berhasil diterima & stok website berhasil disinkronkan!",
+          res.message || "Barang berhasil diterima & alokasi stok berhasil disimpan!",
         );
         queryClient.invalidateQueries({ queryKey: ["adminVendorOrders"] });
         queryClient.invalidateQueries({ queryKey: ["adminProducts"] });
+        queryClient.invalidateQueries({ queryKey: ["adminAllProducts"] });
         queryClient.invalidateQueries({ queryKey: ["financialOverview"] });
         setIsInboundModalOpen(false);
         setSelectedInboundPo(null);
@@ -1367,14 +1399,11 @@ function AdminVendoringPage() {
                             onChange={(e) => {
                               const nextStatus = e.target.value;
                               if (nextStatus === "completed" && !po.is_inbounded) {
-                                if (
-                                  confirm(
-                                    `Status PO diubah ke "Completed". Apakah Anda ingin sekalian memverifikasi penerimaan barang fisik & memasukkannya ke stok website sekarang?`,
-                                  )
-                                ) {
-                                  openInboundModal(po);
-                                  return;
-                                }
+                                toast.info(
+                                  "Silakan cek dan tentukan alokasi stok (Pembeli PO vs Ready Stock) sebelum menyelesaikan PO.",
+                                );
+                                openInboundModal(po);
+                                return;
                               }
                               updatePoStatusMutation.mutate({ id: po.id, status: nextStatus });
                             }}
@@ -1395,10 +1424,10 @@ function AdminVendoringPage() {
                                 ? "bg-teal-50 text-teal-950 border-teal-700 hover:bg-teal-100"
                                 : "bg-blue-600 text-white border-blue-900 hover:bg-blue-700"
                             }`}
-                            title="Penerimaan Barang Fisik & Sinkronkan Otomatis ke Stok Website"
+                            title="Penerimaan Barang Fisik & Alokasi Stok Pembeli PO vs Ready Stock"
                           >
                             <PackageCheck className="w-3.5 h-3.5" />
-                            {po.is_inbounded ? "Rincian Inbound Stok" : "Terima & Masuk Stok"}
+                            {po.is_inbounded ? "Rincian Alokasi Stok" : "Terima & Alokasi Stok"}
                           </button>
 
                           {/* Payment / Termin Button */}
@@ -1460,10 +1489,13 @@ function AdminVendoringPage() {
                               <th className="p-2.5 text-center">Qty Dipesan</th>
                               {po.is_inbounded && (
                                 <>
-                                  <th className="p-2.5 text-center bg-teal-50/50 text-teal-900">
-                                    Masuk Stok Web
+                                  <th className="p-2.5 text-center bg-indigo-50/70 text-indigo-950 font-black">
+                                    Alokasi Pembeli PO
                                   </th>
-                                  <th className="p-2.5 text-center bg-rose-50/50 text-rose-900">
+                                  <th className="p-2.5 text-center bg-emerald-50/70 text-emerald-950 font-black">
+                                    Masuk Ready Web
+                                  </th>
+                                  <th className="p-2.5 text-center bg-rose-50/70 text-rose-950 font-black">
                                     Cacat/Reject
                                   </th>
                                 </>
@@ -1491,13 +1523,16 @@ function AdminVendoringPage() {
                                 </td>
                                 {po.is_inbounded && (
                                   <>
-                                    <td className="p-2.5 text-center font-mono font-black text-teal-800 bg-teal-50/30">
-                                      +
-                                      {item.received_quantity !== null &&
-                                      item.received_quantity !== undefined
-                                        ? item.received_quantity
-                                        : item.quantity}{" "}
-                                      pcs
+                                    <td className="p-2.5 text-center font-mono font-bold text-indigo-800 bg-indigo-50/30">
+                                      {item.po_quantity !== null && item.po_quantity !== undefined
+                                        ? `${item.po_quantity} pcs`
+                                        : `${item.quantity} pcs`}
+                                    </td>
+                                    <td className="p-2.5 text-center font-mono font-black text-emerald-800 bg-emerald-50/30">
+                                      {item.ready_stock_quantity !== null &&
+                                      item.ready_stock_quantity !== undefined
+                                        ? `+${item.ready_stock_quantity} pcs`
+                                        : "+0 pcs"}
                                     </td>
                                     <td className="p-2.5 text-center font-mono font-bold text-rose-700 bg-rose-50/30">
                                       {item.defect_quantity && item.defect_quantity > 0
@@ -1525,25 +1560,68 @@ function AdminVendoringPage() {
                       {po.is_inbounded ? (
                         <div className="bg-teal-50/70 border border-teal-300 p-3 rounded-xl text-xs text-teal-950 flex items-start gap-2.5">
                           <PackageCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
-                          <div className="space-y-0.5">
-                            <p className="font-extrabold text-teal-900">
-                              Stok Fisik PO Telah Masuk ke Sistem Website
-                              {po.inbounded_at && (
-                                <span className="font-normal text-teal-800 ml-1.5">
-                                  •{" "}
-                                  {new Date(po.inbounded_at).toLocaleDateString("id-ID", {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  })}
-                                  {po.inbounded_by ? ` (oleh ${po.inbounded_by})` : ""}
+                          <div className="space-y-1 w-full">
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <p className="font-extrabold text-teal-900">
+                                Stok Fisik PO Telah Diverifikasi &amp; Dialokasikan
+                                {po.inbounded_at && (
+                                  <span className="font-normal text-teal-800 ml-1.5">
+                                    •{" "}
+                                    {new Date(po.inbounded_at).toLocaleDateString("id-ID", {
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric",
+                                      hour: "2-digit",
+                                      minute: "2-digit",
+                                    })}
+                                    {po.inbounded_by ? ` (oleh ${po.inbounded_by})` : ""}
+                                  </span>
+                                )}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => openInboundModal(po)}
+                                className="text-[11px] font-bold text-teal-800 hover:text-teal-950 underline cursor-pointer"
+                              >
+                                Edit Alokasi Stok
+                              </button>
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-teal-900 pt-0.5">
+                              <span className="bg-indigo-50/90 text-indigo-950 px-2 py-0.5 rounded border border-indigo-200">
+                                📦 Pembeli PO:{" "}
+                                <strong>
+                                  {(po.items || []).reduce(
+                                    (sum, it) => sum + (Number(it.po_quantity) || 0),
+                                    0,
+                                  )}{" "}
+                                  pcs
+                                </strong>
+                              </span>
+                              <span className="bg-emerald-100/90 text-emerald-950 px-2 py-0.5 rounded border border-emerald-300">
+                                ⭐ Ready Stok Web:{" "}
+                                <strong>
+                                  +{(po.items || []).reduce(
+                                    (sum, it) => sum + (Number(it.ready_stock_quantity) || 0),
+                                    0,
+                                  )}{" "}
+                                  pcs
+                                </strong>
+                              </span>
+                              {Boolean((po.items || []).some((it) => Number(it.defect_quantity) > 0)) && (
+                                <span className="bg-rose-100 text-rose-900 px-2 py-0.5 rounded border border-rose-300">
+                                  ⚠️ Reject:{" "}
+                                  <strong>
+                                    {(po.items || []).reduce(
+                                      (sum, it) => sum + (Number(it.defect_quantity) || 0),
+                                      0,
+                                    )}{" "}
+                                    pcs
+                                  </strong>
                                 </span>
                               )}
-                            </p>
+                            </div>
                             {po.inbound_notes && (
-                              <p className="text-[11px] text-teal-900/90 italic">
+                              <p className="text-[11px] text-teal-900/90 italic pt-0.5">
                                 &ldquo;{po.inbound_notes}&rdquo;
                               </p>
                             )}
@@ -1554,16 +1632,16 @@ function AdminVendoringPage() {
                           <div className="flex items-center gap-2">
                             <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
                             <span className="text-[11px] font-bold">
-                              Barang PO ini belum di-inbound ke website. Klik tombol{" "}
-                              <strong>&quot;Terima &amp; Masuk Stok&quot;</strong> saat barang tiba
-                              agar stok website otomatis terupdate.
+                              Barang PO ini belum diverifikasi. Klik tombol{" "}
+                              <strong>&quot;Terima &amp; Alokasi Stok&quot;</strong> untuk menentukan
+                              porsi pesanan pembeli PO vs stok yang masuk ke website.
                             </span>
                           </div>
                           <button
                             onClick={() => openInboundModal(po)}
                             className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] uppercase rounded-lg shrink-0 cursor-pointer"
                           >
-                            Inbound Sekarang
+                            Alokasikan Sekarang
                           </button>
                         </div>
                       )}
@@ -3435,7 +3513,7 @@ function AdminVendoringPage() {
       {/* INBOUND / PENERIMAAN BARANG & SINKRONISASI STOK MODAL */}
       {isInboundModalOpen && selectedInboundPo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/70 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-3xl bg-cream border-4 border-ink rounded-3xl p-6 shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] my-8 max-h-[90vh] overflow-y-auto">
+          <div className="relative w-full max-w-5xl bg-cream border-4 border-ink rounded-3xl p-6 shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] my-8 max-h-[92vh] overflow-y-auto">
             {/* Header */}
             <div className="flex items-center justify-between pb-4 border-b-2 border-ink">
               <div className="flex items-center gap-3">
@@ -3444,7 +3522,7 @@ function AdminVendoringPage() {
                 </div>
                 <div>
                   <h3 className="text-lg font-black text-ink uppercase">
-                    Penerimaan Barang &amp; Masuk Stok Website
+                    Penerimaan Barang &amp; Alokasi Stok Vendor
                   </h3>
                   <p className="text-xs font-bold text-muted-foreground">
                     PO #{selectedInboundPo.po_number} • Vendor: {selectedInboundPo.vendor_name}
@@ -3464,39 +3542,62 @@ function AdminVendoringPage() {
             </div>
 
             {/* Info Notice Banner */}
-            <div className="mt-4 p-3 bg-blue-50 border-2 border-blue-600 rounded-xl text-xs text-blue-950 flex items-start gap-2.5">
-              <PackageCheck className="w-4 h-4 text-blue-700 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-bold">Otomasi Sinkronisasi Stok Website:</p>
-                <p className="mt-0.5 text-blue-900 leading-relaxed">
-                  Masukkan jumlah riil barang yang diterima dalam kondisi baik pada kolom{" "}
-                  <strong>&quot;Diterima Baik&quot;</strong>. Stok produk di website akan otomatis
-                  bertambah secara instan dan riwayat restock akan tercatat di log inventori.
+            <div className="mt-4 p-3.5 bg-blue-50/80 border-2 border-blue-600 rounded-xl text-xs text-blue-950 flex items-start gap-3">
+              <PackageCheck className="w-5 h-5 text-blue-700 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="font-black text-blue-950 uppercase tracking-wide">
+                  Pemisahan Alokasi: Pembeli Pre-Order vs Ready Stock
+                </p>
+                <p className="text-blue-900 leading-relaxed text-[11px]">
+                  Barang yang tiba dari vendor tidak semuanya masuk ke ready stock toko. Bedakan porsi untuk{" "}
+                  <strong>Pembeli PO</strong> (stok pemenuhan pesanan customer pre-order yang sudah terdaftar —{" "}
+                  <span className="text-indigo-800 font-bold">tidak dijual ulang di web</span>) dan porsi untuk{" "}
+                  <strong>Ready Stock</strong> (stok lebihan/buffer yang{" "}
+                  <span className="text-emerald-800 font-bold">akan langsung bertambah ke katalog live website &amp; kasir POS</span>).
                 </p>
               </div>
             </div>
 
             {/* Items Table */}
-            <div className="mt-4 overflow-x-auto border-2 border-ink rounded-xl bg-white">
+            <div className="mt-4 overflow-x-auto border-2 border-ink rounded-xl bg-white shadow-2xs">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="bg-cream border-b-2 border-ink text-ink font-black uppercase">
                     <th className="p-3">Produk &amp; Varian</th>
                     <th className="p-3 text-center w-20">Target PO</th>
-                    <th className="p-3 text-center w-36">Diterima Baik (Masuk Stok)</th>
-                    <th className="p-3 text-center w-24">Cacat/Reject</th>
-                    <th className="p-3">Catatan Item</th>
+                    <th className="p-3 text-center w-28">Diterima Fisik</th>
+                    <th className="p-3 text-center w-36 bg-indigo-50/70 border-x border-ink/20 text-indigo-950">
+                      Alokasi Pembeli PO
+                      <span className="text-[10px] font-bold text-indigo-700 block normal-case">
+                        (Pemenuhan Pre-Order)
+                      </span>
+                    </th>
+                    <th className="p-3 text-center w-36 bg-emerald-50/70 border-r border-ink/20 text-emerald-950">
+                      Masuk Ready Stok
+                      <span className="text-[10px] font-bold text-emerald-700 block normal-case">
+                        ⭐ Live Web &amp; POS
+                      </span>
+                    </th>
+                    <th className="p-3 text-center w-20">Cacat</th>
+                    <th className="p-3">Catatan</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y border-ink/20">
                   {inboundItems.map((item, idx) => (
-                    <tr key={idx} className="hover:bg-cream/20">
+                    <tr key={idx} className="hover:bg-cream/20 transition-colors">
                       <td className="p-3">
                         <p className="font-black text-ink">{item.catalog_product_name}</p>
                         <p className="text-[11px] font-bold text-muted-foreground mt-0.5">
                           {[item.size, item.color].filter(Boolean).join(" / ") ||
                             "Standar / All Size"}
                         </p>
+                        {item.po_demand_qty > 0 && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-indigo-100 text-indigo-900 border border-indigo-200">
+                              📦 Kebutuhan PO: {item.po_demand_qty} pcs
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="p-3 text-center font-bold font-mono text-ink">
                         {item.ordered_quantity} pcs
@@ -3508,34 +3609,176 @@ function AdminVendoringPage() {
                             min="0"
                             value={item.received_quantity}
                             onChange={(e) => {
-                              const val = Math.max(0, parseInt(e.target.value) || 0);
+                              const newRcv = Math.max(0, parseInt(e.target.value) || 0);
+                              const poDem = item.po_demand_qty || 0;
+                              const newPo = poDem > 0 ? Math.min(newRcv, poDem) : newRcv;
+                              const newReady = Math.max(0, newRcv - newPo);
                               setInboundItems((prev) =>
                                 prev.map((it, i) =>
-                                  i === idx ? { ...it, received_quantity: val } : it,
+                                  i === idx
+                                    ? {
+                                        ...it,
+                                        received_quantity: newRcv,
+                                        po_quantity: newPo,
+                                        ready_stock_quantity: newReady,
+                                      }
+                                    : it,
                                 ),
                               );
                             }}
-                            className="w-18 px-2 py-1.5 border-2 border-ink rounded-lg font-black font-mono text-center text-xs bg-emerald-50 text-emerald-950 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-16 px-1.5 py-1.5 border-2 border-ink rounded-lg font-black font-mono text-center text-xs bg-white text-ink focus:outline-none focus:ring-2 focus:ring-blue-500"
                           />
-                          <span className="text-[11px] font-bold text-muted-foreground">pcs</span>
+                          <span className="text-[10px] font-bold text-muted-foreground">pcs</span>
                         </div>
                         {item.received_quantity !== item.ordered_quantity && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const newRcv = item.ordered_quantity;
+                              const poDem = item.po_demand_qty || 0;
+                              const newPo = poDem > 0 ? Math.min(newRcv, poDem) : newRcv;
+                              const newReady = Math.max(0, newRcv - newPo);
+                              setInboundItems((prev) =>
+                                prev.map((it, i) =>
+                                  i === idx
+                                    ? {
+                                        ...it,
+                                        received_quantity: newRcv,
+                                        po_quantity: newPo,
+                                        ready_stock_quantity: newReady,
+                                      }
+                                    : it,
+                                ),
+                              );
+                            }}
+                            className="mt-1 text-[10px] text-blue-700 underline font-bold cursor-pointer block mx-auto"
+                          >
+                            Set {item.ordered_quantity}
+                          </button>
+                        )}
+                      </td>
+                      {/* Alokasi Pembeli PO */}
+                      <td className="p-3 text-center bg-indigo-50/40 border-x border-ink/20">
+                        <div className="flex items-center justify-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max={item.received_quantity}
+                            value={item.po_quantity}
+                            onChange={(e) => {
+                              const newPo = Math.max(0, parseInt(e.target.value) || 0);
+                              const newReady = Math.max(0, item.received_quantity - newPo);
+                              setInboundItems((prev) =>
+                                prev.map((it, i) =>
+                                  i === idx
+                                    ? {
+                                        ...it,
+                                        po_quantity: newPo,
+                                        ready_stock_quantity: newReady,
+                                      }
+                                    : it,
+                                ),
+                              );
+                            }}
+                            className="w-16 px-1.5 py-1.5 border-2 border-indigo-600 rounded-lg font-black font-mono text-center text-xs bg-indigo-50 text-indigo-950 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          />
+                          <span className="text-[10px] font-bold text-indigo-900">pcs</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-center gap-1 flex-wrap">
                           <button
                             type="button"
                             onClick={() => {
                               setInboundItems((prev) =>
                                 prev.map((it, i) =>
                                   i === idx
-                                    ? { ...it, received_quantity: it.ordered_quantity }
+                                    ? {
+                                        ...it,
+                                        po_quantity: it.received_quantity,
+                                        ready_stock_quantity: 0,
+                                      }
                                     : it,
                                 ),
                               );
                             }}
-                            className="mt-1 text-[10px] text-blue-700 underline font-bold cursor-pointer"
+                            className="text-[9px] bg-indigo-100 hover:bg-indigo-200 text-indigo-900 border border-indigo-300 px-1 py-0.5 rounded font-bold cursor-pointer"
+                            title="Semua unit yang diterima dialokasikan untuk pemesan PO"
                           >
-                            Set ke {item.ordered_quantity}
+                            Semua PO
                           </button>
-                        )}
+                          {item.po_demand_qty > 0 && item.po_demand_qty !== item.po_quantity && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const targetPo = Math.min(item.received_quantity, item.po_demand_qty);
+                                setInboundItems((prev) =>
+                                  prev.map((it, i) =>
+                                    i === idx
+                                    ? {
+                                        ...it,
+                                        po_quantity: targetPo,
+                                        ready_stock_quantity: Math.max(0, it.received_quantity - targetPo),
+                                      }
+                                    : it,
+                                  ),
+                                );
+                              }}
+                              className="text-[9px] bg-white hover:bg-indigo-50 text-indigo-800 border border-indigo-300 px-1 py-0.5 rounded font-bold cursor-pointer"
+                              title={`Set persis sesuai kebutuhan PO (${item.po_demand_qty} pcs)`}
+                            >
+                              Sesuai PO
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      {/* Alokasi Ready Stok Web */}
+                      <td className="p-3 text-center bg-emerald-50/40 border-r border-ink/20">
+                        <div className="flex items-center justify-center gap-1">
+                          <input
+                            type="number"
+                            min="0"
+                            max={item.received_quantity}
+                            value={item.ready_stock_quantity}
+                            onChange={(e) => {
+                              const newReady = Math.max(0, parseInt(e.target.value) || 0);
+                              const newPo = Math.max(0, item.received_quantity - newReady);
+                              setInboundItems((prev) =>
+                                prev.map((it, i) =>
+                                  i === idx
+                                    ? {
+                                        ...it,
+                                        ready_stock_quantity: newReady,
+                                        po_quantity: newPo,
+                                      }
+                                    : it,
+                                ),
+                              );
+                            }}
+                            className="w-16 px-1.5 py-1.5 border-2 border-emerald-600 rounded-lg font-black font-mono text-center text-xs bg-emerald-50 text-emerald-950 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                          <span className="text-[10px] font-bold text-emerald-900">pcs</span>
+                        </div>
+                        <div className="mt-1 flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setInboundItems((prev) =>
+                                prev.map((it, i) =>
+                                  i === idx
+                                    ? {
+                                        ...it,
+                                        po_quantity: 0,
+                                        ready_stock_quantity: it.received_quantity,
+                                      }
+                                    : it,
+                                ),
+                              );
+                            }}
+                            className="text-[9px] bg-emerald-100 hover:bg-emerald-200 text-emerald-950 border border-emerald-300 px-1 py-0.5 rounded font-bold cursor-pointer"
+                            title="Semua unit yang diterima dialokasikan untuk Ready Stok Website"
+                          >
+                            Semua Ready
+                          </button>
+                        </div>
                       </td>
                       <td className="p-3 text-center">
                         <div className="flex items-center justify-center gap-1">
@@ -3553,7 +3796,7 @@ function AdminVendoringPage() {
                             }}
                             className="w-14 px-1.5 py-1.5 border border-ink/40 rounded-lg font-bold font-mono text-center text-xs bg-rose-50 text-rose-950 focus:outline-none"
                           />
-                          <span className="text-[11px] font-bold text-muted-foreground">pcs</span>
+                          <span className="text-[10px] font-bold text-muted-foreground">pcs</span>
                         </div>
                       </td>
                       <td className="p-3">
@@ -3566,7 +3809,7 @@ function AdminVendoringPage() {
                               prev.map((it, i) => (i === idx ? { ...it, notes: val } : it)),
                             );
                           }}
-                          placeholder="Opsional (misal: cacat jahitan)"
+                          placeholder="Catatan item (opsional)"
                           className="w-full px-2 py-1.5 border border-ink/30 rounded-lg text-xs bg-cream/30 focus:outline-none"
                         />
                       </td>
@@ -3576,33 +3819,101 @@ function AdminVendoringPage() {
               </table>
             </div>
 
-            {/* Inbound Summary Stats */}
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="bg-white border-2 border-ink p-3 rounded-xl">
-                <span className="text-[11px] font-bold text-muted-foreground uppercase">
-                  Total Target Dipesan
+            {/* Validation Balance Notice (if sum of PO + Ready !== Received) */}
+            {(() => {
+              const sumRcv = inboundItems.reduce((acc, it) => acc + (Number(it.received_quantity) || 0), 0);
+              const sumPo = inboundItems.reduce((acc, it) => acc + (Number(it.po_quantity) || 0), 0);
+              const sumReady = inboundItems.reduce((acc, it) => acc + (Number(it.ready_stock_quantity) || 0), 0);
+              const hasMismatch = inboundItems.some(
+                (it) => (Number(it.po_quantity) || 0) + (Number(it.ready_stock_quantity) || 0) !== (Number(it.received_quantity) || 0)
+              );
+              if (hasMismatch) {
+                return (
+                  <div className="mt-3 p-2.5 bg-amber-50 border-2 border-amber-400 rounded-xl text-xs text-amber-950 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span>
+                        Total Alokasi PO (<strong>{sumPo} pcs</strong>) + Ready Stok (<strong>{sumReady} pcs</strong>) = <strong>{sumPo + sumReady} pcs</strong>, berbeda dari Total Diterima (<strong>{sumRcv} pcs</strong>).
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInboundItems((prev) =>
+                          prev.map((it) => {
+                            const rcv = Number(it.received_quantity) || 0;
+                            const poDem = Number(it.po_demand_qty) || 0;
+                            const po = poDem > 0 ? Math.min(rcv, poDem) : rcv;
+                            return {
+                              ...it,
+                              po_quantity: po,
+                              ready_stock_quantity: Math.max(0, rcv - po),
+                            };
+                          })
+                        );
+                      }}
+                      className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg shrink-0 cursor-pointer"
+                    >
+                      Seimbangkan Otomatis
+                    </button>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Inbound Summary Stats Cards */}
+            <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              <div className="bg-white border-2 border-ink p-2.5 rounded-xl">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                  Target PO
                 </span>
-                <p className="text-lg font-black font-mono text-ink mt-0.5">
+                <p className="text-base font-black font-mono text-ink mt-0.5">
                   {inboundItems.reduce((acc, it) => acc + (Number(it.ordered_quantity) || 0), 0)}{" "}
                   pcs
                 </p>
               </div>
 
-              <div className="bg-emerald-50 border-2 border-emerald-700 p-3 rounded-xl">
-                <span className="text-[11px] font-black text-emerald-800 uppercase flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" /> Total Masuk Stok Web
+              <div className="bg-white border-2 border-ink p-2.5 rounded-xl">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">
+                  Total Diterima
                 </span>
-                <p className="text-lg font-black font-mono text-emerald-950 mt-0.5">
-                  +{inboundItems.reduce((acc, it) => acc + (Number(it.received_quantity) || 0), 0)}{" "}
+                <p className="text-base font-black font-mono text-ink mt-0.5">
+                  {inboundItems.reduce((acc, it) => acc + (Number(it.received_quantity) || 0), 0)}{" "}
                   pcs
                 </p>
               </div>
 
-              <div className="bg-rose-50 border-2 border-rose-300 p-3 rounded-xl">
-                <span className="text-[11px] font-bold text-rose-800 uppercase flex items-center gap-1">
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-600" /> Total Cacat / Reject
+              <div className="bg-indigo-50 border-2 border-indigo-700 p-2.5 rounded-xl">
+                <span className="text-[10px] font-black text-indigo-900 uppercase flex items-center gap-1">
+                  📦 Pembeli PO
                 </span>
-                <p className="text-lg font-black font-mono text-rose-950 mt-0.5">
+                <p className="text-base font-black font-mono text-indigo-950 mt-0.5">
+                  {inboundItems.reduce((acc, it) => acc + (Number(it.po_quantity) || 0), 0)} pcs
+                </p>
+                <span className="text-[9px] text-indigo-800/80 font-semibold block leading-tight">
+                  Disimpan utk pemesan
+                </span>
+              </div>
+
+              <div className="bg-emerald-50 border-2 border-emerald-700 p-2.5 rounded-xl">
+                <span className="text-[10px] font-black text-emerald-800 uppercase flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" /> Ready Stok Web
+                </span>
+                <p className="text-base font-black font-mono text-emerald-950 mt-0.5">
+                  +{inboundItems.reduce((acc, it) => acc + (Number(it.ready_stock_quantity) || 0), 0)}{" "}
+                  pcs
+                </p>
+                <span className="text-[9px] text-emerald-800/80 font-bold block leading-tight">
+                  ⭐ Menambah stok web
+                </span>
+              </div>
+
+              <div className="bg-rose-50 border-2 border-rose-300 p-2.5 rounded-xl">
+                <span className="text-[10px] font-bold text-rose-800 uppercase flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600" /> Cacat/Reject
+                </span>
+                <p className="text-base font-black font-mono text-rose-950 mt-0.5">
                   {inboundItems.reduce((acc, it) => acc + (Number(it.defect_quantity) || 0), 0)} pcs
                 </p>
               </div>
@@ -3617,13 +3928,13 @@ function AdminVendoringPage() {
                 <textarea
                   value={inboundNotes}
                   onChange={(e) => setInboundNotes(e.target.value)}
-                  placeholder="Contoh: Barang tiba via kurir Lalamove jam 13.00, packing kardus aman dan sudah dicek fisik."
+                  placeholder="Contoh: Barang tiba via kurir ekspedisi, packing kardus aman dan sudah dicek fisik serta dipisahkan untuk pesanan PO."
                   rows={2}
                   className="w-full px-3 py-2 border-2 border-ink rounded-xl bg-white text-xs font-medium focus:outline-none"
                 />
               </div>
 
-              <label className="flex items-center gap-2.5 cursor-pointer bg-white border-2 border-ink p-3 rounded-xl">
+              <label className="flex items-center gap-2.5 cursor-pointer bg-white border-2 border-ink p-3 rounded-xl shadow-2xs">
                 <input
                   type="checkbox"
                   checked={inboundMarkCompleted}
@@ -3656,9 +3967,22 @@ function AdminVendoringPage() {
                     (acc, it) => acc + (Number(it.received_quantity) || 0),
                     0,
                   );
+                  const totalPo = inboundItems.reduce(
+                    (acc, it) => acc + (Number(it.po_quantity) || 0),
+                    0,
+                  );
+                  const totalReady = inboundItems.reduce(
+                    (acc, it) => acc + (Number(it.ready_stock_quantity) || 0),
+                    0,
+                  );
+                  const totalDef = inboundItems.reduce(
+                    (acc, it) => acc + (Number(it.defect_quantity) || 0),
+                    0,
+                  );
+
                   if (
                     confirm(
-                      `Konfirmasi penerimaan barang?\n\nTotal +${totalRcv} pcs akan langsung ditambahkan ke stok produk di website dan status PO akan disinkronkan.`,
+                      `Konfirmasi Penerimaan Barang PO #${selectedInboundPo.po_number}?\n\n• ${totalPo} pcs dialokasikan untuk pemenuhan pembeli PO (tidak masuk stok web)\n• +${totalReady} pcs akan dimasukkan ke Ready Stok website & POS\n• ${totalDef} pcs cacat / reject\n\nLanjutkan?`,
                     )
                   ) {
                     inboundMutation.mutate({
@@ -3671,6 +3995,8 @@ function AdminVendoringPage() {
                         size: it.size,
                         color: it.color,
                         received_quantity: it.received_quantity,
+                        po_quantity: it.po_quantity,
+                        ready_stock_quantity: it.ready_stock_quantity,
                         defect_quantity: it.defect_quantity,
                         notes: it.notes,
                       })),
@@ -3681,8 +4007,8 @@ function AdminVendoringPage() {
               >
                 <PackageCheck className="w-4 h-4" />
                 {inboundMutation.isPending
-                  ? "Menyimpan & Menambah Stok..."
-                  : "Konfirmasi Terima & Tambah ke Stok Website"}
+                  ? "Menyimpan Alokasi Stok..."
+                  : "Konfirmasi Terima & Alokasi Stok"}
               </button>
             </div>
           </div>
