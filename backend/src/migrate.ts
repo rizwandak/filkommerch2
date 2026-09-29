@@ -1,5 +1,6 @@
 import mysql from "mysql2/promise";
 import dotenv from "dotenv";
+import { runOhRabrawMigration } from "./migrations/ohRabrawMigration";
 
 // Load environment variables
 dotenv.config();
@@ -938,6 +939,13 @@ export async function runMigration() {
         }
       }
     } catch (err: any) {}
+
+    // Run OH RABRAW 2026 data import (idempotent, safe for both local & live DB)
+    try {
+      await runOhRabrawMigration(connection);
+    } catch (err: any) {
+      console.warn("Notice: OH RABRAW migration error:", err?.message || err);
+    }
 
     console.log("✅ Database schema & migrations up-to-date!");
   } catch (err) {
