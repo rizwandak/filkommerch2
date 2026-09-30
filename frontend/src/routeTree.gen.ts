@@ -14,6 +14,7 @@ import { Route as PreOrderRouteImport } from './routes/pre-order'
 import { Route as OrdersRouteImport } from './routes/orders'
 import { Route as OrderConfirmationRouteImport } from './routes/order-confirmation'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as KebijakanPrivasiRouteImport } from './routes/kebijakan-privasi'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as DbTestRouteImport } from './routes/db-test'
 import { Route as Claimbatch1RouteImport } from './routes/claimbatch1'
@@ -62,6 +63,11 @@ const OrderConfirmationRoute = OrderConfirmationRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KebijakanPrivasiRoute = KebijakanPrivasiRouteImport.update({
+  id: '/kebijakan-privasi',
+  path: '/kebijakan-privasi',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FaqRoute = FaqRouteImport.update({
@@ -193,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/claimbatch1': typeof Claimbatch1Route
   '/db-test': typeof DbTestRoute
   '/faq': typeof FaqRoute
+  '/kebijakan-privasi': typeof KebijakanPrivasiRoute
   '/login': typeof LoginRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/orders': typeof OrdersRoute
@@ -222,6 +229,7 @@ export interface FileRoutesByTo {
   '/claimbatch1': typeof Claimbatch1Route
   '/db-test': typeof DbTestRoute
   '/faq': typeof FaqRoute
+  '/kebijakan-privasi': typeof KebijakanPrivasiRoute
   '/login': typeof LoginRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/orders': typeof OrdersRoute
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/claimbatch1': typeof Claimbatch1Route
   '/db-test': typeof DbTestRoute
   '/faq': typeof FaqRoute
+  '/kebijakan-privasi': typeof KebijakanPrivasiRoute
   '/login': typeof LoginRoute
   '/order-confirmation': typeof OrderConfirmationRoute
   '/orders': typeof OrdersRoute
@@ -287,6 +296,7 @@ export interface FileRouteTypes {
     | '/claimbatch1'
     | '/db-test'
     | '/faq'
+    | '/kebijakan-privasi'
     | '/login'
     | '/order-confirmation'
     | '/orders'
@@ -316,6 +326,7 @@ export interface FileRouteTypes {
     | '/claimbatch1'
     | '/db-test'
     | '/faq'
+    | '/kebijakan-privasi'
     | '/login'
     | '/order-confirmation'
     | '/orders'
@@ -347,6 +358,7 @@ export interface FileRouteTypes {
     | '/claimbatch1'
     | '/db-test'
     | '/faq'
+    | '/kebijakan-privasi'
     | '/login'
     | '/order-confirmation'
     | '/orders'
@@ -379,6 +391,7 @@ export interface RootRouteChildren {
   Claimbatch1Route: typeof Claimbatch1Route
   DbTestRoute: typeof DbTestRoute
   FaqRoute: typeof FaqRoute
+  KebijakanPrivasiRoute: typeof KebijakanPrivasiRoute
   LoginRoute: typeof LoginRoute
   OrderConfirmationRoute: typeof OrderConfirmationRoute
   OrdersRoute: typeof OrdersRoute
@@ -424,6 +437,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kebijakan-privasi': {
+      id: '/kebijakan-privasi'
+      path: '/kebijakan-privasi'
+      fullPath: '/kebijakan-privasi'
+      preLoaderRoute: typeof KebijakanPrivasiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/faq': {
@@ -653,6 +673,7 @@ const rootRouteChildren: RootRouteChildren = {
   Claimbatch1Route: Claimbatch1Route,
   DbTestRoute: DbTestRoute,
   FaqRoute: FaqRoute,
+  KebijakanPrivasiRoute: KebijakanPrivasiRoute,
   LoginRoute: LoginRoute,
   OrderConfirmationRoute: OrderConfirmationRoute,
   OrdersRoute: OrdersRoute,

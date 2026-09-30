@@ -295,6 +295,17 @@ function LoginPage() {
                 </span>
               </div>
             </button>
+
+            <p className="text-[11px] text-center text-muted-foreground font-medium pt-1">
+              Dengan masuk, Anda menyetujui{" "}
+              <a
+                href="/kebijakan-privasi"
+                className="text-brand-blue font-bold underline hover:text-brand-orange transition-colors"
+              >
+                Kebijakan Privasi
+              </a>{" "}
+              FILKOM Merch.
+            </p>
           </div>
 
           {/* Benefits Feature List */}

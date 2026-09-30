@@ -135,6 +135,11 @@ export function Footer() {
                 Sign In / Akun UB
               </Link>
             </li>
+            <li>
+              <Link to="/kebijakan-privasi" className="hover:text-brand-orange transition-colors">
+                Kebijakan Privasi
+              </Link>
+            </li>
           </ul>
         </div>
 
@@ -177,7 +182,13 @@ export function Footer() {
       <div className="border-t border-border bg-secondary/30">
         <div className="max-w-[1400px] mx-auto px-5 lg:px-10 py-4 flex flex-col md:flex-row justify-between items-center gap-2 text-[11px] text-muted-foreground font-medium">
           <div>© 2026 FILKOM Merch oleh Creative Enterprise Ministry SGE FILKOM 2026.</div>
-          <div>Official Merchandise Fakultas Ilmu Komputer Universitas Brawijaya.</div>
+          <div className="flex items-center gap-4">
+            <Link to="/kebijakan-privasi" className="hover:text-brand-orange transition-colors underline">
+              Kebijakan Privasi
+            </Link>
+            <span>•</span>
+            <div>Official Merchandise Fakultas Ilmu Komputer Universitas Brawijaya.</div>
+          </div>
         </div>
       </div>
     </footer>
