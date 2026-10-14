@@ -62,6 +62,7 @@ import {
   Sparkles,
   Loader2,
   Pencil,
+  AlertTriangle,
 } from "lucide-react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logoFM from "@/assets/logo-fm.jpg";
@@ -81,6 +82,8 @@ import {
   getJacketUpsizeSurcharge,
   getJacketPriceBreakdown,
   calculateOrderPelunasanAmount,
+  calculateOrderPriceAudit,
+  type OrderPriceAudit,
 } from "@/lib/pelunasan-utils";
 import {
   getOnlineOrders,
@@ -393,6 +396,8 @@ function AdminTransactionsPage() {
   const [productFilterMode, setProductFilterMode] = useState<"include" | "exclude">("include");
   const [shippingFilter, setShippingFilter] = useState<"all" | "pickup" | "delivery">("all");
   const [groupByCustomer, setGroupByCustomer] = useState<boolean>(false);
+  const [onlyPriceMismatch, setOnlyPriceMismatch] = useState<boolean>(false);
+  const [syncingSubtotal, setSyncingSubtotal] = useState<boolean>(false);
   const [aiStatusFilter, setAiStatusFilter] = useState<"all" | "UNDERPAID" | "OVERPAID" | "MATCH" | "UNREADABLE" | "UNSCANNED">("all");
   const [isBatchScanning, setIsBatchScanning] = useState(false);
   const [batchScanProgress, setBatchScanProgress] = useState<{ processed: number; remaining: number } | null>(null);
@@ -507,8 +512,9 @@ function AdminTransactionsPage() {
     if (shippingFilter !== "all") count++;
     if (statusFilter.length > 0) count++;
     if (aiStatusFilter !== "all") count++;
+    if (onlyPriceMismatch) count++;
     return count;
-  }, [campaignFilter, productFilter, shippingFilter, statusFilter, aiStatusFilter]);
+  }, [campaignFilter, productFilter, shippingFilter, statusFilter, aiStatusFilter, onlyPriceMismatch]);
 
   const activeOfflineFilterCount = useMemo(() => {
     let count = 0;
@@ -538,6 +544,7 @@ function AdminTransactionsPage() {
     setShippingFilter("all");
     setStatusFilter([]);
     setAiStatusFilter("all");
+    setOnlyPriceMismatch(false);
     setPosPaymentMethodFilter("all");
     setPosCashierFilter("all");
     setPosDateFilter("all");
@@ -1343,6 +1350,56 @@ function AdminTransactionsPage() {
     }
   };
 
+  const handleSyncOrderSubtotal = async (orderId: string, expectedSubtotal: number, expectedGross: number) => {
+    if (isCashier) {
+      toast.error("Akses ditolak: Hanya admin yang dapat memperbarui subtotal transaksi.");
+      return;
+    }
+    const fmt = (num: number) => `Rp ${Number(num || 0).toLocaleString("id-ID")}`;
+    if (!window.confirm(`Konfirmasi Sinkronisasi Data:\n\nPerbarui subtotal transaksi ${orderId} di database menjadi:\n- Subtotal Baru: ${fmt(expectedSubtotal)}\n- Total Akhir Baru: ${fmt(expectedGross)}\n\nLanjutkan pembaruan ke database?`)) {
+      return;
+    }
+
+    try {
+      setSyncingSubtotal(true);
+      const res = await fetch(`${API_BASE_URL}/api/admin/orders/${encodeURIComponent(orderId)}/sync-subtotal`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          ...getAdminRequestHeaders(),
+        },
+        body: JSON.stringify({
+          new_subtotal: expectedSubtotal,
+          new_gross_amount: expectedGross,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+
+      toast.success(data?.message || `Subtotal pesanan ${orderId} berhasil diperbarui di database!`);
+
+      // Update active managed transaction if currently open
+      setManagedTransaction((prev: any) => {
+        if (!prev || prev.order_id !== orderId) return prev;
+        return {
+          ...prev,
+          subtotal: expectedSubtotal,
+          gross_amount: expectedGross,
+        };
+      });
+
+      await loadTransactions();
+    } catch (err: any) {
+      console.error("Gagal sinkron subtotal:", err);
+      toast.error(err?.message || "Gagal memperbarui subtotal transaksi");
+    } finally {
+      setSyncingSubtotal(false);
+    }
+  };
+
   const handleDeleteOrder = async (id: string) => {
     if (isCashier) {
       toast.error("Akses ditolak: Kasir tidak diizinkan menghapus transaksi.");
@@ -1672,9 +1729,13 @@ function AdminTransactionsPage() {
     let aiMatchCount = 0;
     let aiUnreadableCount = 0;
     let aiUnscannedCount = 0;
+    let mismatchCount = 0;
 
     baseFilteredOrders.forEach((o) => {
       if (!o) return;
+      if (calculateOrderPriceAudit(o).hasMismatch) {
+        mismatchCount++;
+      }
 
       const linkedLns = dpPelunasanMap[o.order_id];
       const isPaid =
@@ -1750,12 +1811,17 @@ function AdminTransactionsPage() {
       aiMatchCount,
       aiUnreadableCount,
       aiUnscannedCount,
+      mismatchCount,
     };
   }, [baseFilteredOrders, dpPelunasanMap]);
 
   // 3. Final filtered orders list applying status & AI filters
   const filteredOnlineOrders = useMemo(() => {
     let result = baseFilteredOrders;
+
+    if (onlyPriceMismatch) {
+      result = result.filter((order) => calculateOrderPriceAudit(order).hasMismatch);
+    }
 
     if (statusFilter && statusFilter.length > 0) {
       result = result.filter((order) => {
@@ -1823,7 +1889,7 @@ function AdminTransactionsPage() {
     }
 
     return result;
-  }, [baseFilteredOrders, statusFilter, aiStatusFilter, dpPelunasanMap]);
+  }, [baseFilteredOrders, statusFilter, aiStatusFilter, onlyPriceMismatch, dpPelunasanMap]);
 
   const targetUserIds = useMemo(() => {
     const ids = filteredOnlineOrders
@@ -2600,6 +2666,32 @@ function AdminTransactionsPage() {
                     )}
                   </Button>
 
+                  {/* Tombol Filter Cepat Selisih Harga */}
+                  <Button
+                    type="button"
+                    variant={onlyPriceMismatch ? "destructive" : "outline"}
+                    size="sm"
+                    onClick={() => setOnlyPriceMismatch((prev) => !prev)}
+                    className={`h-9 text-xs font-black border-2 transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5 ${
+                      onlyPriceMismatch
+                        ? "bg-red-600 text-white hover:bg-red-700 border-red-900"
+                        : "bg-white text-red-600 border-red-300 hover:bg-red-50"
+                    }`}
+                    title="Filter cepat transaksi yang memiliki ketidaksesuaian subtotal / total harga"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <span>Selisih Harga</span>
+                    <span
+                      className={`text-[10px] font-black px-1.5 py-0.2 rounded-full min-w-[18px] text-center border ${
+                        onlyPriceMismatch
+                          ? "bg-white text-red-600 border-red-200"
+                          : "bg-red-100 text-red-700 border-red-300"
+                      }`}
+                    >
+                      {stats.mismatchCount}
+                    </span>
+                  </Button>
+
                   {/* Popover Pengaturan Kolom Tabel */}
                   <Popover>
                     <PopoverTrigger asChild>
@@ -3012,12 +3104,17 @@ function AdminTransactionsPage() {
                     const addr = String((order as any).shipping_address || "").toLowerCase();
                     const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
                     const dt = formatCompactDateTime(order.created_at);
+                    const audit = calculateOrderPriceAudit(order);
 
                     return (
                       <div
                         key={order.order_id}
-                        className={`bg-white border-2 border-ink/20 rounded-xl p-3.5 shadow-sm space-y-2.5 transition-all ${
-                          order.voucher_code || order.discount_amount > 0 ? "border-orange-300 bg-orange-50/20" : ""
+                        className={`rounded-xl p-3.5 shadow-sm space-y-2.5 transition-all border-2 ${
+                          audit.hasMismatch
+                            ? "bg-red-50/70 border-red-400 shadow-red-100"
+                            : order.voucher_code || order.discount_amount > 0
+                              ? "border-orange-300 bg-orange-50/20"
+                              : "bg-white border-ink/20"
                         }`}
                       >
                         {/* Card Top: Order ID + Tags + Date */}
@@ -3032,6 +3129,12 @@ function AdminTransactionsPage() {
                             {dpPelunasanMap[order.order_id] && (
                               <Badge className="bg-purple-100 text-purple-900 border-purple-300 text-[9px] px-1 py-0 font-black">
                                 +Pelunasan
+                              </Badge>
+                            )}
+                            {audit.hasMismatch && (
+                              <Badge className="bg-red-100 text-red-900 border-red-300 text-[9px] px-1.5 py-0 font-black flex items-center gap-1">
+                                <AlertTriangle className="w-2.5 h-2.5 text-red-600" />
+                                Selisih Subtotal
                               </Badge>
                             )}
                           </div>
@@ -3064,8 +3167,34 @@ function AdminTransactionsPage() {
                             <span className="font-mono font-black text-ink text-sm">
                               Rp {Number(order.gross_amount).toLocaleString("id-ID")}
                             </span>
+                            {audit.hasMismatch && (
+                              <span className="block text-[10px] text-red-700 font-bold font-mono">
+                                Seharusnya: Rp {audit.expectedGross.toLocaleString("id-ID")}
+                              </span>
+                            )}
                           </div>
                         </div>
+
+                        {/* Audit Selisih Alert Banner */}
+                        {audit.hasMismatch && (
+                          <div className="bg-red-100/90 border border-red-300 rounded-lg p-2 text-xs space-y-1 text-red-950 font-medium">
+                            <div className="flex items-center justify-between text-[11px] font-bold text-red-900">
+                              <span className="flex items-center gap-1">
+                                <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" />
+                                Selisih Subtotal Terdeteksi
+                              </span>
+                              <span className="font-mono">
+                                {audit.subtotalDiff > 0
+                                  ? `Lebih Ditagih: +Rp ${audit.subtotalDiff.toLocaleString("id-ID")}`
+                                  : `Kurang Ditagih: -Rp ${Math.abs(audit.subtotalDiff).toLocaleString("id-ID")}`}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-[10px] text-red-800/90 pt-0.5 border-t border-red-200">
+                              <span>Tercatat DB: <strong className="font-mono line-through text-red-700">Rp {audit.actualSubtotal.toLocaleString("id-ID")}</strong></span>
+                              <span>Seharusnya: <strong className="font-mono text-emerald-800">Rp {audit.expectedSubtotal.toLocaleString("id-ID")}</strong></span>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Badges Status */}
                         <div className="flex flex-wrap items-center gap-1.5 pt-1">
@@ -3497,81 +3626,101 @@ function AdminTransactionsPage() {
                         </td>
                       </tr>
                     ) : (
-                      sortedOnlineOrders.map((order, idx) => (
-                        <Fragment key={order.order_id}>
-                          <tr
-                            className={`border-t border-border transition-colors ${
-                              order.voucher_code || order.discount_amount > 0
-                                ? "bg-orange-50/50 hover:bg-orange-100/60"
-                                : "hover:bg-cream/10"
-                            }`}
-                          >
-                            <td className="p-2.5 text-center">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6 hover:bg-muted"
-                                onClick={() => void toggleRow(order.order_id, "online")}
-                              >
-                                {expandedRows[order.order_id] ? (
-                                  <ChevronUp className="h-4 w-4 text-ink" />
-                                ) : (
-                                  <ChevronDown className="h-4 w-4 text-ink" />
-                                )}
-                              </Button>
-                            </td>
-                            {visibleColumns.no && (
-                              <td className="p-2.5 font-semibold text-xs text-ink text-center">
-                                {idx + 1}
-                              </td>
-                            )}
-                            {visibleColumns.order_id && (
-                              <td className="p-2.5 font-mono text-xs text-brand-blue font-bold whitespace-nowrap">
-                                <div>{order.order_id}</div>
-                                <div className="flex items-center gap-1 mt-1 flex-wrap">
-                                  {(() => {
-                                    const addr = String((order as any).shipping_address || "").toLowerCase();
-                                    const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
-                                    return isPickup ? (
-                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-950 border border-emerald-300">
-                                        <Store className="w-2.5 h-2.5 text-emerald-700" /> Ambil
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 text-blue-950 border border-blue-300">
-                                        <Truck className="w-2.5 h-2.5 text-blue-700" /> Antar
-                                      </span>
-                                    );
-                                  })()}
-                                  {isDpOrder(order) && (
-                                    <span className="px-1 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300">
-                                      DP
-                                    </span>
+                      sortedOnlineOrders.map((order, idx) => {
+                        const audit = calculateOrderPriceAudit(order);
+                        return (
+                          <Fragment key={order.order_id}>
+                            <tr
+                              className={`border-t border-border transition-colors ${
+                                audit.hasMismatch
+                                  ? "bg-red-50/85 hover:bg-red-100/90 border-l-4 border-l-red-600"
+                                  : order.voucher_code || order.discount_amount > 0
+                                    ? "bg-orange-50/50 hover:bg-orange-100/60"
+                                    : "hover:bg-cream/10"
+                              }`}
+                            >
+                              <td className="p-2.5 text-center">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-6 w-6 hover:bg-muted"
+                                  onClick={() => void toggleRow(order.order_id, "online")}
+                                >
+                                  {expandedRows[order.order_id] ? (
+                                    <ChevronUp className="h-4 w-4 text-ink" />
+                                  ) : (
+                                    <ChevronDown className="h-4 w-4 text-ink" />
                                   )}
-                                  {dpPelunasanMap[order.order_id] && (
-                                    <span className="px-1 py-0.2 rounded text-[9px] font-black bg-purple-100 text-purple-900 border border-purple-300">
-                                      +Lunas
-                                    </span>
-                                  )}
-                                </div>
+                                </Button>
                               </td>
-                            )}
-                            {visibleColumns.customer_name && (
-                              <td className="p-2.5">
-                                <p className="font-bold text-ink uppercase text-xs truncate max-w-[150px] xl:max-w-[190px]" title={order.customer_name}>
-                                  {order.customer_name}
-                                </p>
-                              </td>
-                            )}
-                            {visibleColumns.gross_amount && (
-                              <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
-                                <div>Rp {Number(order.gross_amount).toLocaleString("id-ID")}</div>
-                                {order.payment_proof_match_status === "UNDERPAID" && (
-                                  <div className="text-[10px] font-black text-rose-600 tracking-tight">
-                                    Struk: Rp {Number(order.payment_proof_verified_amount || 0).toLocaleString("id-ID")}
+                              {visibleColumns.no && (
+                                <td className="p-2.5 font-semibold text-xs text-ink text-center">
+                                  {idx + 1}
+                                </td>
+                              )}
+                              {visibleColumns.order_id && (
+                                <td className="p-2.5 font-mono text-xs text-brand-blue font-bold whitespace-nowrap">
+                                  <div>{order.order_id}</div>
+                                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                    {(() => {
+                                      const addr = String((order as any).shipping_address || "").toLowerCase();
+                                      const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
+                                      return isPickup ? (
+                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-50 text-emerald-950 border border-emerald-300">
+                                          <Store className="w-2.5 h-2.5 text-emerald-700" /> Ambil
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-50 text-blue-950 border border-blue-300">
+                                          <Truck className="w-2.5 h-2.5 text-blue-700" /> Antar
+                                        </span>
+                                      );
+                                    })()}
+                                    {isDpOrder(order) && (
+                                      <span className="px-1 py-0.2 rounded text-[9px] font-black bg-amber-100 text-amber-900 border border-amber-300">
+                                        DP
+                                      </span>
+                                    )}
+                                    {dpPelunasanMap[order.order_id] && (
+                                      <span className="px-1 py-0.2 rounded text-[9px] font-black bg-purple-100 text-purple-900 border border-purple-300">
+                                        +Lunas
+                                      </span>
+                                    )}
+                                    {audit.hasMismatch && (
+                                      <span
+                                        className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black bg-red-100 text-red-900 border border-red-300"
+                                        title={`Subtotal DB: Rp ${audit.actualSubtotal.toLocaleString("id-ID")} | Seharusnya: Rp ${audit.expectedSubtotal.toLocaleString("id-ID")}`}
+                                      >
+                                        <AlertTriangle className="w-2.5 h-2.5 text-red-600" /> Selisih Subtotal
+                                      </span>
+                                    )}
                                   </div>
-                                )}
-                              </td>
-                            )}
+                                </td>
+                              )}
+                              {visibleColumns.customer_name && (
+                                <td className="p-2.5">
+                                  <p className="font-bold text-ink uppercase text-xs truncate max-w-[150px] xl:max-w-[190px]" title={order.customer_name}>
+                                    {order.customer_name}
+                                  </p>
+                                </td>
+                              )}
+                              {visibleColumns.gross_amount && (
+                                <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
+                                  <div>Rp {Number(order.gross_amount).toLocaleString("id-ID")}</div>
+                                  {audit.hasMismatch && (
+                                    <div
+                                      className="text-[10px] font-bold text-red-700 tracking-tight"
+                                      title={`Subtotal Seharusnya: Rp ${audit.expectedSubtotal.toLocaleString("id-ID")}`}
+                                    >
+                                      Seharusnya: Rp {audit.expectedGross.toLocaleString("id-ID")}
+                                    </div>
+                                  )}
+                                  {order.payment_proof_match_status === "UNDERPAID" && (
+                                    <div className="text-[10px] font-black text-rose-600 tracking-tight">
+                                      Struk: Rp {Number(order.payment_proof_verified_amount || 0).toLocaleString("id-ID")}
+                                    </div>
+                                  )}
+                                </td>
+                              )}
                             {visibleColumns.pelunasan && (
                               <td className="p-2.5 text-right whitespace-nowrap">
                                 {(() => {
@@ -3877,7 +4026,8 @@ function AdminTransactionsPage() {
                             </tr>
                           )}
                         </Fragment>
-                      ))
+                      );
+                    })
                     )}
                   </tbody>
                 </table>
@@ -5757,35 +5907,156 @@ function AdminTransactionsPage() {
                       </table>
                     </div>
 
-                    {/* Pricing summary */}
-                    <div className="text-xs space-y-2 border-t pt-3">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Subtotal:</span>
-                        <span className="font-semibold text-ink">
-                          Rp {Number(managedTransaction.subtotal || managedTransaction.gross_amount).toLocaleString("id-ID")}
-                        </span>
-                      </div>
-                      {managedTransaction.discount > 0 && (
-                        <div className="flex justify-between text-yellow-600 font-semibold">
-                          <span>Diskon POS:</span>
-                          <span>-Rp {Number(managedTransaction.discount).toLocaleString("id-ID")}</span>
+                    {/* Audit Selisih Subtotal Box & Pricing summary */}
+                    {(() => {
+                      const audit = calculateOrderPriceAudit(managedTransaction, managedItems);
+                      const fmt = (val: number) => `Rp ${Number(val || 0).toLocaleString("id-ID")}`;
+
+                      const posDiscount = Number(managedTransaction.discount || 0);
+                      const voucherDiscount = Number(managedTransaction.discount_amount || 0);
+                      const shippingCost = Number(managedTransaction.shipping_cost || 0);
+
+                      return (
+                        <div className="space-y-3 border-t pt-3">
+                          {/* Audit Alert & Comparison Box jika ada selisih */}
+                          {audit.hasMismatch && (
+                            <div className="rounded-xl border-2 border-red-400 bg-red-50/85 p-3.5 space-y-3 shadow-sm">
+                              <div className="flex items-center justify-between gap-2 border-b border-red-200 pb-2">
+                                <div className="flex items-center gap-1.5 font-black text-red-900 text-xs uppercase tracking-wider">
+                                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                                  <span>Audit Selisih Harga Transaksi</span>
+                                </div>
+                                <span
+                                  className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
+                                    audit.subtotalDiff > 0
+                                      ? "bg-amber-100 text-amber-900 border-amber-300"
+                                      : "bg-rose-100 text-rose-900 border-rose-300"
+                                  }`}
+                                >
+                                  {audit.subtotalDiff > 0
+                                    ? `Lebih Ditagih: +${fmt(audit.subtotalDiff)}`
+                                    : `Kurang Ditagih: -${fmt(Math.abs(audit.subtotalDiff))}`}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+                                <div className="bg-white border border-red-200 rounded-lg p-2.5 space-y-1">
+                                  <span className="text-[10px] font-bold text-muted-foreground uppercase block">
+                                    Tercatat di Database Saat Ini
+                                  </span>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Subtotal DB:</span>
+                                    <span className="font-mono font-bold text-red-700">{fmt(audit.actualSubtotal)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Total Tagihan:</span>
+                                    <span className="font-mono font-bold text-ink">{fmt(audit.actualGross)}</span>
+                                  </div>
+                                </div>
+
+                                <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2.5 space-y-1">
+                                  <span className="text-[10px] font-bold text-emerald-800 uppercase block">
+                                    Hasil Rekalkulasi Item (Seharusnya)
+                                  </span>
+                                  <div className="flex justify-between">
+                                    <span className="text-emerald-900">Subtotal Seharusnya:</span>
+                                    <span className="font-mono font-black text-emerald-700">{fmt(audit.expectedSubtotal)}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-emerald-900">Total Seharusnya:</span>
+                                    <span className="font-mono font-black text-emerald-800">{fmt(audit.expectedGross)}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {audit.hasBundleComponents && (
+                                <p className="text-[10px] text-amber-900 bg-amber-50 border border-amber-200 rounded p-1.5 font-medium leading-relaxed">
+                                  💡 <strong>Catatan Komponen Bundle:</strong> Pesanan ini memiliki komponen paket bundle. Pada rekalkulasi yang benar, komponen di dalamnya dihitung Rp 0 agar tidak terhitung dua kali dengan harga paket utama.
+                                </p>
+                              )}
+
+                              <div className="pt-1 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                                <span className="text-[11px] text-red-800 font-medium">
+                                  Setelah Anda merekap data ini, Anda dapat memperbarui subtotal transaksi di database:
+                                </span>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={syncingSubtotal}
+                                  onClick={() => void handleSyncOrderSubtotal(managedTransaction.order_id, audit.expectedSubtotal, audit.expectedGross)}
+                                  className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] border-2 border-ink flex items-center gap-1.5 cursor-pointer shrink-0"
+                                >
+                                  {syncingSubtotal ? (
+                                    <>
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                      <span>Menyimpan ke DB...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle2 className="w-3.5 h-3.5" />
+                                      <span>Terapkan Subtotal yang Benar ke Database</span>
+                                    </>
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Pricing summary ringkas */}
+                          <div className="text-xs space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Subtotal Tercatat (DB):</span>
+                              <span className={`font-semibold ${audit.hasMismatch ? "text-red-700 line-through font-mono" : "text-ink"}`}>
+                                {fmt(managedTransaction.subtotal || managedTransaction.gross_amount)}
+                              </span>
+                            </div>
+                            {audit.hasMismatch && (
+                              <div className="flex justify-between text-emerald-700 font-bold">
+                                <span>Subtotal Seharusnya (Item):</span>
+                                <span className="font-mono">{fmt(audit.expectedSubtotal)}</span>
+                              </div>
+                            )}
+                            {posDiscount > 0 && (
+                              <div className="flex justify-between text-yellow-600 font-semibold">
+                                <span>Diskon POS:</span>
+                                <span>-{fmt(posDiscount)}</span>
+                              </div>
+                            )}
+                            {managedTransaction.voucher_code && (
+                              <div className="flex justify-between text-brand-orange font-semibold">
+                                <span className="flex items-center gap-1.5">
+                                  Voucher{" "}
+                                  <span className="bg-brand-orange/10 border border-brand-orange/30 px-1.5 py-0.5 rounded text-[10px] uppercase font-mono">
+                                    {managedTransaction.voucher_code}
+                                  </span>
+                                  :
+                                </span>
+                                <span>-{fmt(voucherDiscount)}</span>
+                              </div>
+                            )}
+                            {shippingCost > 0 && (
+                              <div className="flex justify-between text-muted-foreground">
+                                <span>Ongkos Kirim:</span>
+                                <span>+{fmt(shippingCost)}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between border-t border-border pt-2 text-sm font-extrabold">
+                              <span className="text-xs text-ink uppercase tracking-wider">Total Akhir:</span>
+                              <div className="text-right">
+                                <span className="text-brand-orange">
+                                  {fmt(managedTransaction.gross_amount || managedTransaction.total)}
+                                </span>
+                                {audit.hasMismatch && (
+                                  <span className="block text-[11px] text-emerald-700 font-bold font-mono">
+                                    (Seharusnya: {fmt(audit.expectedGross)})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      )}
-                      {managedTransaction.voucher_code && (
-                        <div className="flex justify-between text-brand-orange font-semibold">
-                          <span className="flex items-center gap-1.5">
-                            Voucher <span className="bg-brand-orange/10 border border-brand-orange/30 px-1.5 py-0.5 rounded text-[10px] uppercase font-mono">{managedTransaction.voucher_code}</span>:
-                          </span>
-                          <span>-Rp {Number(managedTransaction.discount_amount || 0).toLocaleString("id-ID")}</span>
-                        </div>
-                      )}
-                      <div className="flex justify-between border-t border-border pt-2 text-sm font-extrabold">
-                        <span className="text-xs text-ink uppercase tracking-wider">Total Akhir:</span>
-                        <span className="text-brand-orange">
-                          Rp {Number(managedTransaction.gross_amount || managedTransaction.total).toLocaleString("id-ID")}
-                        </span>
-                      </div>
-                    </div>
+                      );
+                    })()}
                   </div>
 
                   {/* Status edit controls (Non-POS/Online order only) */}

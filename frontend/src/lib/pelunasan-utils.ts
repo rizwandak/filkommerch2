@@ -134,3 +134,81 @@ export const calculateOrderPelunasanAmount = (order: any, linkedLns?: any): numb
 
   return totalPelunasan;
 };
+
+export interface OrderPriceAudit {
+  actualSubtotal: number;
+  expectedSubtotal: number;
+  subtotalDiff: number; // actual - expected (+: overcharged in DB, -: undercharged in DB)
+  actualGross: number;
+  expectedGross: number;
+  grossDiff: number;
+  hasMismatch: boolean;
+  hasBundleComponents: boolean;
+  itemsSum: number;
+}
+
+export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): OrderPriceAudit => {
+  if (!order) {
+    return {
+      actualSubtotal: 0,
+      expectedSubtotal: 0,
+      subtotalDiff: 0,
+      actualGross: 0,
+      expectedGross: 0,
+      grossDiff: 0,
+      hasMismatch: false,
+      hasBundleComponents: false,
+      itemsSum: 0,
+    };
+  }
+
+  const items: any[] = itemsOverride || order.items || [];
+  const actualSubtotal = Number(order.subtotal || 0);
+  const actualGross = Number(order.gross_amount || 0);
+
+  const posDiscount = Number(order.discount || 0);
+  const voucherDiscount = Number(order.discount_amount || 0);
+  const shippingCost = Number(order.shipping_cost || 0);
+  const serviceFee = Number(order.service_fee || 0);
+  const taxAmount = Number(order.tax_amount || 0);
+  const uniqueCode = Number(order.unique_code || 0);
+
+  const hasBundleComponents = items.some((i: any) =>
+    String(i?.product_name || "").includes("[KOMPONEN BUNDLE]")
+  );
+
+  // If there are items, sum them up (exclude [KOMPONEN BUNDLE] prices as the bundle covers it)
+  let itemsSum = 0;
+  if (items.length > 0) {
+    itemsSum = items.reduce((sum: number, it: any) => {
+      if (String(it?.product_name || "").includes("[KOMPONEN BUNDLE]")) return sum;
+      return sum + Number(it?.subtotal ?? (Number(it?.unit_price || 0) * Number(it?.quantity || 1)));
+    }, 0);
+  } else {
+    itemsSum = actualSubtotal;
+  }
+
+  const expectedSubtotal = itemsSum;
+  const expectedGross = Math.max(
+    0,
+    expectedSubtotal - posDiscount - voucherDiscount + shippingCost + serviceFee + taxAmount + uniqueCode
+  );
+
+  const subtotalDiff = actualSubtotal - expectedSubtotal;
+  const grossDiff = actualGross - expectedGross;
+
+  // Detect mismatch if there are items and subtotal differs, or gross amount differs
+  const hasMismatch = (items.length > 0 && Math.abs(subtotalDiff) > 0) || Math.abs(grossDiff) > 0;
+
+  return {
+    actualSubtotal,
+    expectedSubtotal,
+    subtotalDiff,
+    actualGross,
+    expectedGross,
+    grossDiff,
+    hasMismatch,
+    hasBundleComponents,
+    itemsSum,
+  };
+};

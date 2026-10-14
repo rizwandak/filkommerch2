@@ -1,0 +1,2588 @@
+[
+  {
+    "order_id": "FILKOM-1784528890719",
+    "id": 62,
+    "customer_name": "Muhamad Imam Nurjaman",
+    "created_at": "2026-07-20 06:28:11",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 57000,
+    "itemSubtotalSum": 40000,
+    "subtotalDiff": 17000,
+    "grossAmount": 57000,
+    "expectedGross": 40000,
+    "grossDiff": 17000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1784550076165",
+    "id": 74,
+    "customer_name": "Fathia Kartika Zahratussyifa",
+    "created_at": "2026-07-20 12:21:15",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 35000,
+    "itemSubtotalSum": 57000,
+    "subtotalDiff": -22000,
+    "grossAmount": 35000,
+    "expectedGross": 57000,
+    "grossDiff": -22000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Brand New Days Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 35000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1784581240701",
+    "id": 83,
+    "customer_name": "Reza Abdul Latif",
+    "created_at": "2026-07-20 21:01:41",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 389000,
+    "itemSubtotalSum": 423000,
+    "subtotalDiff": -34000,
+    "grossAmount": 389000,
+    "expectedGross": 423000,
+    "grossDiff": -34000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Proud To Be FILKOM!",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 389000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "XXL",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1784738649351",
+    "id": 89,
+    "customer_name": "RAYHAN PUTRA YAVIE",
+    "created_at": "2026-07-22 16:46:15",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 40000,
+    "itemSubtotalSum": 59000,
+    "subtotalDiff": -19000,
+    "grossAmount": 40000,
+    "expectedGross": 59000,
+    "grossDiff": -19000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "Brand New Days Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 27000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1784789691062",
+    "id": 90,
+    "customer_name": "ABDULLAH RAFIF SYAFRI",
+    "created_at": "2026-07-23 06:56:02",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 339000,
+    "itemSubtotalSum": 321000,
+    "subtotalDiff": 18000,
+    "grossAmount": 339000,
+    "expectedGross": 321000,
+    "grossDiff": 18000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "L",
+        "quantity": 1,
+        "subtotal": 249000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1784811248763",
+    "id": 91,
+    "customer_name": "MUHAMMAD DZAKY ADRIAS",
+    "created_at": "2026-07-23 13:00:42",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 206000,
+    "itemSubtotalSum": 228000,
+    "subtotalDiff": -22000,
+    "grossAmount": 206000,
+    "expectedGross": 228000,
+    "grossDiff": -22000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Brand New Days Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 27000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Half Zip Jacket FILKOM Club Est. 2011 (DP 50%)",
+        "size": "XL",
+        "quantity": 1,
+        "subtotal": 179000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1784823284440",
+    "id": 93,
+    "customer_name": "Mokh. Davis Rasendriya Mukhtar",
+    "created_at": "2026-07-23 16:18:15",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 182500,
+    "itemSubtotalSum": 168500,
+    "subtotalDiff": 14000,
+    "grossAmount": 164250,
+    "expectedGross": 150250,
+    "grossDiff": 14000,
+    "shipping": 0,
+    "discount": 18250,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "S",
+        "quantity": 1,
+        "subtotal": 124500
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1784864886634",
+    "id": 94,
+    "customer_name": "Amartya Raddin Kayla Medina",
+    "created_at": "2026-07-24 03:49:27",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 36000,
+    "itemSubtotalSum": 26000,
+    "subtotalDiff": 10000,
+    "grossAmount": 36000,
+    "expectedGross": 26000,
+    "grossDiff": 10000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1784899036797",
+    "id": 96,
+    "customer_name": "Achmad Alvian Prasetio",
+    "created_at": "2026-07-24 13:18:30",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 151500,
+    "itemSubtotalSum": 173500,
+    "subtotalDiff": -22000,
+    "grossAmount": 151500,
+    "expectedGross": 173500,
+    "grossDiff": -22000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Brand New Days Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 27000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "XXL",
+        "quantity": 1,
+        "subtotal": 124500
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1784968517976",
+    "id": 97,
+    "customer_name": "Daffa Ramadhan Jauhari",
+    "created_at": "2026-07-25 08:38:41",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 36000,
+    "itemSubtotalSum": 26000,
+    "subtotalDiff": 10000,
+    "grossAmount": 36000,
+    "expectedGross": 26000,
+    "grossDiff": 10000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785144958211",
+    "id": 103,
+    "customer_name": "NAFARELLA ALLEAZAHRA RISNANTHEA",
+    "created_at": "2026-07-27 11:44:41",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 72000,
+    "itemSubtotalSum": 52000,
+    "subtotalDiff": 20000,
+    "grossAmount": 72000,
+    "expectedGross": 52000,
+    "grossDiff": 20000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785156603023",
+    "id": 104,
+    "customer_name": "FAIZAH NUR KARIMAH",
+    "created_at": "2026-07-27 12:52:41",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 32000,
+    "itemSubtotalSum": 26000,
+    "subtotalDiff": 6000,
+    "grossAmount": 32000,
+    "expectedGross": 26000,
+    "grossDiff": 6000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785239087439",
+    "id": 110,
+    "customer_name": "MUHAMMAD TAUFIQUL HAFIZH",
+    "created_at": "2026-07-28 11:50:41",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 27000,
+    "itemSubtotalSum": 49000,
+    "subtotalDiff": -22000,
+    "grossAmount": 27000,
+    "expectedGross": 49000,
+    "grossDiff": -22000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Brand New Days Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 27000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785239512533",
+    "id": 111,
+    "customer_name": "Rasya Pasha",
+    "created_at": "2026-07-28 11:53:30",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 30000,
+    "itemSubtotalSum": 20000,
+    "subtotalDiff": 10000,
+    "grossAmount": 30000,
+    "expectedGross": 20000,
+    "grossDiff": 10000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 2,
+        "subtotal": 20000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785240877656",
+    "id": 112,
+    "customer_name": "ARIQ DWI ANUGRAH",
+    "created_at": "2026-07-28 12:15:42",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 64000,
+    "itemSubtotalSum": 52000,
+    "subtotalDiff": 12000,
+    "grossAmount": 64000,
+    "expectedGross": 52000,
+    "grossDiff": 12000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785247594581",
+    "id": 113,
+    "customer_name": "Cristian Joen Pingson Simanjuntak",
+    "created_at": "2026-07-28 14:07:49",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 349000,
+    "itemSubtotalSum": 383000,
+    "subtotalDiff": -34000,
+    "grossAmount": 349000,
+    "expectedGross": 383000,
+    "grossDiff": -34000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Proud To Be FILKOM!",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 349000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "XL",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785248782855",
+    "id": 114,
+    "customer_name": "DEVITHA DINI TANAMA",
+    "created_at": "2026-07-28 14:28:35",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 85000,
+    "itemSubtotalSum": 80000,
+    "subtotalDiff": 5000,
+    "grossAmount": 85000,
+    "expectedGross": 80000,
+    "grossDiff": 5000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Topi Baseball",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 80000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785256347423",
+    "id": 115,
+    "customer_name": "ARYA AGUNG DHARMA WISESA",
+    "created_at": "2026-07-28 16:34:53",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 349000,
+    "itemSubtotalSum": 383000,
+    "subtotalDiff": -34000,
+    "grossAmount": 349000,
+    "expectedGross": 383000,
+    "grossDiff": -34000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Proud To Be FILKOM!",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 349000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "XL",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785296217085",
+    "id": 117,
+    "customer_name": "CATHARINA TIARA MAHARANI",
+    "created_at": "2026-07-29 03:39:28",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 27000,
+    "itemSubtotalSum": 49000,
+    "subtotalDiff": -22000,
+    "grossAmount": 27000,
+    "expectedGross": 49000,
+    "grossDiff": -22000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Brand New Days Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 27000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785319094363",
+    "id": 119,
+    "customer_name": "Himmah Aliyah",
+    "created_at": "2026-07-29 09:59:28",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 35000,
+    "itemSubtotalSum": 57000,
+    "subtotalDiff": -22000,
+    "grossAmount": 35000,
+    "expectedGross": 57000,
+    "grossDiff": -22000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Brand New Days Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 35000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785321312717",
+    "id": 120,
+    "customer_name": "CICI RAMADHANI",
+    "created_at": "2026-07-29 10:35:19",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 13000,
+    "itemSubtotalSum": 10000,
+    "subtotalDiff": 3000,
+    "grossAmount": 13000,
+    "expectedGross": 10000,
+    "grossDiff": 3000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785321407619",
+    "id": 121,
+    "customer_name": "CICI RAMADHANI",
+    "created_at": "2026-07-29 10:38:55",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 264000,
+    "itemSubtotalSum": 259000,
+    "subtotalDiff": 5000,
+    "grossAmount": 264000,
+    "expectedGross": 259000,
+    "grossDiff": 5000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Half Zip Jacket FILKOM Club Est. 2011 (DP 50%)",
+        "size": "XS",
+        "quantity": 1,
+        "subtotal": 179000
+      },
+      {
+        "name": "Topi Baseball",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 80000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785331658795",
+    "id": 123,
+    "customer_name": "GHINA ERVINA SHOVA",
+    "created_at": "2026-07-29 13:30:19",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 77000,
+    "itemSubtotalSum": 60000,
+    "subtotalDiff": 17000,
+    "grossAmount": 77000,
+    "expectedGross": 60000,
+    "grossDiff": 17000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785383416132",
+    "id": 125,
+    "customer_name": "ALFIN NUR ROBBY",
+    "created_at": "2026-07-30 03:51:19",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 261000,
+    "itemSubtotalSum": 257000,
+    "subtotalDiff": 4000,
+    "grossAmount": 241000,
+    "expectedGross": 237000,
+    "grossDiff": 4000,
+    "shipping": 0,
+    "discount": 20000,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 249000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785392171224",
+    "id": 126,
+    "customer_name": "RAFA ADZANI DZAKI PRIYAYASA",
+    "created_at": "2026-07-30 06:17:45",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 99000,
+    "itemSubtotalSum": 222000,
+    "subtotalDiff": -123000,
+    "grossAmount": 99000,
+    "expectedGross": 222000,
+    "grossDiff": -123000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Starter Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 99000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] T-Shirt Kaos",
+        "size": "L",
+        "quantity": 1,
+        "subtotal": 105000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785406206236",
+    "id": 130,
+    "customer_name": "MUHAMMAD ATHA FAUZAN",
+    "created_at": "2026-07-30 10:11:33",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 319000,
+    "itemSubtotalSum": 417000,
+    "subtotalDiff": -98000,
+    "grossAmount": 319000,
+    "expectedGross": 417000,
+    "grossDiff": -98000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "FILKOM The Explorer",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 319000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Topi Baseball",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 80000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785413522682",
+    "id": 132,
+    "customer_name": "THOFA DER ASLAM",
+    "created_at": "2026-07-30 12:17:05",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 256500,
+    "itemSubtotalSum": 236500,
+    "subtotalDiff": 20000,
+    "grossAmount": 256500,
+    "expectedGross": 236500,
+    "grossDiff": 20000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "S",
+        "quantity": 1,
+        "subtotal": 184500
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785463621405",
+    "id": 133,
+    "customer_name": "NABILAH SIFA",
+    "created_at": "2026-07-31 02:15:00",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 338000,
+    "itemSubtotalSum": 326000,
+    "subtotalDiff": 12000,
+    "grossAmount": 338000,
+    "expectedGross": 326000,
+    "grossDiff": 12000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Notebook",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 25000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "S",
+        "quantity": 1,
+        "subtotal": 249000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785466153329",
+    "id": 134,
+    "customer_name": "RAFEYFA TASYAZALIA",
+    "created_at": "2026-07-31 02:49:57",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 36000,
+    "itemSubtotalSum": 26000,
+    "subtotalDiff": 10000,
+    "grossAmount": 36000,
+    "expectedGross": 26000,
+    "grossDiff": 10000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785487176488",
+    "id": 143,
+    "customer_name": "Sahrur Ramadhan",
+    "created_at": "2026-07-31 08:42:04",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 184500,
+    "itemSubtotalSum": 218500,
+    "subtotalDiff": -34000,
+    "grossAmount": 184500,
+    "expectedGross": 218500,
+    "grossDiff": -34000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Proud To Be FILKOM!",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 184500
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "XL",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785489190663",
+    "id": 145,
+    "customer_name": "BAYU PRIYAMBADHA",
+    "created_at": "2026-07-31 09:17:22",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 89000,
+    "itemSubtotalSum": 80000,
+    "subtotalDiff": 9000,
+    "grossAmount": 89000,
+    "expectedGross": 80000,
+    "grossDiff": 9000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Topi Baseball",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 80000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785492317804",
+    "id": 146,
+    "customer_name": "Muhammad Faidz Agustiawan",
+    "created_at": "2026-07-31 10:06:43",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 59000,
+    "itemSubtotalSum": 75000,
+    "subtotalDiff": -16000,
+    "grossAmount": 59000,
+    "expectedGross": 75000,
+    "grossDiff": -16000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Brand New Days Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 27000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785494578953",
+    "id": 148,
+    "customer_name": "HASSAN NASHRALLAH",
+    "created_at": "2026-07-31 11:56:45",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 32000,
+    "itemSubtotalSum": 26000,
+    "subtotalDiff": 6000,
+    "grossAmount": 32000,
+    "expectedGross": 26000,
+    "grossDiff": 6000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785506102862",
+    "id": 179,
+    "customer_name": "THIVANY PRAMESWATI",
+    "created_at": "2026-07-31 13:55:09",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 107000,
+    "itemSubtotalSum": 109000,
+    "subtotalDiff": -2000,
+    "grossAmount": 107000,
+    "expectedGross": 109000,
+    "grossDiff": -2000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Brand New Days Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 35000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785506942318",
+    "id": 180,
+    "customer_name": "I GUSTI NGURAH ANANTAWIJAYA MAHARDIKA",
+    "created_at": "2026-07-31 14:11:25",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 707000,
+    "itemSubtotalSum": 687000,
+    "subtotalDiff": 20000,
+    "grossAmount": 707000,
+    "expectedGross": 687000,
+    "grossDiff": 20000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Notebook",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 27000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "L",
+        "quantity": 1,
+        "subtotal": 259000
+      },
+      {
+        "name": "FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "L",
+        "quantity": 1,
+        "subtotal": 349000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785505742493",
+    "id": 183,
+    "customer_name": "M. Daffa Riyadlussalam",
+    "created_at": "2026-07-31 14:22:48",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 598000,
+    "itemSubtotalSum": 632000,
+    "subtotalDiff": -34000,
+    "grossAmount": 598000,
+    "expectedGross": 632000,
+    "grossDiff": -34000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "L",
+        "quantity": 1,
+        "subtotal": 249000
+      },
+      {
+        "name": "Proud To Be FILKOM!",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 349000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "L",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785508832701",
+    "id": 186,
+    "customer_name": "ARIEL RIZKY NAYOAN",
+    "created_at": "2026-07-31 14:42:28",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 72000,
+    "itemSubtotalSum": 66000,
+    "subtotalDiff": 6000,
+    "grossAmount": 52000,
+    "expectedGross": 46000,
+    "grossDiff": 6000,
+    "shipping": 0,
+    "discount": 20000,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Totebag",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 40000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785508603739",
+    "id": 187,
+    "customer_name": "RAFIF PRIYAMBODO",
+    "created_at": "2026-07-31 14:45:15",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 332000,
+    "itemSubtotalSum": 427000,
+    "subtotalDiff": -95000,
+    "grossAmount": 332000,
+    "expectedGross": 427000,
+    "grossDiff": -95000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "FILKOM The Explorer",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 319000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Topi Baseball",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 80000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785511956949",
+    "id": 192,
+    "customer_name": "ARYA AGUNG DHARMA WISESA",
+    "created_at": "2026-07-31 15:33:27",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 319000,
+    "itemSubtotalSum": 417000,
+    "subtotalDiff": -98000,
+    "grossAmount": 319000,
+    "expectedGross": 417000,
+    "grossDiff": -98000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "FILKOM The Explorer",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 319000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "XL",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Topi Baseball",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 80000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785512246039",
+    "id": 193,
+    "customer_name": "IZZAT ABRISAM VADWI",
+    "created_at": "2026-07-31 15:40:28",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 294000,
+    "itemSubtotalSum": 285000,
+    "subtotalDiff": 9000,
+    "grossAmount": 294000,
+    "expectedGross": 285000,
+    "grossDiff": 9000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 249000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785512701878",
+    "id": 195,
+    "customer_name": "MUHAMMAD ARMAN AL-FIKRI",
+    "created_at": "2026-07-31 15:45:59",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 89000,
+    "itemSubtotalSum": 105000,
+    "subtotalDiff": -16000,
+    "grossAmount": 89000,
+    "expectedGross": 105000,
+    "grossDiff": -16000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "T-Shirt Kaos",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 105000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785516275608",
+    "id": 203,
+    "customer_name": "Gede Raditya Dharma Putra Ayudia",
+    "created_at": "2026-07-31 16:45:32",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 385000,
+    "itemSubtotalSum": 375000,
+    "subtotalDiff": 10000,
+    "grossAmount": 385000,
+    "expectedGross": 375000,
+    "grossDiff": 10000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 349000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785517785708",
+    "id": 207,
+    "customer_name": "Fatarib Maulana Akbar",
+    "created_at": "2026-07-31 17:11:04",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 64000,
+    "itemSubtotalSum": 52000,
+    "subtotalDiff": 12000,
+    "grossAmount": 64000,
+    "expectedGross": 52000,
+    "grossDiff": 12000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785521447170",
+    "id": 208,
+    "customer_name": "FARREL RADITYA",
+    "created_at": "2026-07-31 18:11:07",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 362000,
+    "itemSubtotalSum": 391000,
+    "subtotalDiff": -29000,
+    "grossAmount": 362000,
+    "expectedGross": 391000,
+    "grossDiff": -29000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Proud To Be FILKOM!",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 349000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "L",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785523623682",
+    "id": 209,
+    "customer_name": "ARROW ELSAD ALFIAN LAY",
+    "created_at": "2026-07-31 18:48:37",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 349000,
+    "itemSubtotalSum": 383000,
+    "subtotalDiff": -34000,
+    "grossAmount": 349000,
+    "expectedGross": 383000,
+    "grossDiff": -34000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Proud To Be FILKOM!",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 349000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785597954972",
+    "id": 215,
+    "customer_name": "ELFRIDA GYON WIDAD",
+    "created_at": "2026-08-01 15:27:08",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 21000,
+    "itemSubtotalSum": 14000,
+    "subtotalDiff": 7000,
+    "grossAmount": 21000,
+    "expectedGross": 14000,
+    "grossDiff": 7000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785633536811",
+    "id": 216,
+    "customer_name": "MUHAMMAD FAIZ",
+    "created_at": "2026-08-02 01:20:28",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 32000,
+    "itemSubtotalSum": 26000,
+    "subtotalDiff": 6000,
+    "grossAmount": 32000,
+    "expectedGross": 26000,
+    "grossDiff": 6000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785648681078",
+    "id": 218,
+    "customer_name": "KHOBALA FIRDAUS",
+    "created_at": "2026-08-02 05:32:34",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 89000,
+    "itemSubtotalSum": 105000,
+    "subtotalDiff": -16000,
+    "grossAmount": 89000,
+    "expectedGross": 105000,
+    "grossDiff": -16000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "T-Shirt Kaos",
+        "size": "XL",
+        "quantity": 1,
+        "subtotal": 105000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785670280068",
+    "id": 221,
+    "customer_name": "DARREN GARCIA IYAS JOYOSEPUTRO",
+    "created_at": "2026-08-02 11:32:36",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 99000,
+    "itemSubtotalSum": 105000,
+    "subtotalDiff": -6000,
+    "grossAmount": 99000,
+    "expectedGross": 105000,
+    "grossDiff": -6000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "T-Shirt Kaos",
+        "size": "XXL",
+        "quantity": 1,
+        "subtotal": 105000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785775585140",
+    "id": 228,
+    "customer_name": "PUTY HANIFA",
+    "created_at": "2026-08-03 16:46:28",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 232000,
+    "itemSubtotalSum": 229000,
+    "subtotalDiff": 3000,
+    "grossAmount": 232000,
+    "expectedGross": 229000,
+    "grossDiff": 3000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Totebag",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 40000
+      },
+      {
+        "name": "Half Zip Jacket FILKOM Club Est. 2011 (DP 50%)",
+        "size": "XS",
+        "quantity": 1,
+        "subtotal": 179000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785832735154",
+    "id": 233,
+    "customer_name": "ZASKIA NAURA RAYYANI",
+    "created_at": "2026-08-04 08:43:29",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 42000,
+    "itemSubtotalSum": 28000,
+    "subtotalDiff": 14000,
+    "grossAmount": 42000,
+    "expectedGross": 28000,
+    "grossDiff": 14000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 2,
+        "subtotal": 20000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785839368285",
+    "id": 236,
+    "customer_name": "HAYA AZIZAH RAMADHANI",
+    "created_at": "2026-08-04 10:30:56",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 36000,
+    "itemSubtotalSum": 26000,
+    "subtotalDiff": 10000,
+    "grossAmount": 36000,
+    "expectedGross": 26000,
+    "grossDiff": 10000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785843445605",
+    "id": 237,
+    "customer_name": "MUHAMMAD ARFA AFLAHDANI",
+    "created_at": "2026-08-04 11:38:22",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 18000,
+    "itemSubtotalSum": 12000,
+    "subtotalDiff": 6000,
+    "grossAmount": 18000,
+    "expectedGross": 12000,
+    "grossDiff": 6000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785859576864",
+    "id": 239,
+    "customer_name": "MUHAMMAD ZAKI AL HILMI",
+    "created_at": "2026-08-04 16:07:23",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 70000,
+    "itemSubtotalSum": 56000,
+    "subtotalDiff": 14000,
+    "grossAmount": 70000,
+    "expectedGross": 56000,
+    "grossDiff": 14000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "LNS-FILKOM-1785487176488-9397",
+    "id": 241,
+    "customer_name": "Sahrur Ramadhan",
+    "created_at": "2026-08-05 06:13:04",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 164500,
+    "itemSubtotalSum": 198500,
+    "subtotalDiff": -34000,
+    "grossAmount": 164500,
+    "expectedGross": 198500,
+    "grossDiff": -34000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pelunasan — Proud To Be FILKOM!",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 164500
+      },
+      {
+        "name": "Pelunasan — [KOMPONEN BUNDLE] FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "XL",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "Pelunasan — [KOMPONEN BUNDLE] Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pelunasan — [KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785928997440",
+    "id": 244,
+    "customer_name": "CHRISTIAN MAYNARD DENNIS WIJAYA",
+    "created_at": "2026-08-05 11:24:18",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 60000,
+    "itemSubtotalSum": 38000,
+    "subtotalDiff": 22000,
+    "grossAmount": 40000,
+    "expectedGross": 18000,
+    "grossDiff": 22000,
+    "shipping": 0,
+    "discount": 20000,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 3,
+        "subtotal": 30000
+      },
+      {
+        "name": "Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785930700592",
+    "id": 245,
+    "customer_name": "Gefiranch",
+    "created_at": "2026-08-05 11:53:27",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 32000,
+    "itemSubtotalSum": 26000,
+    "subtotalDiff": 6000,
+    "grossAmount": 32000,
+    "expectedGross": 26000,
+    "grossDiff": 6000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785932016668",
+    "id": 246,
+    "customer_name": "LAYLA \\'AFIFAH RAMADHANI",
+    "created_at": "2026-08-05 12:14:55",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 45000,
+    "itemSubtotalSum": 36000,
+    "subtotalDiff": 9000,
+    "grossAmount": 45000,
+    "expectedGross": 36000,
+    "grossDiff": 9000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785936027053",
+    "id": 247,
+    "customer_name": "PUTY HANIFA",
+    "created_at": "2026-08-05 13:20:37",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 6000,
+    "itemSubtotalSum": 4000,
+    "subtotalDiff": 2000,
+    "grossAmount": 6000,
+    "expectedGross": 4000,
+    "grossDiff": 2000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785937853226",
+    "id": 248,
+    "customer_name": "Jessica Fidela",
+    "created_at": "2026-08-05 13:52:15",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 32000,
+    "itemSubtotalSum": 26000,
+    "subtotalDiff": 6000,
+    "grossAmount": 32000,
+    "expectedGross": 26000,
+    "grossDiff": 6000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785939057232",
+    "id": 249,
+    "customer_name": "MUHAMMAD SYAUQI ARIF RABBANI",
+    "created_at": "2026-08-05 14:13:53",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 149000,
+    "itemSubtotalSum": 126000,
+    "subtotalDiff": 23000,
+    "grossAmount": 149000,
+    "expectedGross": 126000,
+    "grossDiff": 23000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 2,
+        "subtotal": 20000
+      },
+      {
+        "name": "Topi Baseball",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 80000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785942417943",
+    "id": 250,
+    "customer_name": "IDHAM MUHAMAD AKBAR",
+    "created_at": "2026-08-05 15:08:22",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 787000,
+    "itemSubtotalSum": 821000,
+    "subtotalDiff": -34000,
+    "grossAmount": 787000,
+    "expectedGross": 821000,
+    "grossDiff": -34000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Half Zip Jacket FILKOM Club Est. 2011 (DP 50%)",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 179000
+      },
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 249000
+      },
+      {
+        "name": "Pulpen",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "Proud To Be FILKOM!",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 349000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 0
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "[KOMPONEN BUNDLE] Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785944349228",
+    "id": 251,
+    "customer_name": "ABDURRAHMAN SUDAISY",
+    "created_at": "2026-08-05 15:40:21",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 209500,
+    "itemSubtotalSum": 204500,
+    "subtotalDiff": 5000,
+    "grossAmount": 209500,
+    "expectedGross": 204500,
+    "grossDiff": 5000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Topi Baseball",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 80000
+      },
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "M",
+        "quantity": 1,
+        "subtotal": 124500
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785946240387",
+    "id": 252,
+    "customer_name": "FAHRI HANAFI",
+    "created_at": "2026-08-05 16:12:20",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 170500,
+    "itemSubtotalSum": 156500,
+    "subtotalDiff": 14000,
+    "grossAmount": 170500,
+    "expectedGross": 156500,
+    "grossDiff": 14000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+        "size": "XXL",
+        "quantity": 1,
+        "subtotal": 134500
+      },
+      {
+        "name": "Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      }
+    ]
+  },
+  {
+    "order_id": "FILKOM-1785946917682",
+    "id": 253,
+    "customer_name": "Rizwanda Keysha Cahya Putra",
+    "created_at": "2026-08-05 16:25:13",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 114000,
+    "itemSubtotalSum": 123000,
+    "subtotalDiff": -9000,
+    "grossAmount": 114000,
+    "expectedGross": 123000,
+    "grossDiff": -9000,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "T-Shirt Kaos",
+        "size": "L",
+        "quantity": 1,
+        "subtotal": 105000
+      }
+    ]
+  },
+  {
+    "order_id": "IMP-1786172323080-42-221",
+    "id": 300,
+    "customer_name": "NISFIL LAILI AZZAHRA",
+    "created_at": "2026-07-04 08:25:20",
+    "channel": "online",
+    "payment_status": "paid",
+    "orderSubtotal": 198000,
+    "itemSubtotalSum": 196000,
+    "subtotalDiff": 2000,
+    "grossAmount": 196000,
+    "expectedGross": 196000,
+    "grossDiff": 0,
+    "shipping": 0,
+    "discount": 0,
+    "voucherDiscount": 0,
+    "uniqueCode": 0,
+    "items": [
+      {
+        "name": "Sticker Pack",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 8000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "Keychain",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 10000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Enamel",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 26000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Pin Tas",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 4000
+      },
+      {
+        "name": "Topi Baseball",
+        "size": 0,
+        "quantity": 1,
+        "subtotal": 80000
+      }
+    ]
+  }
+]

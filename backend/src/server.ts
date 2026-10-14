@@ -462,6 +462,11 @@ app.put(
   checkRole(["admin", "cashier"]),
   apiControllers.verifyPaymentProof,
 );
+app.put(
+  "/api/admin/orders/:id/sync-subtotal",
+  checkRole(["admin", "cashier"]),
+  apiControllers.syncOrderSubtotal,
+);
 app.post(
   "/api/admin/orders/:id/complete-refund",
   checkRole(["admin", "cashier"]),

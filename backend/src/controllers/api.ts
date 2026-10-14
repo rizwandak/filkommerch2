@@ -5570,6 +5570,63 @@ export const repairHistoricalPelunasanOrders = async () => {
   }
 };
 
+// Admin manual action: Sync / Apply corrected subtotal & gross amount to database
+export const syncOrderSubtotal = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { new_subtotal, new_gross_amount } = req.body || {};
+
+    const order = await queryOne<any>("SELECT * FROM orders WHERE order_id = ? OR id = ?", [id, id]);
+    if (!order) {
+      return res.status(404).json({ success: false, error: "Pesanan tidak ditemukan" });
+    }
+
+    let subtotalToSet = Number(new_subtotal);
+    let grossToSet = Number(new_gross_amount);
+
+    if (isNaN(subtotalToSet) || isNaN(grossToSet)) {
+      // Hitung otomatis dari item
+      const items = await query<any>("SELECT * FROM order_items WHERE order_id = ?", [order.order_id]);
+      const itemsSum = (items || []).reduce((sum: number, it: any) => {
+        if (String(it.product_name || "").includes("[KOMPONEN BUNDLE]")) return sum;
+        return sum + Number(it.subtotal || 0);
+      }, 0);
+
+      const posDiscount = Number(order.discount || 0);
+      const voucherDiscount = Number(order.discount_amount || 0);
+      const shippingCost = Number(order.shipping_cost || 0);
+      const serviceFee = Number(order.service_fee || 0);
+      const taxAmount = Number(order.tax_amount || 0);
+      const uniqueCode = Number(order.unique_code || 0);
+
+      subtotalToSet = itemsSum;
+      grossToSet = Math.max(0, itemsSum - posDiscount - voucherDiscount + shippingCost + serviceFee + taxAmount + uniqueCode);
+    }
+
+    await execute(
+      "UPDATE orders SET subtotal = ?, gross_amount = ? WHERE order_id = ?",
+      [subtotalToSet, grossToSet, order.order_id]
+    );
+
+    // Amankan komponen bundle di order_items agar tidak bernilai ganda
+    await execute(
+      "UPDATE order_items SET unit_price = 0, subtotal = 0 WHERE order_id = ? AND product_name LIKE '[KOMPONEN BUNDLE]%'",
+      [order.order_id]
+    );
+
+    return res.json({
+      success: true,
+      message: `Subtotal dan total transaksi ${order.order_id} berhasil diperbarui di database.`,
+      order_id: order.order_id,
+      subtotal: subtotalToSet,
+      gross_amount: grossToSet,
+    });
+  } catch (error: any) {
+    console.error("Error in syncOrderSubtotal:", error);
+    return res.status(500).json({ success: false, error: error?.message || "Gagal menyinkronkan subtotal" });
+  }
+};
+
 // Create Pelunasan (balance payment) order automatically linked to a DP order (Zero DB Schema change)
 export const createPelunasanOrder = async (req: Request, res: Response) => {
   try {
