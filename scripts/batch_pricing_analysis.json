@@ -1,0 +1,2792 @@
+{
+  "campaigns": {
+    "1": {
+      "batch_name": "Batch #2",
+      "start_date": "2026-07-20 00:00:00",
+      "end_date": "2026-07-31 23:59:00",
+      "extended_end_date": "2026-08-05 23:59:00"
+    },
+    "3": {
+      "batch_name": "Batch #1",
+      "start_date": "2026-07-03 00:00:00",
+      "end_date": "2026-07-09 23:59:00",
+      "extended_end_date": "2026-07-12 23:59:00"
+    },
+    "NaN": {
+      "batch_name": "`batch_name`",
+      "start_date": "`start_date`",
+      "end_date": "`end_date`",
+      "extended_end_date": "`extended_end_date`"
+    }
+  },
+  "products": {
+    "16": {
+      "name": "Pin Enamel",
+      "price": 40000,
+      "filkom_price": 36000,
+      "sale_type": "ready_stock"
+    },
+    "17": {
+      "name": "Pin Tas",
+      "price": 10000,
+      "filkom_price": 9000,
+      "sale_type": "ready_stock"
+    },
+    "18": {
+      "name": "Sticker Pack",
+      "price": 18000,
+      "filkom_price": 15000,
+      "sale_type": "ready_stock"
+    },
+    "19": {
+      "name": "Keychain",
+      "price": 18000,
+      "filkom_price": 15000,
+      "sale_type": "ready_stock"
+    },
+    "20": {
+      "name": "Pulpen",
+      "price": 12000,
+      "filkom_price": 10000,
+      "sale_type": "ready_stock"
+    },
+    "21": {
+      "name": "Notebook",
+      "price": 27000,
+      "filkom_price": 25000,
+      "sale_type": "ready_stock"
+    },
+    "22": {
+      "name": "Totebag",
+      "price": 45000,
+      "filkom_price": 40000,
+      "sale_type": "ready_stock"
+    },
+    "23": {
+      "name": "Tumbler FILKOM Brawijaya 500ml",
+      "price": 85000,
+      "filkom_price": 79000,
+      "sale_type": "ready_stock"
+    },
+    "24": {
+      "name": "Topi Baseball",
+      "price": 95000,
+      "filkom_price": 89000,
+      "sale_type": "ready_stock"
+    },
+    "25": {
+      "name": "T-Shirt Kaos",
+      "price": 95000,
+      "filkom_price": 89000,
+      "sale_type": "ready_stock"
+    },
+    "26": {
+      "name": "Half Zip Jacket FILKOM Club Est. 2011",
+      "price": 199000,
+      "filkom_price": 189000,
+      "sale_type": "ready_stock"
+    },
+    "27": {
+      "name": "FILKOM Varsity Jacket 2026 Edition",
+      "price": 359000,
+      "filkom_price": 349000,
+      "sale_type": "ready_stock"
+    },
+    "28": {
+      "name": "Work Jacket “FILKOM: Taming the Technology”",
+      "price": 269000,
+      "filkom_price": 259000,
+      "sale_type": "ready_stock"
+    },
+    "29": {
+      "name": "Brand New Days Pack",
+      "price": 35000,
+      "filkom_price": 27000,
+      "sale_type": "pre_order"
+    },
+    "30": {
+      "name": "Starter Pack",
+      "price": 115000,
+      "filkom_price": 99000,
+      "sale_type": "pre_order"
+    },
+    "31": {
+      "name": "Campus Daily Pack",
+      "price": 135000,
+      "filkom_price": 109000,
+      "sale_type": "pre_order"
+    },
+    "32": {
+      "name": "FILKOM The Explorer",
+      "price": 349000,
+      "filkom_price": 319000,
+      "sale_type": "pre_order"
+    },
+    "33": {
+      "name": "Proud To Be FILKOM!",
+      "price": 389000,
+      "filkom_price": 349000,
+      "sale_type": "pre_order"
+    },
+    "34": {
+      "name": "Stiker Pack FP 2025",
+      "price": 10000,
+      "filkom_price": 10000,
+      "sale_type": "ready_stock"
+    },
+    "35": {
+      "name": "Varsity Jacket 2025 Stock",
+      "price": 240000,
+      "filkom_price": 240000,
+      "sale_type": "ready_stock"
+    },
+    "36": {
+      "name": "T-Shirt Kaos FILKOM 2011 Abu-Abu",
+      "price": 65000,
+      "filkom_price": 55000,
+      "sale_type": "ready_stock"
+    }
+  },
+  "batchPrices": {},
+  "mismatches": [
+    {
+      "order_id": "FILKOM-1785939057232",
+      "customer_name": "MUHAMMAD SYAUQI ARIF RABBANI",
+      "customer_email": "syauqiarif@student.ub.ac.id",
+      "created_at": "2026-08-05 14:13:53",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 149000,
+      "item_sum": 126000,
+      "diff": 23000,
+      "gross_amount": 149000,
+      "items": [
+        {
+          "product_id": 17,
+          "variant_id": 36,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Oranye",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 42,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Boys",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 18,
+          "variant_id": 43,
+          "product_name": "Sticker Pack",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 8000,
+          "discount_amount": 0,
+          "subtotal": 8000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 122,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 2,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 20000,
+          "color": "filkom buddies",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 24,
+          "variant_id": 77,
+          "product_name": "Topi Baseball",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 80000,
+          "discount_amount": 0,
+          "subtotal": 80000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 95000,
+            "ready_stock_filkom": 89000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 121,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "Satu hati satu jiwa filkom",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785928997440",
+      "customer_name": "CHRISTIAN MAYNARD DENNIS WIJAYA",
+      "customer_email": "maynard@student.ub.ac.id",
+      "created_at": "2026-08-05 11:24:18",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 60000,
+      "item_sum": 38000,
+      "diff": 22000,
+      "gross_amount": 40000,
+      "items": [
+        {
+          "product_id": 19,
+          "variant_id": 124,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 3,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 30000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 18,
+          "variant_id": 43,
+          "product_name": "Sticker Pack",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 8000,
+          "discount_amount": 0,
+          "subtotal": 8000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785144958211",
+      "customer_name": "NAFARELLA ALLEAZAHRA RISNANTHEA",
+      "customer_email": "nafarellaar@student.ub.ac.id",
+      "created_at": "2026-07-27 11:44:41",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 72000,
+      "item_sum": 52000,
+      "diff": 20000,
+      "gross_amount": 72000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 54,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Informatika",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785413522682",
+      "customer_name": "THOFA DER ASLAM",
+      "customer_email": "25des07@gmail.com",
+      "created_at": "2026-07-30 12:17:05",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 256500,
+      "item_sum": 236500,
+      "diff": 20000,
+      "gross_amount": 256500,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 54,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Informatika",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 27,
+          "variant_id": 80,
+          "product_name": "FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+          "size": "S",
+          "quantity": 1,
+          "unit_price": 184500,
+          "discount_amount": 0,
+          "subtotal": 184500,
+          "color": "DP",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 359000,
+            "ready_stock_filkom": 349000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785506102862",
+      "customer_name": "THIVANY PRAMESWATI",
+      "customer_email": "vany_prameswati@student.ub.ac.id",
+      "created_at": "2026-07-31 13:55:09",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 107000,
+      "item_sum": 87000,
+      "diff": 20000,
+      "gross_amount": 107000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 53,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Komputer",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 29,
+          "variant_id": 227,
+          "product_name": "Brand New Days Pack",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 35000,
+          "discount_amount": 0,
+          "subtotal": 35000,
+          "color": "Default",
+          "matchedTier": "ready_stock_public",
+          "allPriceTiers": {
+            "ready_stock_public": 35000,
+            "ready_stock_filkom": 27000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785506942318",
+      "customer_name": "I GUSTI NGURAH ANANTAWIJAYA MAHARDIKA",
+      "customer_email": "ngurahwijaya62@student.ub.ac.id",
+      "created_at": "2026-07-31 14:11:25",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 707000,
+      "item_sum": 687000,
+      "diff": 20000,
+      "gross_amount": 707000,
+      "items": [
+        {
+          "product_id": 21,
+          "variant_id": 46,
+          "product_name": "Notebook",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 27000,
+          "discount_amount": 0,
+          "subtotal": 27000,
+          "color": "Default",
+          "matchedTier": "ready_stock_public",
+          "allPriceTiers": {
+            "ready_stock_public": 27000,
+            "ready_stock_filkom": 25000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 51,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknologi Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 28,
+          "variant_id": 95,
+          "product_name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+          "size": "L",
+          "quantity": 1,
+          "unit_price": 259000,
+          "discount_amount": 0,
+          "subtotal": 259000,
+          "color": "LUNAS",
+          "matchedTier": "ready_stock_filkom",
+          "allPriceTiers": {
+            "ready_stock_public": 269000,
+            "ready_stock_filkom": 259000
+          }
+        },
+        {
+          "product_id": 27,
+          "variant_id": 85,
+          "product_name": "FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+          "size": "L",
+          "quantity": 1,
+          "unit_price": 349000,
+          "discount_amount": 0,
+          "subtotal": 349000,
+          "color": "LUNAS",
+          "matchedTier": "ready_stock_filkom",
+          "allPriceTiers": {
+            "ready_stock_public": 359000,
+            "ready_stock_filkom": 349000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1784789691062",
+      "customer_name": "ABDULLAH RAFIF SYAFRI",
+      "customer_email": "arafifssyafri11@student.ub.ac.id",
+      "created_at": "2026-07-23 06:56:02",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 339000,
+      "item_sum": 321000,
+      "diff": 18000,
+      "gross_amount": 339000,
+      "items": [
+        {
+          "product_id": 28,
+          "variant_id": 95,
+          "product_name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+          "size": "L",
+          "quantity": 1,
+          "unit_price": 249000,
+          "discount_amount": 0,
+          "subtotal": 249000,
+          "color": "LUNAS",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 269000,
+            "ready_stock_filkom": 259000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 53,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Komputer",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 121,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "Satu hati satu jiwa filkom",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 124,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1784528890719",
+      "customer_name": "Muhamad Imam Nurjaman",
+      "customer_email": "imamnurjaman@student.ub.ac.id",
+      "created_at": "2026-07-20 06:28:11",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 57000,
+      "item_sum": 40000,
+      "diff": 17000,
+      "gross_amount": 57000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 51,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknologi Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 42,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Boys",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 123,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "error code",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785331658795",
+      "customer_name": "GHINA ERVINA SHOVA",
+      "customer_email": "ghinashv@student.ub.ac.id",
+      "created_at": "2026-07-29 13:30:19",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 77000,
+      "item_sum": 60000,
+      "diff": 17000,
+      "gross_amount": 77000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 51,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknologi Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 18,
+          "variant_id": 43,
+          "product_name": "Sticker Pack",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 8000,
+          "discount_amount": 0,
+          "subtotal": 8000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785512701878",
+      "customer_name": "MUHAMMAD ARMAN AL-FIKRI",
+      "customer_email": "armanfikri@student.ub.ac.id",
+      "created_at": "2026-07-31 15:45:59",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 89000,
+      "item_sum": 105000,
+      "diff": -16000,
+      "gross_amount": 89000,
+      "items": [
+        {
+          "product_id": 25,
+          "variant_id": 218,
+          "product_name": "T-Shirt Kaos",
+          "size": "M",
+          "quantity": 1,
+          "unit_price": 105000,
+          "discount_amount": 0,
+          "subtotal": 105000,
+          "color": "COMPUTER SCIENCE",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 95000,
+            "ready_stock_filkom": 89000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785648681078",
+      "customer_name": "KHOBALA FIRDAUS",
+      "customer_email": "khobalaf@student.ub.ac.id",
+      "created_at": "2026-08-02 05:32:34",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 89000,
+      "item_sum": 105000,
+      "diff": -16000,
+      "gross_amount": 89000,
+      "items": [
+        {
+          "product_id": 25,
+          "variant_id": 221,
+          "product_name": "T-Shirt Kaos",
+          "size": "XL",
+          "quantity": 1,
+          "unit_price": 105000,
+          "discount_amount": 0,
+          "subtotal": 105000,
+          "color": "SATU HATI SATU JIWA",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 95000,
+            "ready_stock_filkom": 89000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1784823284440",
+      "customer_name": "Mokh. Davis Rasendriya Mukhtar",
+      "customer_email": "davisrasendriya@student.ub.ac.id",
+      "created_at": "2026-07-23 16:18:15",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 182500,
+      "item_sum": 168500,
+      "diff": 14000,
+      "gross_amount": 164250,
+      "items": [
+        {
+          "product_id": 19,
+          "variant_id": 120,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "Bara",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 18,
+          "variant_id": 43,
+          "product_name": "Sticker Pack",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 8000,
+          "discount_amount": 0,
+          "subtotal": 8000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 28,
+          "variant_id": 90,
+          "product_name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+          "size": "S",
+          "quantity": 1,
+          "unit_price": 124500,
+          "discount_amount": 0,
+          "subtotal": 124500,
+          "color": "DP",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 269000,
+            "ready_stock_filkom": 259000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 54,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Informatika",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785832735154",
+      "customer_name": "ZASKIA NAURA RAYYANI",
+      "customer_email": "zaskia_naura@student.ub.ac.id",
+      "created_at": "2026-08-04 08:43:29",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 42000,
+      "item_sum": 28000,
+      "diff": 14000,
+      "gross_amount": 42000,
+      "items": [
+        {
+          "product_id": 19,
+          "variant_id": 121,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 2,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 20000,
+          "color": "Satu hati satu jiwa filkom",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 41,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Girls",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 42,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Boys",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785859576864",
+      "customer_name": "MUHAMMAD ZAKI AL HILMI",
+      "customer_email": "mzakialhilmi@student.ub.ac.id",
+      "created_at": "2026-08-04 16:07:23",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 70000,
+      "item_sum": 56000,
+      "diff": 14000,
+      "gross_amount": 70000,
+      "items": [
+        {
+          "product_id": 17,
+          "variant_id": 42,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Boys",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 52,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Sistem Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785946240387",
+      "customer_name": "FAHRI HANAFI",
+      "customer_email": "fahrihanafi@student.ub.ac.id",
+      "created_at": "2026-08-05 16:12:20",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 170500,
+      "item_sum": 156500,
+      "diff": 14000,
+      "gross_amount": 170500,
+      "items": [
+        {
+          "product_id": 28,
+          "variant_id": 98,
+          "product_name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+          "size": "XXL",
+          "quantity": 1,
+          "unit_price": 134500,
+          "discount_amount": 0,
+          "subtotal": 134500,
+          "color": "DP",
+          "matchedTier": "DP50%_of_ready_stock_public",
+          "allPriceTiers": {
+            "ready_stock_public": 269000,
+            "ready_stock_filkom": 259000
+          }
+        },
+        {
+          "product_id": 18,
+          "variant_id": 43,
+          "product_name": "Sticker Pack",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 8000,
+          "discount_amount": 0,
+          "subtotal": 8000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 36,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Oranye",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 121,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "Satu hati satu jiwa filkom",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785240877656",
+      "customer_name": "ARIQ DWI ANUGRAH",
+      "customer_email": "dwiariq22@student.ub.ac.id",
+      "created_at": "2026-07-28 12:15:42",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 64000,
+      "item_sum": 52000,
+      "diff": 12000,
+      "gross_amount": 64000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 54,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Informatika",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 52,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Sistem Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785463621405",
+      "customer_name": "NABILAH SIFA",
+      "customer_email": "nabilahsifa03@student.ub.ac.id",
+      "created_at": "2026-07-31 02:15:00",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 338000,
+      "item_sum": 326000,
+      "diff": 12000,
+      "gross_amount": 338000,
+      "items": [
+        {
+          "product_id": 21,
+          "variant_id": 46,
+          "product_name": "Notebook",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 25000,
+          "discount_amount": 0,
+          "subtotal": 25000,
+          "color": "Default",
+          "matchedTier": "ready_stock_filkom",
+          "allPriceTiers": {
+            "ready_stock_public": 27000,
+            "ready_stock_filkom": 25000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 52,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Sistem Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 28,
+          "variant_id": 91,
+          "product_name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+          "size": "S",
+          "quantity": 1,
+          "unit_price": 249000,
+          "discount_amount": 0,
+          "subtotal": 249000,
+          "color": "LUNAS",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 269000,
+            "ready_stock_filkom": 259000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785517785708",
+      "customer_name": "Fatarib Maulana Akbar",
+      "customer_email": "fataribmaulana@student.ub.ac.id",
+      "created_at": "2026-07-31 17:11:04",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 64000,
+      "item_sum": 52000,
+      "diff": 12000,
+      "gross_amount": 64000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 52,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Sistem Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1784864886634",
+      "customer_name": "Amartya Raddin Kayla Medina",
+      "customer_email": "amartyamedina@student.ub.ac.id",
+      "created_at": "2026-07-24 03:49:27",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 36000,
+      "item_sum": 26000,
+      "diff": 10000,
+      "gross_amount": 36000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1784968517976",
+      "customer_name": "Daffa Ramadhan Jauhari",
+      "customer_email": "daffarj7@student.ub.ac.id",
+      "created_at": "2026-07-25 08:38:41",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 36000,
+      "item_sum": 26000,
+      "diff": 10000,
+      "gross_amount": 36000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785239512533",
+      "customer_name": "Rasya Pasha",
+      "customer_email": "rasyapasha777@student.ub.ac.id",
+      "created_at": "2026-07-28 11:53:30",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 30000,
+      "item_sum": 20000,
+      "diff": 10000,
+      "gross_amount": 30000,
+      "items": [
+        {
+          "product_id": 19,
+          "variant_id": 120,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 2,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 20000,
+          "color": "Bara",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785466153329",
+      "customer_name": "RAFEYFA TASYAZALIA",
+      "customer_email": "rafeyfaatasyz@student.ub.ac.id",
+      "created_at": "2026-07-31 02:49:57",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 36000,
+      "item_sum": 26000,
+      "diff": 10000,
+      "gross_amount": 36000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 52,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Sistem Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785516275608",
+      "customer_name": "Gede Raditya Dharma Putra Ayudia",
+      "customer_email": "radityadharma6@student.ub.ac.id",
+      "created_at": "2026-07-31 16:45:32",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 385000,
+      "item_sum": 375000,
+      "diff": 10000,
+      "gross_amount": 385000,
+      "items": [
+        {
+          "product_id": 27,
+          "variant_id": 83,
+          "product_name": "FILKOM Varsity Jacket 2026 Edition (DP 50%)",
+          "size": "M",
+          "quantity": 1,
+          "unit_price": 349000,
+          "discount_amount": 0,
+          "subtotal": 349000,
+          "color": "LUNAS",
+          "matchedTier": "ready_stock_filkom",
+          "allPriceTiers": {
+            "ready_stock_public": 359000,
+            "ready_stock_filkom": 349000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785839368285",
+      "customer_name": "HAYA AZIZAH RAMADHANI",
+      "customer_email": "hayaar@student.ub.ac.id",
+      "created_at": "2026-08-04 10:30:56",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 36000,
+      "item_sum": 26000,
+      "diff": 10000,
+      "gross_amount": 36000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 53,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Komputer",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785489190663",
+      "customer_name": "BAYU PRIYAMBADHA",
+      "customer_email": "bayu_priyambadha@ub.ac.id",
+      "created_at": "2026-07-31 09:17:22",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 89000,
+      "item_sum": 80000,
+      "diff": 9000,
+      "gross_amount": 89000,
+      "items": [
+        {
+          "product_id": 24,
+          "variant_id": 77,
+          "product_name": "Topi Baseball",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 80000,
+          "discount_amount": 0,
+          "subtotal": 80000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 95000,
+            "ready_stock_filkom": 89000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785512246039",
+      "customer_name": "IZZAT ABRISAM VADWI",
+      "customer_email": "izzatav08@student.ub.ac.id",
+      "created_at": "2026-07-31 15:40:28",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 294000,
+      "item_sum": 285000,
+      "diff": 9000,
+      "gross_amount": 294000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 52,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Sistem Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 122,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "filkom buddies",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 28,
+          "variant_id": 93,
+          "product_name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+          "size": "M",
+          "quantity": 1,
+          "unit_price": 249000,
+          "discount_amount": 0,
+          "subtotal": 249000,
+          "color": "LUNAS",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 269000,
+            "ready_stock_filkom": 259000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785932016668",
+      "customer_name": "LAYLA \\'AFIFAH RAMADHANI",
+      "customer_email": "laylaafifahr24@student.ub.ac.id",
+      "created_at": "2026-08-05 12:14:55",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 45000,
+      "item_sum": 36000,
+      "diff": 9000,
+      "gross_amount": 45000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 53,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Komputer",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 122,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "filkom buddies",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785946917682",
+      "customer_name": "Rizwanda Keysha Cahya Putra",
+      "customer_email": "rizwandakeysha@student.ub.ac.id",
+      "created_at": "2026-08-05 16:25:13",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 114000,
+      "item_sum": 123000,
+      "diff": -9000,
+      "gross_amount": 114000,
+      "items": [
+        {
+          "product_id": 17,
+          "variant_id": 37,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Blue",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 122,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "filkom buddies",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 42,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Boys",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 25,
+          "variant_id": 216,
+          "product_name": "T-Shirt Kaos",
+          "size": "L",
+          "quantity": 1,
+          "unit_price": 105000,
+          "discount_amount": 0,
+          "subtotal": 105000,
+          "color": "COMPUTER SCIENCE",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 95000,
+            "ready_stock_filkom": 89000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785597954972",
+      "customer_name": "ELFRIDA GYON WIDAD",
+      "customer_email": "elfridawidad@student.ub.ac.id",
+      "created_at": "2026-08-01 15:27:08",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 21000,
+      "item_sum": 14000,
+      "diff": 7000,
+      "gross_amount": 21000,
+      "items": [
+        {
+          "product_id": 17,
+          "variant_id": 36,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Oranye",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 120,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "Bara",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785156603023",
+      "customer_name": "FAIZAH NUR KARIMAH",
+      "customer_email": "faizahnurk@student.ub.ac.id",
+      "created_at": "2026-07-27 12:52:41",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 32000,
+      "item_sum": 26000,
+      "diff": 6000,
+      "gross_amount": 32000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 54,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Informatika",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785492317804",
+      "customer_name": "Muhammad Faidz Agustiawan",
+      "customer_email": "faidzagustiawan@student.ub.ac.id",
+      "created_at": "2026-07-31 10:06:43",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 59000,
+      "item_sum": 53000,
+      "diff": 6000,
+      "gross_amount": 59000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 52,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Sistem Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 29,
+          "variant_id": 227,
+          "product_name": "Brand New Days Pack",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 27000,
+          "discount_amount": 0,
+          "subtotal": 27000,
+          "color": "Default",
+          "matchedTier": "ready_stock_filkom",
+          "allPriceTiers": {
+            "ready_stock_public": 35000,
+            "ready_stock_filkom": 27000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785494578953",
+      "customer_name": "HASSAN NASHRALLAH",
+      "customer_email": "hassanashrallah@student.ub.ac.id",
+      "created_at": "2026-07-31 11:56:45",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 32000,
+      "item_sum": 26000,
+      "diff": 6000,
+      "gross_amount": 32000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 54,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Informatika",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785508832701",
+      "customer_name": "ARIEL RIZKY NAYOAN",
+      "customer_email": "arielnayoan26@student.ub.ac.id",
+      "created_at": "2026-07-31 14:42:28",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 72000,
+      "item_sum": 66000,
+      "diff": 6000,
+      "gross_amount": 52000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 22,
+          "variant_id": 117,
+          "product_name": "Totebag",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 40000,
+          "discount_amount": 0,
+          "subtotal": 40000,
+          "color": "FILKOM BRAWIJAYA Signature",
+          "matchedTier": "ready_stock_filkom",
+          "allPriceTiers": {
+            "ready_stock_public": 45000,
+            "ready_stock_filkom": 40000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785633536811",
+      "customer_name": "MUHAMMAD FAIZ",
+      "customer_email": "muhammadfaiz_@student.ub.ac.id",
+      "created_at": "2026-08-02 01:20:28",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 32000,
+      "item_sum": 26000,
+      "diff": 6000,
+      "gross_amount": 32000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 53,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Teknik Komputer",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785670280068",
+      "customer_name": "DARREN GARCIA IYAS JOYOSEPUTRO",
+      "customer_email": "iyasdarren@student.ub.ac.id",
+      "created_at": "2026-08-02 11:32:36",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 99000,
+      "item_sum": 105000,
+      "diff": -6000,
+      "gross_amount": 99000,
+      "items": [
+        {
+          "product_id": 25,
+          "variant_id": 224,
+          "product_name": "T-Shirt Kaos",
+          "size": "XXL",
+          "quantity": 1,
+          "unit_price": 105000,
+          "discount_amount": 0,
+          "subtotal": 105000,
+          "color": "COMPUTER SCIENCE",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 95000,
+            "ready_stock_filkom": 89000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785843445605",
+      "customer_name": "MUHAMMAD ARFA AFLAHDANI",
+      "customer_email": "aflahdani@student.ub.ac.id",
+      "created_at": "2026-08-04 11:38:22",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 18000,
+      "item_sum": 12000,
+      "diff": 6000,
+      "gross_amount": 18000,
+      "items": [
+        {
+          "product_id": 17,
+          "variant_id": 36,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Oranye",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 37,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Blue",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 39,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "It\\'s My First Time Ngoding",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785930700592",
+      "customer_name": "Gefiranch",
+      "customer_email": "dmuafah@student.ub.ac.id",
+      "created_at": "2026-08-05 11:53:27",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 32000,
+      "item_sum": 26000,
+      "diff": 6000,
+      "gross_amount": 32000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 52,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Sistem Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785937853226",
+      "customer_name": "Jessica Fidela",
+      "customer_email": "jessicafidela@student.ub.ac.id",
+      "created_at": "2026-08-05 13:52:15",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 32000,
+      "item_sum": 26000,
+      "diff": 6000,
+      "gross_amount": 32000,
+      "items": [
+        {
+          "product_id": 16,
+          "variant_id": 49,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785248782855",
+      "customer_name": "DEVITHA DINI TANAMA",
+      "customer_email": "devithadini@student.ub.ac.id",
+      "created_at": "2026-07-28 14:28:35",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 85000,
+      "item_sum": 80000,
+      "diff": 5000,
+      "gross_amount": 85000,
+      "items": [
+        {
+          "product_id": 24,
+          "variant_id": 77,
+          "product_name": "Topi Baseball",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 80000,
+          "discount_amount": 0,
+          "subtotal": 80000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 95000,
+            "ready_stock_filkom": 89000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785321407619",
+      "customer_name": "CICI RAMADHANI",
+      "customer_email": "ciciramadhani@student.ub.ac.id",
+      "created_at": "2026-07-29 10:38:55",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 264000,
+      "item_sum": 259000,
+      "diff": 5000,
+      "gross_amount": 264000,
+      "items": [
+        {
+          "product_id": 26,
+          "variant_id": 237,
+          "product_name": "Half Zip Jacket FILKOM Club Est. 2011 (DP 50%)",
+          "size": "XS",
+          "quantity": 1,
+          "unit_price": 179000,
+          "discount_amount": 0,
+          "subtotal": 179000,
+          "color": "LUNAS",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 199000,
+            "ready_stock_filkom": 189000
+          }
+        },
+        {
+          "product_id": 24,
+          "variant_id": 77,
+          "product_name": "Topi Baseball",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 80000,
+          "discount_amount": 0,
+          "subtotal": 80000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 95000,
+            "ready_stock_filkom": 89000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785521447170",
+      "customer_name": "FARREL RADITYA",
+      "customer_email": "radityafarrel@student.ub.ac.id",
+      "created_at": "2026-07-31 18:11:07",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 362000,
+      "item_sum": 357000,
+      "diff": 5000,
+      "gross_amount": 362000,
+      "items": [
+        {
+          "product_id": 33,
+          "variant_id": 231,
+          "product_name": "Proud To Be FILKOM!",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 349000,
+          "discount_amount": 0,
+          "subtotal": 349000,
+          "color": "Default",
+          "matchedTier": "ready_stock_filkom",
+          "allPriceTiers": {
+            "ready_stock_public": 389000,
+            "ready_stock_filkom": 349000
+          }
+        },
+        {
+          "product_id": 18,
+          "variant_id": 43,
+          "product_name": "Sticker Pack",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 8000,
+          "discount_amount": 0,
+          "subtotal": 8000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785944349228",
+      "customer_name": "ABDURRAHMAN SUDAISY",
+      "customer_email": "abdurrahman25@student.ub.ac.id",
+      "created_at": "2026-08-05 15:40:21",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 209500,
+      "item_sum": 204500,
+      "diff": 5000,
+      "gross_amount": 209500,
+      "items": [
+        {
+          "product_id": 24,
+          "variant_id": 77,
+          "product_name": "Topi Baseball",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 80000,
+          "discount_amount": 0,
+          "subtotal": 80000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 95000,
+            "ready_stock_filkom": 89000
+          }
+        },
+        {
+          "product_id": 28,
+          "variant_id": 92,
+          "product_name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+          "size": "M",
+          "quantity": 1,
+          "unit_price": 124500,
+          "discount_amount": 0,
+          "subtotal": 124500,
+          "color": "DP",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 269000,
+            "ready_stock_filkom": 259000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785383416132",
+      "customer_name": "ALFIN NUR ROBBY",
+      "customer_email": "inialfin@student.ub.ac.id",
+      "created_at": "2026-07-30 03:51:19",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 261000,
+      "item_sum": 257000,
+      "diff": 4000,
+      "gross_amount": 241000,
+      "items": [
+        {
+          "product_id": 28,
+          "variant_id": 93,
+          "product_name": "Work Jacket “FILKOM: Taming the Technology” (DP 50%)",
+          "size": "M",
+          "quantity": 1,
+          "unit_price": 249000,
+          "discount_amount": 0,
+          "subtotal": 249000,
+          "color": "LUNAS",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 269000,
+            "ready_stock_filkom": 259000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 38,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "Let\\'s Stay Connected",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 37,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Blue",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1784738649351",
+      "customer_name": "RAYHAN PUTRA YAVIE",
+      "customer_email": "rahpyav@student.ub.ac.id",
+      "created_at": "2026-07-22 16:46:15",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 40000,
+      "item_sum": 37000,
+      "diff": 3000,
+      "gross_amount": 40000,
+      "items": [
+        {
+          "product_id": 19,
+          "variant_id": 123,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "error code",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 29,
+          "variant_id": 227,
+          "product_name": "Brand New Days Pack",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 27000,
+          "discount_amount": 0,
+          "subtotal": 27000,
+          "color": "Default",
+          "matchedTier": "ready_stock_filkom",
+          "allPriceTiers": {
+            "ready_stock_public": 35000,
+            "ready_stock_filkom": 27000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785321312717",
+      "customer_name": "CICI RAMADHANI",
+      "customer_email": "ciciramadhani@student.ub.ac.id",
+      "created_at": "2026-07-29 10:35:19",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 13000,
+      "item_sum": 10000,
+      "diff": 3000,
+      "gross_amount": 13000,
+      "items": [
+        {
+          "product_id": 19,
+          "variant_id": 120,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "Bara",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785508603739",
+      "customer_name": "RAFIF PRIYAMBODO",
+      "customer_email": "rafifpriyambodo@student.ub.ac.id",
+      "created_at": "2026-07-31 14:45:15",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 332000,
+      "item_sum": 329000,
+      "diff": 3000,
+      "gross_amount": 332000,
+      "items": [
+        {
+          "product_id": 19,
+          "variant_id": 121,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "Satu hati satu jiwa filkom",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 32,
+          "variant_id": 230,
+          "product_name": "FILKOM The Explorer",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 319000,
+          "discount_amount": 0,
+          "subtotal": 319000,
+          "color": "Default",
+          "matchedTier": "ready_stock_filkom",
+          "allPriceTiers": {
+            "ready_stock_public": 349000,
+            "ready_stock_filkom": 319000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785775585140",
+      "customer_name": "PUTY HANIFA",
+      "customer_email": "putyhanifa@student.ub.ac.id",
+      "created_at": "2026-08-03 16:46:28",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 232000,
+      "item_sum": 229000,
+      "diff": 3000,
+      "gross_amount": 232000,
+      "items": [
+        {
+          "product_id": 22,
+          "variant_id": 117,
+          "product_name": "Totebag",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 40000,
+          "discount_amount": 0,
+          "subtotal": 40000,
+          "color": "FILKOM BRAWIJAYA Signature",
+          "matchedTier": "ready_stock_filkom",
+          "allPriceTiers": {
+            "ready_stock_public": 45000,
+            "ready_stock_filkom": 40000
+          }
+        },
+        {
+          "product_id": 26,
+          "variant_id": 237,
+          "product_name": "Half Zip Jacket FILKOM Club Est. 2011 (DP 50%)",
+          "size": "XS",
+          "quantity": 1,
+          "unit_price": 179000,
+          "discount_amount": 0,
+          "subtotal": 179000,
+          "color": "LUNAS",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 199000,
+            "ready_stock_filkom": 189000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 121,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "Satu hati satu jiwa filkom",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "FILKOM-1785936027053",
+      "customer_name": "PUTY HANIFA",
+      "customer_email": "putyhanifa@student.ub.ac.id",
+      "created_at": "2026-08-05 13:20:37",
+      "payment_status": "paid",
+      "pre_order_campaign_id": null,
+      "campaign_name": null,
+      "order_subtotal": 6000,
+      "item_sum": 4000,
+      "diff": 2000,
+      "gross_amount": 6000,
+      "items": [
+        {
+          "product_id": 17,
+          "variant_id": 37,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Blue",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        }
+      ]
+    },
+    {
+      "order_id": "IMP-1786172323080-42-221",
+      "customer_name": "NISFIL LAILI AZZAHRA",
+      "customer_email": "nisfillailiazz@student.ub.ac.id",
+      "created_at": "2026-07-04 08:25:20",
+      "payment_status": "paid",
+      "pre_order_campaign_id": 3,
+      "campaign_name": "Batch #1",
+      "order_subtotal": 198000,
+      "item_sum": 196000,
+      "diff": 2000,
+      "gross_amount": 196000,
+      "items": [
+        {
+          "product_id": 18,
+          "variant_id": null,
+          "product_name": "Sticker Pack",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 8000,
+          "discount_amount": 0,
+          "subtotal": 8000,
+          "color": "",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 120,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "Bara",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 121,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "Satu hati satu jiwa filkom",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 122,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "filkom buddies",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 19,
+          "variant_id": 124,
+          "product_name": "Keychain",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 10000,
+          "discount_amount": 0,
+          "subtotal": 10000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 18000,
+            "ready_stock_filkom": 15000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": null,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "FILKOM",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 16,
+          "variant_id": null,
+          "product_name": "Pin Enamel",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 26000,
+          "discount_amount": 0,
+          "subtotal": 26000,
+          "color": "Pendidikan Teknologi Informasi",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 40000,
+            "ready_stock_filkom": 36000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 36,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Oranye",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 37,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Blue",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 40,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "I ❤️ Coding",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 17,
+          "variant_id": 41,
+          "product_name": "Pin Tas",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 4000,
+          "discount_amount": 0,
+          "subtotal": 4000,
+          "color": "FILKOM Girls",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 10000,
+            "ready_stock_filkom": 9000
+          }
+        },
+        {
+          "product_id": 24,
+          "variant_id": null,
+          "product_name": "Topi Baseball",
+          "size": "",
+          "quantity": 1,
+          "unit_price": 80000,
+          "discount_amount": 0,
+          "subtotal": 80000,
+          "color": "Default",
+          "matchedTier": "NO_MATCH",
+          "allPriceTiers": {
+            "ready_stock_public": 95000,
+            "ready_stock_filkom": 89000
+          }
+        }
+      ]
+    }
+  ]
+}

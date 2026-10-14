@@ -1,0 +1,1045 @@
+﻿=== PARSING RESULTS ===
+Orders: 457
+Order Items (unique order_ids): 457
+Products: 21
+Batch Prices: 0
+Campaigns: 3
+
+=== PRE-ORDER CAMPAIGNS ===
+  Campaign #NaN: "`batch_name`" (`start_date` ~ `end_date`, extended: `extended_end_date`)
+  Campaign #1: "Batch #2" (2026-07-20 00:00:00 ~ 2026-07-31 23:59:00, extended: 2026-08-05 23:59:00)
+  Campaign #3: "Batch #1" (2026-07-03 00:00:00 ~ 2026-07-09 23:59:00, extended: 2026-07-12 23:59:00)
+
+=== PRODUCT PRICE TIERS ===
+  Product #16 | Pin Enamel | RS_Public=40000 | RS_FILKOM=36000 | ready_stock
+  Product #17 | Pin Tas | RS_Public=10000 | RS_FILKOM=9000 | ready_stock
+  Product #18 | Sticker Pack | RS_Public=18000 | RS_FILKOM=15000 | ready_stock
+  Product #19 | Keychain | RS_Public=18000 | RS_FILKOM=15000 | ready_stock
+  Product #20 | Pulpen | RS_Public=12000 | RS_FILKOM=10000 | ready_stock
+  Product #21 | Notebook | RS_Public=27000 | RS_FILKOM=25000 | ready_stock
+  Product #22 | Totebag | RS_Public=45000 | RS_FILKOM=40000 | ready_stock
+  Product #23 | Tumbler FILKOM Brawijaya 500ml | RS_Public=85000 | RS_FILKOM=79000 | ready_stock
+  Product #24 | Topi Baseball | RS_Public=95000 | RS_FILKOM=89000 | ready_stock
+  Product #25 | T-Shirt Kaos | RS_Public=95000 | RS_FILKOM=89000 | ready_stock
+  Product #26 | Half Zip Jacket FILKOM Club Est. 2011 | RS_Public=199000 | RS_FILKOM=189000 | ready_stock
+  Product #27 | FILKOM Varsity Jacket 2026 Edition | RS_Public=359000 | RS_FILKOM=349000 | ready_stock
+  Product #28 | Work Jacket ÔÇ£FILKOM: Taming the TechnologyÔÇØ | RS_Public=269000 | RS_FILKOM=259000 | ready_stock
+  Product #29 | Brand New Days Pack | RS_Public=35000 | RS_FILKOM=27000 | pre_order
+  Product #30 | Starter Pack | RS_Public=115000 | RS_FILKOM=99000 | pre_order
+  Product #31 | Campus Daily Pack | RS_Public=135000 | RS_FILKOM=109000 | pre_order
+  Product #32 | FILKOM The Explorer | RS_Public=349000 | RS_FILKOM=319000 | pre_order
+  Product #33 | Proud To Be FILKOM! | RS_Public=389000 | RS_FILKOM=349000 | pre_order
+  Product #34 | Stiker Pack FP 2025 | RS_Public=10000 | RS_FILKOM=10000 | ready_stock
+  Product #35 | Varsity Jacket 2025 Stock | RS_Public=240000 | RS_FILKOM=240000 | ready_stock
+  Product #36 | T-Shirt Kaos FILKOM 2011 Abu-Abu | RS_Public=65000 | RS_FILKOM=55000 | ready_stock
+
+=== BATCH PRODUCT PRICES ===
+  (empty - no batch-specific pricing found in batch_product_prices table)
+  => The system likely changed products.price over time for different batches
+  => Current prices in products table are the READY STOCK prices
+
+=== DETAILED MISMATCH ANALYSIS ===
+
+Total online orders analyzed: 272
+Orders with subtotal mismatches: 49
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785939057232
+Customer: MUHAMMAD SYAUQI ARIF RABBANI (syauqiarif@student.ub.ac.id)
+Date: 2026-08-05 14:13:53
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 149000
+Item Sum (calculated): 126000
+DIFFERENCE: +23000 (OVERCHARGED)
+  Items:
+    - Pin Tas (size:, color:FILKOM Oranye)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Pin Tas (size:, color:FILKOM Boys)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Sticker Pack (size:, color:Default)
+      qty=1, unit_price=8000, subtotal=8000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Keychain (size:, color:filkom buddies)
+      qty=2, unit_price=10000, subtotal=20000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Topi Baseball (size:, color:Default)
+      qty=1, unit_price=80000, subtotal=80000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":95000,"ready_stock_filkom":89000}
+    - Keychain (size:, color:Satu hati satu jiwa filkom)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785928997440
+Customer: CHRISTIAN MAYNARD DENNIS WIJAYA (maynard@student.ub.ac.id)
+Date: 2026-08-05 11:24:18
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 60000
+Item Sum (calculated): 38000
+DIFFERENCE: +22000 (OVERCHARGED)
+  Items:
+    - Keychain (size:, color:FILKOM)
+      qty=3, unit_price=10000, subtotal=30000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Sticker Pack (size:, color:Default)
+      qty=1, unit_price=8000, subtotal=8000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785144958211
+Customer: NAFARELLA ALLEAZAHRA RISNANTHEA (nafarellaar@student.ub.ac.id)
+Date: 2026-07-27 11:44:41
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 72000
+Item Sum (calculated): 52000
+DIFFERENCE: +20000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Teknik Informatika)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785413522682
+Customer: THOFA DER ASLAM (25des07@gmail.com)
+Date: 2026-07-30 12:17:05
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 256500
+Item Sum (calculated): 236500
+DIFFERENCE: +20000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Teknik Informatika)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - FILKOM Varsity Jacket 2026 Edition (DP 50%) (size:S, color:DP)
+      qty=1, unit_price=184500, subtotal=184500
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":359000,"ready_stock_filkom":349000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785506102862
+Customer: THIVANY PRAMESWATI (vany_prameswati@student.ub.ac.id)
+Date: 2026-07-31 13:55:09
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 107000
+Item Sum (calculated): 87000
+DIFFERENCE: +20000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Enamel (size:, color:Teknik Komputer)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Brand New Days Pack (size:, color:Default)
+      qty=1, unit_price=35000, subtotal=35000
+      Matched Tier: ready_stock_public
+      All Tiers: {"ready_stock_public":35000,"ready_stock_filkom":27000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785506942318
+Customer: I GUSTI NGURAH ANANTAWIJAYA MAHARDIKA (ngurahwijaya62@student.ub.ac.id)
+Date: 2026-07-31 14:11:25
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 707000
+Item Sum (calculated): 687000
+DIFFERENCE: +20000 (OVERCHARGED)
+  Items:
+    - Notebook (size:, color:Default)
+      qty=1, unit_price=27000, subtotal=27000
+      Matched Tier: ready_stock_public
+      All Tiers: {"ready_stock_public":27000,"ready_stock_filkom":25000}
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Enamel (size:, color:Teknologi Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Work Jacket ÔÇ£FILKOM: Taming the TechnologyÔÇØ (DP 50%) (size:L, color:LUNAS)
+      qty=1, unit_price=259000, subtotal=259000
+      Matched Tier: ready_stock_filkom
+      All Tiers: {"ready_stock_public":269000,"ready_stock_filkom":259000}
+    - FILKOM Varsity Jacket 2026 Edition (DP 50%) (size:L, color:LUNAS)
+      qty=1, unit_price=349000, subtotal=349000
+      Matched Tier: ready_stock_filkom
+      All Tiers: {"ready_stock_public":359000,"ready_stock_filkom":349000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1784789691062
+Customer: ABDULLAH RAFIF SYAFRI (arafifssyafri11@student.ub.ac.id)
+Date: 2026-07-23 06:56:02
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 339000
+Item Sum (calculated): 321000
+DIFFERENCE: +18000 (OVERCHARGED)
+  Items:
+    - Work Jacket ÔÇ£FILKOM: Taming the TechnologyÔÇØ (DP 50%) (size:L, color:LUNAS)
+      qty=1, unit_price=249000, subtotal=249000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":269000,"ready_stock_filkom":259000}
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Enamel (size:, color:Teknik Komputer)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Keychain (size:, color:Satu hati satu jiwa filkom)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Keychain (size:, color:FILKOM)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1784528890719
+Customer: Muhamad Imam Nurjaman (imamnurjaman@student.ub.ac.id)
+Date: 2026-07-20 06:28:11
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 57000
+Item Sum (calculated): 40000
+DIFFERENCE: +17000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Teknologi Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Tas (size:, color:FILKOM Boys)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Keychain (size:, color:error code)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785331658795
+Customer: GHINA ERVINA SHOVA (ghinashv@student.ub.ac.id)
+Date: 2026-07-29 13:30:19
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 77000
+Item Sum (calculated): 60000
+DIFFERENCE: +17000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Teknologi Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Sticker Pack (size:, color:Default)
+      qty=1, unit_price=8000, subtotal=8000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785512701878
+Customer: MUHAMMAD ARMAN AL-FIKRI (armanfikri@student.ub.ac.id)
+Date: 2026-07-31 15:45:59
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 89000
+Item Sum (calculated): 105000
+DIFFERENCE: -16000 (UNDERCHARGED)
+  Items:
+    - T-Shirt Kaos (size:M, color:COMPUTER SCIENCE)
+      qty=1, unit_price=105000, subtotal=105000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":95000,"ready_stock_filkom":89000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785648681078
+Customer: KHOBALA FIRDAUS (khobalaf@student.ub.ac.id)
+Date: 2026-08-02 05:32:34
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 89000
+Item Sum (calculated): 105000
+DIFFERENCE: -16000 (UNDERCHARGED)
+  Items:
+    - T-Shirt Kaos (size:XL, color:SATU HATI SATU JIWA)
+      qty=1, unit_price=105000, subtotal=105000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":95000,"ready_stock_filkom":89000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1784823284440
+Customer: Mokh. Davis Rasendriya Mukhtar (davisrasendriya@student.ub.ac.id)
+Date: 2026-07-23 16:18:15
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 182500
+Item Sum (calculated): 168500
+DIFFERENCE: +14000 (OVERCHARGED)
+  Items:
+    - Keychain (size:, color:Bara)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Sticker Pack (size:, color:Default)
+      qty=1, unit_price=8000, subtotal=8000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Work Jacket ÔÇ£FILKOM: Taming the TechnologyÔÇØ (DP 50%) (size:S, color:DP)
+      qty=1, unit_price=124500, subtotal=124500
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":269000,"ready_stock_filkom":259000}
+    - Pin Enamel (size:, color:Teknik Informatika)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785832735154
+Customer: ZASKIA NAURA RAYYANI (zaskia_naura@student.ub.ac.id)
+Date: 2026-08-04 08:43:29
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 42000
+Item Sum (calculated): 28000
+DIFFERENCE: +14000 (OVERCHARGED)
+  Items:
+    - Keychain (size:, color:Satu hati satu jiwa filkom)
+      qty=2, unit_price=10000, subtotal=20000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Pin Tas (size:, color:FILKOM Girls)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Pin Tas (size:, color:FILKOM Boys)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785859576864
+Customer: MUHAMMAD ZAKI AL HILMI (mzakialhilmi@student.ub.ac.id)
+Date: 2026-08-04 16:07:23
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 70000
+Item Sum (calculated): 56000
+DIFFERENCE: +14000 (OVERCHARGED)
+  Items:
+    - Pin Tas (size:, color:FILKOM Boys)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Pin Enamel (size:, color:Sistem Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785946240387
+Customer: FAHRI HANAFI (fahrihanafi@student.ub.ac.id)
+Date: 2026-08-05 16:12:20
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 170500
+Item Sum (calculated): 156500
+DIFFERENCE: +14000 (OVERCHARGED)
+  Items:
+    - Work Jacket ÔÇ£FILKOM: Taming the TechnologyÔÇØ (DP 50%) (size:XXL, color:DP)
+      qty=1, unit_price=134500, subtotal=134500
+      Matched Tier: DP50%_of_ready_stock_public
+      All Tiers: {"ready_stock_public":269000,"ready_stock_filkom":259000}
+    - Sticker Pack (size:, color:Default)
+      qty=1, unit_price=8000, subtotal=8000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Pin Tas (size:, color:FILKOM Oranye)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Keychain (size:, color:Satu hati satu jiwa filkom)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785240877656
+Customer: ARIQ DWI ANUGRAH (dwiariq22@student.ub.ac.id)
+Date: 2026-07-28 12:15:42
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 64000
+Item Sum (calculated): 52000
+DIFFERENCE: +12000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Teknik Informatika)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Enamel (size:, color:Sistem Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785463621405
+Customer: NABILAH SIFA (nabilahsifa03@student.ub.ac.id)
+Date: 2026-07-31 02:15:00
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 338000
+Item Sum (calculated): 326000
+DIFFERENCE: +12000 (OVERCHARGED)
+  Items:
+    - Notebook (size:, color:Default)
+      qty=1, unit_price=25000, subtotal=25000
+      Matched Tier: ready_stock_filkom
+      All Tiers: {"ready_stock_public":27000,"ready_stock_filkom":25000}
+    - Pin Enamel (size:, color:Sistem Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Work Jacket ÔÇ£FILKOM: Taming the TechnologyÔÇØ (DP 50%) (size:S, color:LUNAS)
+      qty=1, unit_price=249000, subtotal=249000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":269000,"ready_stock_filkom":259000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785517785708
+Customer: Fatarib Maulana Akbar (fataribmaulana@student.ub.ac.id)
+Date: 2026-07-31 17:11:04
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 64000
+Item Sum (calculated): 52000
+DIFFERENCE: +12000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Enamel (size:, color:Sistem Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1784864886634
+Customer: Amartya Raddin Kayla Medina (amartyamedina@student.ub.ac.id)
+Date: 2026-07-24 03:49:27
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 36000
+Item Sum (calculated): 26000
+DIFFERENCE: +10000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1784968517976
+Customer: Daffa Ramadhan Jauhari (daffarj7@student.ub.ac.id)
+Date: 2026-07-25 08:38:41
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 36000
+Item Sum (calculated): 26000
+DIFFERENCE: +10000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785239512533
+Customer: Rasya Pasha (rasyapasha777@student.ub.ac.id)
+Date: 2026-07-28 11:53:30
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 30000
+Item Sum (calculated): 20000
+DIFFERENCE: +10000 (OVERCHARGED)
+  Items:
+    - Keychain (size:, color:Bara)
+      qty=2, unit_price=10000, subtotal=20000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785466153329
+Customer: RAFEYFA TASYAZALIA (rafeyfaatasyz@student.ub.ac.id)
+Date: 2026-07-31 02:49:57
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 36000
+Item Sum (calculated): 26000
+DIFFERENCE: +10000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Sistem Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785516275608
+Customer: Gede Raditya Dharma Putra Ayudia (radityadharma6@student.ub.ac.id)
+Date: 2026-07-31 16:45:32
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 385000
+Item Sum (calculated): 375000
+DIFFERENCE: +10000 (OVERCHARGED)
+  Items:
+    - FILKOM Varsity Jacket 2026 Edition (DP 50%) (size:M, color:LUNAS)
+      qty=1, unit_price=349000, subtotal=349000
+      Matched Tier: ready_stock_filkom
+      All Tiers: {"ready_stock_public":359000,"ready_stock_filkom":349000}
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785839368285
+Customer: HAYA AZIZAH RAMADHANI (hayaar@student.ub.ac.id)
+Date: 2026-08-04 10:30:56
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 36000
+Item Sum (calculated): 26000
+DIFFERENCE: +10000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Teknik Komputer)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785489190663
+Customer: BAYU PRIYAMBADHA (bayu_priyambadha@ub.ac.id)
+Date: 2026-07-31 09:17:22
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 89000
+Item Sum (calculated): 80000
+DIFFERENCE: +9000 (OVERCHARGED)
+  Items:
+    - Topi Baseball (size:, color:Default)
+      qty=1, unit_price=80000, subtotal=80000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":95000,"ready_stock_filkom":89000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785512246039
+Customer: IZZAT ABRISAM VADWI (izzatav08@student.ub.ac.id)
+Date: 2026-07-31 15:40:28
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 294000
+Item Sum (calculated): 285000
+DIFFERENCE: +9000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Sistem Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Keychain (size:, color:filkom buddies)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Work Jacket ÔÇ£FILKOM: Taming the TechnologyÔÇØ (DP 50%) (size:M, color:LUNAS)
+      qty=1, unit_price=249000, subtotal=249000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":269000,"ready_stock_filkom":259000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785932016668
+Customer: LAYLA \'AFIFAH RAMADHANI (laylaafifahr24@student.ub.ac.id)
+Date: 2026-08-05 12:14:55
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 45000
+Item Sum (calculated): 36000
+DIFFERENCE: +9000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Teknik Komputer)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Keychain (size:, color:filkom buddies)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785946917682
+Customer: Rizwanda Keysha Cahya Putra (rizwandakeysha@student.ub.ac.id)
+Date: 2026-08-05 16:25:13
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 114000
+Item Sum (calculated): 123000
+DIFFERENCE: -9000 (UNDERCHARGED)
+  Items:
+    - Pin Tas (size:, color:FILKOM Blue)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Keychain (size:, color:filkom buddies)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Pin Tas (size:, color:FILKOM Boys)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - T-Shirt Kaos (size:L, color:COMPUTER SCIENCE)
+      qty=1, unit_price=105000, subtotal=105000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":95000,"ready_stock_filkom":89000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785597954972
+Customer: ELFRIDA GYON WIDAD (elfridawidad@student.ub.ac.id)
+Date: 2026-08-01 15:27:08
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 21000
+Item Sum (calculated): 14000
+DIFFERENCE: +7000 (OVERCHARGED)
+  Items:
+    - Pin Tas (size:, color:FILKOM Oranye)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Keychain (size:, color:Bara)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785156603023
+Customer: FAIZAH NUR KARIMAH (faizahnurk@student.ub.ac.id)
+Date: 2026-07-27 12:52:41
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 32000
+Item Sum (calculated): 26000
+DIFFERENCE: +6000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Teknik Informatika)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785492317804
+Customer: Muhammad Faidz Agustiawan (faidzagustiawan@student.ub.ac.id)
+Date: 2026-07-31 10:06:43
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 59000
+Item Sum (calculated): 53000
+DIFFERENCE: +6000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Sistem Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Brand New Days Pack (size:, color:Default)
+      qty=1, unit_price=27000, subtotal=27000
+      Matched Tier: ready_stock_filkom
+      All Tiers: {"ready_stock_public":35000,"ready_stock_filkom":27000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785494578953
+Customer: HASSAN NASHRALLAH (hassanashrallah@student.ub.ac.id)
+Date: 2026-07-31 11:56:45
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 32000
+Item Sum (calculated): 26000
+DIFFERENCE: +6000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Teknik Informatika)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785508832701
+Customer: ARIEL RIZKY NAYOAN (arielnayoan26@student.ub.ac.id)
+Date: 2026-07-31 14:42:28
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 72000
+Item Sum (calculated): 66000
+DIFFERENCE: +6000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Totebag (size:, color:FILKOM BRAWIJAYA Signature)
+      qty=1, unit_price=40000, subtotal=40000
+      Matched Tier: ready_stock_filkom
+      All Tiers: {"ready_stock_public":45000,"ready_stock_filkom":40000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785633536811
+Customer: MUHAMMAD FAIZ (muhammadfaiz_@student.ub.ac.id)
+Date: 2026-08-02 01:20:28
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 32000
+Item Sum (calculated): 26000
+DIFFERENCE: +6000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Teknik Komputer)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785670280068
+Customer: DARREN GARCIA IYAS JOYOSEPUTRO (iyasdarren@student.ub.ac.id)
+Date: 2026-08-02 11:32:36
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 99000
+Item Sum (calculated): 105000
+DIFFERENCE: -6000 (UNDERCHARGED)
+  Items:
+    - T-Shirt Kaos (size:XXL, color:COMPUTER SCIENCE)
+      qty=1, unit_price=105000, subtotal=105000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":95000,"ready_stock_filkom":89000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785843445605
+Customer: MUHAMMAD ARFA AFLAHDANI (aflahdani@student.ub.ac.id)
+Date: 2026-08-04 11:38:22
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 18000
+Item Sum (calculated): 12000
+DIFFERENCE: +6000 (OVERCHARGED)
+  Items:
+    - Pin Tas (size:, color:FILKOM Oranye)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Pin Tas (size:, color:FILKOM Blue)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Pin Tas (size:, color:It\'s My First Time Ngoding)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785930700592
+Customer: Gefiranch (dmuafah@student.ub.ac.id)
+Date: 2026-08-05 11:53:27
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 32000
+Item Sum (calculated): 26000
+DIFFERENCE: +6000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:Sistem Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785937853226
+Customer: Jessica Fidela (jessicafidela@student.ub.ac.id)
+Date: 2026-08-05 13:52:15
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 32000
+Item Sum (calculated): 26000
+DIFFERENCE: +6000 (OVERCHARGED)
+  Items:
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785248782855
+Customer: DEVITHA DINI TANAMA (devithadini@student.ub.ac.id)
+Date: 2026-07-28 14:28:35
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 85000
+Item Sum (calculated): 80000
+DIFFERENCE: +5000 (OVERCHARGED)
+  Items:
+    - Topi Baseball (size:, color:Default)
+      qty=1, unit_price=80000, subtotal=80000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":95000,"ready_stock_filkom":89000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785321407619
+Customer: CICI RAMADHANI (ciciramadhani@student.ub.ac.id)
+Date: 2026-07-29 10:38:55
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 264000
+Item Sum (calculated): 259000
+DIFFERENCE: +5000 (OVERCHARGED)
+  Items:
+    - Half Zip Jacket FILKOM Club Est. 2011 (DP 50%) (size:XS, color:LUNAS)
+      qty=1, unit_price=179000, subtotal=179000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":199000,"ready_stock_filkom":189000}
+    - Topi Baseball (size:, color:Default)
+      qty=1, unit_price=80000, subtotal=80000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":95000,"ready_stock_filkom":89000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785521447170
+Customer: FARREL RADITYA (radityafarrel@student.ub.ac.id)
+Date: 2026-07-31 18:11:07
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 362000
+Item Sum (calculated): 357000
+DIFFERENCE: +5000 (OVERCHARGED)
+  Items:
+    - Proud To Be FILKOM! (size:, color:Default)
+      qty=1, unit_price=349000, subtotal=349000
+      Matched Tier: ready_stock_filkom
+      All Tiers: {"ready_stock_public":389000,"ready_stock_filkom":349000}
+    - Sticker Pack (size:, color:Default)
+      qty=1, unit_price=8000, subtotal=8000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785944349228
+Customer: ABDURRAHMAN SUDAISY (abdurrahman25@student.ub.ac.id)
+Date: 2026-08-05 15:40:21
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 209500
+Item Sum (calculated): 204500
+DIFFERENCE: +5000 (OVERCHARGED)
+  Items:
+    - Topi Baseball (size:, color:Default)
+      qty=1, unit_price=80000, subtotal=80000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":95000,"ready_stock_filkom":89000}
+    - Work Jacket ÔÇ£FILKOM: Taming the TechnologyÔÇØ (DP 50%) (size:M, color:DP)
+      qty=1, unit_price=124500, subtotal=124500
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":269000,"ready_stock_filkom":259000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785383416132
+Customer: ALFIN NUR ROBBY (inialfin@student.ub.ac.id)
+Date: 2026-07-30 03:51:19
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 261000
+Item Sum (calculated): 257000
+DIFFERENCE: +4000 (OVERCHARGED)
+  Items:
+    - Work Jacket ÔÇ£FILKOM: Taming the TechnologyÔÇØ (DP 50%) (size:M, color:LUNAS)
+      qty=1, unit_price=249000, subtotal=249000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":269000,"ready_stock_filkom":259000}
+    - Pin Tas (size:, color:Let\'s Stay Connected)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Pin Tas (size:, color:FILKOM Blue)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1784738649351
+Customer: RAYHAN PUTRA YAVIE (rahpyav@student.ub.ac.id)
+Date: 2026-07-22 16:46:15
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 40000
+Item Sum (calculated): 37000
+DIFFERENCE: +3000 (OVERCHARGED)
+  Items:
+    - Keychain (size:, color:error code)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Brand New Days Pack (size:, color:Default)
+      qty=1, unit_price=27000, subtotal=27000
+      Matched Tier: ready_stock_filkom
+      All Tiers: {"ready_stock_public":35000,"ready_stock_filkom":27000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785321312717
+Customer: CICI RAMADHANI (ciciramadhani@student.ub.ac.id)
+Date: 2026-07-29 10:35:19
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 13000
+Item Sum (calculated): 10000
+DIFFERENCE: +3000 (OVERCHARGED)
+  Items:
+    - Keychain (size:, color:Bara)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785508603739
+Customer: RAFIF PRIYAMBODO (rafifpriyambodo@student.ub.ac.id)
+Date: 2026-07-31 14:45:15
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 332000
+Item Sum (calculated): 329000
+DIFFERENCE: +3000 (OVERCHARGED)
+  Items:
+    - Keychain (size:, color:Satu hati satu jiwa filkom)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - FILKOM The Explorer (size:, color:Default)
+      qty=1, unit_price=319000, subtotal=319000
+      Matched Tier: ready_stock_filkom
+      All Tiers: {"ready_stock_public":349000,"ready_stock_filkom":319000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785775585140
+Customer: PUTY HANIFA (putyhanifa@student.ub.ac.id)
+Date: 2026-08-03 16:46:28
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 232000
+Item Sum (calculated): 229000
+DIFFERENCE: +3000 (OVERCHARGED)
+  Items:
+    - Totebag (size:, color:FILKOM BRAWIJAYA Signature)
+      qty=1, unit_price=40000, subtotal=40000
+      Matched Tier: ready_stock_filkom
+      All Tiers: {"ready_stock_public":45000,"ready_stock_filkom":40000}
+    - Half Zip Jacket FILKOM Club Est. 2011 (DP 50%) (size:XS, color:LUNAS)
+      qty=1, unit_price=179000, subtotal=179000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":199000,"ready_stock_filkom":189000}
+    - Keychain (size:, color:Satu hati satu jiwa filkom)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: FILKOM-1785936027053
+Customer: PUTY HANIFA (putyhanifa@student.ub.ac.id)
+Date: 2026-08-05 13:20:37
+Campaign: None (Ready Stock) (id=null)
+Order Subtotal (charged): 6000
+Item Sum (calculated): 4000
+DIFFERENCE: +2000 (OVERCHARGED)
+  Items:
+    - Pin Tas (size:, color:FILKOM Blue)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+
+ÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöüÔöü
+ORDER: IMP-1786172323080-42-221
+Customer: NISFIL LAILI AZZAHRA (nisfillailiazz@student.ub.ac.id)
+Date: 2026-07-04 08:25:20
+Campaign: Batch #1 (id=3)
+Order Subtotal (charged): 198000
+Item Sum (calculated): 196000
+DIFFERENCE: +2000 (OVERCHARGED)
+  Items:
+    - Sticker Pack (size:, color:)
+      qty=1, unit_price=8000, subtotal=8000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Keychain (size:, color:Bara)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Keychain (size:, color:Satu hati satu jiwa filkom)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Keychain (size:, color:filkom buddies)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Keychain (size:, color:FILKOM)
+      qty=1, unit_price=10000, subtotal=10000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":18000,"ready_stock_filkom":15000}
+    - Pin Enamel (size:, color:FILKOM)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Enamel (size:, color:Pendidikan Teknologi Informasi)
+      qty=1, unit_price=26000, subtotal=26000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":40000,"ready_stock_filkom":36000}
+    - Pin Tas (size:, color:FILKOM Oranye)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Pin Tas (size:, color:FILKOM Blue)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Pin Tas (size:, color:I ÔØñ´©Å Coding)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Pin Tas (size:, color:FILKOM Girls)
+      qty=1, unit_price=4000, subtotal=4000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":10000,"ready_stock_filkom":9000}
+    - Topi Baseball (size:, color:Default)
+      qty=1, unit_price=80000, subtotal=80000
+      Matched Tier: NO_MATCH
+      All Tiers: {"ready_stock_public":95000,"ready_stock_filkom":89000}
+
+ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
+CASE STUDY: BAYU PRIYAMBADHA (FILKOM-1785489190663)
+ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
+Customer: BAYU PRIYAMBADHA
+Date: 2026-07-31 09:17:22
+Campaign ID: null
+Topi Baseball (id=24):
+  RS Public: 95000
+  RS FILKOM: 89000
+Order items:
+  Topi Baseball: unit_price=80000, subtotal=80000
+Charged: 89000, Gross: 89000
+
+ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
+SUMMARY
+ÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉÔòÉ
+Overcharged: 45 orders (total: +Rp 451,000)
+Undercharged: 4 orders (total: -Rp 47,000)
+
+Cases where diff matches a known price tier difference:
+  FILKOM-1785516275608 | Gede Raditya Dharma Putra Ayudia | diff=10000 | FILKOM Varsity Jacket 2026 Edition (DP 50%)
+    => ready_stock_public(359000) vs ready_stock_filkom(349000)
+  FILKOM-1785670280068 | DARREN GARCIA IYAS JOYOSEPUTRO | diff=-6000 | T-Shirt Kaos
+    => ready_stock_public(95000) vs ready_stock_filkom(89000)
+  FILKOM-1784738649351 | RAYHAN PUTRA YAVIE | diff=3000 | Keychain
+    => ready_stock_public(18000) vs ready_stock_filkom(15000)
+  FILKOM-1785321312717 | CICI RAMADHANI | diff=3000 | Keychain
+    => ready_stock_public(18000) vs ready_stock_filkom(15000)
+  FILKOM-1785508603739 | RAFIF PRIYAMBODO | diff=3000 | Keychain
+    => ready_stock_public(18000) vs ready_stock_filkom(15000)
+  FILKOM-1785775585140 | PUTY HANIFA | diff=3000 | Keychain
+    => ready_stock_public(18000) vs ready_stock_filkom(15000)
+
+Full analysis saved to scripts/batch_pricing_analysis.json

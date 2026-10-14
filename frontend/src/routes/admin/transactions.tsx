@@ -3181,7 +3181,7 @@ function AdminTransactionsPage() {
                             <div className="flex items-center justify-between text-[11px] font-bold text-red-900">
                               <span className="flex items-center gap-1">
                                 <AlertTriangle className="w-3 h-3 text-red-600 shrink-0" />
-                                Selisih Subtotal Terdeteksi
+                                Selisih Subtotal ({audit.batchLabel})
                               </span>
                               <span className="font-mono">
                                 {audit.subtotalDiff > 0
@@ -3688,9 +3688,9 @@ function AdminTransactionsPage() {
                                     {audit.hasMismatch && (
                                       <span
                                         className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black bg-red-100 text-red-900 border border-red-300"
-                                        title={`Subtotal DB: Rp ${audit.actualSubtotal.toLocaleString("id-ID")} | Seharusnya: Rp ${audit.expectedSubtotal.toLocaleString("id-ID")}`}
+                                        title={`[${audit.batchLabel}] Subtotal DB: Rp ${audit.actualSubtotal.toLocaleString("id-ID")} | Seharusnya: Rp ${audit.expectedSubtotal.toLocaleString("id-ID")}`}
                                       >
-                                        <AlertTriangle className="w-2.5 h-2.5 text-red-600" /> Selisih Subtotal
+                                        <AlertTriangle className="w-2.5 h-2.5 text-red-600" /> Selisih ({audit.batchLabel})
                                       </span>
                                     )}
                                   </div>
@@ -5925,6 +5925,9 @@ function AdminTransactionsPage() {
                                 <div className="flex items-center gap-1.5 font-black text-red-900 text-xs uppercase tracking-wider">
                                   <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
                                   <span>Audit Selisih Harga Transaksi</span>
+                                  <span className="bg-red-200/90 text-red-900 border border-red-300 text-[10px] font-bold px-1.5 py-0.2 rounded uppercase">
+                                    {audit.batchLabel}
+                                  </span>
                                 </div>
                                 <span
                                   className={`text-[10px] font-black px-2 py-0.5 rounded-full border ${
@@ -5956,7 +5959,7 @@ function AdminTransactionsPage() {
 
                                 <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2.5 space-y-1">
                                   <span className="text-[10px] font-bold text-emerald-800 uppercase block">
-                                    Hasil Rekalkulasi Item (Seharusnya)
+                                    Hasil Rekalkulasi Item ({audit.batchLabel})
                                   </span>
                                   <div className="flex justify-between">
                                     <span className="text-emerald-900">Subtotal Seharusnya:</span>

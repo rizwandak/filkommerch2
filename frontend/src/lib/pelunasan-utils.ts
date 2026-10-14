@@ -135,6 +135,170 @@ export const calculateOrderPelunasanAmount = (order: any, linkedLns?: any): numb
   return totalPelunasan;
 };
 
+// ============ MASTER PRICE MATRIX (BATCH 1, BATCH 2, READY STOCK) ============
+
+export const BATCH_1_PRICES: Record<string, number> = {
+  kaos: 105000,
+  topi: 80000,
+  totebag: 40000,
+  keychain: 10000,
+  sticker: 8000,
+  pin_tas: 4000,
+  pin_enamel: 26000,
+};
+
+export const BATCH_2_PRICES: Record<string, number> = {
+  work_jacket: 249000,
+  varsity: 329000,
+  half_zip: 179000,
+  kaos: 89000,
+  topi: 80000,
+  tumbler: 79000,
+  totebag: 40000,
+  notebook: 25000,
+  pulpen: 10000,
+  keychain: 13000,
+  sticker: 13000,
+  pin_tas: 6000,
+  pin_enamel: 32000,
+  // Bundles
+  brand_new_days: 27000,
+  starter_pack: 99000,
+  explorer: 319000,
+  proud_to_be_filkom: 349000,
+};
+
+export const READY_STOCK_FILKOM_PRICES: Record<string, number> = {
+  work_jacket: 259000,
+  varsity: 349000,
+  half_zip: 189000,
+  kaos: 95000,
+  topi: 89000,
+  tumbler: 85000,
+  totebag: 45000,
+  notebook: 27000,
+  pulpen: 12000,
+  keychain: 15000,
+  sticker: 15000,
+  pin_tas: 6000,
+  pin_enamel: 36000,
+};
+
+export const READY_STOCK_UMUM_PRICES: Record<string, number> = {
+  work_jacket: 269000,
+  varsity: 359000,
+  half_zip: 199000,
+  kaos: 99000,
+  topi: 95000,
+  tumbler: 95000,
+  totebag: 49000,
+  notebook: 29000,
+  pulpen: 12000,
+  keychain: 15000,
+  sticker: 20000,
+  pin_tas: 8000,
+  pin_enamel: 40000,
+};
+
+export const normalizeProductKey = (name?: string | null): string => {
+  if (!name) return "";
+  const n = String(name).toLowerCase();
+  if (n.includes("work jacket")) return "work_jacket";
+  if (n.includes("varsity")) return "varsity";
+  if (n.includes("half zip") || n.includes("halfzip") || n.includes("half-zip")) return "half_zip";
+  if (n.includes("kaos") || n.includes("t-shirt") || n.includes("tee")) return "kaos";
+  if (n.includes("topi")) return "topi";
+  if (n.includes("tumbler") || n.includes("botol")) return "tumbler";
+  if (n.includes("totebag") || n.includes("tote")) return "totebag";
+  if (n.includes("notebook") || n.includes("buku")) return "notebook";
+  if (n.includes("pulpen") || n.includes("pen")) return "pulpen";
+  if (n.includes("keychain") || n.includes("gantungan")) return "keychain";
+  if (n.includes("sticker") || n.includes("stiker")) return "sticker";
+  if (n.includes("pin enamel")) return "pin_enamel";
+  if (n.includes("pin tas") || n.includes("pin 44")) return "pin_tas";
+  if (n.includes("brand new days")) return "brand_new_days";
+  if (n.includes("starter pack")) return "starter_pack";
+  if (n.includes("explorer")) return "explorer";
+  if (n.includes("proud to be filkom")) return "proud_to_be_filkom";
+  return "";
+};
+
+export type OrderBatchTier = "BATCH_1" | "BATCH_2" | "READY_STOCK";
+
+export const determineOrderBatch = (order: any): OrderBatchTier => {
+  if (!order) return "READY_STOCK";
+  const cId = Number(order.pre_order_campaign_id);
+  const orderNum = String(order.order_number || order.order_id || "");
+  if (cId === 3 || orderNum.startsWith("IMP-")) return "BATCH_1";
+  if (cId === 1) return "BATCH_2";
+
+  const d = order.created_at ? String(order.created_at).substring(0, 10) : "";
+  if (d && d >= "2026-07-01" && d <= "2026-07-15") return "BATCH_1";
+  if (d && d >= "2026-07-16" && d <= "2026-08-08") return "BATCH_2";
+  return "READY_STOCK";
+};
+
+export const getOrderBatchLabel = (batch: OrderBatchTier): string => {
+  if (batch === "BATCH_1") return "PO Batch 1";
+  if (batch === "BATCH_2") return "PO Batch 2";
+  return "Ready Stock";
+};
+
+export const isFilkomCustomer = (order: any): boolean => {
+  if (!order) return true;
+  const email = String(order.customer_email || "").toLowerCase().trim();
+  const nim = String(order.customer_nim || "").trim();
+  if (email.endsWith("@student.ub.ac.id") || email.endsWith("@ub.ac.id") || nim.length > 0) {
+    return true;
+  }
+  return false;
+};
+
+export const getExpectedItemUnitPrice = (item: any, order: any): number => {
+  if (!item) return 0;
+  const name = item.product_name || item.name || "";
+  if (String(name).includes("[KOMPONEN BUNDLE]")) return 0;
+
+  const key = normalizeProductKey(name);
+  const batch = determineOrderBatch(order);
+  const isFilkom = isFilkomCustomer(order);
+
+  // Pelunasan item (remaining 50% balance)
+  const isPelunasanItem =
+    String(name).toUpperCase().includes("PELUNASAN") ||
+    String(item.color || "").toUpperCase().includes("PELUNASAN") ||
+    String(order.order_number || order.order_id || "").startsWith("LNS-");
+
+  if (isPelunasanItem) {
+    if (key === "work_jacket") return 124500;
+    if (key === "half_zip") return 89500;
+    if (key === "varsity") return 164500;
+    if (key === "proud_to_be_filkom") return 164500;
+  }
+
+  // Base price lookup according to batch
+  let basePrice = 0;
+  if (batch === "BATCH_1") {
+    basePrice = BATCH_1_PRICES[key] ?? Number(item.unit_price || 0);
+  } else if (batch === "BATCH_2") {
+    basePrice = BATCH_2_PRICES[key] ?? Number(item.unit_price || 0);
+  } else {
+    // Ready stock
+    basePrice = isFilkom
+      ? (READY_STOCK_FILKOM_PRICES[key] ?? Number(item.unit_price || 0))
+      : (READY_STOCK_UMUM_PRICES[key] ?? Number(item.unit_price || 0));
+  }
+
+  // Jacket DP check
+  if (isDpItem(item)) {
+    const upsize = getJacketUpsizeSurcharge(name, item.size);
+    const halfBase = Math.floor(basePrice / 2);
+    return halfBase + upsize;
+  }
+
+  return basePrice;
+};
+
 export interface OrderPriceAudit {
   actualSubtotal: number;
   expectedSubtotal: number;
@@ -145,6 +309,9 @@ export interface OrderPriceAudit {
   hasMismatch: boolean;
   hasBundleComponents: boolean;
   itemsSum: number;
+  batchTier: OrderBatchTier;
+  batchLabel: string;
+  isFilkom: boolean;
 }
 
 export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): OrderPriceAudit => {
@@ -159,8 +326,15 @@ export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): Ord
       hasMismatch: false,
       hasBundleComponents: false,
       itemsSum: 0,
+      batchTier: "READY_STOCK",
+      batchLabel: "Ready Stock",
+      isFilkom: true,
     };
   }
+
+  const batchTier = determineOrderBatch(order);
+  const batchLabel = getOrderBatchLabel(batchTier);
+  const isFilkom = isFilkomCustomer(order);
 
   const items: any[] = itemsOverride || order.items || [];
   const actualSubtotal = Number(order.subtotal || 0);
@@ -177,18 +351,20 @@ export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): Ord
     String(i?.product_name || "").includes("[KOMPONEN BUNDLE]")
   );
 
-  // If there are items, sum them up (exclude [KOMPONEN BUNDLE] prices as the bundle covers it)
-  let itemsSum = 0;
+  // Calculate expected subtotal using batch-aware expected unit prices
+  let calculatedExpectedSubtotal = 0;
   if (items.length > 0) {
-    itemsSum = items.reduce((sum: number, it: any) => {
+    calculatedExpectedSubtotal = items.reduce((sum: number, it: any) => {
       if (String(it?.product_name || "").includes("[KOMPONEN BUNDLE]")) return sum;
-      return sum + Number(it?.subtotal ?? (Number(it?.unit_price || 0) * Number(it?.quantity || 1)));
+      const expectedUnit = getExpectedItemUnitPrice(it, order);
+      const qty = Number(it?.quantity || 1);
+      return sum + (expectedUnit * qty);
     }, 0);
   } else {
-    itemsSum = actualSubtotal;
+    calculatedExpectedSubtotal = actualSubtotal;
   }
 
-  const expectedSubtotal = itemsSum;
+  const expectedSubtotal = calculatedExpectedSubtotal;
   const expectedGross = Math.max(
     0,
     expectedSubtotal - posDiscount - voucherDiscount + shippingCost + serviceFee + taxAmount + uniqueCode
@@ -209,6 +385,10 @@ export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): Ord
     grossDiff,
     hasMismatch,
     hasBundleComponents,
-    itemsSum,
+    itemsSum: expectedSubtotal,
+    batchTier,
+    batchLabel,
+    isFilkom,
   };
 };
+
