@@ -73,6 +73,8 @@ export interface JacketPriceBreakdown {
   upsize: number;
   normalPrice: number;
   subtotal: number;
+  upsizePaidAtDp: boolean;
+  unpaidUpsize: number;
 }
 
 export const getJacketPriceBreakdown = (item: any): JacketPriceBreakdown => {
@@ -80,12 +82,28 @@ export const getJacketPriceBreakdown = (item: any): JacketPriceBreakdown => {
   const isDp = isDpItem(item);
   const unitPrice = Number(item?.unit_price || item?.price || 0);
   const upsize = isJacket ? getJacketUpsizeSurcharge(item?.product_name, item?.size) : 0;
+  const defaultNormalDp = isJacket ? getJacketDefaultNormalDpPrice(item?.product_name) : 0;
 
   let normalPrice = unitPrice;
-  if (isJacket && upsize > 0) {
+  let upsizePaidAtDp = true;
+  let unpaidUpsize = 0;
+
+  if (isJacket && isDp) {
+    if (defaultNormalDp > 0) {
+      normalPrice = defaultNormalDp;
+      // If the buyer paid strictly <= defaultNormalDp (e.g. 124.500 for Work Jacket XXL),
+      // upsize (+10.000) was NOT paid at DP and is deferred to Pelunasan!
+      if (upsize > 0 && unitPrice <= defaultNormalDp) {
+        upsizePaidAtDp = false;
+        unpaidUpsize = upsize;
+      }
+    } else if (upsize > 0) {
+      normalPrice = Math.max(0, unitPrice - upsize);
+    }
+  } else if (isJacket && !isDp && upsize > 0) {
     normalPrice = Math.max(0, unitPrice - upsize);
   } else if (isJacket && normalPrice <= 0) {
-    normalPrice = getJacketDefaultNormalDpPrice(item?.product_name);
+    normalPrice = defaultNormalDp;
   }
 
   const subtotal = Number(item?.subtotal || unitPrice * Number(item?.quantity || 1) || 0);
@@ -97,13 +115,15 @@ export const getJacketPriceBreakdown = (item: any): JacketPriceBreakdown => {
     upsize,
     normalPrice,
     subtotal,
+    upsizePaidAtDp,
+    unpaidUpsize,
   };
 };
 
 /**
  * Calculates the exact expected pelunasan amount for an order.
  * - If order already has a linked LNS order, uses linkedLns.gross_amount.
- * - Otherwise, sums only the normal DP prices of jacket items (ignoring upsize and non-jacket items).
+ * - Otherwise, sums only the normal DP prices of jacket items (plus any unpaid upsize deferred from DP).
  */
 export const calculateOrderPelunasanAmount = (order: any, linkedLns?: any): number => {
   if (linkedLns && Number(linkedLns.gross_amount) > 0) {
@@ -129,7 +149,8 @@ export const calculateOrderPelunasanAmount = (order: any, linkedLns?: any): numb
 
     const breakdown = getJacketPriceBreakdown(item);
     const qty = Number(item.quantity || 1);
-    totalPelunasan += breakdown.normalPrice * qty;
+    // If upsize was not paid at DP (e.g. Achmad Alvian: charged 124.500 for XXL), add the unpaid upsize (+10.000) to Pelunasan!
+    totalPelunasan += (breakdown.normalPrice + breakdown.unpaidUpsize) * qty;
   }
 
   return totalPelunasan;
@@ -332,6 +353,12 @@ export const calculateSingleItemPrice = (
     const upsize = getJacketUpsizeSurcharge(name, item.size);
     if (isDpItem(item)) {
       const halfBase = Math.floor(basePrice / 2);
+      const actualUnit = Number(item.unit_price || 0);
+      // If the buyer was charged only standard base DP at checkout (e.g. 124.500 instead of 134.500 for XXL),
+      // the upsize fee (+10.000) was not charged at DP and is deferred to Pelunasan.
+      if (actualUnit === halfBase) {
+        return halfBase;
+      }
       return halfBase + upsize;
     }
     return basePrice + upsize;
@@ -471,6 +498,9 @@ export interface OrderPriceAudit {
   paymentDiff: number;
   paymentDiffType: "OVERPAID" | "UNDERPAID" | "EXACT";
   paymentNote: string | null;
+  // Deferred upsize tracking (when upsize was not charged at DP and is deferred to Pelunasan)
+  hasDeferredUpsize: boolean;
+  deferredUpsizeAmount: number;
 }
 
 export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): OrderPriceAudit => {
@@ -495,6 +525,8 @@ export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): Ord
       paymentDiff: 0,
       paymentDiffType: "EXACT",
       paymentNote: null,
+      hasDeferredUpsize: false,
+      deferredUpsizeAmount: 0,
     };
   }
 
@@ -562,6 +594,18 @@ export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): Ord
         : `Pembeli mentransfer Rp ${verifiedNominal.toLocaleString("id-ID")} (Kurang Bayar: -Rp ${Math.abs(paymentDiff).toLocaleString("id-ID")})`;
   }
 
+  // Detect deferred upsize (e.g. Achmad Alvian: XXL upsize +10k was not charged at DP, will be charged at Pelunasan)
+  let deferredUpsizeAmount = 0;
+  for (const it of items) {
+    if (isJacketProduct(it?.product_name) && isDpItem(it)) {
+      const bd = getJacketPriceBreakdown(it);
+      if (!bd.upsizePaidAtDp && bd.unpaidUpsize > 0) {
+        deferredUpsizeAmount += bd.unpaidUpsize * Number(it?.quantity || 1);
+      }
+    }
+  }
+  const hasDeferredUpsize = deferredUpsizeAmount > 0;
+
   return {
     actualSubtotal,
     expectedSubtotal,
@@ -582,6 +626,8 @@ export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): Ord
     paymentDiff,
     paymentDiffType,
     paymentNote,
+    hasDeferredUpsize,
+    deferredUpsizeAmount,
   };
 };
 

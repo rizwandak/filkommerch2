@@ -5803,14 +5803,20 @@ export const createPelunasanOrder = async (req: Request, res: Response) => {
         );
       }
 
-      // Upsize surcharge is only paid once during DP. Pelunasan only pays normal price!
+      // Normal base DP price
+      const defaultNormalDp = getJacketDefaultNormalDpPrice(item.product_name);
       const upsize = getJacketUpsizeSurcharge(item.product_name, item.size);
       let unitPrice = Number(item.unit_price || 0);
       if (unitPrice <= 0) {
-        unitPrice = getJacketDefaultNormalDpPrice(item.product_name) + upsize;
+        unitPrice = defaultNormalDp + upsize;
       }
-      const normalDpPrice = Math.max(0, unitPrice - upsize);
-      const finalSisa = normalDpPrice;
+      
+      let baseDp = defaultNormalDp > 0 ? defaultNormalDp : (upsize > 0 ? Math.max(0, unitPrice - upsize) : unitPrice);
+      let finalSisa = baseDp;
+      // If buyer only paid base normal DP at checkout (e.g. 124.500 for XXL), the upsize was NOT paid in DP -> add to pelunasan!
+      if (upsize > 0 && defaultNormalDp > 0 && unitPrice <= defaultNormalDp) {
+        finalSisa += upsize;
+      }
 
       const subtotal = finalSisa * item.quantity;
       calculatedSubtotal += subtotal;
@@ -6026,14 +6032,18 @@ export const getPelunasanInfo = async (req: Request, res: Response) => {
         );
       }
 
-      // Upsize surcharge is only paid once during DP. Pelunasan only pays normal price!
+      const defaultNormalDp = getJacketDefaultNormalDpPrice(item.product_name);
       const upsize = getJacketUpsizeSurcharge(item.product_name, item.size);
       let unitPrice = Number(item.unit_price || 0);
       if (unitPrice <= 0) {
-        unitPrice = getJacketDefaultNormalDpPrice(item.product_name) + upsize;
+        unitPrice = defaultNormalDp + upsize;
       }
-      const normalDpPrice = Math.max(0, unitPrice - upsize);
-      const sisa = normalDpPrice;
+      let baseDp = defaultNormalDp > 0 ? defaultNormalDp : (upsize > 0 ? Math.max(0, unitPrice - upsize) : unitPrice);
+      let sisa = baseDp;
+      // If buyer only paid base normal DP at checkout (e.g. 124.500 for XXL), add upsize to pelunasan!
+      if (upsize > 0 && defaultNormalDp > 0 && unitPrice <= defaultNormalDp) {
+        sisa += upsize;
+      }
       const subtotal = sisa * item.quantity;
       calculatedSubtotal += subtotal;
 

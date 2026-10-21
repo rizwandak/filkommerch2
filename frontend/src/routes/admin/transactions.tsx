@@ -5930,13 +5930,21 @@ function AdminTransactionsPage() {
                                       <span className="text-gray-600">
                                         Harga Normal: <strong className="font-semibold text-ink">Rp {breakdown.normalPrice.toLocaleString("id-ID")}</strong>
                                       </span>
-                                      <span className="text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-300 font-bold text-[9px]">
-                                        + Biaya Upsize ({item.size}): Rp {breakdown.upsize.toLocaleString("id-ID")}
-                                      </span>
-                                      {breakdown.isDp && (
-                                        <span className="text-purple-800 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 text-[9px] font-semibold">
-                                          (Dibayar 1x di DP)
+                                      {breakdown.isDp && !breakdown.upsizePaidAtDp ? (
+                                        <span className="text-purple-800 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-300 font-bold text-[9px]">
+                                          + Biaya Upsize ({item.size}): Rp {breakdown.upsize.toLocaleString("id-ID")} (Belum masuk di DP, dialihkan ke Pelunasan)
                                         </span>
+                                      ) : (
+                                        <>
+                                          <span className="text-amber-800 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-300 font-bold text-[9px]">
+                                            + Biaya Upsize ({item.size}): Rp {breakdown.upsize.toLocaleString("id-ID")}
+                                          </span>
+                                          {breakdown.isDp && (
+                                            <span className="text-purple-800 bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 text-[9px] font-semibold">
+                                              (Dibayar 1x di DP)
+                                            </span>
+                                          )}
+                                        </>
                                       )}
                                     </div>
                                   )}
@@ -6048,6 +6056,12 @@ function AdminTransactionsPage() {
                               {audit.hasBundleComponents && (
                                 <p className="text-[10px] text-amber-900 bg-amber-50 border border-amber-200 rounded p-1.5 font-medium leading-relaxed">
                                   💡 <strong>Catatan Komponen Bundle:</strong> Pesanan ini memiliki komponen paket bundle. Pada rekalkulasi yang benar, komponen di dalamnya dihitung Rp 0 agar tidak terhitung dua kali dengan harga paket utama.
+                                </p>
+                              )}
+
+                              {audit.hasDeferredUpsize && (
+                                <p className="text-[10px] text-blue-900 bg-blue-50 border border-blue-200 rounded p-1.5 font-medium leading-relaxed">
+                                  ℹ️ <strong>Catatan Biaya Upsize DP:</strong> Pesanan ini memiliki jaket DP berukuran upsize ({fmt(audit.deferredUpsizeAmount)}) yang belum tertagih saat DP. Biaya ini secara otomatis dialihkan dan ditambahkan ke dalam sisa tagihan Pelunasan (Pelunasan menjadi {fmt(calculateOrderPelunasanAmount(managedTransaction))}).
                                 </p>
                               )}
 
