@@ -168,6 +168,28 @@ export const BATCH_2_PRICES: Record<string, number> = {
   proud_to_be_filkom: 349000,
 };
 
+// PO Batch 2 untuk Umum (Non-FILKOM): menggunakan kolom "FILKOM Sell Price" sesuai arahan
+export const BATCH_2_UMUM_PRICES: Record<string, number> = {
+  work_jacket: 259000,
+  varsity: 349000,
+  half_zip: 189000,
+  kaos: 95000,
+  topi: 89000,
+  tumbler: 85000,
+  totebag: 45000,
+  notebook: 27000,
+  pulpen: 12000,
+  keychain: 15000,
+  sticker: 15000,
+  pin_tas: 6000,
+  pin_enamel: 36000,
+  // Bundles
+  brand_new_days: 35000,
+  starter_pack: 115000,
+  explorer: 349000,
+  proud_to_be_filkom: 389000,
+};
+
 export const READY_STOCK_FILKOM_PRICES: Record<string, number> = {
   work_jacket: 259000,
   varsity: 349000,
@@ -182,6 +204,11 @@ export const READY_STOCK_FILKOM_PRICES: Record<string, number> = {
   sticker: 15000,
   pin_tas: 6000,
   pin_enamel: 36000,
+  // Bundles
+  brand_new_days: 27000,
+  starter_pack: 99000,
+  explorer: 319000,
+  proud_to_be_filkom: 349000,
 };
 
 export const READY_STOCK_UMUM_PRICES: Record<string, number> = {
@@ -198,6 +225,11 @@ export const READY_STOCK_UMUM_PRICES: Record<string, number> = {
   sticker: 20000,
   pin_tas: 8000,
   pin_enamel: 40000,
+  // Bundles
+  brand_new_days: 35000,
+  starter_pack: 115000,
+  explorer: 349000,
+  proud_to_be_filkom: 389000,
 };
 
 export const normalizeProductKey = (name?: string | null): string => {
@@ -224,6 +256,7 @@ export const normalizeProductKey = (name?: string | null): string => {
 };
 
 export type OrderBatchTier = "BATCH_1" | "BATCH_2" | "READY_STOCK";
+export type CustomerPriceCategory = "FILKOM" | "UMUM" | "INTERNASIONAL";
 
 export const determineOrderBatch = (order: any): OrderBatchTier => {
   if (!order) return "READY_STOCK";
@@ -244,30 +277,25 @@ export const getOrderBatchLabel = (batch: OrderBatchTier): string => {
   return "Ready Stock";
 };
 
-export const isFilkomCustomer = (order: any): boolean => {
-  if (!order) return true;
-  const email = String(order.customer_email || "").toLowerCase().trim();
-  const nim = String(order.customer_nim || "").trim();
-  if (email.endsWith("@student.ub.ac.id") || email.endsWith("@ub.ac.id") || nim.length > 0) {
-    return true;
-  }
-  return false;
-};
-
-export const getExpectedItemUnitPrice = (item: any, order: any): number => {
+/**
+ * Calculates item price given a specific category (FILKOM vs UMUM vs INTERNASIONAL)
+ */
+export const calculateSingleItemPrice = (
+  item: any,
+  batch: OrderBatchTier,
+  category: CustomerPriceCategory
+): number => {
   if (!item) return 0;
   const name = item.product_name || item.name || "";
   if (String(name).includes("[KOMPONEN BUNDLE]")) return 0;
 
   const key = normalizeProductKey(name);
-  const batch = determineOrderBatch(order);
-  const isFilkom = isFilkomCustomer(order);
 
   // Pelunasan item (remaining 50% balance)
   const isPelunasanItem =
     String(name).toUpperCase().includes("PELUNASAN") ||
     String(item.color || "").toUpperCase().includes("PELUNASAN") ||
-    String(order.order_number || order.order_id || "").startsWith("LNS-");
+    String(item.order_id || "").startsWith("LNS-");
 
   if (isPelunasanItem) {
     if (key === "work_jacket") return 124500;
@@ -276,27 +304,150 @@ export const getExpectedItemUnitPrice = (item: any, order: any): number => {
     if (key === "proud_to_be_filkom") return 164500;
   }
 
-  // Base price lookup according to batch
+  // Base price lookup according to batch & category
   let basePrice = 0;
-  if (batch === "BATCH_1") {
-    basePrice = BATCH_1_PRICES[key] ?? Number(item.unit_price || 0);
-  } else if (batch === "BATCH_2") {
-    basePrice = BATCH_2_PRICES[key] ?? Number(item.unit_price || 0);
+  if (category === "INTERNASIONAL") {
+    basePrice = Number(item.unit_price || 0);
+  } else if (category === "UMUM") {
+    if (batch === "BATCH_1") {
+      basePrice = BATCH_1_PRICES[key] ?? Number(item.unit_price || 0);
+    } else if (batch === "BATCH_2") {
+      basePrice = BATCH_2_UMUM_PRICES[key] ?? Number(item.unit_price || 0);
+    } else {
+      basePrice = READY_STOCK_UMUM_PRICES[key] ?? Number(item.unit_price || 0);
+    }
   } else {
-    // Ready stock
-    basePrice = isFilkom
-      ? (READY_STOCK_FILKOM_PRICES[key] ?? Number(item.unit_price || 0))
-      : (READY_STOCK_UMUM_PRICES[key] ?? Number(item.unit_price || 0));
+    // FILKOM
+    if (batch === "BATCH_1") {
+      basePrice = BATCH_1_PRICES[key] ?? Number(item.unit_price || 0);
+    } else if (batch === "BATCH_2") {
+      basePrice = BATCH_2_PRICES[key] ?? Number(item.unit_price || 0);
+    } else {
+      basePrice = READY_STOCK_FILKOM_PRICES[key] ?? Number(item.unit_price || 0);
+    }
   }
 
-  // Jacket DP check
-  if (isDpItem(item)) {
+  // Jacket calculation: applies upsize (XXL, XXXL, etc.) for both DP and Lunas
+  if (isJacketProduct(name)) {
     const upsize = getJacketUpsizeSurcharge(name, item.size);
-    const halfBase = Math.floor(basePrice / 2);
-    return halfBase + upsize;
+    if (isDpItem(item)) {
+      const halfBase = Math.floor(basePrice / 2);
+      return halfBase + upsize;
+    }
+    return basePrice + upsize;
   }
 
   return basePrice;
+};
+
+/**
+ * Calculates sum of items under a specific category
+ */
+export const calculateCategoryTotal = (
+  items: any[],
+  order: any,
+  category: CustomerPriceCategory
+): number => {
+  const batch = determineOrderBatch(order);
+  return items.reduce((sum: number, it: any) => {
+    if (String(it?.product_name || "").includes("[KOMPONEN BUNDLE]")) return sum;
+    const unitPrice = calculateSingleItemPrice(it, batch, category);
+    const qty = Number(it?.quantity || 1);
+    return sum + (unitPrice * qty);
+  }, 0);
+};
+
+/**
+ * Determines whether the customer used FILKOM, UMUM, or INTERNASIONAL pricing
+ */
+export const determineCustomerPriceCategory = (
+  order: any,
+  itemsOverride?: any[]
+): CustomerPriceCategory => {
+  if (!order) return "FILKOM";
+
+  // 1. Check International explicitly
+  if (
+    order.is_international ||
+    order.customer_type === "internasional" ||
+    order.customer_category === "internasional" ||
+    String(order.notes || "").toLowerCase().includes("internasional") ||
+    String(order.notes || "").toLowerCase().includes("international")
+  ) {
+    return "INTERNASIONAL";
+  }
+
+  // 2. POS explicit customer_type / category
+  if (order.customer_type === "umum" || order.customer_category === "umum") {
+    return "UMUM";
+  }
+  if (order.customer_type === "filkom" || order.customer_category === "filkom") {
+    return "FILKOM";
+  }
+
+  // 3. Batch 1 Google Form orders (IMP-*) always used Batch 1 prices
+  const orderNum = String(order.order_number || order.order_id || "");
+  const campaignId = Number(order.pre_order_campaign_id);
+  if (campaignId === 3 || orderNum.startsWith("IMP-")) {
+    return "FILKOM";
+  }
+
+  // 4. Compare subtotal against FILKOM vs UMUM calculation
+  const items = itemsOverride || order.items || [];
+  const actualSubtotal = Number(order.subtotal || 0);
+  if (items.length > 0 && actualSubtotal > 0) {
+    const filkomTotal = calculateCategoryTotal(items, order, "FILKOM");
+    const umumTotal = calculateCategoryTotal(items, order, "UMUM");
+
+    // If matches UMUM exactly and differs from FILKOM (e.g. Imam: 57.000 vs 51.000, Fathia: 35.000 vs 27.000)
+    if (actualSubtotal === umumTotal && actualSubtotal !== filkomTotal) {
+      return "UMUM";
+    }
+    // If matches FILKOM exactly and differs from UMUM
+    if (actualSubtotal === filkomTotal && actualSubtotal !== umumTotal) {
+      return "FILKOM";
+    }
+  }
+
+  // 5. Check NIM and verification status
+  // PENTING: Civitas FILKOM wajib memiliki NIM terverifikasi (terdaftar di profil atau diisi saat checkout).
+  // Akun mahasiswa UB fakultas lain atau mahasiswa yang belum verified NIM-nya (seperti kasus Imam dan Fathia)
+  // tetap dikenakan tarif Harga UMUM.
+  const nim = String(order.customer_nim || "").trim();
+  const isVerified = order.is_filkom_verified === 1 || order.is_filkom_verified === true || order.is_filkom_verified === "1";
+
+  if (nim.length >= 5 || isVerified) {
+    return "FILKOM";
+  }
+
+  // Jika tidak memiliki NIM terverifikasi pada transaksi -> Harga UMUM
+  return "UMUM";
+};
+
+export const getPriceCategoryLabel = (category: CustomerPriceCategory): string => {
+  if (category === "FILKOM") return "Harga FILKOM";
+  if (category === "UMUM") return "Harga Umum";
+  return "Harga Internasional";
+};
+
+export const getPriceCategoryBadgeColor = (category: CustomerPriceCategory): string => {
+  if (category === "FILKOM") return "bg-emerald-100 text-emerald-900 border-emerald-300";
+  if (category === "UMUM") return "bg-indigo-100 text-indigo-900 border-indigo-300";
+  return "bg-amber-100 text-amber-900 border-amber-300";
+};
+
+export const isFilkomCustomer = (order: any): boolean => {
+  return determineCustomerPriceCategory(order) === "FILKOM";
+};
+
+export const getExpectedItemUnitPrice = (
+  item: any,
+  order: any,
+  categoryOverride?: CustomerPriceCategory
+): number => {
+  const batch = determineOrderBatch(order);
+  const category = categoryOverride || determineCustomerPriceCategory(order);
+  return calculateSingleItemPrice(item, batch, category);
 };
 
 export interface OrderPriceAudit {
@@ -311,7 +462,15 @@ export interface OrderPriceAudit {
   itemsSum: number;
   batchTier: OrderBatchTier;
   batchLabel: string;
+  priceCategory: CustomerPriceCategory;
+  priceCategoryLabel: string;
   isFilkom: boolean;
+  // Payment tracking (e.g. for Nisfil +2.000 surplus)
+  paidAmount: number;
+  hasPaymentDiscrepancy: boolean;
+  paymentDiff: number;
+  paymentDiffType: "OVERPAID" | "UNDERPAID" | "EXACT";
+  paymentNote: string | null;
 }
 
 export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): OrderPriceAudit => {
@@ -328,15 +487,24 @@ export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): Ord
       itemsSum: 0,
       batchTier: "READY_STOCK",
       batchLabel: "Ready Stock",
+      priceCategory: "FILKOM",
+      priceCategoryLabel: "Harga FILKOM",
       isFilkom: true,
+      paidAmount: 0,
+      hasPaymentDiscrepancy: false,
+      paymentDiff: 0,
+      paymentDiffType: "EXACT",
+      paymentNote: null,
     };
   }
 
+  const items: any[] = itemsOverride || order.items || [];
   const batchTier = determineOrderBatch(order);
   const batchLabel = getOrderBatchLabel(batchTier);
-  const isFilkom = isFilkomCustomer(order);
+  const priceCategory = determineCustomerPriceCategory(order, items);
+  const priceCategoryLabel = getPriceCategoryLabel(priceCategory);
+  const isFilkom = priceCategory === "FILKOM";
 
-  const items: any[] = itemsOverride || order.items || [];
   const actualSubtotal = Number(order.subtotal || 0);
   const actualGross = Number(order.gross_amount || 0);
 
@@ -351,12 +519,12 @@ export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): Ord
     String(i?.product_name || "").includes("[KOMPONEN BUNDLE]")
   );
 
-  // Calculate expected subtotal using batch-aware expected unit prices
+  // Calculate expected subtotal using category & batch-aware expected unit prices
   let calculatedExpectedSubtotal = 0;
   if (items.length > 0) {
     calculatedExpectedSubtotal = items.reduce((sum: number, it: any) => {
       if (String(it?.product_name || "").includes("[KOMPONEN BUNDLE]")) return sum;
-      const expectedUnit = getExpectedItemUnitPrice(it, order);
+      const expectedUnit = getExpectedItemUnitPrice(it, order, priceCategory);
       const qty = Number(it?.quantity || 1);
       return sum + (expectedUnit * qty);
     }, 0);
@@ -376,6 +544,24 @@ export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): Ord
   // Detect mismatch if there are items and subtotal differs, or gross amount differs
   const hasMismatch = (items.length > 0 && Math.abs(subtotalDiff) > 0) || Math.abs(grossDiff) > 0;
 
+  // Payment discrepancy tracking (e.g. for Google Form CSV import human error like Nisfil +2.000)
+  const verifiedNominal = Number(order.payment_proof_verified_amount || 0);
+  const paidAmount = verifiedNominal > 0 ? verifiedNominal : actualGross;
+  let paymentDiff = 0;
+  let paymentDiffType: "OVERPAID" | "UNDERPAID" | "EXACT" = "EXACT";
+  let hasPaymentDiscrepancy = false;
+  let paymentNote: string | null = null;
+
+  if (verifiedNominal > 0 && verifiedNominal !== expectedGross) {
+    paymentDiff = verifiedNominal - expectedGross;
+    hasPaymentDiscrepancy = true;
+    paymentDiffType = paymentDiff > 0 ? "OVERPAID" : "UNDERPAID";
+    paymentNote =
+      paymentDiff > 0
+        ? `Pembeli mentransfer Rp ${verifiedNominal.toLocaleString("id-ID")} (Kelebihan Bayar: +Rp ${paymentDiff.toLocaleString("id-ID")})`
+        : `Pembeli mentransfer Rp ${verifiedNominal.toLocaleString("id-ID")} (Kurang Bayar: -Rp ${Math.abs(paymentDiff).toLocaleString("id-ID")})`;
+  }
+
   return {
     actualSubtotal,
     expectedSubtotal,
@@ -388,7 +574,15 @@ export const calculateOrderPriceAudit = (order: any, itemsOverride?: any[]): Ord
     itemsSum: expectedSubtotal,
     batchTier,
     batchLabel,
+    priceCategory,
+    priceCategoryLabel,
     isFilkom,
+    paidAmount,
+    hasPaymentDiscrepancy,
+    paymentDiff,
+    paymentDiffType,
+    paymentNote,
   };
 };
+
 

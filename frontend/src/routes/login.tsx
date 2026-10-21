@@ -241,7 +241,7 @@ function LoginPage() {
               MASUK KE FILKOM MERCH
             </h1>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              Login langsung dengan <strong className="text-ink">Akun Google UB (@student.ub.ac.id)</strong> untuk mengaktifkan diskon harga civitas dan menyimpan riwayat belanja Anda.
+              Login dengan <strong className="text-ink">Akun Google UB (@student.ub.ac.id)</strong> lalu lakukan verifikasi NIM mahasiswa FILKOM untuk mengaktifkan diskon harga khusus civitas.
             </p>
           </div>
 

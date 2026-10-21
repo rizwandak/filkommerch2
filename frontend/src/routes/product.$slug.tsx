@@ -35,8 +35,8 @@ import { Navbar } from "@/components/Navbar";
 import pVarsity from "@/assets/p-varsity.jpg";
 import pHoodie from "@/assets/p-hoodie.jpg";
 import pTshirt from "@/assets/p-tshirt.jpg";
-import pTee2 from "@/assets/p-tee2.jpg";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import { getJacketUpsizeSurcharge } from "@/lib/pelunasan-utils";
 
 const scrollToId = (id: string) => {
   const el = document.getElementById(id);
@@ -422,7 +422,15 @@ function ProductDetailPage() {
             }
           }
 
-          bundleAddon += (selectedAddon - refAddon);
+          let diff = selectedAddon - refAddon;
+          // Fallback: If price_override was not set on variant or user is non-UB, apply standard jacket upsize surcharge (e.g. XXL +10k, XXXL +20k)
+          if (diff <= 0 && selectedVar?.size) {
+            const sizeUpsize = getJacketUpsizeSurcharge(comp.name, selectedVar.size);
+            if (sizeUpsize > 0) {
+              diff = sizeUpsize;
+            }
+          }
+          bundleAddon += diff;
         }
       }
       return basePrice + bundleAddon;
@@ -503,7 +511,14 @@ function ProductDetailPage() {
             }
           }
 
-          bundleAddon += (selectedAddon - refAddon);
+          let diff = selectedAddon - refAddon;
+          if (diff <= 0 && selectedVar?.size) {
+            const sizeUpsize = getJacketUpsizeSurcharge(comp.name, selectedVar.size);
+            if (sizeUpsize > 0) {
+              diff = sizeUpsize;
+            }
+          }
+          bundleAddon += diff;
         }
       }
       

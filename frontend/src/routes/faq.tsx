@@ -91,8 +91,8 @@ const PRESET_QUESTIONS = [
   },
   {
     id: "discount",
-    q: "Dapet diskon mahasiswa gimana caranya?",
-    a: "Gampang! Kamu tinggal login pake email student UB (@student.ub.ac.id) atau masukin NIM di menu Akun. Nanti otomatis dapet potongan harga civitas 5%! Lumayan kan buat beli es teh? 🥤",
+    q: "Dapet harga khusus civitas FILKOM gimana caranya?",
+    a: "Login menggunakan akun email student UB (@student.ub.ac.id) lalu lakukan verifikasi NIM mahasiswa aktif FILKOM di menu Akun / Navbar. Harga khusus civitas hanya berlaku bagi mahasiswa FILKOM yang NIM-nya telah terverifikasi. Mahasiswa fakultas lain di UB atau yang belum verifikasi NIM tetap dikenakan Harga Umum.",
   },
   {
     id: "payment",

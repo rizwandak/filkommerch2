@@ -49,6 +49,7 @@ import {
 import { bluetoothPrinter, type ReceiptData } from "@frontend/lib/bluetooth-printer";
 import { cleanProductName, cleanVariantPart, printBrowserReceipt } from "@frontend/lib/receipt-printer";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import { getJacketUpsizeSurcharge } from "@/lib/pelunasan-utils";
 import { getApiBaseUrl } from "@/lib/api-config";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logoFM from "@/assets/logo-fm.jpg";
@@ -622,6 +623,14 @@ export function POSKasir({ admin_id, admin_name, store_name }: POSKasirProps) {
       } else if (customerCategory === "filkom") {
         if (product.filkom_price && Number(product.filkom_price) > 0) {
           bundleUnitPrice = Number(product.filkom_price);
+        }
+      }
+
+      // Add upsize surcharge if component jacket has upsize (XXL, XXXL, etc.)
+      for (const comp of product.bundle_components || []) {
+        const selectedVar = selections[comp.id];
+        if (selectedVar?.size) {
+          bundleUnitPrice += getJacketUpsizeSurcharge(comp.name, selectedVar.size);
         }
       }
 

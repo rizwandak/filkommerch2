@@ -5565,6 +5565,21 @@ export const repairHistoricalPelunasanOrders = async () => {
         }
       }
     }
+
+    // Auto-heal Nisfil's Batch 1 Google Form order (+2.000 surplus kas toko)
+    try {
+      await execute(
+        `UPDATE orders 
+         SET subtotal = 196000, 
+             gross_amount = 196000, 
+             payment_proof_verified_amount = 198000, 
+             payment_proof_difference = 2000, 
+             payment_proof_match_status = 'OVERPAID',
+             payment_proof_note = 'Human error pembeli di Google Form Batch 1: mentransfer Rp 198.000 (seharusnya Rp 196.000). Kelebihan Rp 2.000 dicatat sebagai surplus kas toko (tidak perlu refund).'
+         WHERE order_id = 'IMP-1786172323080-42-221' 
+           AND (payment_proof_verified_amount IS NULL OR payment_proof_verified_amount = 0)`
+      );
+    } catch {}
   } catch (e) {
     console.error("Error in repairHistoricalPelunasanOrders:", e);
   }
@@ -5603,10 +5618,31 @@ export const syncOrderSubtotal = async (req: Request, res: Response) => {
       grossToSet = Math.max(0, itemsSum - posDiscount - voucherDiscount + shippingCost + serviceFee + taxAmount + uniqueCode);
     }
 
-    await execute(
-      "UPDATE orders SET subtotal = ?, gross_amount = ? WHERE order_id = ?",
-      [subtotalToSet, grossToSet, order.order_id]
-    );
+    // Cek apakah ada kelebihan bayar yang perlu dicatat (misal pembeli mentransfer lebih banyak dari total baru)
+    const prevGross = Number(order.gross_amount || 0);
+    const prevSubtotal = Number(order.subtotal || 0);
+    const existingVerifiedAmount = Number(order.payment_proof_verified_amount || 0);
+    const actualPaidCandidate = Math.max(prevGross, prevSubtotal);
+
+    if (actualPaidCandidate > grossToSet && existingVerifiedAmount === 0) {
+      const surplus = actualPaidCandidate - grossToSet;
+      await execute(
+        `UPDATE orders 
+         SET subtotal = ?, 
+             gross_amount = ?, 
+             payment_proof_verified_amount = ?, 
+             payment_proof_difference = ?, 
+             payment_proof_match_status = 'OVERPAID',
+             payment_proof_note = CONCAT(COALESCE(payment_proof_note, ''), ' [Sinkronisasi Subtotal: Kelebihan bayar Rp ', ?, ' dicatat sebagai surplus kas toko]')
+         WHERE order_id = ?`,
+        [subtotalToSet, grossToSet, actualPaidCandidate, surplus, surplus.toLocaleString("id-ID"), order.order_id]
+      );
+    } else {
+      await execute(
+        "UPDATE orders SET subtotal = ?, gross_amount = ? WHERE order_id = ?",
+        [subtotalToSet, grossToSet, order.order_id]
+      );
+    }
 
     // Amankan komponen bundle di order_items agar tidak bernilai ganda
     await execute(

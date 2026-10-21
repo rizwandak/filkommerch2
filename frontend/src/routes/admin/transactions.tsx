@@ -83,7 +83,11 @@ import {
   getJacketPriceBreakdown,
   calculateOrderPelunasanAmount,
   calculateOrderPriceAudit,
+  determineCustomerPriceCategory,
+  getPriceCategoryLabel,
+  getPriceCategoryBadgeColor,
   type OrderPriceAudit,
+  type CustomerPriceCategory,
 } from "@/lib/pelunasan-utils";
 import {
   getOnlineOrders,
@@ -3121,6 +3125,9 @@ function AdminTransactionsPage() {
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-1.5 flex-wrap">
                             <span className="font-mono text-xs font-black text-brand-blue">{order.order_id}</span>
+                            <Badge className={`text-[9px] px-1.5 py-0 font-bold border ${getPriceCategoryBadgeColor(audit.priceCategory)}`}>
+                              {audit.priceCategoryLabel}
+                            </Badge>
                             {isDpOrder(order) && (
                               <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-[9px] px-1 py-0 font-black">
                                 DP
@@ -3662,6 +3669,12 @@ function AdminTransactionsPage() {
                                 <td className="p-2.5 font-mono text-xs text-brand-blue font-bold whitespace-nowrap">
                                   <div>{order.order_id}</div>
                                   <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                    <span
+                                      className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold border ${getPriceCategoryBadgeColor(audit.priceCategory)}`}
+                                      title={`${audit.priceCategoryLabel} (${audit.batchLabel})`}
+                                    >
+                                      {audit.priceCategoryLabel}
+                                    </span>
                                     {(() => {
                                       const addr = String((order as any).shipping_address || "").toLowerCase();
                                       const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
@@ -4348,9 +4361,19 @@ function AdminTransactionsPage() {
                           key={sale.sale_id}
                           className="bg-white border-2 border-ink/20 rounded-xl p-3.5 shadow-sm space-y-2.5"
                         >
-                          {/* Top: Sale ID + Status + Date */}
+                          {/* Top: Sale ID + Category + Status + Date */}
                           <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono text-xs font-black text-brand-blue">{sale.sale_id}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono text-xs font-black text-brand-blue">{sale.sale_id}</span>
+                              {(() => {
+                                const cat = determineCustomerPriceCategory(sale);
+                                return (
+                                  <Badge className={`text-[9px] px-1.5 py-0 font-bold border ${getPriceCategoryBadgeColor(cat)}`}>
+                                    {getPriceCategoryLabel(cat)}
+                                  </Badge>
+                                );
+                              })()}
+                            </div>
                             <div className="flex items-center gap-1.5">
                               <Badge
                                 className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${statusColor[sale.status] || statusColor.completed}`}
@@ -4691,7 +4714,17 @@ function AdminTransactionsPage() {
                               )}
                               {visibleColumns.order_id && (
                                 <td className="p-2.5 font-mono text-xs text-brand-blue font-bold whitespace-nowrap">
-                                  {sale.sale_id}
+                                  <div>{sale.sale_id}</div>
+                                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                                    {(() => {
+                                      const cat = determineCustomerPriceCategory(sale);
+                                      return (
+                                        <span className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold border ${getPriceCategoryBadgeColor(cat)}`}>
+                                          {getPriceCategoryLabel(cat)}
+                                        </span>
+                                      );
+                                    })()}
+                                  </div>
                                 </td>
                               )}
                               {visibleColumns.cashier && (
@@ -5029,6 +5062,46 @@ function AdminTransactionsPage() {
                       {managedTransaction.customer_phone && (
                         <p className="text-muted-foreground">{managedTransaction.customer_phone}</p>
                       )}
+
+                      {/* Kategori Tarif & Keterangan */}
+                      {(() => {
+                        const modalAudit = calculateOrderPriceAudit(managedTransaction, managedItems);
+                        return (
+                          <div className="mt-2.5 pt-2.5 border-t border-dashed border-border/80 space-y-1.5">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-[10px] uppercase font-bold text-muted-foreground">Kategori Tarif:</span>
+                              <div className="flex items-center gap-1.5">
+                                <Badge className={`text-[10px] px-2 py-0.5 font-extrabold border ${getPriceCategoryBadgeColor(modalAudit.priceCategory)}`}>
+                                  {modalAudit.priceCategoryLabel}
+                                </Badge>
+                                <span className="text-[10px] font-semibold text-muted-foreground">
+                                  ({modalAudit.batchLabel})
+                                </span>
+                              </div>
+                            </div>
+                            {modalAudit.priceCategory === "UMUM" ? (
+                              <p className="text-[10px] text-indigo-950 bg-indigo-50 border border-indigo-200 rounded p-1.5 font-medium leading-relaxed">
+                                ℹ️ <strong>Tarif Harga Umum:</strong> Transaksi ini menggunakan skema harga umum/non-civitas.
+                                {managedTransaction.customer_email?.toLowerCase().endsWith("@student.ub.ac.id") ? (
+                                  <span className="block mt-0.5 text-indigo-900 font-semibold">
+                                    Catatan: Pembeli menggunakan email student UB, namun NIM belum diverifikasi sebagai civitas aktif FILKOM saat checkout (tetap berlaku Harga Umum).
+                                  </span>
+                                ) : (
+                                  <span> Pembelian umum/walk-in non-civitas FILKOM.</span>
+                                )}
+                              </p>
+                            ) : modalAudit.priceCategory === "INTERNASIONAL" ? (
+                              <p className="text-[10px] text-amber-950 bg-amber-50 border border-amber-200 rounded p-1.5 font-medium leading-relaxed">
+                                🌍 <strong>Tarif Internasional:</strong> Transaksi menggunakan ketentuan harga internasional.
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-emerald-950 bg-emerald-50 border border-emerald-200 rounded p-1.5 font-medium leading-relaxed">
+                                🎓 <strong>Tarif Civitas FILKOM:</strong> Transaksi menggunakan harga khusus civitas/mahasiswa FILKOM UB.
+                              </p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="border-t border-dashed border-border pt-3">
@@ -5926,7 +5999,7 @@ function AdminTransactionsPage() {
                                   <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
                                   <span>Audit Selisih Harga Transaksi</span>
                                   <span className="bg-red-200/90 text-red-900 border border-red-300 text-[10px] font-bold px-1.5 py-0.2 rounded uppercase">
-                                    {audit.batchLabel}
+                                    {audit.batchLabel} • {audit.priceCategoryLabel}
                                   </span>
                                 </div>
                                 <span
@@ -5959,7 +6032,7 @@ function AdminTransactionsPage() {
 
                                 <div className="bg-emerald-50 border border-emerald-300 rounded-lg p-2.5 space-y-1">
                                   <span className="text-[10px] font-bold text-emerald-800 uppercase block">
-                                    Hasil Rekalkulasi Item ({audit.batchLabel})
+                                    Hasil Rekalkulasi Item ({audit.batchLabel} • {audit.priceCategoryLabel})
                                   </span>
                                   <div className="flex justify-between">
                                     <span className="text-emerald-900">Subtotal Seharusnya:</span>
@@ -6002,6 +6075,24 @@ function AdminTransactionsPage() {
                                   )}
                                 </Button>
                               </div>
+                            </div>
+                          )}
+
+                          {/* Catatan Pembayaran / Surplus Kas Toko (misal human error Google Form Batch 1 seperti Nisfil) */}
+                          {(audit.hasPaymentDiscrepancy || managedTransaction.payment_proof_match_status === "OVERPAID" || (managedTransaction.payment_proof_difference && Number(managedTransaction.payment_proof_difference) > 0)) && (
+                            <div className="rounded-xl border border-blue-300 bg-blue-50/80 p-3 space-y-1.5 shadow-xs text-xs">
+                              <div className="flex items-center justify-between font-extrabold text-[11px] text-blue-950">
+                                <span className="flex items-center gap-1.5">
+                                  <CreditCard className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                                  <span>Catatan Pembayaran & Surplus Kas</span>
+                                </span>
+                                <Badge className="bg-blue-100 text-blue-900 border-blue-300 font-mono text-[10px]">
+                                  Kelebihan Bayar: +{fmt(managedTransaction.payment_proof_difference || audit.paymentDiff)}
+                                </Badge>
+                              </div>
+                              <p className="text-[11px] text-blue-900 leading-relaxed font-medium">
+                                💡 {managedTransaction.payment_proof_note || audit.paymentNote || `Pembeli mentransfer Rp ${fmt(audit.paidAmount)} (kelebihan bayar +${fmt(audit.paymentDiff)}). Nominal kelebihan ini dicatat sebagai surplus kas toko (tidak perlu direfund).`}
+                              </p>
                             </div>
                           )}
 

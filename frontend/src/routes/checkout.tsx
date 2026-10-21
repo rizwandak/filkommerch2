@@ -643,8 +643,15 @@ function CheckoutPage() {
           {currentStep > 1 && (
             <div className="hidden lg:block lg:col-span-1">
               <Card className="sticky top-4 border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] sm:shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] overflow-hidden">
-                <CardHeader className="bg-cream/20 border-b-2 border-ink py-4">
+                <CardHeader className="bg-cream/20 border-b-2 border-ink py-3.5 flex flex-row items-center justify-between">
                   <CardTitle className="display text-xs tracking-wider uppercase text-ink">Ringkasan Pesanan</CardTitle>
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${
+                    Number(user?.is_filkom_verified) === 1
+                      ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                      : "bg-indigo-100 text-indigo-900 border-indigo-300"
+                  }`}>
+                    {Number(user?.is_filkom_verified) === 1 ? "Tarif: FILKOM" : "Tarif: Umum"}
+                  </span>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6 space-y-4">
                   {cartItems.map((item) => (
@@ -866,11 +873,20 @@ function CheckoutPage() {
             <div className="relative w-full max-w-lg bg-card rounded-t-2xl border-t-2 border-x-2 border-ink p-5 space-y-4 max-h-[85vh] overflow-y-auto shadow-2xl z-10 animate-in slide-in-from-bottom duration-300">
               {/* Modal Header */}
               <div className="flex items-center justify-between border-b-2 border-ink pb-3">
-                <div>
-                  <h3 className="display text-xs uppercase tracking-wider text-ink font-bold">Rincian Pesanan</h3>
-                  <p className="text-[10px] text-muted-foreground font-semibold">
-                    {cartItems.reduce((s, i) => s + i.quantity, 0)} produk di keranjang
-                  </p>
+                <div className="flex items-center gap-2">
+                  <div>
+                    <h3 className="display text-xs uppercase tracking-wider text-ink font-bold">Rincian Pesanan</h3>
+                    <p className="text-[10px] text-muted-foreground font-semibold">
+                      {cartItems.reduce((s, i) => s + i.quantity, 0)} produk di keranjang
+                    </p>
+                  </div>
+                  <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded border ${
+                    Number(user?.is_filkom_verified) === 1
+                      ? "bg-emerald-100 text-emerald-900 border-emerald-300"
+                      : "bg-indigo-100 text-indigo-900 border-indigo-300"
+                  }`}>
+                    {Number(user?.is_filkom_verified) === 1 ? "Tarif: FILKOM" : "Tarif: Umum"}
+                  </span>
                 </div>
                 <button
                   type="button"
@@ -1284,13 +1300,51 @@ function CustomerDetailsStep({
       <CardContent className="p-4 sm:p-6 space-y-6 text-ink">
         {/* User Auth Session Info Card */}
         {user && (
-          <div className="bg-[#FCFAF7] border-2 border-ink p-4 rounded-xl text-ink text-xs space-y-2 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)]">
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-black uppercase tracking-wider text-[10px] text-emerald-700">
-                Akun Terverifikasi
-              </span>
+          <div
+            className={`border-2 border-ink p-4 rounded-xl text-ink text-xs space-y-2 shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] ${
+              Number(user.is_filkom_verified) === 1
+                ? "bg-[#FCFAF7]"
+                : "bg-amber-50/80 border-amber-300"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    Number(user.is_filkom_verified) === 1
+                      ? "bg-emerald-500 animate-pulse"
+                      : "bg-amber-500"
+                  }`}
+                />
+                <span
+                  className={`font-black uppercase tracking-wider text-[10px] ${
+                    Number(user.is_filkom_verified) === 1
+                      ? "text-emerald-700"
+                      : "text-amber-900"
+                  }`}
+                >
+                  {Number(user.is_filkom_verified) === 1
+                    ? "✓ Civitas FILKOM Terverifikasi (Dapat Harga Khusus Mahasiswa)"
+                    : "⚠️ Akun Belum Terverifikasi FILKOM (Berlaku Tarif Harga Umum)"}
+                </span>
+              </div>
+              {Number(user.is_filkom_verified) !== 1 && (
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new Event("open-verification"))}
+                  className="text-[10px] font-extrabold text-brand-orange hover:underline cursor-pointer bg-brand-orange/10 px-2 py-0.5 rounded border border-brand-orange/30"
+                >
+                  Verifikasi NIM FILKOM Sekarang →
+                </button>
+              )}
             </div>
+
+            {Number(user.is_filkom_verified) !== 1 && (
+              <p className="text-[11px] text-amber-950 leading-relaxed font-medium bg-white/70 p-2 rounded border border-amber-200">
+                Email student UB atau akun Google Anda saat ini belum diverifikasi memiliki NIM mahasiswa aktif FILKOM UB. Sesuai kebijakan toko, pesanan Anda saat ini menggunakan <strong>Tarif Harga Umum</strong>.
+              </p>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs pt-1 border-t border-ink/10">
               <div>
                 <span className="text-muted-foreground font-bold block text-[10px] uppercase">Email Anda</span>
