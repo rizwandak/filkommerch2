@@ -5180,6 +5180,26 @@ function AdminTransactionsPage() {
                               Rp {Number(linkedLns.gross_amount).toLocaleString("id-ID")}
                             </span>
                           </div>
+                          {linkedLns.payment_proof_verified_amount != null && (
+                            <div className="flex justify-between items-center pt-1 border-t border-purple-100">
+                              <span className="text-muted-foreground text-[11px]">Nominal Ditransfer:</span>
+                              <span className="font-extrabold font-mono text-purple-950 text-sm">
+                                Rp {Number(linkedLns.payment_proof_verified_amount).toLocaleString("id-ID")}
+                              </span>
+                            </div>
+                          )}
+                          {linkedLns.payment_proof_difference != null && Number(linkedLns.payment_proof_difference) !== 0 && (
+                            <div className="flex justify-between items-center">
+                              <span className="text-muted-foreground text-[11px]">Selisih Pembayaran Pelunasan:</span>
+                              <span className={`font-bold font-mono text-[11px] ${
+                                Number(linkedLns.payment_proof_difference) > 0 ? "text-emerald-700" : "text-amber-700"
+                              }`}>
+                                {Number(linkedLns.payment_proof_difference) > 0
+                                  ? `+Rp ${Math.abs(Number(linkedLns.payment_proof_difference)).toLocaleString("id-ID")} (Kelebihan Bayar)`
+                                  : `-Rp ${Math.abs(Number(linkedLns.payment_proof_difference)).toLocaleString("id-ID")} (Kurang Bayar)`}
+                              </span>
+                            </div>
+                          )}
                           <div className="flex justify-between items-center">
                             <span className="text-muted-foreground text-[11px]">Waktu Dibuat:</span>
                             <span className="text-muted-foreground font-medium text-[11px]">
