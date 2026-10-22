@@ -212,11 +212,11 @@ export const BATCH_2_UMUM_PRICES: Record<string, number> = {
 };
 
 export const READY_STOCK_FILKOM_PRICES: Record<string, number> = {
-  work_jacket: 249000,
-  varsity: 329000,
-  half_zip: 179000,
+  work_jacket: 259000,
+  varsity: 349000,
+  half_zip: 189000,
   kaos: 89000,
-  topi: 80000,
+  topi: 89000,
   tumbler: 79000,
   totebag: 40000,
   notebook: 25000,
