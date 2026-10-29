@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Lock,
   LogIn,
@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   KeyRound,
   ArrowRight,
+  AlertTriangle,
+  Compass,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { authLogin, authGoogleLogin } from "@backend/server-actions";
@@ -24,6 +26,8 @@ import logo from "@/assets/logo-fm.jpg";
 import logoFilkom from "@/assets/logo_filkom.png";
 import { useGoogleLogin } from "@react-oauth/google";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import { InAppBrowserModal } from "@/components/InAppBrowserModal";
+import { detectInAppBrowser } from "@/lib/in-app-browser";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -43,6 +47,20 @@ function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // In-App Browser states (Instagram, WhatsApp, TikTok, dll)
+  const [showInAppModal, setShowInAppModal] = useState(false);
+  const [inAppInfo, setInAppInfo] = useState<{ isInApp: boolean; appName: string }>({
+    isInApp: false,
+    appName: "",
+  });
+
+  useEffect(() => {
+    const detected = detectInAppBrowser();
+    if (detected.isInApp) {
+      setInAppInfo(detected);
+    }
+  }, []);
 
   // Handle Admin / Cashier manual login
   const handleAdminLogin = async (e: React.FormEvent) => {
@@ -134,6 +152,14 @@ function LoginPage() {
     },
     onError: () => toast.error("Login dengan Google dibatalkan"),
   });
+
+  const handleGoogleLoginClick = () => {
+    if (inAppInfo.isInApp) {
+      setShowInAppModal(true);
+      return;
+    }
+    loginWithGoogle();
+  };
 
   return (
     <div className="min-h-screen bg-white text-ink flex flex-col lg:flex-row items-stretch overflow-hidden font-sans">
@@ -245,6 +271,31 @@ function LoginPage() {
             </p>
           </div>
 
+          {/* IN-APP BROWSER ALERT (Instagram / WhatsApp / TikTok) */}
+          {inAppInfo.isInApp && (
+            <div className="bg-amber-50 border-2 border-amber-500 text-amber-950 rounded-2xl p-4 shadow-[3px_3px_0px_0px_rgba(217,119,6,1)] space-y-2">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="font-extrabold uppercase tracking-wide text-xs text-amber-950">
+                    Terdeteksi Membuka Dari {inAppInfo.appName}
+                  </p>
+                  <p className="text-[11px] text-amber-900 leading-relaxed font-medium">
+                    Google secara resmi membatasi login di dalam browser aplikasi (Webview). Buka di <strong>Chrome</strong> atau <strong>Safari</strong> agar login berhasil.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInAppModal(true)}
+                className="w-full mt-1 py-2 px-3 bg-amber-500 hover:bg-amber-600 text-ink font-black text-[11px] uppercase tracking-wider rounded-lg border border-ink flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Compass className="w-3.5 h-3.5" />
+                <span>Panduan Buka di Browser Bawaan HP &rarr;</span>
+              </button>
+            </div>
+          )}
+
           {/* MAIN HERO ACTION: GOOGLE LOGIN BUTTON */}
           <div className="bg-white border-2 border-ink rounded-2xl p-5 shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-4">
             <div className="flex items-center gap-3">
@@ -264,7 +315,7 @@ function LoginPage() {
             {/* Maximized Google Login Button */}
             <button
               type="button"
-              onClick={() => loginWithGoogle()}
+              onClick={handleGoogleLoginClick}
               disabled={loading}
               className="w-full flex items-center justify-center gap-3.5 bg-white hover:bg-neutral-50 active:bg-neutral-100 text-ink border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] font-extrabold tracking-wider h-14 px-5 rounded-xl transition-all text-xs sm:text-sm uppercase cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed group"
             >
@@ -424,6 +475,12 @@ function LoginPage() {
           </div>
         </div>
       </div>
+
+      {/* In-App Browser Guidance Modal */}
+      <InAppBrowserModal
+        isOpen={showInAppModal}
+        onClose={() => setShowInAppModal(false)}
+      />
     </div>
   );
 }

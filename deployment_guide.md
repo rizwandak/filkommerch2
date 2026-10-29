@@ -204,21 +204,38 @@ File `.htaccess` digunakan untuk mengarahkan request `/api/*` dari domain utama 
 3. Isi dengan kode berikut:
 
 ```apache
+# ====================================================================
+# FILKOM Merch - Apache .htaccess Production Configuration
+# ====================================================================
+
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /
 
-  # 1. Pastikan request /api/* diteruskan ke Node.js Application URL
-  # (Phusion Passenger otomatis memproses request ini jika root path sesuai)
-  RewriteRule ^api/(.*)$ http://127.0.0.1:PORT_INTERNAL_NODE/$1 [P,L]
+  # 1. FORCE HTTPS: Alihkan semua akses HTTP ke HTTPS
+  RewriteCond %{HTTPS} off
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
-  # 2. Redirect request non-file & non-direktori ke index.html (React routing)
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /index.html [L]
+  # 2. CANONICAL NON-WWW: Alihkan www.filkommerch.com ke filkommerch.com
+  RewriteCond %{HTTP_HOST} ^www\.filkommerch\.com$ [NC]
+  RewriteRule ^(.*)$ https://filkommerch.com%{REQUEST_URI} [L,R=301]
+
+  # 3. STATIC FILES: Jangan redirect file dan folder fisik yang nyata
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # 4. SPA ROUTING: Redirect semua rute frontend ke index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# SECURITY HEADERS UNTUK GOOGLE OAUTH POPUP FLOW
+<IfModule mod_headers.c>
+  Header set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+  Header set X-Content-Type-Options "nosniff"
 </IfModule>
 ```
-*(Catatan: cPanel secara otomatis mengelola server backend jika Application URL diset ke domain utama. Jika api tidak terjangkau, pastikan subfolder routing `.htaccess` dikonfigurasi dengan benar).*
+*(Catatan: File `.htaccess` ini juga sudah otomatis disertakan di `frontend/public/.htaccess` sehingga otomatis masuk ke dalam folder `dist/` setiap kali kamu menjalankan `npm run build`).*
 
 ---
 

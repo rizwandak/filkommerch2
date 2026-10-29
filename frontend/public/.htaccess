@@ -1,0 +1,40 @@
+# ====================================================================
+# FILKOM Merch - Apache .htaccess Production Configuration
+# 1. Force HTTPS (Cegah Origin Mismatch Google OAuth akibat HTTP)
+# 2. Canonical non-WWW redirect (Seragamkan Origin)
+# 3. Google OAuth COOP Headers
+# 4. Gzip Compression
+# 5. React SPA Fallback Routing
+# ====================================================================
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # 1. FORCE HTTPS: Alihkan semua akses HTTP ke HTTPS (preserve full URL)
+  RewriteCond %{HTTPS} off
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+  # 2. CANONICAL NON-WWW: Alihkan www.filkommerch.com ke filkommerch.com
+  RewriteCond %{HTTP_HOST} ^www\.filkommerch\.com$ [NC]
+  RewriteRule ^(.*)$ https://filkommerch.com%{REQUEST_URI} [L,R=301]
+
+  # 3. STATIC FILES: Jangan redirect file dan folder fisik yang nyata (JS, CSS, JPG, dll)
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # 4. SPA ROUTING: Redirect semua URL rute frontend ke index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# SECURITY HEADERS UNTUK GOOGLE OAUTH POPUP FLOW
+<IfModule mod_headers.c>
+  Header set Cross-Origin-Opener-Policy "same-origin-allow-popups"
+  Header set X-Content-Type-Options "nosniff"
+</IfModule>
+
+# GZIP COMPRESSION UNTUK ASSET CEPAT
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json image/svg+xml
+</IfModule>

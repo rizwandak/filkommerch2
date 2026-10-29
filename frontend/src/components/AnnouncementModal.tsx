@@ -29,6 +29,8 @@ import { AccountClaimModal } from "@frontend/components/AccountClaimModal";
 import { useAuth } from "@/lib/auth";
 import { useGoogleLogin } from "@react-oauth/google";
 import { toast } from "sonner";
+import { InAppBrowserModal } from "@/components/InAppBrowserModal";
+import { detectInAppBrowser } from "@/lib/in-app-browser";
 
 interface Props {
   delayMs?: number;
@@ -63,6 +65,7 @@ function AnnouncementModalInner({
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [isActivatingPush, setIsActivatingPush] = useState(false);
   const [isGoogleLoggingIn, setIsGoogleLoggingIn] = useState(false);
+  const [isInAppModalOpen, setIsInAppModalOpen] = useState(false);
   const [activeTabNotif, setActiveTabNotif] = useState<"android" | "ios">("android");
   const [activeTabCivitas, setActiveTabCivitas] = useState<"student" | "alumni">("student");
 
@@ -382,7 +385,14 @@ function AnnouncementModalInner({
                       ) : (
                         <div className="space-y-2">
                           <button
-                            onClick={() => loginWithGoogle()}
+                            onClick={() => {
+                              const detected = detectInAppBrowser();
+                              if (detected.isInApp) {
+                                setIsInAppModalOpen(true);
+                                return;
+                              }
+                              loginWithGoogle();
+                            }}
                             disabled={isGoogleLoggingIn}
                             className="w-full py-3.5 px-4 bg-white hover:bg-neutral-50 text-ink font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer flex items-center justify-center gap-2.5 disabled:opacity-60"
                           >
@@ -770,6 +780,12 @@ function AnnouncementModalInner({
       <NotificationActivationModal
         isOpen={isNotifModalOpen}
         onClose={() => setIsNotifModalOpen(false)}
+      />
+
+      {/* In-App Browser Guidance Modal */}
+      <InAppBrowserModal
+        isOpen={isInAppModalOpen}
+        onClose={() => setIsInAppModalOpen(false)}
       />
     </>
   );
