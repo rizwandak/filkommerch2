@@ -63,6 +63,7 @@ import {
   Loader2,
   Pencil,
   AlertTriangle,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import logoFM from "@/assets/logo-fm.jpg";
@@ -291,6 +292,21 @@ const formatCompactDateTime = (dateStr: string | Date | null | undefined) => {
   }
 };
 
+const formatIndoDate = (dateStr: string) => {
+  if (!dateStr) return "";
+  try {
+    const parts = dateStr.split("-");
+    if (parts.length !== 3) return dateStr;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    const date = new Date(y, m, d);
+    return date.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" });
+  } catch {
+    return dateStr;
+  }
+};
+
 type SortField = "no" | "order_id" | "customer_name" | "gross_amount" | "pelunasan" | "payment_status" | "difference" | "fulfillment_status" | "created_at";
 type SortDirection = "asc" | "desc";
 
@@ -496,6 +512,8 @@ function AdminTransactionsPage() {
   const [posPaymentMethodFilter, setPosPaymentMethodFilter] = useState<"all" | "cash" | "qris">("all");
   const [posCashierFilter, setPosCashierFilter] = useState<string>("all");
   const [posDateFilter, setPosDateFilter] = useState<"all" | "today" | "yesterday" | "last7days" | "last30days" | "thisMonth">("all");
+  const [posStartDate, setPosStartDate] = useState<string>("");
+  const [posEndDate, setPosEndDate] = useState<string>("");
   const [posStatusFilter, setPosStatusFilter] = useState<string>("all");
 
   // POS Customer Name Edit State
@@ -525,10 +543,31 @@ function AdminTransactionsPage() {
     if (productFilter.length > 0) count++;
     if (posPaymentMethodFilter !== "all") count++;
     if (posCashierFilter !== "all") count++;
-    if (posDateFilter !== "all") count++;
+    if (posDateFilter !== "all" || posStartDate || posEndDate) count++;
     if (posStatusFilter !== "all") count++;
     return count;
-  }, [productFilter, posPaymentMethodFilter, posCashierFilter, posDateFilter, posStatusFilter]);
+  }, [productFilter, posPaymentMethodFilter, posCashierFilter, posDateFilter, posStartDate, posEndDate, posStatusFilter]);
+
+  const posDateButtonLabel = useMemo(() => {
+    if (posStartDate && posEndDate) {
+      if (posStartDate === posEndDate) {
+        return formatIndoDate(posStartDate);
+      }
+      return `${formatIndoDate(posStartDate)} - ${formatIndoDate(posEndDate)}`;
+    }
+    if (posStartDate) {
+      return `Mulai ${formatIndoDate(posStartDate)}`;
+    }
+    if (posEndDate) {
+      return `Hingga ${formatIndoDate(posEndDate)}`;
+    }
+    if (posDateFilter === "today") return "Hari Ini";
+    if (posDateFilter === "yesterday") return "Kemarin";
+    if (posDateFilter === "last7days" || posDateFilter === "7days") return "7 Hari Terakhir";
+    if (posDateFilter === "last30days" || posDateFilter === "30days") return "30 Hari Terakhir";
+    if (posDateFilter === "thisMonth") return "Bulan Ini";
+    return "Pilih Tanggal / Periode";
+  }, [posDateFilter, posStartDate, posEndDate]);
 
   const uniqueCashiers = useMemo(() => {
     const list = Array.isArray(offlineSales) ? offlineSales : [];
@@ -552,6 +591,8 @@ function AdminTransactionsPage() {
     setPosPaymentMethodFilter("all");
     setPosCashierFilter("all");
     setPosDateFilter("all");
+    setPosStartDate("");
+    setPosEndDate("");
     setPosStatusFilter("all");
     setSearchQuery("");
   };
@@ -2257,25 +2298,40 @@ function AdminTransactionsPage() {
         }
       }
 
-      // 6. Date Range Filter
-      if (posDateFilter !== "all" && sale.created_at) {
+      // 6. Date Range & Specific Date Filter
+      if (sale.created_at) {
         const saleDate = new Date(sale.created_at);
+        const time = saleDate.getTime();
         const now = new Date();
         const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
         const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
-        const time = saleDate.getTime();
 
-        if (posDateFilter === "today") {
-          if (time < startOfToday) return false;
-        } else if (posDateFilter === "yesterday") {
-          if (time < startOfYesterday || time >= startOfToday) return false;
-        } else if (posDateFilter === "last7days") {
-          if (time < now.getTime() - 7 * 24 * 60 * 60 * 1000) return false;
-        } else if (posDateFilter === "last30days") {
-          if (time < now.getTime() - 30 * 24 * 60 * 60 * 1000) return false;
-        } else if (posDateFilter === "thisMonth") {
-          const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-          if (time < startOfMonth) return false;
+        // Custom start/end date filter
+        if (posStartDate) {
+          const [sy, sm, sd] = posStartDate.split("-").map(Number);
+          const startTime = new Date(sy, sm - 1, sd, 0, 0, 0, 0).getTime();
+          if (time < startTime) return false;
+        }
+        if (posEndDate) {
+          const [ey, em, ed] = posEndDate.split("-").map(Number);
+          const endTime = new Date(ey, em - 1, ed, 23, 59, 59, 999).getTime();
+          if (time > endTime) return false;
+        }
+
+        // Quick Preset date filter (applied if not overridden by custom dates)
+        if (!posStartDate && !posEndDate && posDateFilter !== "all") {
+          if (posDateFilter === "today") {
+            if (time < startOfToday) return false;
+          } else if (posDateFilter === "yesterday") {
+            if (time < startOfYesterday || time >= startOfToday) return false;
+          } else if (posDateFilter === "last7days" || posDateFilter === "7days") {
+            if (time < now.getTime() - 7 * 24 * 60 * 60 * 1000) return false;
+          } else if (posDateFilter === "last30days" || posDateFilter === "30days") {
+            if (time < now.getTime() - 30 * 24 * 60 * 60 * 1000) return false;
+          } else if (posDateFilter === "thisMonth") {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+            if (time < startOfMonth) return false;
+          }
         }
       }
 
@@ -2328,6 +2384,8 @@ function AdminTransactionsPage() {
     posCashierFilter,
     posStatusFilter,
     posDateFilter,
+    posStartDate,
+    posEndDate,
     rowItems,
   ]);
 
@@ -3711,7 +3769,10 @@ function AdminTransactionsPage() {
                               )}
                               {visibleColumns.customer_name && (
                                 <td className="p-2.5">
-                                  <p className="font-bold text-ink uppercase text-xs truncate max-w-[150px] xl:max-w-[190px]" title={order.customer_name}>
+                                  <p
+                                    className="font-bold text-ink uppercase text-xs min-w-[140px] whitespace-normal break-words leading-tight"
+                                    title={order.customer_name}
+                                  >
                                     {order.customer_name}
                                   </p>
                                 </td>
@@ -4086,6 +4147,182 @@ function AdminTransactionsPage() {
                     )}
                   </Button>
 
+                  {/* Popover Pilih Tanggal & Periode Tanggal POS */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className={`h-9 text-xs font-black border-2 border-ink transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5 ${
+                          posDateFilter !== "all" || posStartDate || posEndDate
+                            ? "bg-brand-orange text-white hover:bg-brand-orange/90"
+                            : "bg-white text-ink hover:bg-cream"
+                        }`}
+                        title="Pilih Tanggal atau Rentang Periode Tanggal Penjualan POS"
+                      >
+                        <CalendarIcon className={`w-3.5 h-3.5 ${posDateFilter !== "all" || posStartDate || posEndDate ? "text-white" : "text-brand-orange"}`} />
+                        <span>{posDateButtonLabel}</span>
+                        <ChevronDown className="w-3 h-3 opacity-60" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="start"
+                      className="w-80 sm:w-96 p-3.5 bg-white border-2 border-ink rounded-xl shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] space-y-3 z-50 text-xs"
+                    >
+                      {/* Header Popover */}
+                      <div className="flex items-center justify-between pb-2 border-b border-dashed border-ink/20">
+                        <div className="flex items-center gap-1.5">
+                          <CalendarIcon className="w-4 h-4 text-brand-orange" />
+                          <span className="text-xs font-black uppercase text-ink tracking-wider">
+                            Pilih Tanggal / Periode POS
+                          </span>
+                        </div>
+                        {(posDateFilter !== "all" || posStartDate || posEndDate) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPosDateFilter("all");
+                              setPosStartDate("");
+                              setPosEndDate("");
+                            }}
+                            className="text-[10px] font-bold text-red-600 hover:underline cursor-pointer flex items-center gap-0.5"
+                          >
+                            <RotateCcw className="w-3 h-3" /> Reset Tanggal
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Presets Cepat */}
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block mb-1.5">
+                          Pilihan Cepat
+                        </span>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { id: "all", label: "Semua Waktu" },
+                            { id: "today", label: "Hari Ini" },
+                            { id: "yesterday", label: "Kemarin" },
+                            { id: "last7days", label: "7 Hari" },
+                            { id: "last30days", label: "30 Hari" },
+                            { id: "thisMonth", label: "Bulan Ini" },
+                          ].map((item) => {
+                            const isActive =
+                              posDateFilter === item.id && !posStartDate && !posEndDate;
+                            return (
+                              <button
+                                key={item.id}
+                                type="button"
+                                onClick={() => {
+                                  setPosDateFilter(item.id as any);
+                                  setPosStartDate("");
+                                  setPosEndDate("");
+                                }}
+                                className={`px-2 py-1.5 rounded-lg text-[11px] font-bold border transition-all text-center cursor-pointer ${
+                                  isActive
+                                    ? "bg-brand-orange text-white border-brand-orange shadow-xs font-black"
+                                    : "bg-cream/40 border-ink/20 text-ink hover:bg-cream hover:border-ink"
+                                }`}
+                              >
+                                {item.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Pilih 1 Tanggal Spesifik */}
+                      <div className="pt-2 border-t border-dashed border-ink/15 space-y-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">
+                          Pilih 1 Tanggal Spesifik
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="date"
+                            value={posStartDate && posEndDate && posStartDate === posEndDate ? posStartDate : ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val) {
+                                setPosStartDate(val);
+                                setPosEndDate(val);
+                                setPosDateFilter("all");
+                              }
+                            }}
+                            className="h-8 text-xs font-bold bg-cream/30 border-2 border-ink rounded-lg focus-visible:ring-0"
+                          />
+                          {posStartDate && posEndDate && posStartDate === posEndDate && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setPosStartDate("");
+                                setPosEndDate("");
+                              }}
+                              className="h-8 px-2 text-red-600 hover:bg-red-50 text-[10px] font-bold"
+                            >
+                              Hapus
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Rentang Periode Tanggal */}
+                      <div className="pt-2 border-t border-dashed border-ink/15 space-y-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground block">
+                          Rentang Periode Tanggal
+                        </span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <span className="text-[10px] text-muted-foreground font-semibold block mb-0.5">Dari Tanggal:</span>
+                            <Input
+                              type="date"
+                              value={posStartDate}
+                              onChange={(e) => {
+                                setPosStartDate(e.target.value);
+                                setPosDateFilter("all");
+                              }}
+                              className="h-8 text-xs font-bold bg-cream/30 border-2 border-ink rounded-lg focus-visible:ring-0"
+                            />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-muted-foreground font-semibold block mb-0.5">Sampai Tanggal:</span>
+                            <Input
+                              type="date"
+                              value={posEndDate}
+                              onChange={(e) => {
+                                setPosEndDate(e.target.value);
+                                setPosDateFilter("all");
+                              }}
+                              className="h-8 text-xs font-bold bg-cream/30 border-2 border-ink rounded-lg focus-visible:ring-0"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status / Ringkasan */}
+                      {(posDateFilter !== "all" || posStartDate || posEndDate) && (
+                        <div className="pt-2 border-t border-dashed border-ink/15 flex items-center justify-between text-[11px] font-bold text-emerald-800 bg-emerald-50/80 p-2 rounded-lg border border-emerald-300">
+                          <span className="flex items-center gap-1">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                            Filter tanggal aktif ({sortedOfflineSales.length} transaksi)
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPosDateFilter("all");
+                              setPosStartDate("");
+                              setPosEndDate("");
+                            }}
+                            className="text-[10px] font-extrabold text-red-600 hover:underline cursor-pointer"
+                          >
+                            Reset
+                          </button>
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+
                   {/* Popover Pengaturan Kolom Tabel */}
                   <Popover>
                     <PopoverTrigger asChild>
@@ -4173,6 +4410,8 @@ function AdminTransactionsPage() {
                         setPosPaymentMethodFilter("all");
                         setPosCashierFilter("all");
                         setPosDateFilter("all");
+                        setPosStartDate("");
+                        setPosEndDate("");
                         setPosStatusFilter("all");
                         setProductFilter([]);
                         setProductFilterMode("include");
@@ -4220,16 +4459,32 @@ function AdminTransactionsPage() {
                       <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setPosPaymentMethodFilter("all")} />
                     </Badge>
                   )}
-                  {posDateFilter !== "all" && (
+                  {(posDateFilter !== "all" || posStartDate || posEndDate) && (
                     <Badge variant="outline" className="bg-emerald-50 text-emerald-900 border-emerald-300 text-[10px] font-bold flex items-center gap-1">
-                      Waktu: {
-                        posDateFilter === "today" ? "Hari Ini" :
-                        posDateFilter === "yesterday" ? "Kemarin" :
-                        posDateFilter === "7days" ? "7 Hari Terakhir" :
-                        posDateFilter === "30days" ? "30 Hari Terakhir" :
-                        posDateFilter === "thisMonth" ? "Bulan Ini" : posDateFilter
+                      <CalendarIcon className="w-3 h-3 text-emerald-700" />
+                      Tanggal: {
+                        posStartDate && posEndDate && posStartDate === posEndDate
+                          ? formatIndoDate(posStartDate)
+                          : posStartDate && posEndDate
+                            ? `${formatIndoDate(posStartDate)} s/d ${formatIndoDate(posEndDate)}`
+                            : posStartDate
+                              ? `Mulai ${formatIndoDate(posStartDate)}`
+                              : posEndDate
+                                ? `Hingga ${formatIndoDate(posEndDate)}`
+                                : posDateFilter === "today" ? "Hari Ini"
+                                : posDateFilter === "yesterday" ? "Kemarin"
+                                : posDateFilter === "last7days" || posDateFilter === "7days" ? "7 Hari Terakhir"
+                                : posDateFilter === "last30days" || posDateFilter === "30days" ? "30 Hari Terakhir"
+                                : posDateFilter === "thisMonth" ? "Bulan Ini" : posDateFilter
                       }
-                      <X className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600" onClick={() => setPosDateFilter("all")} />
+                      <X
+                        className="w-3 h-3 cursor-pointer ml-1 hover:text-red-600"
+                        onClick={() => {
+                          setPosDateFilter("all");
+                          setPosStartDate("");
+                          setPosEndDate("");
+                        }}
+                      />
                     </Badge>
                   )}
                   {posStatusFilter !== "all" && (
@@ -4563,13 +4818,23 @@ function AdminTransactionsPage() {
                                   </td>
                                 )}
                                 {visibleColumns.cashier && (
-                                  <td className="p-2.5 text-xs text-muted-foreground truncate max-w-[120px]">
-                                    {group.cashier_names.join(", ") || "-"}
+                                  <td className="p-2.5">
+                                    <p
+                                      className="font-bold text-ink uppercase text-xs min-w-[130px] whitespace-normal break-words leading-tight"
+                                      title={group.cashier_names.join(", ") || "-"}
+                                    >
+                                      {group.cashier_names.join(", ") || "-"}
+                                    </p>
                                   </td>
                                 )}
                                 {visibleColumns.customer_name && (
-                                  <td className="p-2.5 font-black text-ink uppercase">
-                                    {group.customer_name}
+                                  <td className="p-2.5">
+                                    <p
+                                      className="font-bold text-ink uppercase text-xs min-w-[150px] whitespace-normal break-words leading-tight"
+                                      title={group.customer_name}
+                                    >
+                                      {group.customer_name}
+                                    </p>
                                   </td>
                                 )}
                                 {visibleColumns.gross_amount && (
@@ -4637,7 +4902,11 @@ function AdminTransactionsPage() {
                                               return (
                                                 <tr key={subSale.sale_id} className="border-b border-dashed border-border/50 hover:bg-cream/20">
                                                   <td className="p-2 font-mono font-bold text-brand-blue">{subSale.sale_id}</td>
-                                                  <td className="p-2 font-medium">{subSale.cashier_name || "-"}</td>
+                                                  <td className="p-2 font-bold text-ink uppercase text-xs">
+                                                    <div className="min-w-[120px] whitespace-normal break-words leading-tight" title={subSale.cashier_name || "-"}>
+                                                      {subSale.cashier_name || "-"}
+                                                    </div>
+                                                  </td>
                                                   <td className="p-2 text-muted-foreground">{subSale.payment_method}</td>
                                                   <td className="p-2 text-right font-black">
                                                     Rp {Number(subSale.total).toLocaleString("id-ID")}
@@ -4728,13 +4997,23 @@ function AdminTransactionsPage() {
                                 </td>
                               )}
                               {visibleColumns.cashier && (
-                                <td className="p-2.5 font-semibold text-ink uppercase text-xs tracking-wide truncate max-w-[120px]">
-                                  {sale.cashier_name || "-"}
+                                <td className="p-2.5">
+                                  <p
+                                    className="font-bold text-ink uppercase text-xs min-w-[130px] whitespace-normal break-words leading-tight"
+                                    title={sale.cashier_name || "-"}
+                                  >
+                                    {sale.cashier_name || "-"}
+                                  </p>
                                 </td>
                               )}
                               {visibleColumns.customer_name && (
-                                <td className="p-2.5 font-medium text-ink truncate max-w-[150px]">
-                                  {sale.customer_name || "-"}
+                                <td className="p-2.5">
+                                  <p
+                                    className="font-bold text-ink uppercase text-xs min-w-[150px] whitespace-normal break-words leading-tight"
+                                    title={sale.customer_name || "-"}
+                                  >
+                                    {sale.customer_name || "-"}
+                                  </p>
                                 </td>
                               )}
                               {visibleColumns.gross_amount && (
@@ -7280,24 +7559,56 @@ function AdminTransactionsPage() {
                 </select>
               </div>
 
-              {/* 3. Rentang Waktu POS */}
-              <div className="space-y-1.5">
+              {/* 3. Rentang Waktu & Periode POS */}
+              <div className="space-y-2">
                 <label className="font-extrabold uppercase text-ink flex items-center gap-1.5 text-[11px]">
-                  <Clock className="w-3.5 h-3.5 text-brand-orange" />
-                  Rentang Waktu Transaksi
+                  <CalendarIcon className="w-3.5 h-3.5 text-brand-orange" />
+                  Rentang Waktu / Periode Transaksi
                 </label>
                 <select
                   value={posDateFilter}
-                  onChange={(e) => setPosDateFilter(e.target.value as any)}
+                  onChange={(e) => {
+                    setPosDateFilter(e.target.value as any);
+                    if (e.target.value !== "all") {
+                      setPosStartDate("");
+                      setPosEndDate("");
+                    }
+                  }}
                   className="w-full text-xs font-bold text-ink bg-cream/40 border-2 border-ink rounded-lg p-2.5 focus:outline-none cursor-pointer"
                 >
                   <option value="all">Semua Waktu</option>
                   <option value="today">Hari Ini</option>
                   <option value="yesterday">Kemarin</option>
-                  <option value="7days">7 Hari Terakhir</option>
-                  <option value="30days">30 Hari Terakhir</option>
+                  <option value="last7days">7 Hari Terakhir</option>
+                  <option value="last30days">30 Hari Terakhir</option>
                   <option value="thisMonth">Bulan Ini</option>
                 </select>
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground font-bold block mb-0.5">Dari Tanggal:</span>
+                    <Input
+                      type="date"
+                      value={posStartDate}
+                      onChange={(e) => {
+                        setPosStartDate(e.target.value);
+                        setPosDateFilter("all");
+                      }}
+                      className="h-8 text-xs font-bold bg-white border-2 border-ink/40 rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground font-bold block mb-0.5">Sampai Tanggal:</span>
+                    <Input
+                      type="date"
+                      value={posEndDate}
+                      onChange={(e) => {
+                        setPosEndDate(e.target.value);
+                        setPosDateFilter("all");
+                      }}
+                      className="h-8 text-xs font-bold bg-white border-2 border-ink/40 rounded-lg"
+                    />
+                  </div>
+                </div>
               </div>
 
               {/* 4. Filter Produk POS (Shared with include/exclude) */}
@@ -7442,6 +7753,8 @@ function AdminTransactionsPage() {
                     setPosPaymentMethodFilter("all");
                     setPosCashierFilter("all");
                     setPosDateFilter("all");
+                    setPosStartDate("");
+                    setPosEndDate("");
                     setPosStatusFilter("all");
                     setProductFilter([]);
                     setProductFilterMode("include");
