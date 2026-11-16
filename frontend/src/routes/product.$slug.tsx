@@ -1890,7 +1890,7 @@ function ProductDetailPage() {
 
             <div className="pt-2 flex flex-col gap-2">
               <a
-                href="https://maps.google.com/?q=Fakultas+Ilmu+Komputer+Universitas+Brawijaya"
+                href="https://maps.app.goo.gl/M4CGhHQc267j9dT19"
                 target="_blank"
                 rel="noreferrer"
                 className="w-full py-3 px-4 bg-brand-orange hover:bg-ink text-cream hover:text-cream font-black text-xs uppercase tracking-wider rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 text-center"

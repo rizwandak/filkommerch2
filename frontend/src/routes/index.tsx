@@ -2214,7 +2214,7 @@ function Index() {
                 </p>
               </div>
               <a
-                href="https://maps.google.com/?q=Fakultas+Ilmu+Komputer+Universitas+Brawijaya"
+                href="https://maps.app.goo.gl/M4CGhHQc267j9dT19"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-orange hover:underline pt-2 border-t border-neutral-800"
