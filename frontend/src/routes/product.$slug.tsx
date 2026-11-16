@@ -29,6 +29,7 @@ import {
   MessageCircle,
   AlertCircle,
   Clock,
+  CreditCard,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
