@@ -8973,7 +8973,7 @@ export const getOrderItemPickupLogs = async (req: Request, res: Response) => {
   try {
     const { orderId } = req.params;
     const logs = await query<any>(
-      `SELECT l.*, oi.product_name, oi.size, oi.color 
+      `SELECT l.*, oi.product_name, oi.size, oi.color, oi.quantity
        FROM order_item_pickup_logs l
        LEFT JOIN order_items oi ON oi.id = l.order_item_id
        WHERE l.order_id = ?
@@ -8985,6 +8985,90 @@ export const getOrderItemPickupLogs = async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error("Error getting order item pickup logs:", error);
     return res.status(500).json({ success: false, error: "Gagal mengambil riwayat pengambilan" });
+  }
+};
+
+// Get global pickup audit logs across all orders (Admin/Cashier)
+export const getAllPickupLogs = async (req: Request, res: Response) => {
+  try {
+    const search = String(req.query.search || "").trim();
+    const status = String(req.query.status || "all").trim();
+    const startDate = String(req.query.startDate || "").trim();
+    const endDate = String(req.query.endDate || "").trim();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 50, 1), 200);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (search) {
+      const like = `%${search}%`;
+      conditions.push(
+        "(l.order_id LIKE ? OR o.customer_name LIKE ? OR o.customer_nim LIKE ? OR oi.product_name LIKE ? OR l.actor_name LIKE ? OR l.notes LIKE ?)",
+      );
+      params.push(like, like, like, like, like, like);
+    }
+
+    if (status && status !== "all") {
+      conditions.push("l.new_status = ?");
+      params.push(status);
+    }
+
+    if (startDate) {
+      conditions.push("DATE(l.created_at) >= ?");
+      params.push(startDate);
+    }
+
+    if (endDate) {
+      conditions.push("DATE(l.created_at) <= ?");
+      params.push(endDate);
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+    const logs = await query<any>(
+      `SELECT l.*,
+              oi.product_name, oi.size, oi.color, oi.quantity,
+              o.customer_name, o.customer_nim, o.customer_phone, o.channel, o.order_status
+       FROM order_item_pickup_logs l
+       LEFT JOIN order_items oi ON oi.id = l.order_item_id
+       LEFT JOIN orders o ON o.order_id = l.order_id
+       ${whereClause}
+       ORDER BY l.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limit, offset],
+    );
+
+    const [countRow] = await query<any>(
+      `SELECT COUNT(*) as total
+       FROM order_item_pickup_logs l
+       LEFT JOIN order_items oi ON oi.id = l.order_item_id
+       LEFT JOIN orders o ON o.order_id = l.order_id
+       ${whereClause}`,
+      params,
+    );
+
+    const [statsRow] = await query<any>(
+      `SELECT 
+         COUNT(*) as total_logs,
+         SUM(CASE WHEN new_status = 'picked_up' THEN 1 ELSE 0 END) as picked_up_total,
+         SUM(CASE WHEN new_status = 'picked_up' AND DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) as picked_up_today
+       FROM order_item_pickup_logs`,
+    );
+
+    return res.json({
+      success: true,
+      logs: logs || [],
+      total: Number(countRow?.total || 0),
+      stats: {
+        total_logs: Number(statsRow?.total_logs || 0),
+        picked_up_total: Number(statsRow?.picked_up_total || 0),
+        picked_up_today: Number(statsRow?.picked_up_today || 0),
+      },
+    });
+  } catch (error: any) {
+    console.error("Error getting all pickup logs:", error);
+    return res.status(500).json({ success: false, error: "Gagal mengambil riwayat pengambilan barang" });
   }
 };
 

@@ -17,7 +17,7 @@ export type ElementType =
 export type SegmentType = ElementType;
 
 export interface PopupAnnouncementConfig {
-  activeTemplate: "filkom_verification" | "notification" | "thank_you";
+  activeTemplate: "filkom_verification" | "notification" | "thank_you" | "year_end_sale";
   version: string;
   delayMs: number;
 }

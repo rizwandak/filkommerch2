@@ -24,6 +24,11 @@ import {
   LayoutDashboard,
   MonitorSmartphone,
   Zap,
+  Flame,
+  MapPin,
+  MessageCircle,
+  AlertCircle,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
@@ -237,6 +242,7 @@ function ProductDetailPage() {
 
   // Size Fit Guide State
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+  const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
   const [userHeight, setUserHeight] = useState("");
   const [userWeight, setUserWeight] = useState("");
   const [sizeRecommendation, setSizeRecommendation] = useState<{
@@ -943,16 +949,38 @@ function ProductDetailPage() {
             </div>
 
             {/* Price Section */}
-            <div className="p-4 bg-white border-2 border-ink rounded-2xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] space-y-2">
+            <div className="p-4 bg-white border-2 border-ink rounded-2xl shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] space-y-3">
               <div className="flex items-baseline gap-3 flex-wrap">
                 <span className="text-3xl sm:text-4xl font-black text-brand-orange tracking-tight">
                   Rp {currentPrice.toLocaleString("id-ID")}
                 </span>
                 {originalPrice && originalPrice > currentPrice && (
-                  <span className="text-sm font-extrabold text-red-500 line-through">
-                    Rp {originalPrice.toLocaleString("id-ID")}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-extrabold text-red-500 line-through">
+                      Rp {originalPrice.toLocaleString("id-ID")}
+                    </span>
+                    <span className="bg-red-600 text-white font-black text-xs px-2.5 py-0.5 rounded-full border border-ink shadow-xs">
+                      🔥 Save {Math.round(((originalPrice - currentPrice) / originalPrice) * 100)}%
+                    </span>
+                  </div>
                 )}
+              </div>
+
+              {/* Year-End Sale In-Store Alert */}
+              <div className="p-3 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white rounded-xl border border-ink space-y-1.5 shadow-xs">
+                <div className="flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider text-amber-200">
+                  <Flame className="w-3.5 h-3.5 text-amber-300" /> PROMO CUCI GUDANG YEAR-END SALE (16-30 NOV 2026)
+                </div>
+                <p className="text-[11px] leading-relaxed text-white/95 font-medium">
+                  Diskon hingga 50% hanya bisa didapatkan langsung di <strong>Store Resmi FILKOM Merch (Gedung A FILKOM UB)</strong>. Website difokuskan sebagai katalog stok &amp; sistem POS Kasir toko.
+                </p>
+                <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold text-amber-100 pt-1 border-t border-white/20">
+                  <span>📍 Gedung A FILKOM UB (Lt. 1)</span>
+                  <span>•</span>
+                  <span>⏰ 09.00 - 16.30 WIB</span>
+                  <span>•</span>
+                  <span>💳 Tunai &amp; QRIS Kasir</span>
+                </div>
               </div>
 
               {Number(user?.is_filkom_verified) === 1 ? (
@@ -1538,22 +1566,23 @@ function ProductDetailPage() {
                   </span>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Buttons - Offline In-Store Focus */}
                 <div className="space-y-2.5">
                   <button
-                    onClick={() => handleAddToCart(false)}
-                    disabled={currentStock <= 0 || isPreOrderClosed}
-                    className="w-full py-3 px-4 bg-brand-orange hover:bg-brand-orange/90 text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 dark:disabled:border-zinc-700"
+                    type="button"
+                    onClick={() => setIsStoreModalOpen(true)}
+                    className="w-full py-3.5 px-4 bg-brand-orange hover:bg-ink text-cream hover:text-cream font-black text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2"
                   >
-                    <Plus className="w-4 h-4" /> {currentStock <= 0 ? "Stok Habis" : "+ Keranjang"}
+                    <MapPin className="w-4 h-4" /> Beli di Store (Gedung A)
                   </button>
-                  <button
-                    onClick={() => handleAddToCart(true)}
-                    disabled={currentStock <= 0 || isPreOrderClosed}
-                    className="w-full py-3 px-4 bg-card hover:bg-secondary text-foreground font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 dark:disabled:border-zinc-700"
+                  <a
+                    href={`https://wa.me/6282235526105?text=${encodeURIComponent(`Halo Admin FILKOM Merch, saya ingin menanyakan ketersediaan stok ${product.name} (Ukuran: ${selectedSize || "One Size"}) untuk promo Year-End Sale di store.`)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 text-center"
                   >
-                    {currentStock <= 0 ? "Stok Habis" : (isPreOrder ? "Pesan Sekarang" : "Beli Langsung")}
-                  </button>
+                    <MessageCircle className="w-4 h-4" /> Tanya Stok via WhatsApp
+                  </a>
                 </div>
 
                 {/* Share Link */}
@@ -1775,25 +1804,108 @@ function ProductDetailPage() {
           </div>
         </div>
       )}
-      {/* Sticky Bottom Dock for Mobile */}
+      {/* Sticky Bottom Dock for Mobile - Offline In-Store Focus */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t-2 border-border p-3 md:hidden shadow-[0_-4px_15px_rgba(0,0,0,0.2)]">
         <div className="grid grid-cols-2 gap-2.5">
           <button
-            onClick={() => handleAddToCart(false)}
-            disabled={currentStock <= 0 || isPreOrderClosed}
-            className="py-3 px-3 bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 flex items-center justify-center gap-2 cursor-pointer text-center"
+            type="button"
+            onClick={() => setIsStoreModalOpen(true)}
+            className="py-3 px-3 bg-brand-orange hover:bg-brand-orange/90 text-cream font-black text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center"
           >
-            <ShoppingBag className="w-4 h-4" /> {isPreOrderClosed ? "Ditutup" : (currentStock <= 0 ? "Habis" : "Masuk Bag")}
+            <MapPin className="w-4 h-4" /> Beli di Store
           </button>
-          <button
-            onClick={() => handleAddToCart(true)}
-            disabled={currentStock <= 0 || isPreOrderClosed}
-            className="py-3 px-3 bg-ink text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,0.4)] active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 flex items-center justify-center gap-2 cursor-pointer text-center"
+          <a
+            href={`https://wa.me/6282235526105?text=${encodeURIComponent(`Halo Admin FILKOM Merch, saya ingin menanyakan ketersediaan stok ${product.name} (Ukuran: ${selectedSize || "One Size"}) untuk promo Year-End Sale di store.`)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="py-3 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center"
           >
-            <Zap className="w-4 h-4" /> {isPreOrderClosed ? "Ditutup" : (currentStock <= 0 ? "Habis" : (isPreOrder ? "Pesan Sekarang" : "Beli Sekarang"))}
-          </button>
+            <MessageCircle className="w-4 h-4" /> Tanya WA
+          </a>
         </div>
       </div>
+
+      {/* Store Location & Information Modal */}
+      {isStoreModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-ink/70 backdrop-blur-xs animate-fade-in"
+          onClick={() => setIsStoreModalOpen(false)}
+        >
+          <div
+            className="bg-card border-4 border-ink rounded-3xl w-full max-w-md overflow-hidden shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] p-6 space-y-4 animate-scale-in relative text-ink"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b-2 border-ink pb-3">
+              <div className="flex items-center gap-2">
+                <span className="p-1.5 bg-red-600 text-white rounded-lg">
+                  <Flame className="w-4 h-4" />
+                </span>
+                <h3 className="font-extrabold text-sm uppercase tracking-wide">
+                  Store Resmi FILKOM Merch
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsStoreModalOpen(false)}
+                className="p-1 border-2 border-ink rounded-lg hover:bg-cream"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-orange-50 border border-brand-orange/40 rounded-xl space-y-1">
+                <p className="font-black text-brand-orange text-[11px] uppercase">
+                  🏷️ Cuci Gudang Year-End Sale 2026
+                </p>
+                <p className="text-muted-foreground leading-relaxed">
+                  Diskon hingga 50% untuk <strong>{product.name}</strong> hanya bisa didapatkan langsung di kasir toko offline.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-start gap-2.5">
+                  <MapPin className="w-4 h-4 text-brand-orange shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block text-ink">Lokasi:</strong>
+                    <span className="text-muted-foreground">Store FILKOM Merch, Gedung A FILKOM UB (Lantai 1), Jl. Veteran, Malang.</span>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <Clock className="w-4 h-4 text-brand-orange shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block text-ink">Jam Operasional:</strong>
+                    <span className="text-muted-foreground">Senin - Jumat (09.00 - 16.30 WIB)</span>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <CreditCard className="w-4 h-4 text-brand-orange shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="block text-ink">Metode Pembayaran Kasir:</strong>
+                    <span className="text-muted-foreground">Tunai (Cash) &amp; QRIS Instan POS</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex flex-col gap-2">
+              <a
+                href="https://maps.google.com/?q=Fakultas+Ilmu+Komputer+Universitas+Brawijaya"
+                target="_blank"
+                rel="noreferrer"
+                className="w-full py-3 px-4 bg-brand-orange hover:bg-ink text-cream hover:text-cream font-black text-xs uppercase tracking-wider rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all flex items-center justify-center gap-2 text-center"
+              >
+                <MapPin className="w-4 h-4" /> Buka di Google Maps
+              </a>
+              <button
+                onClick={() => setIsStoreModalOpen(false)}
+                className="w-full py-2.5 px-4 bg-secondary text-ink font-bold text-xs uppercase tracking-wider rounded-xl border-2 border-ink hover:bg-cream transition-all"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -338,6 +338,8 @@ const DEFAULT_VISIBLE_COLUMNS: VisibleColumns = {
   actions: true,
 };
 
+const ENABLE_PRICE_AUDIT = false;
+
 const COLUMN_DEFINITIONS = [
   { id: "no", label: "No" },
   { id: "order_id", label: "Order ID / Sale ID" },
@@ -347,7 +349,7 @@ const COLUMN_DEFINITIONS = [
   { id: "payment_method", label: "Pembayaran (POS)" },
   { id: "pelunasan", label: "Nominal Pelunasan (Online)" },
   { id: "payment_status", label: "Status" },
-  { id: "difference", label: "Selisih Bayar (Online)" },
+  ...(ENABLE_PRICE_AUDIT ? ([{ id: "difference", label: "Selisih Bayar (Online)" }] as const) : []),
   { id: "created_at", label: "Tanggal & Jam" },
   { id: "actions", label: "Tombol Aksi" },
 ] as const;
@@ -1864,7 +1866,7 @@ function AdminTransactionsPage() {
   const filteredOnlineOrders = useMemo(() => {
     let result = baseFilteredOrders;
 
-    if (onlyPriceMismatch) {
+    if (ENABLE_PRICE_AUDIT && onlyPriceMismatch) {
       result = result.filter((order) => calculateOrderPriceAudit(order).hasMismatch);
     }
 
@@ -2728,31 +2730,33 @@ function AdminTransactionsPage() {
                     )}
                   </Button>
 
-                  {/* Tombol Filter Cepat Selisih Harga */}
-                  <Button
-                    type="button"
-                    variant={onlyPriceMismatch ? "destructive" : "outline"}
-                    size="sm"
-                    onClick={() => setOnlyPriceMismatch((prev) => !prev)}
-                    className={`h-9 text-xs font-black border-2 transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5 ${
-                      onlyPriceMismatch
-                        ? "bg-red-600 text-white hover:bg-red-700 border-red-900"
-                        : "bg-white text-red-600 border-red-300 hover:bg-red-50"
-                    }`}
-                    title="Filter cepat transaksi yang memiliki ketidaksesuaian subtotal / total harga"
-                  >
-                    <AlertTriangle className="w-3.5 h-3.5" />
-                    <span>Selisih Harga</span>
-                    <span
-                      className={`text-[10px] font-black px-1.5 py-0.2 rounded-full min-w-[18px] text-center border ${
+                  {/* Tombol Filter Cepat Selisih Harga (Dinonaktifkan sementara) */}
+                  {ENABLE_PRICE_AUDIT && (
+                    <Button
+                      type="button"
+                      variant={onlyPriceMismatch ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={() => setOnlyPriceMismatch((prev) => !prev)}
+                      className={`h-9 text-xs font-black border-2 transition-all cursor-pointer shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] flex items-center gap-1.5 ${
                         onlyPriceMismatch
-                          ? "bg-white text-red-600 border-red-200"
-                          : "bg-red-100 text-red-700 border-red-300"
+                          ? "bg-red-600 text-white hover:bg-red-700 border-red-900"
+                          : "bg-white text-red-600 border-red-300 hover:bg-red-50"
                       }`}
+                      title="Filter cepat transaksi yang memiliki ketidaksesuaian subtotal / total harga"
                     >
-                      {stats.mismatchCount}
-                    </span>
-                  </Button>
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span>Selisih Harga</span>
+                      <span
+                        className={`text-[10px] font-black px-1.5 py-0.2 rounded-full min-w-[18px] text-center border ${
+                          onlyPriceMismatch
+                            ? "bg-white text-red-600 border-red-200"
+                            : "bg-red-100 text-red-700 border-red-300"
+                        }`}
+                      >
+                        {stats.mismatchCount}
+                      </span>
+                    </Button>
+                  )}
 
                   {/* Popover Pengaturan Kolom Tabel */}
                   <Popover>
@@ -3167,12 +3171,13 @@ function AdminTransactionsPage() {
                     const isPickup = !addr || addr.includes("ambil") || addr.includes("filkom merch") || addr.includes("pickup");
                     const dt = formatCompactDateTime(order.created_at);
                     const audit = calculateOrderPriceAudit(order);
+                    const showAuditMismatch = ENABLE_PRICE_AUDIT && audit.hasMismatch;
 
                     return (
                       <div
                         key={order.order_id}
                         className={`rounded-xl p-3.5 shadow-sm space-y-2.5 transition-all border-2 ${
-                          audit.hasMismatch
+                          showAuditMismatch
                             ? "bg-red-50/70 border-red-400 shadow-red-100"
                             : order.voucher_code || order.discount_amount > 0
                               ? "border-orange-300 bg-orange-50/20"
@@ -3196,7 +3201,7 @@ function AdminTransactionsPage() {
                                 +Pelunasan
                               </Badge>
                             )}
-                            {audit.hasMismatch && (
+                            {showAuditMismatch && (
                               <Badge className="bg-red-100 text-red-900 border-red-300 text-[9px] px-1.5 py-0 font-black flex items-center gap-1">
                                 <AlertTriangle className="w-2.5 h-2.5 text-red-600" />
                                 Selisih Subtotal
@@ -3232,7 +3237,7 @@ function AdminTransactionsPage() {
                             <span className="font-mono font-black text-ink text-sm">
                               Rp {Number(order.gross_amount).toLocaleString("id-ID")}
                             </span>
-                            {audit.hasMismatch && (
+                            {showAuditMismatch && (
                               <span className="block text-[10px] text-red-700 font-bold font-mono">
                                 Seharusnya: Rp {audit.expectedGross.toLocaleString("id-ID")}
                               </span>
@@ -3241,7 +3246,7 @@ function AdminTransactionsPage() {
                         </div>
 
                         {/* Audit Selisih Alert Banner */}
-                        {audit.hasMismatch && (
+                        {showAuditMismatch && (
                           <div className="bg-red-100/90 border border-red-300 rounded-lg p-2 text-xs space-y-1 text-red-950 font-medium">
                             <div className="flex items-center justify-between text-[11px] font-bold text-red-900">
                               <span className="flex items-center gap-1">
@@ -3425,7 +3430,7 @@ function AdminTransactionsPage() {
                       {visibleColumns.payment_status && (
                         <SortHeaderColumn label="STATUS" field="payment_status" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
                       )}
-                      {visibleColumns.difference && (
+                      {ENABLE_PRICE_AUDIT && visibleColumns.difference && (
                         <SortHeaderColumn label="SELISIH" field="difference" currentField={sortField} direction={sortDirection} onSort={handleSort} align="center" />
                       )}
                       {visibleColumns.created_at && (
@@ -3693,11 +3698,12 @@ function AdminTransactionsPage() {
                     ) : (
                       sortedOnlineOrders.map((order, idx) => {
                         const audit = calculateOrderPriceAudit(order);
+                        const showAuditMismatch = ENABLE_PRICE_AUDIT && audit.hasMismatch;
                         return (
                           <Fragment key={order.order_id}>
                             <tr
                               className={`border-t border-border transition-colors ${
-                                audit.hasMismatch
+                                showAuditMismatch
                                   ? "bg-red-50/85 hover:bg-red-100/90 border-l-4 border-l-red-600"
                                   : order.voucher_code || order.discount_amount > 0
                                     ? "bg-orange-50/50 hover:bg-orange-100/60"
@@ -3756,7 +3762,7 @@ function AdminTransactionsPage() {
                                         +Lunas
                                       </span>
                                     )}
-                                    {audit.hasMismatch && (
+                                    {showAuditMismatch && (
                                       <span
                                         className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-black bg-red-100 text-red-900 border border-red-300"
                                         title={`[${audit.batchLabel}] Subtotal DB: Rp ${audit.actualSubtotal.toLocaleString("id-ID")} | Seharusnya: Rp ${audit.expectedSubtotal.toLocaleString("id-ID")}`}
@@ -3780,7 +3786,7 @@ function AdminTransactionsPage() {
                               {visibleColumns.gross_amount && (
                                 <td className="p-2.5 text-right font-black text-ink whitespace-nowrap">
                                   <div>Rp {Number(order.gross_amount).toLocaleString("id-ID")}</div>
-                                  {audit.hasMismatch && (
+                                  {showAuditMismatch && (
                                     <div
                                       className="text-[10px] font-bold text-red-700 tracking-tight"
                                       title={`Subtotal Seharusnya: Rp ${audit.expectedSubtotal.toLocaleString("id-ID")}`}
@@ -3872,7 +3878,7 @@ function AdminTransactionsPage() {
                                 </div>
                               </td>
                             )}
-                            {visibleColumns.difference && (
+                            {ENABLE_PRICE_AUDIT && visibleColumns.difference && (
                               <td className="p-2.5 text-center whitespace-nowrap">
                                 {renderDifferenceCell(order, dpPelunasanMap[order.order_id])}
                               </td>
@@ -6299,7 +6305,7 @@ function AdminTransactionsPage() {
                       return (
                         <div className="space-y-3 border-t pt-3">
                           {/* Audit Alert & Comparison Box jika ada selisih */}
-                          {audit.hasMismatch && (
+                          {ENABLE_PRICE_AUDIT && audit.hasMismatch && (
                             <div className="rounded-xl border-2 border-red-400 bg-red-50/85 p-3.5 space-y-3 shadow-sm">
                               <div className="flex items-center justify-between gap-2 border-b border-red-200 pb-2">
                                 <div className="flex items-center gap-1.5 font-black text-red-900 text-xs uppercase tracking-wider">

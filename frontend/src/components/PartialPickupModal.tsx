@@ -16,10 +16,15 @@ import {
   Camera,
   Eye,
   Image as ImageIcon,
+  History,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getApiBaseUrl } from "@/lib/api-config";
-import type { OrderItem } from "@/backend/server-actions";
+import {
+  getOrderItemPickupLogsServerAction,
+  type OrderItem,
+  type PickupLogEntry,
+} from "@/backend/server-actions";
 import { LiveCameraCapture } from "@/components/LiveCameraCapture";
 import { resolveImageUrl } from "@/lib/image-resolver";
 
@@ -69,7 +74,9 @@ export function PartialPickupModal({
 }: PartialPickupModalProps) {
   const [items, setItems] = useState<OrderItem[]>(initialItems || []);
   const [selectedItemIds, setSelectedItemIds] = useState<number[]>([]);
-  const [activeTab, setActiveTab] = useState<"checklist" | "notification">("checklist");
+  const [activeTab, setActiveTab] = useState<"checklist" | "notification" | "history">("checklist");
+  const [pickupLogs, setPickupLogs] = useState<PickupLogEntry[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
   const [notifTitle, setNotifTitle] = useState("");
   const [notifMessage, setNotifMessage] = useState("");
   const [sendingNotif, setSendingNotif] = useState(false);
@@ -98,6 +105,20 @@ export function PartialPickupModal({
     }
   }, [isOpen]);
 
+  const fetchPickupLogs = async (orderId: string) => {
+    try {
+      setLoadingLogs(true);
+      const res = await getOrderItemPickupLogsServerAction({ data: { orderId } });
+      if (res.success) {
+        setPickupLogs(res.logs || []);
+      }
+    } catch (e) {
+      console.warn("Gagal mengambil riwayat pengambilan:", e);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
+
   useEffect(() => {
     if (isOpen && order) {
       setItems(initialItems || []);
@@ -117,6 +138,9 @@ export function PartialPickupModal({
       );
 
       generateNotificationMessage(initialItems || [], defaultSelected);
+      if (order.order_id) {
+        void fetchPickupLogs(order.order_id);
+      }
     }
   }, [isOpen, order, initialItems]);
 
@@ -244,6 +268,7 @@ export function PartialPickupModal({
       if (data.success) {
         setItems(data.items);
         if (onItemsUpdated) onItemsUpdated(data.items);
+        if (order?.order_id) void fetchPickupLogs(order.order_id);
         toast.success(data.message || "Status item berhasil diperbarui");
       } else {
         toast.error(data.error || "Gagal memperbarui status item");
@@ -504,6 +529,24 @@ export function PartialPickupModal({
             }`}
           >
             <Send className="w-4 h-4" /> Notifikasi WhatsApp Pembeli
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab("history");
+              if (order?.order_id) void fetchPickupLogs(order.order_id);
+            }}
+            className={`py-3 px-2 text-xs font-bold border-b-2 transition-all flex items-center gap-1.5 cursor-pointer ${
+              activeTab === "history"
+                ? "border-brand-orange text-brand-orange"
+                : "border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+            }`}
+          >
+            <History className="w-4 h-4" /> Riwayat Pengambilan
+            {pickupLogs.length > 0 && (
+              <span className="text-[10px] bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1.5 py-0.2 rounded-full font-black border border-gray-200 dark:border-gray-700">
+                {pickupLogs.length}
+              </span>
+            )}
           </button>
         </div>
 
@@ -790,7 +833,7 @@ export function PartialPickupModal({
                 })}
               </div>
             </div>
-          ) : (
+          ) : activeTab === "notification" ? (
             /* Tab Notifikasi WhatsApp */
             <div className="space-y-4">
               <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 rounded-xl border border-blue-200 dark:border-blue-900/50 flex items-start gap-2.5">
@@ -873,6 +916,122 @@ export function PartialPickupModal({
                   <span>Kirim Notifikasi via WhatsApp</span>
                 </button>
               </div>
+            </div>
+          ) : (
+            /* Tab Riwayat Pengambilan Barang */
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+                  <History className="w-4 h-4 text-brand-orange" />
+                  Log Aktivitas Pengambilan Pesanan #{order.order_id}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => order?.order_id && void fetchPickupLogs(order.order_id)}
+                  disabled={loadingLogs}
+                  className="text-[11px] font-bold text-brand-orange hover:underline flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                >
+                  <RotateCcw className={`w-3 h-3 ${loadingLogs ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+              </div>
+
+              {loadingLogs ? (
+                <div className="py-10 text-center text-xs text-gray-500">
+                  Memuat riwayat pengambilan...
+                </div>
+              ) : pickupLogs.length === 0 ? (
+                <div className="py-10 text-center bg-gray-50 dark:bg-gray-800/40 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 space-y-1.5">
+                  <History className="w-7 h-7 text-gray-300 mx-auto" />
+                  <p className="text-xs font-bold text-gray-500">
+                    Belum ada riwayat perubahan pengambilan
+                  </p>
+                  <p className="text-[11px] text-gray-400">
+                    Setiap serah terima barang atau perubahan status akan tercatat otomatis di sini.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {pickupLogs.map((log) => {
+                    const statusLabel = (s?: string | null) => {
+                      if (s === "picked_up") return "Sudah Diambil";
+                      if (s === "ready") return "Siap Diambil";
+                      if (s === "pending") return "Menyusul";
+                      return s || "-";
+                    };
+                    const statusBadgeClass = (s?: string | null) => {
+                      if (s === "picked_up") return "bg-emerald-100 text-emerald-800 border-emerald-300";
+                      if (s === "ready") return "bg-blue-100 text-blue-800 border-blue-300";
+                      return "bg-amber-100 text-amber-800 border-amber-300";
+                    };
+                    const variantText = [log.size, log.color]
+                      .filter((v) => v && v !== "-" && v !== "One Size" && v !== "All Size")
+                      .join(" / ");
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="p-3 bg-white dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl space-y-2 text-xs shadow-2xs"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="space-y-0.5">
+                            <p className="font-bold text-gray-900 dark:text-white">
+                              {log.product_name || `Item #${log.order_item_id}`}
+                              {variantText && (
+                                <span className="text-gray-500 font-medium ml-1">({variantText})</span>
+                              )}
+                              {log.quantity ? (
+                                <span className="text-gray-500 font-semibold ml-1.5">× {log.quantity} pcs</span>
+                              ) : null}
+                            </p>
+                            <div className="flex items-center gap-1.5 flex-wrap text-[10px]">
+                              <span className={`px-1.5 py-0.2 rounded border font-bold ${statusBadgeClass(log.previous_status)}`}>
+                                {statusLabel(log.previous_status)}
+                              </span>
+                              <span className="text-gray-400 font-bold">→</span>
+                              <span className={`px-1.5 py-0.2 rounded border font-bold ${statusBadgeClass(log.new_status)}`}>
+                                {statusLabel(log.new_status)}
+                              </span>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-gray-500 font-mono shrink-0">
+                            {new Date(log.created_at).toLocaleString("id-ID", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+
+                        {log.notes && (
+                          <p className="text-[11px] text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900/50 px-2.5 py-1.5 rounded-lg border border-gray-100 dark:border-gray-800">
+                            {log.notes}
+                          </p>
+                        )}
+
+                        <div className="flex items-center justify-between pt-1 border-t border-gray-100 dark:border-gray-800 text-[11px]">
+                          <span className="text-gray-500 flex items-center gap-1">
+                            <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                            Petugas: <strong className="text-gray-800 dark:text-gray-200">{log.actor_name || "Admin"}</strong>
+                            {log.actor_role && <span className="text-[10px] text-gray-400">({log.actor_role})</span>}
+                          </span>
+                          {log.proof_url && (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewPhotoModal(log.proof_url || null)}
+                              className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200 cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" /> Lihat Bukti Foto
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>

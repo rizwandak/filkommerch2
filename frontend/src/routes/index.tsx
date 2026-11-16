@@ -23,6 +23,9 @@ import {
   Mail,
   MapPin,
   ChevronDown,
+  Flame,
+  Clock,
+  CreditCard,
   LayoutDashboard,
   MonitorSmartphone,
   ChevronLeft,
@@ -154,8 +157,8 @@ export const Route = createFileRoute("/")({
 
 const NAV = [
   { label: "BERANDA", href: "/", isScroll: true, target: "top" },
-  { label: "PRODUK", href: "/products" },
-  { label: "PRE-ORDER", href: "/pre-order" },
+  { label: "KATALOG PROMO", href: "/products" },
+  { label: "LOKASI STORE", href: "/#store-location", isScroll: true, target: "store-location" },
   { label: "TENTANG KAMI", href: "/#about", isScroll: true, target: "about" },
   { label: "FAQ", href: "/faq" },
 ];
@@ -904,6 +907,53 @@ function Index() {
 
       <div id="top" />
 
+      {/* ===== YEAR-END SALE 2026 HERO SPOTLIGHT BANNER ===== */}
+      <section className="relative bg-gradient-to-br from-red-700 via-orange-600 to-amber-500 text-white border-b-2 border-ink overflow-hidden">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-10 py-10 sm:py-14 relative z-10">
+          <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+            <div className="space-y-4 text-center lg:text-left max-w-2xl">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-ink text-amber-300 text-[10px] sm:text-xs font-black rounded-full uppercase tracking-widest border border-amber-400/40 shadow-md animate-pulse">
+                <Flame className="w-3.5 h-3.5 text-amber-400" /> CUCI GUDANG AKHIR TAHUN • 16 - 30 NOVEMBER 2026
+              </div>
+              <h2 className="display text-4xl sm:text-5xl lg:text-6xl font-black uppercase leading-[0.95] tracking-tight drop-shadow-sm">
+                YEAR-END SALE!<br />DISKON S.D 50% 🔥
+              </h2>
+              <p className="text-xs sm:text-sm text-orange-50 font-medium leading-relaxed">
+                Saatnya borong official merchandise FILKOM UB dengan harga miring akhir tahun! Mulai dari <strong>Varsity, Work Jacket, Half Zip, Kaos, Tumbler, Totebag, hingga Aksesoris</strong> banting harga spesial cuci gudang. <strong>Promo eksklusif hanya berlaku untuk pembelian langsung di Store Resmi FILKOM Merch</strong> (website tidak melayani pembelian online &amp; difokuskan sebagai POS Kasir).
+              </p>
+              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 pt-1">
+                <Link
+                  to="/products"
+                  className="inline-flex items-center gap-2 bg-ink text-cream hover:bg-cream hover:text-ink px-6 py-3.5 rounded-xl text-xs font-black tracking-[0.15em] uppercase border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] transition-all"
+                >
+                  <ShoppingBag className="w-4 h-4 text-brand-orange" /> Lihat Katalog Promo
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => scrollToId("store-location")}
+                  className="inline-flex items-center gap-2 bg-white text-ink hover:bg-cream px-6 py-3.5 rounded-xl text-xs font-black tracking-[0.15em] uppercase border-2 border-ink shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] transition-all cursor-pointer"
+                >
+                  <MapPin className="w-4 h-4 text-red-600" /> Lokasi Store (Gedung A)
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-ink/90 backdrop-blur-xs text-cream border-2 border-ink rounded-2xl p-5 sm:p-6 shadow-[6px_6px_0px_0px_rgba(27,27,27,0.8)] w-full max-w-sm space-y-4">
+              <div className="text-[10px] font-black tracking-widest text-amber-400 uppercase flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-500 animate-ping" />
+                PROMO BERAKHIR DALAM:
+              </div>
+              <CountdownTimer targetDate="2026-11-30T23:59:59+07:00" />
+              <div className="pt-3 border-t border-white/15 space-y-1.5 text-[11px] text-neutral-300 font-medium">
+                <p>📍 <strong className="text-white">Store:</strong> Gedung A FILKOM UB (Lt. 1)</p>
+                <p>⏰ <strong className="text-white">Buka:</strong> Senin - Jumat (09.00 - 16.30 WIB)</p>
+                <p>🏷️ <strong className="text-amber-300">In-Store Only:</strong> Stok cuci gudang terbatas!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Modular Builder segments renderer */}
       {segments
         .filter((seg) => seg.enabled)
@@ -1175,31 +1225,26 @@ function Index() {
                                         </div>
                                       </div>
 
-                                      {/* Dual Icon Action Buttons - Below Price, Full Width Split 50/50 */}
+                                      {/* Dual Action Buttons - Detail Promo & Lokasi Store */}
                                       <div className="pt-1 flex gap-1.5 w-full">
-                                        <button
-                                          onClick={() => {
-                                            if ((p as any).rawProduct) {
-                                              addToCart((p as any).rawProduct);
-                                            } else {
-                                              addToCart(p);
-                                            }
-                                          }}
-                                          disabled={(p.sale_type === "preorder" || p.sale_type === "pre_order") && !isPoOpen}
-                                          title="Masuk Bag"
-                                          className="flex-1 h-8 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-brand-orange border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
-                                        >
-                                          <ShoppingBag className="w-4 h-4" />
-                                        </button>
-
                                         <Link
                                           to="/product/$slug"
                                           params={{ slug: p.id }}
-                                          title="Pesan Sekarang"
-                                          className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center"
+                                          title="Detail Promo"
+                                          className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center gap-1 text-xs font-black uppercase tracking-wider"
                                         >
-                                          <ArrowRight className="w-4 h-4" />
+                                          <Eye className="w-3.5 h-3.5" /> Detail Promo
                                         </Link>
+
+                                        <button
+                                          onClick={() => {
+                                            scrollToId("store-location");
+                                          }}
+                                          title="Cek Lokasi Store"
+                                          className="h-8 px-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-brand-orange border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center gap-1 text-xs font-bold"
+                                        >
+                                          <MapPin className="w-3.5 h-3.5" /> Toko
+                                        </button>
                                       </div>
                                     </div>
                                   </div>
@@ -1961,9 +2006,15 @@ function Index() {
                                           alt={p.name}
                                           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                                         />
-                                        <span className="absolute top-2 left-2 bg-brand-orange text-ink font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
-                                          PO
-                                        </span>
+                                        {p.rawOriginalPrice && p.rawPrice && p.rawOriginalPrice > p.rawPrice ? (
+                                          <span className="absolute top-2 left-2 bg-red-600 text-white font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
+                                            🔥 Save {Math.round(((p.rawOriginalPrice - p.rawPrice) / p.rawOriginalPrice) * 100)}%
+                                          </span>
+                                        ) : (
+                                          <span className="absolute top-2 left-2 bg-brand-orange text-ink font-mono font-black text-[9px] tracking-wider px-2 py-0.5 rounded-full border border-ink shadow-xs uppercase">
+                                            {p.tag || "SALE"}
+                                          </span>
+                                        )}
                                       </Link>
 
                                       <div className="p-3 sm:p-3.5 flex-1 flex flex-col justify-between space-y-2.5">
@@ -1988,13 +2039,14 @@ function Index() {
                                             )}
                                           </div>
 
-                                          <button
-                                            onClick={() => addToCart(p)}
-                                            className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
-                                            title="Tambah ke bag"
+                                          <Link
+                                            to="/product/$slug"
+                                            params={{ slug: p.id }}
+                                            className="px-2 py-1 rounded bg-brand-orange text-cream hover:bg-ink transition-colors border border-ink cursor-pointer shadow-xs text-[10px] font-black uppercase flex items-center gap-1"
+                                            title="Cek Detail Promo"
                                           >
-                                            <ShoppingBag className="w-3 h-3" />
-                                          </button>
+                                            <Eye className="w-3 h-3" /> Detail
+                                          </Link>
                                         </div>
                                       </div>
                                     </div>
@@ -2128,6 +2180,97 @@ function Index() {
         ))}
 
 
+      {/* ===== YEAR-END SALE STORE LOCATION & OFFLINE SHOPPING GUIDE ===== */}
+      <section id="store-location" className="bg-neutral-950 text-white py-16 sm:py-24 border-b-2 border-ink scroll-mt-24">
+        <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
+          <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16 space-y-3">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-red-600 text-white text-[10px] sm:text-xs font-black rounded-full uppercase tracking-widest border border-red-400/30 animate-pulse">
+              <Flame className="w-3.5 h-3.5 text-amber-400" /> Eksklusif Pembelian Offline di Toko
+            </div>
+            <h2 className="display text-3xl sm:text-5xl lg:text-6xl font-extrabold uppercase tracking-tight text-white">
+              KUNJUNGI STORE RESMI FILKOM MERCH
+            </h2>
+            <p className="text-xs sm:text-sm text-neutral-300 font-medium leading-relaxed max-w-2xl mx-auto">
+              Seluruh promo diskon gila-gilaan <strong>hingga 50%</strong> hanya bisa didapatkan langsung di Store FILKOM Merch (16-30 November 2026). Website ini tidak melayani checkout online dan hanya digunakan kasir sebagai sistem POS. Yuk segera merapat sebelum stok cuci gudang habis!
+            </p>
+          </div>
+
+          {/* 3 Grid Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+            {/* Card 1: Lokasi */}
+            <div className="p-6 rounded-2xl bg-neutral-900 border-2 border-neutral-700 shadow-[4px_4px_0px_0px_rgba(255,107,0,1)] space-y-3 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-brand-orange/20 text-brand-orange flex items-center justify-center border border-brand-orange/40">
+                  <MapPin className="w-6 h-6" />
+                </div>
+                <h3 className="font-extrabold text-lg uppercase text-white tracking-wide">
+                  Lokasi Toko
+                </h3>
+                <p className="text-xs text-neutral-300 leading-relaxed font-medium">
+                  <strong>Official Store FILKOM Merch</strong><br />
+                  Gedung A FILKOM UB (Lantai 1)<br />
+                  Fakultas Ilmu Komputer, Universitas Brawijaya<br />
+                  Jl. Veteran, Kota Malang
+                </p>
+              </div>
+              <a
+                href="https://maps.google.com/?q=Fakultas+Ilmu+Komputer+Universitas+Brawijaya"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-brand-orange hover:underline pt-2 border-t border-neutral-800"
+              >
+                Petunjuk Arah Google Maps <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
+
+            {/* Card 2: Periode & Jam Operasional */}
+            <div className="p-6 rounded-2xl bg-neutral-900 border-2 border-neutral-700 shadow-[4px_4px_0px_0px_rgba(255,107,0,1)] space-y-3 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/40">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <h3 className="font-extrabold text-lg uppercase text-white tracking-wide">
+                  Periode &amp; Jam Buka
+                </h3>
+                <div className="text-xs text-neutral-300 leading-relaxed font-medium space-y-1">
+                  <p><strong className="text-amber-400">16 - 30 November 2026</strong></p>
+                  <p>Senin - Jumat: <strong>09.00 - 16.30 WIB</strong></p>
+                  <p className="text-neutral-400">Sabtu, Minggu &amp; Libur: Tutup</p>
+                </div>
+              </div>
+              <div className="pt-2 border-t border-neutral-800">
+                <span className="inline-block text-[10px] bg-red-950 text-red-300 border border-red-800 font-bold px-2 py-0.5 rounded">
+                  ⚠️ Kuota stok terbatas cuci gudang
+                </span>
+              </div>
+            </div>
+
+            {/* Card 3: Pembayaran & WhatsApp */}
+            <div className="p-6 rounded-2xl bg-neutral-900 border-2 border-neutral-700 shadow-[4px_4px_0px_0px_rgba(255,107,0,1)] space-y-3 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center border border-emerald-500/40">
+                  <CreditCard className="w-6 h-6" />
+                </div>
+                <h3 className="font-extrabold text-lg uppercase text-white tracking-wide">
+                  Kasir POS &amp; CS
+                </h3>
+                <p className="text-xs text-neutral-300 leading-relaxed font-medium">
+                  Kasir POS toko melayani pembayaran <strong>Tunai (Cash)</strong> dan <strong>QRIS Instan</strong> (semua e-wallet &amp; mobile banking).
+                </p>
+              </div>
+              <a
+                href="https://wa.me/6282235526105?text=Halo%20Admin%20Aliya,%20saya%20ingin%20tanya%20stok%20promo%20Year-End%20Sale"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400 hover:underline pt-2 border-t border-neutral-800"
+              >
+                Chat Admin Aliya (Tanya Stok) <ArrowRight className="w-3.5 h-3.5" />
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* 10. Footer */}
       <Footer />
 
@@ -2193,20 +2336,16 @@ function Index() {
                 {getProductAvailableSizes(quickViewProduct).length > 0 && (
                   <div className="space-y-2 mb-6 animate-scale-in">
                     <span className="text-xs font-bold text-ink tracking-wider uppercase block">
-                      PILIH UKURAN:
+                      UKURAN TERSEDIA DI STORE:
                     </span>
                     <div className="flex flex-wrap gap-2">
                       {getProductAvailableSizes(quickViewProduct).map((size) => (
-                        <button
+                        <span
                           key={size}
-                          onClick={() => {
-                            addToCart(quickViewProduct, size);
-                            setQuickViewProduct(null);
-                          }}
-                          className="border-2 border-ink font-bold text-xs py-2 px-4 hover:bg-brand-orange hover:text-cream cursor-pointer uppercase transition-all duration-200"
+                          className="border-2 border-ink font-bold text-xs py-2 px-4 bg-cream/40 uppercase"
                         >
                           Size {size}
-                        </button>
+                        </span>
                       ))}
                     </div>
                   </div>
@@ -2214,25 +2353,22 @@ function Index() {
               </div>
 
               <div className="pt-4 border-t border-ink/10 flex flex-col sm:flex-row gap-3">
+                <Link
+                  to="/product/$slug"
+                  params={{ slug: quickViewProduct.id }}
+                  onClick={() => setQuickViewProduct(null)}
+                  className="flex-1 bg-brand-orange text-cream font-bold tracking-widest text-xs py-4 text-center hover:bg-ink hover:text-cream transition-all duration-200 uppercase cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Eye className="w-4 h-4" /> LIHAT DETAIL &amp; STOK STORE
+                </Link>
                 <button
                   onClick={() => {
-                    addToCart(quickViewProduct);
                     setQuickViewProduct(null);
+                    scrollToId("store-location");
                   }}
-                  className="flex-1 bg-ink text-cream font-bold tracking-widest text-xs py-4 text-center hover:bg-brand-orange hover:text-cream transition-all duration-200 uppercase cursor-pointer"
+                  className="border-2 border-ink font-bold text-xs px-4 py-4 flex items-center justify-center gap-1.5 hover:bg-ink hover:text-cream transition-all duration-200 cursor-pointer uppercase"
                 >
-                  ADD TO BAG
-                </button>
-                <button
-                  onClick={() => {
-                    toggleWishlist(quickViewProduct.id);
-                  }}
-                  className="border-2 border-ink font-bold text-xs p-4 flex items-center justify-center hover:bg-ink hover:text-cream transition-all duration-200 cursor-pointer"
-                  aria-label="Wishlist toggle"
-                >
-                  <Heart
-                    className={`w-4 h-4 ${wishlist.includes(quickViewProduct.id) ? "fill-red-500 text-red-500" : ""}`}
-                  />
+                  <MapPin className="w-4 h-4 text-brand-orange" /> LOKASI STORE
                 </button>
               </div>
             </div>
@@ -2242,9 +2378,9 @@ function Index() {
 
       {/* Homepage Announcement Modal */}
       <AnnouncementModal
-        enabled={popupSegment ? popupSegment.enabled : true}
-        activeTemplate={popupElement?.config?.activeTemplate || "filkom_verification"}
-        version={popupElement?.config?.version || "v1"}
+        enabled={true}
+        activeTemplate="year_end_sale"
+        version="year_end_sale_2026"
         delayMs={popupElement?.config?.delayMs ?? 600}
       />
     </div>

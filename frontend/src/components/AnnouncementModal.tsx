@@ -16,6 +16,10 @@ import {
   PartyPopper,
   Check,
   Info,
+  Flame,
+  MapPin,
+  AlertCircle,
+  Clock,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import baraSmile from "@/assets/bara-smile.png";
@@ -35,7 +39,7 @@ import { detectInAppBrowser } from "@/lib/in-app-browser";
 interface Props {
   delayMs?: number;
   enabled?: boolean;
-  activeTemplate?: "filkom_verification" | "notification" | "thank_you";
+  activeTemplate?: "filkom_verification" | "notification" | "thank_you" | "year_end_sale";
   version?: string;
 }
 
@@ -113,7 +117,7 @@ function AnnouncementModalInner({
       if (!dismissed) {
         setIsVisible(true);
 
-        if (activeTemplate === "thank_you") {
+        if (activeTemplate === "thank_you" || activeTemplate === "year_end_sale") {
           playCheersSound();
           isRainingRef.current = true;
           try {
@@ -749,6 +753,188 @@ function AnnouncementModalInner({
                 {/* Celebratory Bottom Footer Bar */}
                 <div className="w-full bg-cream py-2 px-4 border-t-2 border-ink text-center text-[10px] font-black uppercase text-brand-orange tracking-widest flex items-center justify-center gap-2 shrink-0">
                   <Sparkles className="w-3.5 h-3.5 animate-spin" /> OFFICIAL ANNOUNCEMENT — FILKOM MERCH STORE <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                </div>
+              </>
+            )}
+
+            {/* ========================================================================= */}
+            {/* TEMPLATE 4: CUCI GUDANG YEAR-END SALE 2026 MODAL                          */}
+            {/* ========================================================================= */}
+            {activeTemplate === "year_end_sale" && (
+              <>
+                {/* Header Bar */}
+                <div className="bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white border-b-2 border-ink p-3.5 sm:p-4 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-2">
+                    <span className="px-3 py-1 bg-ink text-amber-300 text-[11px] font-black rounded-full border border-ink uppercase tracking-wider shadow-xs flex items-center gap-1.5 animate-pulse">
+                      <Flame className="w-3.5 h-3.5 text-amber-400" /> CUCI GUDANG 2026
+                    </span>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-white hidden sm:inline">
+                      16 - 30 NOVEMBER 2026
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleClose}
+                    className="p-1.5 border-2 border-ink rounded-xl bg-white text-ink hover:bg-rose-500 hover:text-white transition-all cursor-pointer shadow-xs"
+                    aria-label="Tutup pengumuman"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-4 sm:p-6 space-y-4 text-ink overflow-y-auto">
+                  {/* Mascot & Headline */}
+                  <div className="flex items-center gap-3.5 bg-orange-50/90 dark:bg-orange-950/40 border-2 border-brand-orange/40 p-4 rounded-2xl shadow-xs">
+                    <img
+                      src={baraSmile}
+                      alt="Bara Filkom Merch"
+                      className="w-16 h-16 sm:w-20 sm:h-20 object-contain shrink-0 drop-shadow-md animate-bounce"
+                    />
+                    <div className="space-y-1 min-w-0">
+                      <div className="inline-block bg-red-600 text-white text-[9px] font-black px-2 py-0.5 rounded tracking-wider uppercase mb-0.5">
+                        DISKON S.D 50%
+                      </div>
+                      <h3 className="display text-base sm:text-lg font-black uppercase text-ink leading-tight">
+                        YEAR-END SALE RESMI DIMULAI! 🔥
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-muted-foreground font-semibold leading-relaxed">
+                        Pesta cuci gudang terbesar akhir tahun untuk seluruh koleksi official merchandise FILKOM UB!
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Crucial In-Store Notice Box */}
+                  <div className="p-3.5 bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-400 rounded-2xl space-y-2">
+                    <div className="flex items-center gap-2 text-amber-900 dark:text-amber-200 font-black text-xs uppercase tracking-wide">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                      PENTING: EKSKLUSIF DI STORE OFFLINE!
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-amber-950/80 dark:text-amber-100/90 leading-relaxed font-medium">
+                      Seluruh diskon cuci gudang hingga 50% <strong>hanya bisa didapatkan langsung di Store Resmi FILKOM Merch</strong>. Website ini tidak melayani transaksi online dan difokuskan sebagai katalog referensi &amp; sistem POS Kasir.
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-[11px] font-bold text-amber-900 dark:text-amber-300 pt-1 border-t border-amber-200/60">
+                      <span>📍 Gedung A FILKOM UB (Lantai 1)</span>
+                      <span>•</span>
+                      <span>⏰ 09.00 - 16.30 WIB</span>
+                      <span>•</span>
+                      <span>💳 Tunai &amp; QRIS Kasir</span>
+                    </div>
+                  </div>
+
+                  {/* Highlight Deals Table */}
+                  <div className="border-2 border-ink rounded-2xl overflow-hidden shadow-xs">
+                    <div className="bg-ink text-cream px-3 py-2 text-[10px] font-extrabold uppercase tracking-wider flex justify-between items-center">
+                      <span>Bocoran Harga Cuci Gudang</span>
+                      <span className="text-brand-orange">Diskon s.d 50%</span>
+                    </div>
+                    <div className="divide-y divide-border text-xs max-h-44 overflow-y-auto bg-card">
+                      <div className="px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold">Pin Tas</span>
+                        <div className="text-right">
+                          <span className="font-extrabold text-emerald-600">Rp 4.500</span>
+                          <span className="text-[10px] text-muted-foreground line-through ml-1.5">Rp 9.000</span>
+                          <span className="ml-1 text-[9px] bg-red-100 text-red-700 px-1 rounded font-black">-50%</span>
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold">Totebag Canvas</span>
+                        <div className="text-right">
+                          <span className="font-extrabold text-emerald-600">Rp 27.000</span>
+                          <span className="text-[10px] text-muted-foreground line-through ml-1.5">Rp 45.000</span>
+                          <span className="ml-1 text-[9px] bg-red-100 text-red-700 px-1 rounded font-black">-40%</span>
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold">Sticker Pack &amp; Keychain Akrilik</span>
+                        <div className="text-right">
+                          <span className="font-extrabold text-emerald-600">Rp 9.000</span>
+                          <span className="text-[10px] text-muted-foreground line-through ml-1.5">Rp 15.000</span>
+                          <span className="ml-1 text-[9px] bg-red-100 text-red-700 px-1 rounded font-black">-40%</span>
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold">Notebook</span>
+                        <div className="text-right">
+                          <span className="font-extrabold text-emerald-600">Rp 19.000</span>
+                          <span className="text-[10px] text-muted-foreground line-through ml-1.5">Rp 27.000</span>
+                          <span className="ml-1 text-[9px] bg-red-100 text-red-700 px-1 rounded font-black">-30%</span>
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold">Topi Baseball &amp; Pin Enamel Prodi</span>
+                        <div className="text-right">
+                          <span className="font-extrabold text-emerald-600">Mulai Rp 27.000</span>
+                          <span className="ml-1 text-[9px] bg-red-100 text-red-700 px-1 rounded font-black">-25%</span>
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold">Tumbler Brawijaya 500ml</span>
+                        <div className="text-right">
+                          <span className="font-extrabold text-emerald-600">Rp 68.000</span>
+                          <span className="text-[10px] text-muted-foreground line-through ml-1.5">Rp 85.000</span>
+                          <span className="ml-1 text-[9px] bg-red-100 text-red-700 px-1 rounded font-black">-20%</span>
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold">T-Shirt Kaos FILKOM</span>
+                        <div className="text-right">
+                          <span className="font-extrabold text-emerald-600">Rp 76.000</span>
+                          <span className="text-[10px] text-muted-foreground line-through ml-1.5">Rp 89.000</span>
+                          <span className="ml-1 text-[9px] bg-red-100 text-red-700 px-1 rounded font-black">-15%</span>
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold">Half Zip Jacket Club</span>
+                        <div className="text-right">
+                          <span className="font-extrabold text-emerald-600">Rp 161.000</span>
+                          <span className="text-[10px] text-muted-foreground line-through ml-1.5">Rp 189.000</span>
+                          <span className="ml-1 text-[9px] bg-red-100 text-red-700 px-1 rounded font-black">-15%</span>
+                        </div>
+                      </div>
+                      <div className="px-3 py-2 flex items-center justify-between">
+                        <span className="font-bold">Work Jacket &amp; Varsity Jacket</span>
+                        <div className="text-right">
+                          <span className="font-extrabold text-emerald-600">Mulai Rp 233.000</span>
+                          <span className="ml-1 text-[9px] bg-red-100 text-red-700 px-1 rounded font-black">-10%</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Buttons */}
+                  <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleClose();
+                        if (window.location.pathname === "/") {
+                          const el = document.getElementById("store-location");
+                          if (el) el.scrollIntoView({ behavior: "smooth" });
+                        } else {
+                          window.location.href = "/#store-location";
+                        }
+                      }}
+                      className="flex-1 py-3 px-4 bg-brand-orange hover:bg-ink text-cream hover:text-cream font-black text-xs uppercase tracking-wider rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <MapPin className="w-4 h-4" /> Kunjungi Store Kami
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleClose();
+                        window.location.href = "/products";
+                      }}
+                      className="flex-1 py-3 px-4 bg-card hover:bg-secondary text-ink font-black text-xs uppercase tracking-wider rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <ShoppingBag className="w-4 h-4" /> Buka Katalog Promo
+                    </button>
+                  </div>
+                </div>
+
+                {/* Celebratory Bottom Footer Bar */}
+                <div className="w-full bg-cream py-2 px-4 border-t-2 border-ink text-center text-[10px] font-black uppercase text-brand-orange tracking-widest flex items-center justify-center gap-2 shrink-0">
+                  <Flame className="w-3.5 h-3.5 text-red-600 animate-pulse" /> PROMO RESMI CUCI GUDANG — FILKOM MERCH STORE <Flame className="w-3.5 h-3.5 text-red-600 animate-pulse" />
                 </div>
               </>
             )}

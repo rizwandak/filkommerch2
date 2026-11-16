@@ -20,6 +20,7 @@ import {
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  PackageCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth, type AdminRole } from "@/lib/auth";
@@ -38,6 +39,7 @@ const adminNavItems: NavItem[] = [
   { label: "Pre-Order Batch", to: "/admin/pre-order", icon: CalendarClock, roles: ["admin", "cashier"] },
   { label: "Vendoring", to: "/admin/vendoring", icon: Truck, roles: ["admin", "cashier"] },
   { label: "Transaksi", to: "/admin/transactions", icon: Receipt, roles: ["admin", "cashier"] },
+  { label: "Riwayat Pengambilan", to: "/admin/pickup-history", icon: PackageCheck, roles: ["admin", "cashier"] },
   { label: "Neraca Keuangan", to: "/admin/finance", icon: Scale, roles: ["admin"] },
   { label: "Kode Voucher", to: "/admin/vouchers", icon: Ticket, roles: ["admin"] },
   { label: "Pengguna", to: "/admin/users", icon: Users, roles: ["admin", "cashier"] },

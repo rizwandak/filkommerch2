@@ -1,5 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ShoppingBag, ArrowLeft, Loader2, QrCode, Copy, Check, CreditCard, ChevronUp, ChevronDown, X, Ticket } from "lucide-react";
+import { createFileRoute, useNavigate, Link } from "@tanstack/react-router";
+import { ShoppingBag, ArrowLeft, Loader2, QrCode, Copy, Check, CreditCard, ChevronUp, ChevronDown, X, Ticket, Flame, MapPin, AlertCircle } from "lucide-react";
 import { useState, useEffect } from "react";
 import logoFilkom from "@/assets/logo_filkom.png";
 import { toast } from "sonner";
@@ -447,25 +447,50 @@ function CheckoutPage() {
     }
   };
 
-  if (cartItems.length === 0 && !isProcessing) {
+  // During Year-End Sale (16-30 Nov 2026), online checkout is disabled: purchases are strictly in-store.
+  if (!isProcessing) {
     return (
-      <div className="min-h-screen bg-background">
-        {/* Header */}
-        <div className="border-b border-border bg-card">
-          <div className="mx-auto max-w-6xl px-4 py-8">
-            <h1 className="text-3xl font-bold text-foreground">Checkout</h1>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-xl w-full bg-card border-4 border-ink rounded-3xl p-6 sm:p-8 shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] space-y-6 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border-2 border-brand-orange text-brand-orange flex items-center justify-center mx-auto text-3xl">
+            🔥
           </div>
-        </div>
+          <div className="space-y-2">
+            <span className="bg-red-600 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wider inline-block">
+              In-Store Only • 16-30 Nov 2026
+            </span>
+            <h1 className="text-2xl sm:text-3xl font-extrabold uppercase text-ink">
+              TRANSAKSI ONLINE DITUTUP SEMENTARA
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed font-medium">
+              Selama periode <strong>CUCI GUDANG YEAR-END SALE</strong>, seluruh diskon gila-gilaan hingga <strong>50%</strong> hanya bisa didapatkan dengan berbelanja langsung di <strong>Store Resmi FILKOM Merch</strong>! Website ini hanya digunakan sebagai katalog dan sistem POS Kasir toko.
+            </p>
+          </div>
 
-        {/* Empty Cart */}
-        <div className="flex min-h-[400px] items-center justify-center">
-          <div className="text-center">
-            <ShoppingBag className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
-            <h2 className="mb-2 text-xl font-semibold text-foreground">Your cart is empty</h2>
-            <p className="mb-6 text-muted-foreground">Add some items to get started</p>
-            <Button asChild>
-              <a href="/">Continue Shopping</a>
-            </Button>
+          <div className="p-4 bg-orange-50 dark:bg-orange-950/30 border-2 border-brand-orange/40 rounded-2xl text-left space-y-2 text-ink text-xs">
+            <div className="font-extrabold text-brand-orange uppercase text-[11px] flex items-center gap-1.5">
+              <MapPin className="w-4 h-4" /> Lokasi &amp; Jam Buka Store:
+            </div>
+            <div className="space-y-1 text-ink/90">
+              <p>📍 <strong>Store FILKOM Merch:</strong> Gedung A FILKOM UB (Lantai 1)</p>
+              <p>⏰ <strong>Jam Operasional:</strong> Senin - Jumat (09.00 - 16.30 WIB)</p>
+              <p>💳 <strong>Pembayaran Kasir:</strong> Tunai (Cash) &amp; QRIS Instan</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <Link
+              to="/"
+              className="flex-1 py-3.5 px-4 bg-brand-orange hover:bg-ink text-cream hover:text-cream font-extrabold text-xs uppercase tracking-wider rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all text-center flex items-center justify-center gap-2"
+            >
+              <ArrowLeft className="w-4 h-4" /> Kembali ke Beranda
+            </Link>
+            <Link
+              to="/products"
+              className="flex-1 py-3.5 px-4 bg-card hover:bg-secondary text-ink font-extrabold text-xs uppercase tracking-wider rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] transition-all text-center flex items-center justify-center gap-2"
+            >
+              <ShoppingBag className="w-4 h-4" /> Cek Katalog Promo
+            </Link>
           </div>
         </div>
       </div>

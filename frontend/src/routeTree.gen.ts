@@ -34,6 +34,7 @@ import { Route as AdminTransactionsRouteImport } from './routes/admin/transactio
 import { Route as AdminSettingsRouteImport } from './routes/admin/settings'
 import { Route as AdminProductsRouteImport } from './routes/admin/products'
 import { Route as AdminPreOrderRouteImport } from './routes/admin/pre-order'
+import { Route as AdminPickupHistoryRouteImport } from './routes/admin/pickup-history'
 import { Route as AdminKasirRouteImport } from './routes/admin/kasir'
 import { Route as AdminHomepageRouteImport } from './routes/admin/homepage'
 import { Route as AdminFinanceRouteImport } from './routes/admin/finance'
@@ -165,6 +166,11 @@ const AdminPreOrderRoute = AdminPreOrderRouteImport.update({
   path: '/pre-order',
   getParentRoute: () => AdminRouteRoute,
 } as any)
+const AdminPickupHistoryRoute = AdminPickupHistoryRouteImport.update({
+  id: '/pickup-history',
+  path: '/pickup-history',
+  getParentRoute: () => AdminRouteRoute,
+} as any)
 const AdminKasirRoute = AdminKasirRouteImport.update({
   id: '/kasir',
   path: '/kasir',
@@ -210,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/kasir': typeof AdminKasirRoute
+  '/admin/pickup-history': typeof AdminPickupHistoryRoute
   '/admin/pre-order': typeof AdminPreOrderRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -240,6 +247,7 @@ export interface FileRoutesByTo {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/kasir': typeof AdminKasirRoute
+  '/admin/pickup-history': typeof AdminPickupHistoryRoute
   '/admin/pre-order': typeof AdminPreOrderRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -273,6 +281,7 @@ export interface FileRoutesById {
   '/admin/finance': typeof AdminFinanceRoute
   '/admin/homepage': typeof AdminHomepageRoute
   '/admin/kasir': typeof AdminKasirRoute
+  '/admin/pickup-history': typeof AdminPickupHistoryRoute
   '/admin/pre-order': typeof AdminPreOrderRoute
   '/admin/products': typeof AdminProductsRoute
   '/admin/settings': typeof AdminSettingsRoute
@@ -307,6 +316,7 @@ export interface FileRouteTypes {
     | '/admin/finance'
     | '/admin/homepage'
     | '/admin/kasir'
+    | '/admin/pickup-history'
     | '/admin/pre-order'
     | '/admin/products'
     | '/admin/settings'
@@ -337,6 +347,7 @@ export interface FileRouteTypes {
     | '/admin/finance'
     | '/admin/homepage'
     | '/admin/kasir'
+    | '/admin/pickup-history'
     | '/admin/pre-order'
     | '/admin/products'
     | '/admin/settings'
@@ -369,6 +380,7 @@ export interface FileRouteTypes {
     | '/admin/finance'
     | '/admin/homepage'
     | '/admin/kasir'
+    | '/admin/pickup-history'
     | '/admin/pre-order'
     | '/admin/products'
     | '/admin/settings'
@@ -579,6 +591,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminPreOrderRouteImport
       parentRoute: typeof AdminRouteRoute
     }
+    '/admin/pickup-history': {
+      id: '/admin/pickup-history'
+      path: '/pickup-history'
+      fullPath: '/admin/pickup-history'
+      preLoaderRoute: typeof AdminPickupHistoryRouteImport
+      parentRoute: typeof AdminRouteRoute
+    }
     '/admin/kasir': {
       id: '/admin/kasir'
       path: '/kasir'
@@ -623,6 +642,7 @@ interface AdminRouteRouteChildren {
   AdminFinanceRoute: typeof AdminFinanceRoute
   AdminHomepageRoute: typeof AdminHomepageRoute
   AdminKasirRoute: typeof AdminKasirRoute
+  AdminPickupHistoryRoute: typeof AdminPickupHistoryRoute
   AdminPreOrderRoute: typeof AdminPreOrderRoute
   AdminProductsRoute: typeof AdminProductsRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
@@ -639,6 +659,7 @@ const AdminRouteRouteChildren: AdminRouteRouteChildren = {
   AdminFinanceRoute: AdminFinanceRoute,
   AdminHomepageRoute: AdminHomepageRoute,
   AdminKasirRoute: AdminKasirRoute,
+  AdminPickupHistoryRoute: AdminPickupHistoryRoute,
   AdminPreOrderRoute: AdminPreOrderRoute,
   AdminProductsRoute: AdminProductsRoute,
   AdminSettingsRoute: AdminSettingsRoute,

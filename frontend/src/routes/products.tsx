@@ -23,6 +23,10 @@ import {
   User,
   LayoutDashboard,
   MonitorSmartphone,
+  Flame,
+  MapPin,
+  MessageCircle,
+  Eye,
 } from "lucide-react";
 import { getProducts, getCategories, getActivePreOrderCampaignServerAction, type ProductWithVariants } from "@backend/server-actions";
 import { useQuery } from "@tanstack/react-query";
@@ -272,7 +276,38 @@ function ProductsCatalogPage() {
     <div className="min-h-screen bg-background text-foreground font-sans">
       <Navbar searchQuery={searchTerm} onSearchQueryChange={setSearchTerm} />
 
-
+      {/* YEAR-END SALE HERO BANNER ON PRODUCTS PAGE */}
+      <div className="bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white border-b-2 border-ink py-8 sm:py-12 px-4 shadow-sm">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-2 text-center md:text-left">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-ink text-amber-300 text-[10px] sm:text-xs font-black rounded-full uppercase tracking-widest border border-ink shadow-sm">
+              <Flame className="w-3.5 h-3.5 text-amber-400" /> CUCI GUDANG YEAR-END SALE • 16-30 NOVEMBER 2026
+            </div>
+            <h1 className="text-2xl sm:text-4xl font-extrabold uppercase tracking-tight text-white drop-shadow-sm">
+              KATALOG PROMO DISKON S.D 50%
+            </h1>
+            <p className="text-xs sm:text-sm text-orange-100 max-w-2xl font-medium leading-relaxed">
+              Pesta diskon cuci gudang terbesar akhir tahun! <strong>Diskon hanya berlaku untuk pembelian langsung di Store FILKOM Merch (Gedung A FILKOM UB)</strong>. Website tidak melayani pembelian online dan digunakan kasir sebagai sistem POS.
+            </p>
+          </div>
+          <div className="shrink-0 flex flex-wrap gap-2.5">
+            <a
+              href="/#store-location"
+              className="px-5 py-3 rounded-xl bg-ink text-white font-black text-xs uppercase tracking-wider border-2 border-ink hover:bg-white hover:text-ink transition-all shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] cursor-pointer flex items-center gap-2"
+            >
+              <MapPin className="w-4 h-4 text-brand-orange" /> Cek Lokasi Store
+            </a>
+            <a
+              href="https://wa.me/6282235526105?text=Halo%20Admin%20FILKOM%20Merch,%20saya%20ingin%20tanya%20stok%20promo%20Year-End%20Sale"
+              target="_blank"
+              rel="noreferrer"
+              className="px-5 py-3 rounded-xl bg-emerald-700 text-white font-black text-xs uppercase tracking-wider border-2 border-ink hover:bg-emerald-800 transition-all shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] cursor-pointer flex items-center gap-2"
+            >
+              <MessageCircle className="w-4 h-4" /> Tanya Admin WA
+            </a>
+          </div>
+        </div>
+      </div>
 
       {/* Main Catalog Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -597,9 +632,9 @@ function ProductsCatalogPage() {
                           <Link
                             to="/product/$slug"
                             params={{ slug: p.slug }}
-                            className="bg-brand-orange hover:bg-ink text-cream hover:text-cream p-2 rounded-lg transition border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none"
+                            className="bg-brand-orange hover:bg-ink text-cream hover:text-cream px-3 py-1.5 rounded-lg transition border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none flex items-center gap-1.5 text-xs font-black uppercase tracking-wider"
                           >
-                            <ShoppingBag className="w-4 h-4" />
+                            <Eye className="w-3.5 h-3.5" /> Detail
                           </Link>
                         </div>
                       </div>

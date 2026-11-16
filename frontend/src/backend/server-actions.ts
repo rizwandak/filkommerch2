@@ -2802,3 +2802,90 @@ export const deleteOperationalExpenseServerAction = createServerFn({ method: "PO
       return { success: false, error: e.message || "Failed to delete operational expense" };
     }
   });
+
+export interface PickupLogEntry {
+  id: number;
+  order_id: string;
+  order_item_id: number;
+  previous_status: string | null;
+  new_status: string;
+  actor_id?: number | null;
+  actor_name?: string | null;
+  actor_role?: string | null;
+  notes?: string | null;
+  proof_url?: string | null;
+  created_at: string;
+  product_name?: string | null;
+  size?: string | null;
+  color?: string | null;
+  quantity?: number | null;
+  customer_name?: string | null;
+  customer_nim?: string | null;
+  customer_phone?: string | null;
+  channel?: string | null;
+  order_status?: string | null;
+}
+
+export const getOrderItemPickupLogsServerAction = createServerFn({ method: "POST" })
+  .validator((data: { orderId: string }) => data)
+  .handler(async ({ data }): Promise<{ success: boolean; logs: PickupLogEntry[]; error?: string }> => {
+    try {
+      const baseUrl = getApiUrl();
+      const res = await serverFetch(`${baseUrl}/api/admin/orders/${encodeURIComponent(data.orderId)}/pickup-logs`);
+      if (!res.ok) {
+        return { success: false, logs: [], error: `HTTP ${res.status}` };
+      }
+      return await res.json();
+    } catch (e: any) {
+      console.warn("getOrderItemPickupLogsServerAction error:", e);
+      return { success: false, logs: [], error: e.message || "Gagal mengambil riwayat pengambilan" };
+    }
+  });
+
+export const getAllPickupLogsServerAction = createServerFn({ method: "POST" })
+  .validator(
+    (data: {
+      search?: string;
+      status?: string;
+      startDate?: string;
+      endDate?: string;
+      limit?: number;
+      offset?: number;
+    }) => data,
+  )
+  .handler(
+    async ({
+      data,
+    }): Promise<{
+      success: boolean;
+      logs: PickupLogEntry[];
+      total: number;
+      stats?: { total_logs: number; picked_up_total: number; picked_up_today: number };
+      error?: string;
+    }> => {
+      try {
+        const baseUrl = getApiUrl();
+        const params = new URLSearchParams();
+        if (data.search) params.set("search", data.search);
+        if (data.status && data.status !== "all") params.set("status", data.status);
+        if (data.startDate) params.set("startDate", data.startDate);
+        if (data.endDate) params.set("endDate", data.endDate);
+        if (data.limit) params.set("limit", String(data.limit));
+        if (data.offset !== undefined) params.set("offset", String(data.offset));
+
+        const res = await serverFetch(`${baseUrl}/api/admin/pickup-logs?${params.toString()}`);
+        if (!res.ok) {
+          return { success: false, logs: [], total: 0, error: `HTTP ${res.status}` };
+        }
+        return await res.json();
+      } catch (e: any) {
+        console.warn("getAllPickupLogsServerAction error:", e);
+        return {
+          success: false,
+          logs: [],
+          total: 0,
+          error: e.message || "Gagal mengambil riwayat pengambilan barang",
+        };
+      }
+    },
+  );

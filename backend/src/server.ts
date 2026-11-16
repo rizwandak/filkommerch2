@@ -493,6 +493,11 @@ app.get(
   checkRole(["admin", "cashier"]),
   apiControllers.getOrderItemPickupLogs,
 );
+app.get(
+  "/api/admin/pickup-logs",
+  checkRole(["admin", "cashier"]),
+  apiControllers.getAllPickupLogs,
+);
 app.post(
   "/api/admin/orders/:orderId/notify-pickup",
   checkRole(["admin", "cashier"]),

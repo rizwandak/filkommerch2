@@ -27,6 +27,8 @@ import {
   ArrowRight,
   Bell,
   GraduationCap,
+  Flame,
+  MapPin,
 } from "lucide-react";
 
 import logo from "@/assets/logo-fm.jpg";
@@ -35,8 +37,8 @@ import logoFilkom from "@/assets/logo_filkom.png";
 
 const NAV = [
   { label: "BERANDA", href: "/", isScroll: true, target: "top" },
-  { label: "PRODUK", href: "/products" },
-  { label: "PRE-ORDER", href: "/pre-order" },
+  { label: "KATALOG PROMO", href: "/products" },
+  { label: "LOKASI STORE", href: "/#store-location", isScroll: true, target: "store-location" },
   { label: "TANYA BARA", href: "/faq" },
 ];
 
@@ -69,8 +71,9 @@ function formatRp(n: number) {
 }
 
 function getMarqueeText(settings: any) {
-  const defaultText = "OFFICIAL FILKOM UB MERCHANDISE | FREE ONGKIR KE FILKOM ★ | PRE-ORDER VARSITY '25 OPEN | 100% PRODUK MAHASISWA | CASHBACK 5% MEMBER | DROP BARU TIAP BULAN";
-  if (!settings || !settings.homepage_layout) return defaultText;
+  const yearEndSaleText =
+    "🔥 CUCI GUDANG YEAR-END SALE (16-30 NOV 2026) | DISKON S.D 50% SELURUH PRODUK | KHUSUS PEMBELIAN LANGSUNG DI STORE FILKOM MERCH | STOK TERBATAS CUCI GUDANG | GEDUNG A FILKOM UB | BORONG SEBELUM KEHABISAN!";
+  if (!settings || !settings.homepage_layout) return yearEndSaleText;
   try {
     const parsed = typeof settings.homepage_layout === "object"
       ? settings.homepage_layout
@@ -79,18 +82,18 @@ function getMarqueeText(settings: any) {
       for (const segment of parsed) {
         if (segment.elements) {
           const marqueeEl = segment.elements.find((e: any) => e.type === "marquee");
-          if (marqueeEl && marqueeEl.config?.text) {
+          if (marqueeEl && marqueeEl.config?.text && marqueeEl.config.text.toUpperCase().includes("YEAR-END")) {
             return marqueeEl.config.text;
           }
         }
       }
-    } else if (parsed?.marqueeText) {
+    } else if (parsed?.marqueeText && parsed.marqueeText.toUpperCase().includes("YEAR-END")) {
       return parsed.marqueeText;
     }
   } catch (e) {
     console.error("Error parsing homepage layout in marquee:", e);
   }
-  return defaultText;
+  return yearEndSaleText;
 }
 
 interface NavbarProps {
@@ -930,6 +933,17 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
                 <X className="w-5 h-5 text-ink" />
               </button>
             </div>
+
+            {/* Year-End Sale In-Store Only Notice */}
+            <div className="bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white p-3.5 border-b-2 border-ink space-y-1">
+              <div className="flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider text-amber-200">
+                <Flame className="w-3.5 h-3.5 text-amber-300" /> CUCI GUDANG YEAR-END SALE (16-30 NOV 2026)
+              </div>
+              <p className="text-[11px] leading-tight text-white/95 font-medium">
+                Pembelian online dinonaktifkan. Diskon hingga <strong>50%</strong> hanya berlaku untuk transaksi langsung di <strong>Store FILKOM Merch (Gedung A)</strong>.
+              </p>
+            </div>
+
             <div className="flex-1 overflow-y-auto px-6 py-4">
               {cart.length === 0 ? (
                 <div className="text-center py-20">
@@ -1015,22 +1029,31 @@ export function Navbar({ searchQuery, onSearchQueryChange }: NavbarProps) {
             </div>
 
             {cart.length > 0 && (
-              <div className="border-t border-border p-6 bg-secondary/30">
-
-                <div className="flex justify-between items-center mb-4">
+              <div className="border-t border-border p-6 bg-secondary/30 space-y-3">
+                <div className="flex justify-between items-center">
                   <span className="text-xs tracking-[0.2em] font-bold uppercase text-muted-foreground">
-                    Subtotal
+                    Subtotal Acuan
                   </span>
                   <span className="text-xl font-bold font-mono text-ink">
                     {formatRp(cartTotal)}
                   </span>
                 </div>
                 <button
-                  onClick={handleCheckout}
-                  className="w-full flex items-center justify-center gap-2 bg-ink text-cream py-4 text-xs font-bold tracking-[0.2em] hover:bg-brand-orange transition-colors uppercase cursor-pointer"
+                  onClick={() => {
+                    setCartOpen(false);
+                    if (pathname === "/") {
+                      scrollToId("store-location");
+                    } else {
+                      navigate({ to: "/#store-location" });
+                    }
+                  }}
+                  className="w-full flex items-center justify-center gap-2 bg-brand-orange text-cream py-4 text-xs font-black tracking-[0.15em] hover:bg-ink transition-colors uppercase cursor-pointer rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)]"
                 >
-                  PROCEED TO CHECKOUT <ArrowRight className="w-4 h-4" />
+                  <MapPin className="w-4 h-4" /> KUNJUNGI STORE OFFLINE (DISKON S.D 50%)
                 </button>
+                <p className="text-[10px] text-center text-muted-foreground font-medium">
+                  Kasir POS siap melayani pembayaran Tunai &amp; QRIS di toko
+                </p>
               </div>
             )}
           </aside>
