@@ -33,8 +33,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery } from "@tanstack/react-query";
-import { getProductBySlug, getProducts, getProductReviewsServerAction, getActivePreOrderCampaignServerAction } from "@backend/server-actions";
+import { getProductBySlug, getProducts, getStoreSettings, getProductReviewsServerAction, getActivePreOrderCampaignServerAction } from "@backend/server-actions";
 import { isPreOrderOpen } from "@/lib/pre-order-utils";
+import { isInStoreOnlyMode } from "@/lib/store-mode";
 import { Button } from "@frontend/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { Navbar } from "@/components/Navbar";
@@ -145,6 +146,13 @@ function ProductDetailPage() {
 
   const [selectedBundleVariants, setSelectedBundleVariants] = useState<Record<number, any>>({});
   const [isZoomOpen, setIsZoomOpen] = useState(false);
+
+  const { data: settingsData } = useQuery({
+    queryKey: ["storeSettings"],
+    queryFn: () => getStoreSettings(),
+    staleTime: 30 * 1000,
+  });
+  const isInStoreOnly = isInStoreOnlyMode(settingsData?.settings);
 
   // Reviews Data State
   const [reviewsData, setReviewsData] = useState<{ reviews: any[]; totalReviews: number; avgRating: number; totalBuyers: number }>({
@@ -968,21 +976,23 @@ function ProductDetailPage() {
               </div>
 
               {/* Year-End Sale In-Store Alert */}
-              <div className="p-3 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white rounded-xl border border-ink space-y-1.5 shadow-xs">
-                <div className="flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider text-amber-200">
-                  <Flame className="w-3.5 h-3.5 text-amber-300" /> PROMO CUCI GUDANG YEAR-END SALE (16-30 NOV 2026)
+              {isInStoreOnly && (
+                <div className="p-3 bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white rounded-xl border border-ink space-y-1.5 shadow-xs">
+                  <div className="flex items-center gap-1.5 font-black text-[10px] uppercase tracking-wider text-amber-200">
+                    <Flame className="w-3.5 h-3.5 text-amber-300" /> PROMO CUCI GUDANG YEAR-END SALE (16-30 NOV 2026)
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-white/95 font-medium">
+                    Diskon hingga 50% hanya bisa didapatkan langsung di <strong>Store Resmi FILKOM Merch (Gedung A FILKOM UB)</strong>. Website difokuskan sebagai katalog stok &amp; sistem POS Kasir toko.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold text-amber-100 pt-1 border-t border-white/20">
+                    <span>📍 Gedung A FILKOM UB (Lt. 1)</span>
+                    <span>•</span>
+                    <span>⏰ 09.00 - 16.30 WIB</span>
+                    <span>•</span>
+                    <span>💳 Tunai &amp; QRIS Kasir</span>
+                  </div>
                 </div>
-                <p className="text-[11px] leading-relaxed text-white/95 font-medium">
-                  Diskon hingga 50% hanya bisa didapatkan langsung di <strong>Store Resmi FILKOM Merch (Gedung A FILKOM UB)</strong>. Website difokuskan sebagai katalog stok &amp; sistem POS Kasir toko.
-                </p>
-                <div className="flex flex-wrap items-center gap-2 text-[10px] font-bold text-amber-100 pt-1 border-t border-white/20">
-                  <span>📍 Gedung A FILKOM UB (Lt. 1)</span>
-                  <span>•</span>
-                  <span>⏰ 09.00 - 16.30 WIB</span>
-                  <span>•</span>
-                  <span>💳 Tunai &amp; QRIS Kasir</span>
-                </div>
-              </div>
+              )}
 
               {Number(user?.is_filkom_verified) === 1 ? (
                 <div className="text-xs font-bold text-brand-orange bg-brand-orange/10 border border-brand-orange/30 rounded-lg p-2.5 flex items-center gap-1.5">
@@ -1567,24 +1577,43 @@ function ProductDetailPage() {
                   </span>
                 </div>
 
-                {/* Action Buttons - Offline In-Store Focus */}
-                <div className="space-y-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setIsStoreModalOpen(true)}
-                    className="w-full py-3.5 px-4 bg-brand-orange hover:bg-ink text-cream hover:text-cream font-black text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2"
-                  >
-                    <MapPin className="w-4 h-4" /> Beli di Store (Gedung A)
-                  </button>
-                  <a
-                    href={`https://wa.me/6282235526105?text=${encodeURIComponent(`Halo Admin FILKOM Merch, saya ingin menanyakan ketersediaan stok ${product.name} (Ukuran: ${selectedSize || "One Size"}) untuk promo Year-End Sale di store.`)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 text-center"
-                  >
-                    <MessageCircle className="w-4 h-4" /> Tanya Stok via WhatsApp
-                  </a>
-                </div>
+                {/* Action Buttons */}
+                {isInStoreOnly ? (
+                  <div className="space-y-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setIsStoreModalOpen(true)}
+                      className="w-full py-3.5 px-4 bg-brand-orange hover:bg-ink text-cream hover:text-cream font-black text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <MapPin className="w-4 h-4" /> Beli di Store (Gedung A)
+                    </button>
+                    <a
+                      href={`https://wa.me/6282235526105?text=${encodeURIComponent(`Halo Admin FILKOM Merch, saya ingin menanyakan ketersediaan stok ${product.name} (Ukuran: ${selectedSize || "One Size"}) untuk promo Year-End Sale di store.`)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 text-center"
+                    >
+                      <MessageCircle className="w-4 h-4" /> Tanya Stok via WhatsApp
+                    </a>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    <button
+                      onClick={() => handleAddToCart(false)}
+                      disabled={currentStock <= 0 || isPreOrderClosed}
+                      className="w-full py-3 px-4 bg-brand-orange hover:bg-brand-orange/90 text-ink font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 dark:disabled:border-zinc-700"
+                    >
+                      <Plus className="w-4 h-4" /> {currentStock <= 0 ? "Stok Habis" : "+ Keranjang"}
+                    </button>
+                    <button
+                      onClick={() => handleAddToCart(true)}
+                      disabled={currentStock <= 0 || isPreOrderClosed}
+                      className="w-full py-3 px-4 bg-card hover:bg-secondary text-foreground font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[3px_3px_0px_0px_rgba(27,27,27,1)] hover:shadow-none hover:translate-x-[1px] hover:translate-y-[1px] transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 dark:disabled:border-zinc-700"
+                    >
+                      {currentStock <= 0 ? "Stok Habis" : (isPreOrder ? "Pesan Sekarang" : "Beli Langsung")}
+                    </button>
+                  </div>
+                )}
 
                 {/* Share Link */}
                 <button
@@ -1805,25 +1834,44 @@ function ProductDetailPage() {
           </div>
         </div>
       )}
-      {/* Sticky Bottom Dock for Mobile - Offline In-Store Focus */}
+      {/* Sticky Bottom Dock for Mobile */}
       <div className="fixed bottom-0 left-0 right-0 z-40 bg-card border-t-2 border-border p-3 md:hidden shadow-[0_-4px_15px_rgba(0,0,0,0.2)]">
-        <div className="grid grid-cols-2 gap-2.5">
-          <button
-            type="button"
-            onClick={() => setIsStoreModalOpen(true)}
-            className="py-3 px-3 bg-brand-orange hover:bg-brand-orange/90 text-cream font-black text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center"
-          >
-            <MapPin className="w-4 h-4" /> Beli di Store
-          </button>
-          <a
-            href={`https://wa.me/6282235526105?text=${encodeURIComponent(`Halo Admin FILKOM Merch, saya ingin menanyakan ketersediaan stok ${product.name} (Ukuran: ${selectedSize || "One Size"}) untuk promo Year-End Sale di store.`)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="py-3 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center"
-          >
-            <MessageCircle className="w-4 h-4" /> Tanya WA
-          </a>
-        </div>
+        {isInStoreOnly ? (
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => setIsStoreModalOpen(true)}
+              className="py-3 px-3 bg-brand-orange hover:bg-brand-orange/90 text-cream font-black text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center"
+            >
+              <MapPin className="w-4 h-4" /> Beli di Store
+            </button>
+            <a
+              href={`https://wa.me/6282235526105?text=${encodeURIComponent(`Halo Admin FILKOM Merch, saya ingin menanyakan ketersediaan stok ${product.name} (Ukuran: ${selectedSize || "One Size"}) untuk promo Year-End Sale di store.`)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="py-3 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer text-center"
+            >
+              <MessageCircle className="w-4 h-4" /> Tanya WA
+            </a>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2.5">
+            <button
+              onClick={() => handleAddToCart(false)}
+              disabled={currentStock <= 0 || isPreOrderClosed}
+              className="py-3 px-3 bg-brand-orange hover:bg-brand-orange/90 text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 flex items-center justify-center gap-2 cursor-pointer text-center"
+            >
+              <ShoppingBag className="w-4 h-4" /> {isPreOrderClosed ? "Ditutup" : (currentStock <= 0 ? "Habis" : "Masuk Bag")}
+            </button>
+            <button
+              onClick={() => handleAddToCart(true)}
+              disabled={currentStock <= 0 || isPreOrderClosed}
+              className="py-3 px-3 bg-ink text-white font-extrabold text-xs tracking-wider uppercase rounded-xl border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,0.4)] active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:bg-muted dark:disabled:bg-zinc-800 dark:disabled:text-zinc-400 flex items-center justify-center gap-2 cursor-pointer text-center"
+            >
+              <Zap className="w-4 h-4" /> {isPreOrderClosed ? "Ditutup" : (currentStock <= 0 ? "Habis" : (isPreOrder ? "Pesan Sekarang" : "Beli Sekarang"))}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Store Location & Information Modal */}

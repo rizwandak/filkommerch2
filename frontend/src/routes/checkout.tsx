@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { useQuery } from "@tanstack/react-query";
 import { createOrderAndPayment, getStoreSettings, validateVoucherServerAction, getActivePreOrderCampaignServerAction } from "@backend/server-actions";
 import { isPreOrderOpen } from "@/lib/pre-order-utils";
+import { isInStoreOnlyMode } from "@/lib/store-mode";
 import { Button } from "@frontend/components/ui/button";
 import { resolveImageUrl } from "@/lib/image-resolver";
 import { Input } from "@frontend/components/ui/input";
@@ -170,13 +171,16 @@ function CheckoutPage() {
   }, [user]);
 
   const [storeSettings, setStoreSettings] = useState<any>(null);
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
-    void getStoreSettings().then((res) => {
-      if (res?.settings) {
-        setStoreSettings(res.settings);
-      }
-    });
+    void getStoreSettings()
+      .then((res) => {
+        if (res?.settings) {
+          setStoreSettings(res.settings);
+        }
+      })
+      .finally(() => setSettingsLoaded(true));
   }, []);
 
   // Check auth and load cart
@@ -447,8 +451,16 @@ function CheckoutPage() {
     }
   };
 
-  // During Year-End Sale (16-30 Nov 2026), online checkout is disabled: purchases are strictly in-store.
-  if (!isProcessing) {
+  if (!settingsLoaded && !isProcessing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-ink" />
+      </div>
+    );
+  }
+
+  // During Year-End Sale (In-Store Only mode active), online checkout is disabled.
+  if (isInStoreOnlyMode(storeSettings) && !isProcessing) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="max-w-xl w-full bg-card border-4 border-ink rounded-3xl p-6 sm:p-8 shadow-[8px_8px_0px_0px_rgba(27,27,27,1)] space-y-6 text-center">
@@ -491,6 +503,31 @@ function CheckoutPage() {
             >
               <ShoppingBag className="w-4 h-4" /> Cek Katalog Promo
             </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (cartItems.length === 0 && !isProcessing) {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Header */}
+        <div className="border-b border-border bg-card">
+          <div className="mx-auto max-w-6xl px-4 py-8">
+            <h1 className="text-3xl font-bold text-foreground">Checkout</h1>
+          </div>
+        </div>
+
+        {/* Empty Cart */}
+        <div className="flex min-h-[400px] items-center justify-center">
+          <div className="text-center">
+            <ShoppingBag className="mx-auto mb-4 h-16 w-16 text-muted-foreground" />
+            <h2 className="mb-2 text-xl font-semibold text-foreground">Your cart is empty</h2>
+            <p className="mb-6 text-muted-foreground">Add some items to get started</p>
+            <Button asChild>
+              <a href="/">Continue Shopping</a>
+            </Button>
           </div>
         </div>
       </div>

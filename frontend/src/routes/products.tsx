@@ -28,9 +28,10 @@ import {
   MessageCircle,
   Eye,
 } from "lucide-react";
-import { getProducts, getCategories, getActivePreOrderCampaignServerAction, type ProductWithVariants } from "@backend/server-actions";
+import { getProducts, getCategories, getStoreSettings, getActivePreOrderCampaignServerAction, type ProductWithVariants } from "@backend/server-actions";
 import { useQuery } from "@tanstack/react-query";
 import { isProductVisibleToUser, isPreOrderOpen } from "@/lib/pre-order-utils";
+import { isInStoreOnlyMode } from "@/lib/store-mode";
 import { PreOrderNotOpenPlaceholder } from "@/components/PreOrderNotOpenPlaceholder";
 import { useAuth } from "@/lib/auth";
 import { VerificationModal } from "@frontend/components/VerificationModal";
@@ -107,6 +108,13 @@ function ProductsCatalogPage() {
     queryFn: () => getActivePreOrderCampaignServerAction(),
     staleTime: 30 * 1000,
   });
+  const { data: settingsData } = useQuery({
+    queryKey: ["storeSettings"],
+    queryFn: () => getStoreSettings(),
+    staleTime: 30 * 1000,
+  });
+  const isInStoreOnly = isInStoreOnlyMode(settingsData?.settings);
+
   const activePoCampaign = activePoRes?.data || null;
   const isPoOpen = useMemo(() => isPreOrderOpen(activePoCampaign), [activePoCampaign]);
   const canSeeProducts = useMemo(
@@ -277,6 +285,7 @@ function ProductsCatalogPage() {
       <Navbar searchQuery={searchTerm} onSearchQueryChange={setSearchTerm} />
 
       {/* YEAR-END SALE HERO BANNER ON PRODUCTS PAGE */}
+      {isInStoreOnly && (
       <div className="bg-gradient-to-r from-red-600 via-orange-500 to-amber-500 text-white border-b-2 border-ink py-8 sm:py-12 px-4 shadow-sm">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
           <div className="space-y-2 text-center md:text-left">
@@ -308,6 +317,7 @@ function ProductsCatalogPage() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Main Catalog Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
@@ -629,13 +639,23 @@ function ProductsCatalogPage() {
                             )}
                           </div>
 
-                          <Link
-                            to="/product/$slug"
-                            params={{ slug: p.slug }}
-                            className="bg-brand-orange hover:bg-ink text-cream hover:text-cream px-3 py-1.5 rounded-lg transition border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none flex items-center gap-1.5 text-xs font-black uppercase tracking-wider"
-                          >
-                            <Eye className="w-3.5 h-3.5" /> Detail
-                          </Link>
+                          {isInStoreOnly ? (
+                            <Link
+                              to="/product/$slug"
+                              params={{ slug: p.slug }}
+                              className="bg-brand-orange hover:bg-ink text-cream hover:text-cream px-3 py-1.5 rounded-lg transition border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none flex items-center gap-1.5 text-xs font-black uppercase tracking-wider"
+                            >
+                              <Eye className="w-3.5 h-3.5" /> Detail
+                            </Link>
+                          ) : (
+                            <Link
+                              to="/product/$slug"
+                              params={{ slug: p.slug }}
+                              className="bg-brand-orange hover:bg-ink text-cream hover:text-cream p-2 rounded-lg transition border-2 border-ink shadow-[2px_2px_0px_0px_rgba(27,27,27,1)] hover:shadow-none"
+                            >
+                              <ShoppingBag className="w-4 h-4" />
+                            </Link>
+                          )}
                         </div>
                       </div>
                     </article>

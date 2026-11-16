@@ -1,6 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
+import { Flame, ShoppingBag, Store } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@frontend/components/ui/card";
@@ -17,6 +19,7 @@ import {
 import { getStoreSettings, updateStoreSettings, type StoreSettings } from "@backend/server-actions";
 import { uploadImageHelper } from "@/lib/upload-helper";
 import { resolveImageUrl } from "@/lib/image-resolver";
+import { isInStoreOnlyMode, setInStoreOnlyInLayout } from "@/lib/store-mode";
 
 export const Route = createFileRoute("/admin/settings")({
   component: AdminSettingsPage,
@@ -24,6 +27,7 @@ export const Route = createFileRoute("/admin/settings")({
 });
 
 function AdminSettingsPage() {
+  const queryClient = useQueryClient();
   const { user, loading: authLoading } = useAuth();
   const isCashier = user?.type === "admin" && user.role === "cashier";
   const [settings, setSettings] = useState<StoreSettings | null>(null);
@@ -93,6 +97,7 @@ function AdminSettingsPage() {
     });
     setSaving(false);
     if (result.success) {
+      void queryClient.invalidateQueries({ queryKey: ["storeSettings"] });
       toast.success("Pengaturan toko disimpan");
     } else {
       toast.error(result.error || "Gagal menyimpan");
@@ -102,6 +107,19 @@ function AdminSettingsPage() {
   if (loading || !settings) {
     return <div className="p-8 text-muted-foreground">Memuat pengaturan...</div>;
   }
+
+  const inStoreOnly = isInStoreOnlyMode(settings);
+
+  const handleToggleInStoreOnly = (nextVal: boolean) => {
+    setSettings((prev) =>
+      prev
+        ? {
+            ...prev,
+            homepage_layout: setInStoreOnlyInLayout(prev.homepage_layout, nextVal),
+          }
+        : null,
+    );
+  };
 
   return (
     <div className="p-6 lg:p-8 space-y-6 max-w-2xl bg-background min-h-screen">
@@ -117,6 +135,65 @@ function AdminSettingsPage() {
           ⚠ READ-ONLY MODE: Kasir tidak diizinkan mengubah pengaturan toko.
         </div>
       )}
+
+      {/* Toggle Mode Year-End Sale (In-Store Only) vs Mode Online Normal */}
+      <Card className={`border-2 ${inStoreOnly ? "border-brand-orange bg-orange-50/40 dark:bg-orange-950/20" : "border-emerald-500 bg-emerald-50/30 dark:bg-emerald-950/20"}`}>
+        <CardHeader className="pb-3">
+          <CardTitle className="display text-sm tracking-wider text-ink flex items-center gap-2">
+            {inStoreOnly ? (
+              <>
+                <Flame className="w-4 h-4 text-brand-orange" /> Mode Promo Year-End Sale (In-Store Only)
+              </>
+            ) : (
+              <>
+                <ShoppingBag className="w-4 h-4 text-emerald-600" /> Mode Pembelian Online Normal
+              </>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="space-y-1 text-xs">
+              <p className="font-bold text-ink">
+                Status Saat Ini:{" "}
+                <span className={inStoreOnly ? "text-brand-orange" : "text-emerald-600"}>
+                  {inStoreOnly
+                    ? "AKTIF — Pembelian Online Ditutup (Hanya Kasir POS & Store Offline)"
+                    : "NONAKTIF — Pembelian Online & Checkout Dibuka Normal"}
+                </span>
+              </p>
+              <p className="text-muted-foreground leading-relaxed">
+                {inStoreOnly
+                  ? "Banner, pop-up, marquee Year-End Sale, dan section Lokasi Store ditampilkan di beranda. Tombol keranjang & checkout online dinonaktifkan."
+                  : "Seluruh banner/pop-up Year-End Sale disembunyikan dan tampilan kembali normal. Pengunjung dapat menambahkan barang ke keranjang dan checkout online."}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button
+                type="button"
+                disabled={isCashier}
+                variant={inStoreOnly ? "default" : "outline"}
+                onClick={() => handleToggleInStoreOnly(true)}
+                className={`text-xs font-bold cursor-pointer ${inStoreOnly ? "bg-brand-orange text-cream hover:bg-brand-orange/90" : ""}`}
+              >
+                <Store className="w-3.5 h-3.5 mr-1.5" /> Mode In-Store
+              </Button>
+              <Button
+                type="button"
+                disabled={isCashier}
+                variant={!inStoreOnly ? "default" : "outline"}
+                onClick={() => handleToggleInStoreOnly(false)}
+                className={`text-xs font-bold cursor-pointer ${!inStoreOnly ? "bg-emerald-600 text-white hover:bg-emerald-700" : ""}`}
+              >
+                <ShoppingBag className="w-3.5 h-3.5 mr-1.5" /> Mode Online Normal
+              </Button>
+            </div>
+          </div>
+          <p className="text-[11px] text-amber-800 dark:text-amber-300 font-medium">
+            *Jangan lupa klik tombol <strong>Simpan Pengaturan</strong> di bawah setelah mengubah mode agar tersimpan ke server.
+          </p>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

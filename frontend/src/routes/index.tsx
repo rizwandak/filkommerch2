@@ -43,6 +43,7 @@ import { getProducts, getStoreSettings, getCategories, getActivePreOrderCampaign
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { isProductVisibleToUser, isPreOrderOpen } from "@/lib/pre-order-utils";
+import { isInStoreOnlyMode } from "@/lib/store-mode";
 import { PreOrderNotOpenPlaceholder } from "@/components/PreOrderNotOpenPlaceholder";
 import { AnnouncementModal } from "@/components/AnnouncementModal";
 import {
@@ -636,6 +637,7 @@ function Index() {
   });
 
   const settings = settingsData?.settings ?? initialSettings;
+  const isInStoreOnly = isInStoreOnlyMode(settings);
 
   // Merge database layout configuration with default segments list
   const segments = useMemo((): HomepageSegment[] => {
@@ -908,6 +910,7 @@ function Index() {
       <div id="top" />
 
       {/* ===== YEAR-END SALE 2026 HERO SPOTLIGHT BANNER ===== */}
+      {isInStoreOnly && (
       <section className="relative bg-gradient-to-br from-red-700 via-orange-600 to-amber-500 text-white border-b-2 border-ink overflow-hidden">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-10 py-10 sm:py-14 relative z-10">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
@@ -953,10 +956,11 @@ function Index() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Modular Builder segments renderer */}
       {segments
-        .filter((seg) => seg.enabled)
+        .filter((seg) => seg.enabled && seg.id !== "seg-in-store-only")
         .map((seg) => (
           <ScrollFadeSegment key={seg.id}>
             {(seg.elements || []).map((el) => {
@@ -1225,27 +1229,55 @@ function Index() {
                                         </div>
                                       </div>
 
-                                      {/* Dual Action Buttons - Detail Promo & Lokasi Store */}
-                                      <div className="pt-1 flex gap-1.5 w-full">
-                                        <Link
-                                          to="/product/$slug"
-                                          params={{ slug: p.id }}
-                                          title="Detail Promo"
-                                          className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center gap-1 text-xs font-black uppercase tracking-wider"
-                                        >
-                                          <Eye className="w-3.5 h-3.5" /> Detail Promo
-                                        </Link>
+                                      {/* Dual Action Buttons - Detail Promo & Lokasi Store vs Normal Cart */}
+                                      {isInStoreOnly ? (
+                                        <div className="pt-1 flex gap-1.5 w-full">
+                                          <Link
+                                            to="/product/$slug"
+                                            params={{ slug: p.id }}
+                                            title="Detail Promo"
+                                            className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center gap-1 text-xs font-black uppercase tracking-wider"
+                                          >
+                                            <Eye className="w-3.5 h-3.5" /> Detail Promo
+                                          </Link>
 
-                                        <button
-                                          onClick={() => {
-                                            scrollToId("store-location");
-                                          }}
-                                          title="Cek Lokasi Store"
-                                          className="h-8 px-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-brand-orange border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center gap-1 text-xs font-bold"
-                                        >
-                                          <MapPin className="w-3.5 h-3.5" /> Toko
-                                        </button>
-                                      </div>
+                                          <button
+                                            onClick={() => {
+                                              scrollToId("store-location");
+                                            }}
+                                            title="Cek Lokasi Store"
+                                            className="h-8 px-2.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-brand-orange border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center gap-1 text-xs font-bold"
+                                          >
+                                            <MapPin className="w-3.5 h-3.5" /> Toko
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="pt-1 flex gap-1.5 w-full">
+                                          <button
+                                            onClick={() => {
+                                              if ((p as any).rawProduct) {
+                                                addToCart((p as any).rawProduct);
+                                              } else {
+                                                addToCart(p);
+                                              }
+                                            }}
+                                            disabled={(p.sale_type === "preorder" || p.sale_type === "pre_order") && !isPoOpen}
+                                            title="Masuk Bag"
+                                            className="flex-1 h-8 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-brand-orange border border-neutral-600 shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none"
+                                          >
+                                            <ShoppingBag className="w-4 h-4" />
+                                          </button>
+
+                                          <Link
+                                            to="/product/$slug"
+                                            params={{ slug: p.id }}
+                                            title="Pesan Sekarang"
+                                            className="flex-1 h-8 rounded-lg bg-brand-orange hover:bg-cream text-ink border border-ink shadow-[1px_1px_0px_0px_rgba(255,255,255,0.7)] transition-all cursor-pointer flex items-center justify-center"
+                                          >
+                                            <ArrowRight className="w-4 h-4" />
+                                          </Link>
+                                        </div>
+                                      )}
                                     </div>
                                   </div>
                                 );
@@ -2039,14 +2071,24 @@ function Index() {
                                             )}
                                           </div>
 
-                                          <Link
-                                            to="/product/$slug"
-                                            params={{ slug: p.id }}
-                                            className="px-2 py-1 rounded bg-brand-orange text-cream hover:bg-ink transition-colors border border-ink cursor-pointer shadow-xs text-[10px] font-black uppercase flex items-center gap-1"
-                                            title="Cek Detail Promo"
-                                          >
-                                            <Eye className="w-3 h-3" /> Detail
-                                          </Link>
+                                          {isInStoreOnly ? (
+                                            <Link
+                                              to="/product/$slug"
+                                              params={{ slug: p.id }}
+                                              className="px-2 py-1 rounded bg-brand-orange text-cream hover:bg-ink transition-colors border border-ink cursor-pointer shadow-xs text-[10px] font-black uppercase flex items-center gap-1"
+                                              title="Cek Detail Promo"
+                                            >
+                                              <Eye className="w-3 h-3" /> Detail
+                                            </Link>
+                                          ) : (
+                                            <button
+                                              onClick={() => addToCart(p)}
+                                              className="p-1.5 rounded bg-ink text-cream hover:bg-brand-orange transition-colors border border-ink cursor-pointer shadow-xs"
+                                              title="Tambah ke bag"
+                                            >
+                                              <ShoppingBag className="w-3 h-3" />
+                                            </button>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
@@ -2181,6 +2223,7 @@ function Index() {
 
 
       {/* ===== YEAR-END SALE STORE LOCATION & OFFLINE SHOPPING GUIDE ===== */}
+      {isInStoreOnly && (
       <section id="store-location" className="bg-neutral-950 text-white py-16 sm:py-24 border-b-2 border-ink scroll-mt-24">
         <div className="max-w-[1400px] mx-auto px-5 lg:px-10">
           <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16 space-y-3">
@@ -2270,6 +2313,7 @@ function Index() {
           </div>
         </div>
       </section>
+      )}
 
       {/* 10. Footer */}
       <Footer />
@@ -2336,41 +2380,79 @@ function Index() {
                 {getProductAvailableSizes(quickViewProduct).length > 0 && (
                   <div className="space-y-2 mb-6 animate-scale-in">
                     <span className="text-xs font-bold text-ink tracking-wider uppercase block">
-                      UKURAN TERSEDIA DI STORE:
+                      {isInStoreOnly ? "UKURAN TERSEDIA DI STORE:" : "PILIH UKURAN:"}
                     </span>
                     <div className="flex flex-wrap gap-2">
-                      {getProductAvailableSizes(quickViewProduct).map((size) => (
-                        <span
-                          key={size}
-                          className="border-2 border-ink font-bold text-xs py-2 px-4 bg-cream/40 uppercase"
-                        >
-                          Size {size}
-                        </span>
-                      ))}
+                      {getProductAvailableSizes(quickViewProduct).map((size) =>
+                        isInStoreOnly ? (
+                          <span
+                            key={size}
+                            className="border-2 border-ink font-bold text-xs py-2 px-4 bg-cream/40 uppercase"
+                          >
+                            Size {size}
+                          </span>
+                        ) : (
+                          <button
+                            key={size}
+                            onClick={() => {
+                              addToCart(quickViewProduct, size);
+                              setQuickViewProduct(null);
+                            }}
+                            className="border-2 border-ink font-bold text-xs py-2 px-4 hover:bg-brand-orange hover:text-cream cursor-pointer uppercase transition-all duration-200"
+                          >
+                            Size {size}
+                          </button>
+                        ),
+                      )}
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="pt-4 border-t border-ink/10 flex flex-col sm:flex-row gap-3">
-                <Link
-                  to="/product/$slug"
-                  params={{ slug: quickViewProduct.id }}
-                  onClick={() => setQuickViewProduct(null)}
-                  className="flex-1 bg-brand-orange text-cream font-bold tracking-widest text-xs py-4 text-center hover:bg-ink hover:text-cream transition-all duration-200 uppercase cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Eye className="w-4 h-4" /> LIHAT DETAIL &amp; STOK STORE
-                </Link>
-                <button
-                  onClick={() => {
-                    setQuickViewProduct(null);
-                    scrollToId("store-location");
-                  }}
-                  className="border-2 border-ink font-bold text-xs px-4 py-4 flex items-center justify-center gap-1.5 hover:bg-ink hover:text-cream transition-all duration-200 cursor-pointer uppercase"
-                >
-                  <MapPin className="w-4 h-4 text-brand-orange" /> LOKASI STORE
-                </button>
-              </div>
+              {isInStoreOnly ? (
+                <div className="pt-4 border-t border-ink/10 flex flex-col sm:flex-row gap-3">
+                  <Link
+                    to="/product/$slug"
+                    params={{ slug: quickViewProduct.id }}
+                    onClick={() => setQuickViewProduct(null)}
+                    className="flex-1 bg-brand-orange text-cream font-bold tracking-widest text-xs py-4 text-center hover:bg-ink hover:text-cream transition-all duration-200 uppercase cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <Eye className="w-4 h-4" /> LIHAT DETAIL &amp; STOK STORE
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setQuickViewProduct(null);
+                      scrollToId("store-location");
+                    }}
+                    className="border-2 border-ink font-bold text-xs px-4 py-4 flex items-center justify-center gap-1.5 hover:bg-ink hover:text-cream transition-all duration-200 cursor-pointer uppercase"
+                  >
+                    <MapPin className="w-4 h-4 text-brand-orange" /> LOKASI STORE
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-4 border-t border-ink/10 flex flex-col sm:flex-row gap-3">
+                  <button
+                    onClick={() => {
+                      addToCart(quickViewProduct);
+                      setQuickViewProduct(null);
+                    }}
+                    className="flex-1 bg-ink text-cream font-bold tracking-widest text-xs py-4 text-center hover:bg-brand-orange hover:text-cream transition-all duration-200 uppercase cursor-pointer"
+                  >
+                    ADD TO BAG
+                  </button>
+                  <button
+                    onClick={() => {
+                      toggleWishlist(quickViewProduct.id);
+                    }}
+                    className="border-2 border-ink font-bold text-xs p-4 flex items-center justify-center hover:bg-ink hover:text-cream transition-all duration-200 cursor-pointer"
+                    aria-label="Wishlist toggle"
+                  >
+                    <Heart
+                      className={`w-4 h-4 ${wishlist.includes(quickViewProduct.id) ? "fill-red-500 text-red-500" : ""}`}
+                    />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2378,9 +2460,15 @@ function Index() {
 
       {/* Homepage Announcement Modal */}
       <AnnouncementModal
-        enabled={true}
-        activeTemplate="year_end_sale"
-        version="year_end_sale_2026"
+        enabled={isInStoreOnly ? true : (popupSegment ? popupSegment.enabled : true)}
+        activeTemplate={
+          isInStoreOnly
+            ? "year_end_sale"
+            : (popupElement?.config?.activeTemplate === "year_end_sale"
+                ? "filkom_verification"
+                : popupElement?.config?.activeTemplate || "filkom_verification")
+        }
+        version={isInStoreOnly ? "year_end_sale_2026" : (popupElement?.config?.version || "v1")}
         delayMs={popupElement?.config?.delayMs ?? 600}
       />
     </div>
