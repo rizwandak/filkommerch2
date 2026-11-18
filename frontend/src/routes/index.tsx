@@ -958,6 +958,82 @@ function Index() {
       </section>
       )}
 
+      {/* ===== TOP HIGHLIGHT: INSTAGRAM YEAR-END SALE POSTER, REELS & RUTE TOKO ===== */}
+      {isInStoreOnly && (
+        <section className="bg-neutral-950 text-white py-10 sm:py-14 border-b-2 border-ink">
+          <div className="max-w-[1400px] mx-auto px-4 sm:px-8 lg:px-10">
+            <div className="text-center max-w-2xl mx-auto mb-8 space-y-2">
+              <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-black tracking-widest text-brand-orange uppercase">
+                <Instagram className="w-3.5 h-3.5" /> @MERCHFILKOMUB HIGHLIGHT
+              </div>
+              <h3 className="display text-2xl sm:text-4xl font-extrabold uppercase text-white tracking-tight">
+                POSTER PROMO, REELS &amp; PANDUAN RUTE KE TOKO
+              </h3>
+              <p className="text-xs sm:text-sm text-neutral-400 font-medium">
+                Intip poster resmi, keseruan promo cuci gudang, serta video panduan rute jalan menuju Store Resmi FILKOM Merch.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {[
+                {
+                  badge: "🏷️ POSTER YEAR-END SALE",
+                  title: "Poster Cuci Gudang 2026",
+                  embedUrl: "https://www.instagram.com/p/Df2Iqb-vgNs/embed/",
+                  linkUrl: "https://www.instagram.com/p/Df2Iqb-vgNs/",
+                },
+                {
+                  badge: "🎬 REELS PROMO",
+                  title: "Reels Year-End Sale",
+                  embedUrl: "https://www.instagram.com/reel/DfyP6JLuVC4/embed/",
+                  linkUrl: "https://www.instagram.com/reel/DfyP6JLuVC4/",
+                },
+                {
+                  badge: "📍 RUTE KE TOKO",
+                  title: "Arah Rute ke Store FILKOM",
+                  embedUrl: "https://www.instagram.com/reel/DXDe49byM3W/embed/",
+                  linkUrl: "https://www.instagram.com/reel/DXDe49byM3W/",
+                },
+              ].map((item) => (
+                <div
+                  key={item.embedUrl}
+                  className="bg-neutral-900 border-2 border-neutral-700 rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(255,107,0,1)] flex flex-col"
+                >
+                  <div className="px-4 py-3 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-black text-brand-orange uppercase tracking-wider block">
+                        {item.badge}
+                      </span>
+                      <h4 className="text-xs font-extrabold text-white uppercase tracking-wide">
+                        {item.title}
+                      </h4>
+                    </div>
+                    <a
+                      href={item.linkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] font-bold text-neutral-300 hover:text-brand-orange flex items-center gap-1 shrink-0"
+                    >
+                      IG <ArrowRight className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <div className="bg-white w-full aspect-[4/5] relative">
+                    <iframe
+                      src={item.embedUrl}
+                      title={item.title}
+                      className="w-full h-full border-0"
+                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                      allowFullScreen
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* Modular Builder segments renderer */}
       {segments
         .filter((seg) => seg.enabled && seg.id !== "seg-in-store-only")
@@ -2309,78 +2385,6 @@ function Index() {
               >
                 Chat Admin Aliya (Tanya Stok) <ArrowRight className="w-3.5 h-3.5" />
               </a>
-            </div>
-          </div>
-
-          {/* Instagram Year-End Sale Poster, Reels & Store Route Showcase */}
-          <div className="mt-14 sm:mt-16 pt-12 border-t border-neutral-800">
-            <div className="text-center max-w-2xl mx-auto mb-8 space-y-2">
-              <div className="inline-flex items-center gap-1.5 text-[10px] sm:text-xs font-black tracking-widest text-brand-orange uppercase">
-                <Instagram className="w-3.5 h-3.5" /> @MERCHFILKOMUB SHOWCASE
-              </div>
-              <h3 className="display text-2xl sm:text-3xl font-extrabold uppercase text-white tracking-tight">
-                POSTER PROMO, REELS &amp; PANDUAN RUTE KE TOKO
-              </h3>
-              <p className="text-xs text-neutral-400 font-medium">
-                Intip poster resmi, keseruan promo cuci gudang, serta video panduan rute jalan menuju Store Resmi FILKOM Merch.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-              {[
-                {
-                  badge: "🏷️ POSTER YEAR-END SALE",
-                  title: "Poster Cuci Gudang 2026",
-                  embedUrl: "https://www.instagram.com/p/Df2Iqb-vgNs/embed/",
-                  linkUrl: "https://www.instagram.com/p/Df2Iqb-vgNs/",
-                },
-                {
-                  badge: "🎬 REELS PROMO",
-                  title: "Reels Year-End Sale",
-                  embedUrl: "https://www.instagram.com/reel/DfyP6JLuVC4/embed/",
-                  linkUrl: "https://www.instagram.com/reel/DfyP6JLuVC4/",
-                },
-                {
-                  badge: "📍 RUTE KE TOKO",
-                  title: "Arah Rute ke Store FILKOM",
-                  embedUrl: "https://www.instagram.com/reel/DXDe49byM3W/embed/",
-                  linkUrl: "https://www.instagram.com/reel/DXDe49byM3W/",
-                },
-              ].map((item) => (
-                <div
-                  key={item.embedUrl}
-                  className="bg-neutral-900 border-2 border-neutral-700 rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(255,107,0,1)] flex flex-col"
-                >
-                  <div className="px-4 py-3 bg-neutral-950 border-b border-neutral-800 flex items-center justify-between gap-2">
-                    <div>
-                      <span className="text-[10px] font-black text-brand-orange uppercase tracking-wider block">
-                        {item.badge}
-                      </span>
-                      <h4 className="text-xs font-extrabold text-white uppercase tracking-wide">
-                        {item.title}
-                      </h4>
-                    </div>
-                    <a
-                      href={item.linkUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] font-bold text-neutral-300 hover:text-brand-orange flex items-center gap-1 shrink-0"
-                    >
-                      IG <ArrowRight className="w-3 h-3" />
-                    </a>
-                  </div>
-                  <div className="bg-white w-full aspect-[4/5] relative">
-                    <iframe
-                      src={item.embedUrl}
-                      title={item.title}
-                      className="w-full h-full border-0"
-                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                      allowFullScreen
-                      loading="lazy"
-                    />
-                  </div>
-                </div>
-              ))}
             </div>
           </div>
         </div>
