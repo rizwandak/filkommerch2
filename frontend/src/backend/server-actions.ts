@@ -104,6 +104,7 @@ const serverFetch = async (url: string, init?: RequestInit) => {
   }
   return fetch(finalUrl, {
     ...init,
+    signal: init?.signal ?? AbortSignal.timeout(8000),
     cache: "no-store",
     headers: {
       ...authHeaders,
