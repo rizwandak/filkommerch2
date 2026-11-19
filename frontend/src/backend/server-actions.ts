@@ -102,15 +102,21 @@ const serverFetch = async (url: string, init?: RequestInit) => {
     const path = url.replace(/^http:\/\/(127\.0\.0\.1|localhost):8080/, "");
     finalUrl = baseUrl ? `${baseUrl}${path}` : path;
   }
-  return fetch(finalUrl, {
-    ...init,
-    signal: init?.signal ?? AbortSignal.timeout(8000),
-    cache: "no-store",
-    headers: {
-      ...authHeaders,
-      ...init?.headers,
-    },
-  });
+  const controller = !init?.signal ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 8000) : null;
+  try {
+    return await fetch(finalUrl, {
+      ...init,
+      signal: init?.signal ?? controller?.signal,
+      cache: "no-store",
+      headers: {
+        ...authHeaders,
+        ...init?.headers,
+      },
+    });
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
 };
 
 const executeApiCall = async (endpoint: string, method: string = "POST", bodyData?: any) => {
