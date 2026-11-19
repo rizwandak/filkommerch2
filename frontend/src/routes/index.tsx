@@ -954,6 +954,80 @@ function Index() {
               </div>
             </div>
           </div>
+
+          {/* Poster, Reels Promo & Rute Toko tergabung langsung di section Year-End Sale */}
+          <div className="mt-10 pt-8 border-t border-white/25">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-5">
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-1 bg-ink text-amber-300 text-[10px] font-black rounded-full uppercase tracking-wider border border-ink flex items-center gap-1.5">
+                  <Instagram className="w-3.5 h-3.5 text-amber-400" /> @MERCHFILKOMUB
+                </span>
+                <h3 className="display text-lg sm:text-2xl font-black uppercase tracking-tight text-white drop-shadow-xs">
+                  POSTER PROMO, REELS &amp; ARAH RUTE KE TOKO
+                </h3>
+              </div>
+              <span className="text-[11px] text-orange-100 font-semibold">
+                Klik play untuk menonton langsung di halaman ini
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {[
+                {
+                  badge: "🏷️ POSTER YEAR-END SALE",
+                  title: "Poster Cuci Gudang 2026",
+                  embedUrl: "https://www.instagram.com/p/Df2Iqb-vgNs/embed/",
+                  linkUrl: "https://www.instagram.com/p/Df2Iqb-vgNs/",
+                },
+                {
+                  badge: "🎬 REELS PROMO",
+                  title: "Reels Year-End Sale",
+                  embedUrl: "https://www.instagram.com/reel/DfyP6JLuVC4/embed/",
+                  linkUrl: "https://www.instagram.com/reel/DfyP6JLuVC4/",
+                },
+                {
+                  badge: "📍 RUTE KE TOKO",
+                  title: "Arah Rute ke Store FILKOM",
+                  embedUrl: "https://www.instagram.com/reel/DXDe49byM3W/embed/",
+                  linkUrl: "https://www.instagram.com/reel/DXDe49byM3W/",
+                },
+              ].map((item) => (
+                <div
+                  key={item.embedUrl}
+                  className="bg-ink text-white border-2 border-ink rounded-2xl overflow-hidden shadow-[4px_4px_0px_0px_rgba(27,27,27,1)] flex flex-col"
+                >
+                  <div className="px-3.5 py-2.5 bg-ink border-b border-white/15 flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-[9px] font-black text-amber-400 uppercase tracking-wider block">
+                        {item.badge}
+                      </span>
+                      <h4 className="text-xs font-extrabold text-white uppercase tracking-wide">
+                        {item.title}
+                      </h4>
+                    </div>
+                    <a
+                      href={item.linkUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-[10px] font-bold text-amber-300 hover:text-white flex items-center gap-1 shrink-0"
+                    >
+                      Buka IG <ArrowRight className="w-3 h-3" />
+                    </a>
+                  </div>
+                  <div className="bg-white w-full aspect-[4/5] relative">
+                    <iframe
+                      src={item.embedUrl}
+                      title={item.title}
+                      className="w-full h-full border-0"
+                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                      allowFullScreen
+                      loading="lazy"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
       )}
